@@ -4,41 +4,56 @@ import mysql
 from configparser import ConfigParser
 
 
-def read_db_config(filename='I:/Haushaltbuch/config.ini', section='HaushaltDB'):
-    parser = ConfigParser()
-    parser.read(filename)
+class HaushaltDB:
+    def __init__(self, config_file: str = 'I:/Haushaltbuch/config.ini', section: str = 'HaushaltDB'):
+        self.config_file = config_file
+        self.section = section
+        self.db_config = self.read_db_config()
+        self.conn = mysql.connector.connect(**self.db_config)
 
-    db = {}
-    if parser.has_section(section):
-        items = parser.items(section)
-        for item in items:
-            db[item[0]] = item[1]
-    else:
-        raise Exception(f"Section {section} not found in {filename}! Abandon ship!")
-    return db
+    def read_db_config(self):
+        parser = ConfigParser()
+        parser.read(self.config_file)
+
+        db = {}
+        if parser.has_section(self.section):
+            items = parser.items(self.section)
+            for item in items:
+                db[item[0]] = item[1]
+        else:
+            raise Exception(f"Section {self.section} not found in {self.config_file}! Abandon ship!")
+        return db
 
 
-def insert_currency(conn, currency_name: str):
-    """Insert a currency into the database like a pirate plunderin' a Spanish galleon!"""
+class DBConnection:
+    def runQuery(self, query):
+        #
+        return resultSet
 
-    sql_query = "INSERT INTO Currency (title) VALUES (%s)"
 
-    values = (currency_name,)
-    cursor = conn.cursor()
-    try:
-        cursor.execute(sql_query, values)
-        conn.commit()
+    def insert_currency(self, currency_name: str, connector):
+        """Insert a currency into the database like a pirate plunderin' a Spanish galleon!"""
 
-        print(f"Yarrr! The currency {currency_name} be inserted, a deed as glorious as findin' a sunken treasure!")
+        sql_query = "INSERT INTO Currency (title) VALUES (%s)"
 
-    except Exception as e:
-        print(f"Arrr, a foul wind! An error be upon us: {e}")
-        raise e
+        values = (currency_name,)
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute(sql_query, values)
+            self.conn.commit()
+
+            print(f"Yarrr! The currency {currency_name} be inserted, a deed as glorious as findin' a sunken treasure!")
+
+        except Exception as e:
+            print(f"Arrr, a foul wind! An error be upon us: {e}")
+            raise e
 
 
 if __name__ == "__main__":
     db_config = read_db_config()
     conn = mysql.connector.connect(**db_config)
+
+
 
     if conn.is_connected():
         print("Yarrr! Successfully connected to the belly o' the beast!")
