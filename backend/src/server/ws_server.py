@@ -3,6 +3,7 @@
 # from datetime import datetime
 import asyncio
 import websockets
+import socket
 import logging
 
 logging.basicConfig()
@@ -53,7 +54,13 @@ class WS_Handler:
 
 
 async def main():
-    handler = WS_Handler()
-    async with websockets.serve(handler.handler, "192.168.1.233", 8765):
+    ws_handler = WS_Handler()
+    hostname = socket.gethostname()
+    async with websockets.serve(
+        ws_handler.handler, ["localhost", hostname], 8765
+    ) as ws_server:
         print("WS server started.")
+        print(
+            f"Listening on addresses: {' , '.join( [sock.getsockname()[0] for sock in ws_server.sockets])}"
+        )
         await asyncio.Future()  # run forever
