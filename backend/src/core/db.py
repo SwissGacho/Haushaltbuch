@@ -1,6 +1,7 @@
 """ Manage connection to the database
 """
 
+
 import asyncio
 from contextlib import asynccontextmanager
 import aiomysql
@@ -25,13 +26,15 @@ class DB:
         return f"connection: {self._connection}"
 
     async def check(self):
-        cur = await self._connection.cursor(aiomysql.DictCursor)
-        await cur.execute(
+        "Check DB for valid schema"
+        cur = await self._connection.cursor()
+        num_tables = await cur.execute(
             f"""SELECT table_name FROM information_schema.tables 
                 WHERE table_schema = '{self._connection.db}'"""
         )
-        r = await cur.fetchall()
-        print(f"{r=}, {len(r)=}")
+        tables = {t[0] for t in await cur.fetchall()}
+
+        await self._connection.commit()
         await cur.close()
 
 

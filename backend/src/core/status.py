@@ -4,6 +4,8 @@
 STATUS_UNDEF = "undefined"
 STATUS_UNCONFIGURED = "unconfigured"
 STATUS_NO_DB = "noDB"
+STATUS_CHECK_DB = "checkingDBschema"
+STATUS_OLD_DB = "outdatedDBschema"
 
 
 class _Status:

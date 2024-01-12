@@ -11,15 +11,16 @@ from server.ws_server import get_websocket
 async def main():
     app.status = STATUS_UNCONFIGURED
     db_cfg = get_db_config()
-    print(f"{app.status=}, {db_cfg=}")
+    # print(f"{app.status=}, {db_cfg=}")
 
     async with (
         get_db(db_cfg) as db,
-        # get_websocket() as ws,
+        get_websocket() as ws,
     ):
+        print(f"{app.status=}")
         print("App running")
 
-        # await asyncio.Future()
+        await asyncio.Future()
 
 
 if __name__ == "__main__":
