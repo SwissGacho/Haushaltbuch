@@ -2,6 +2,7 @@
 
 # from datetime import datetime
 import asyncio
+from contextlib import asynccontextmanager
 import websockets
 import socket
 import logging
@@ -53,14 +54,24 @@ class WS_Handler:
             print("Connection closed.")
 
 
-async def main():
+@asynccontextmanager
+async def get_websocket():
+    print("get_websocket")
     ws_handler = WS_Handler()
     hostname = socket.gethostname()
-    async with websockets.serve(
+    ws_server = await websockets.serve(
         ws_handler.handler, ["localhost", hostname], 8765
-    ) as ws_server:
+    )
+    if ws_server.is_serving():
         print("WS server started.")
         print(
             f"Listening on addresses: {' , '.join( [sock.getsockname()[0] for sock in ws_server.sockets])}"
         )
-        await asyncio.Future()  # run forever
+    else:
+        print("Failed to start WS server")
+    try:
+        yield ws_server
+        print("after yield")
+    finally:
+        print("Closing WS server")
+        ws_server.close()
