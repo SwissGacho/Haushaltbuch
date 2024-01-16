@@ -5,7 +5,7 @@
 """
 
 import json
-from core.status import app, STATUS_NO_DB
+from core.status import app, Status
 
 LOCAL_CFG_FILE = "configuration.json"
 
@@ -19,5 +19,5 @@ def get_db_config():
         # config["db_cfg"]["url"] = cfg.get("url", None)
         config["db_cfg"] = {c: cfg.get(c) for c in ("host", "user", "password", "db")}
         if config["db_cfg"].get("db") is None:
-            app.status = STATUS_NO_DB
+            app.status = Status.STATUS_NO_DB
     return config["db_cfg"]
