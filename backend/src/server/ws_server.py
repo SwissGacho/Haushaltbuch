@@ -5,9 +5,18 @@ import asyncio
 from contextlib import asynccontextmanager
 import websockets
 import socket
+from secrets import token_hex as token
 import logging
 
-logging.basicConfig()
+# logging.basicConfig()
+
+from core.const import *
+from core.status import app
+
+# from server.session import Session
+from server.ws_token import WSToken
+from messages.message import Message
+from messages.login import HelloMessage
 
 
 class WSProtocol(websockets.WebSocketServerProtocol):
@@ -33,34 +42,65 @@ class WSProtocol(websockets.WebSocketServerProtocol):
         # user = gacho_cookie.get("user", None)
 
 
+class WS_Connection:
+    """Websocket connection created by the client"""
+
+    def __init__(self, websocket) -> None:
+        self._socket = websocket
+        self._session = None
+        self._token = WSToken()
+
+    async def _send(self, payload):
+        await self._socket.send(payload)
+        print(f"sent message: {payload}")
+
+    async def send_message(self, message: Message, status=False):
+        "Send a message to the client"
+        if status:
+            message.add({WS_ATTR_STATUS: app.status})
+        await self._send(message.serialize())
+
+    async def start_connection(self):
+        "say hello"
+        await self.send_message(HelloMessage(token=self._token, status=app.status))
+
+    async def handle_message(self, message: Message):
+        "accept a message from the client and trigger according actions"
+        print(f"handle {message=} {message.message=} {message.token=}")
+        if message.token != self._token:
+            print(f"Received invalid token {message.token}")
+        else:
+            await message.handle_message(self)
+
+
 class WS_Handler:
     def __init__(self):
         pass
 
-    async def send(self, msg, websocket):
-        "Send a merssage to the client"
-        await websocket.send(msg)
-        print(f"sent message: {msg}")
-
     async def handler(self, websocket, path):
         "Handle a ws connection"
-        print(f"Connection started: {websocket=}")
+        print("connection opened")
+        connection = WS_Connection(websocket)
+        print("connection object created")
         try:
-            async for message in websocket:
-                print(f"Client posted: {message=}")
-                # data = json.loads(message)
-                await self.send('"Hello User"', websocket)
+            await connection.start_connection()
+            async for ws_message in websocket:
+                print(f"Client posted: {ws_message=}")
+                message = Message(json_message=ws_message)
+                await connection.handle_message(message=message)
         finally:
             print("Connection closed.")
 
 
 @asynccontextmanager
 async def get_websocket():
-    print("get_websocket")
     ws_handler = WS_Handler()
     hostname = socket.gethostname()
     ws_server = await websockets.serve(
-        ws_handler.handler, ["localhost", hostname], 8765
+        ws_handler.handler,
+        ["localhost", hostname],
+        WEBSOCKET_PORT,
+        # create_protocol=WSProtocol
     )
     if ws_server.is_serving():
         print("WS server started.")
