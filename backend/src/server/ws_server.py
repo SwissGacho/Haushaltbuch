@@ -52,7 +52,7 @@ class WS_Connection:
 
     async def _send(self, payload):
         await self._socket.send(payload)
-        print(f"sent message: {payload}")
+        # print(f"sent message: {payload}")
 
     async def send_message(self, message: Message, status=False):
         "Send a message to the client"
@@ -66,7 +66,7 @@ class WS_Connection:
 
     async def handle_message(self, message: Message):
         "accept a message from the client and trigger according actions"
-        print(f"handle {message=} {message.message=} {message.token=}")
+        # print(f"handle {message=} {message.message=} {message.token=}")
         if message.token != self._token:
             print(f"Received invalid token {message.token}")
         else:
@@ -79,9 +79,8 @@ class WS_Handler:
 
     async def handler(self, websocket, path):
         "Handle a ws connection"
-        print("connection opened")
+        # print("connection opened")
         connection = WS_Connection(websocket)
-        print("connection object created")
         try:
             await connection.start_connection()
             async for ws_message in websocket:
@@ -103,15 +102,13 @@ async def get_websocket():
         # create_protocol=WSProtocol
     )
     if ws_server.is_serving():
-        print("WS server started.")
         print(
-            f"Listening on addresses: {' , '.join( [sock.getsockname()[0] for sock in ws_server.sockets])}"
+            f"Websocket server listening on addresses: {' , '.join( [sock.getsockname()[0] for sock in ws_server.sockets])}"
         )
     else:
         print("Failed to start WS server")
     try:
         yield ws_server
-        print("after yield")
     finally:
         print("Closing WS server")
         ws_server.close()

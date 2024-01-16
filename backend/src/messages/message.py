@@ -25,6 +25,7 @@ class MessageAttribute(Enum):
 
 
 def json_encode(obj: Any) -> Any:
+    "jsonize objects"
     return (
         str(obj)
         if isinstance(obj, BaseObject)

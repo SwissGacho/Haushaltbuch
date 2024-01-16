@@ -14,6 +14,8 @@ class HelloMessage(Message):
 
 
 class LoginMessage(Message):
+    "incoming login message"
+
     @classmethod
     def message_type(cls):
         return MessageType.WS_TYPE_LOGIN.value
@@ -38,6 +40,8 @@ class LoginMessage(Message):
 
 
 class WelcomeMessage(Message):
+    "provide session token after successful login"
+
     def __init__(
         self, token: WSToken, ses_token: WSToken = None, status: str = None
     ) -> None:

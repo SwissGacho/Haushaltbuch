@@ -17,7 +17,7 @@ async def main():
         get_db(db_cfg) as db,
         get_websocket() as ws,
     ):
-        print(f"{app.status=}")
+        # print(f"{app.status=}")
         print("App running")
 
         await asyncio.Future()
