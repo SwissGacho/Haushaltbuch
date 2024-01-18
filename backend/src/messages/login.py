@@ -4,6 +4,9 @@
 from server.ws_token import WSToken
 from server.session import Session
 from messages.message import Message, MessageType, MessageAttribute
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
 
 
 class HelloMessage(Message):
@@ -22,7 +25,7 @@ class LoginMessage(Message):
 
     async def handle_message(self, connection):
         "handle login message"
-        print(f"handle {self=} {self.message=}")
+        LOG.debug(f"handle {self=} {self.message=}")
         user = self.message.get(MessageAttribute.WS_ATTR_USER.value)
         token = self.message.get(MessageAttribute.WS_ATTR_TOKEN.value)
         connection._session = (

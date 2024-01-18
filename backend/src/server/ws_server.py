@@ -10,19 +10,21 @@ import logging
 
 # logging.basicConfig()
 
-from core.const import *
-from core.status import app
+from core.app import app, WEBSOCKET_PORT
 
 # from server.session import Session
 from server.ws_token import WSToken
 from messages.message import Message
 from messages.login import HelloMessage
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
 
 
 class WSProtocol(websockets.WebSocketServerProtocol):
     async def process_request(self, path, headers):
-        print(f"Request, path: {path} ")
-        print(f"  Headers: {headers} ")
+        LOG.debug(f"Request, path: {path} ")
+        LOG.debug(f"  Headers: {headers} ")
         # self.cookies = {}
         # # Loop over all Cookie headers
         # for value in headers.get_all("Cookie"):
@@ -37,7 +39,7 @@ class WSProtocol(websockets.WebSocketServerProtocol):
         #             ]
         #         }
         #     )
-        # # print(f"Cookies: {self.cookies} ")
+        # # LOG.debug(f"Cookies: {self.cookies} ")
         # gacho_cookie = json.loads(self.cookies.get("gacho", "{}"))
         # user = gacho_cookie.get("user", None)
 
@@ -52,7 +54,7 @@ class WS_Connection:
 
     async def _send(self, payload):
         await self._socket.send(payload)
-        # print(f"sent message: {payload}")
+        # LOG.debug(f"sent message: {payload}")
 
     async def send_message(self, message: Message, status=False):
         "Send a message to the client"
@@ -66,9 +68,9 @@ class WS_Connection:
 
     async def handle_message(self, message: Message):
         "accept a message from the client and trigger according actions"
-        # print(f"handle {message=} {message.message=} {message.token=}")
+        # LOG.debug(f"handle {message=} {message.message=} {message.token=}")
         if message.token != self._token:
-            print(f"Received invalid token {message.token}")
+            LOG.warning(f"Received invalid token {message.token}")
         else:
             await message.handle_message(self)
 
@@ -79,16 +81,16 @@ class WS_Handler:
 
     async def handler(self, websocket, path):
         "Handle a ws connection"
-        # print("connection opened")
+        # LOG.debug("connection opened")
         connection = WS_Connection(websocket)
         try:
             await connection.start_connection()
             async for ws_message in websocket:
-                print(f"Client posted: {ws_message=}")
+                LOG.debug(f"Client posted: {ws_message=}")
                 message = Message(json_message=ws_message)
                 await connection.handle_message(message=message)
         finally:
-            print("Connection closed.")
+            LOG.debug("Connection closed.")
 
 
 @asynccontextmanager
@@ -101,14 +103,9 @@ async def get_websocket():
         WEBSOCKET_PORT,
         # create_protocol=WSProtocol
     )
-    if ws_server.is_serving():
-        print(
-            f"Websocket server listening on addresses: {' , '.join( [sock.getsockname()[0] for sock in ws_server.sockets])}"
-        )
-    else:
-        print("Failed to start WS server")
+    if not ws_server.is_serving():
+        LOG.error("Failed to start WS server")
     try:
         yield ws_server
     finally:
-        print("Closing WS server")
         ws_server.close()

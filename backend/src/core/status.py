@@ -6,16 +6,16 @@ from core.base_object import BaseObject
 
 
 class Status(Enum):
-    STATUS_UNDEF = "undefined"
     STATUS_UNCONFIGURED = "unconfigured"
     STATUS_NO_DB = "noDB"
+    STATUS_DB_CFG = "DBconfigured"
     STATUS_CHECK_DB = "checkingDBschema"
     STATUS_OLD_DB = "outdatedDBschema"
 
 
-class _Status(BaseObject):
+class AppStatus(BaseObject):
     def __init__(self) -> None:
-        self._status = Status.STATUS_UNDEF
+        self._status = Status.STATUS_UNCONFIGURED
 
     @property
     def status(self):
@@ -32,6 +32,3 @@ class _Status(BaseObject):
 
     def __repr__(self) -> str:
         return f"<Status({self._status.value})>"
-
-
-app = _Status()

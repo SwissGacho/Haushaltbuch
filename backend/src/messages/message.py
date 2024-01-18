@@ -6,6 +6,9 @@ from json import dumps, loads
 from typing import Any
 from core.base_object import BaseObject
 from server.ws_token import WSToken
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
 
 
 class MessageType(Enum):
@@ -51,7 +54,7 @@ class Message(BaseObject):
     "Commons of messages"
 
     def __new__(cls, json_message: str = None, **kwa):
-        # print(f"Message.__new__({cls=} {json_message=} {kwa=})")
+        # LOG.debug(f"Message.__new__({cls=} {json_message=} {kwa=})")
         if json_message and isinstance(json_message, str):
             message_type = loads(json_message).get(MessageAttribute.WS_ATTR_TYPE.value)
             for sub in cls.__subclasses__():
@@ -93,6 +96,4 @@ class Message(BaseObject):
 
     async def handle_message(self, connection):
         "Handle unknown message type"
-        print(
-            f">>>>>>>>>> received unknown message ({self.message} from {connection=})"
-        )
+        LOG.error(f"received unknown message ({self.message})")

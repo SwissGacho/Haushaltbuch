@@ -6,6 +6,13 @@ import asyncio
 from contextlib import asynccontextmanager
 import aiomysql
 
+from core.app import app
+from core.status import Status
+from core.config import Config
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
+
 
 class DB:
     "Connection to the DB"
@@ -39,14 +46,21 @@ class DB:
 
 
 @asynccontextmanager
-async def get_db(db_cfg={}):
+async def get_db():
     "Create a DB connection"
-    db.connection = await aiomysql.connect(**db_cfg)
-    try:
-        await db.check()
-        yield db
-    finally:
-        db.connection.close()
+    if app.status == Status.STATUS_DB_CFG:
+        LOG.debug(f"DB configuration: {app.configuration[Config.CONFIG_DB.value]=}")
+        db.connection = await aiomysql.connect(
+            **app.configuration[Config.CONFIG_DB.value]
+        )
+        try:
+            await db.check()
+            yield db
+        finally:
+            db.connection.close()
+    else:
+        LOG.warning("No DB configuration available")
+    yield None
 
 
 db = DB()
