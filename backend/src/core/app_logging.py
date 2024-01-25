@@ -14,6 +14,7 @@ ch.setFormatter(
     logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 )
 root_logger.addHandler(ch)
+root_logger.debug("root logger initialized.")
 
 
 def getLogger(name: str, level=logging.NOTSET) -> None:

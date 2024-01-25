@@ -3,6 +3,9 @@
 """
 
 from server.ws_token import WSToken
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
 
 
 class Session:
@@ -34,3 +37,6 @@ class Session:
         return (
             f"<Session(user={self.user},token={self.token},conn_token={self._tokens})>"
         )
+
+
+# LOG.debug("module imported")

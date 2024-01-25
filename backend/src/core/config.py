@@ -33,3 +33,6 @@ class AppConfiguration:
             cfg = {}
         self.configuration = cfg
         LOG.info(f"configuration: {self.configuration}")
+
+
+# LOG.debug("module imported")

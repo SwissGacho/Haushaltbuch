@@ -3,6 +3,9 @@
 
 from enum import Enum
 from core.base_object import BaseObject
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
 
 
 class Status(Enum):
@@ -32,3 +35,6 @@ class AppStatus(BaseObject):
 
     def __repr__(self) -> str:
         return f"<Status({self._status.value})>"
+
+
+# LOG.debug("module imported")

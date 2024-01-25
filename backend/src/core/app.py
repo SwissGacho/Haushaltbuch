@@ -12,6 +12,10 @@ class App:
     "keep status and configuration of the app"
 
     def __init__(self) -> None:
+        self._status = None
+        self._config = None
+
+    def initialize(self):
         self._status = AppStatus()
         self._config = AppConfiguration()
         self._status.status = (
@@ -21,6 +25,7 @@ class App:
             )
             else Status.STATUS_NO_DB
         )
+        LOG.debug("app initialized")
 
     @property
     def status(self):
@@ -32,3 +37,4 @@ class App:
 
 
 app = App()
+# LOG.debug("module imported")
