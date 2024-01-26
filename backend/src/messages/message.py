@@ -57,20 +57,23 @@ class Message(BaseObject):
         # LOG.debug(f"Message.__new__({cls=} {json_message=} {kwa=})")
         if json_message and isinstance(json_message, str):
             message_type = loads(json_message).get(MessageAttribute.WS_ATTR_TYPE.value)
-            for sub in cls.__subclasses__():
-                if sub.message_type() == message_type:
-                    return super().__new__(sub)
+            if message_type:
+                for sub in cls.__subclasses__():
+                    if sub.message_type() == message_type:
+                        return super().__new__(sub)
         return super().__new__(cls)
 
     def __init__(
         self,
         json_message: str = None,
-        msg_type: MessageType = None,
+        msg_type: MessageType = MessageType.WS_TYPE_NONE,
         token: WSToken = None,
         status: str = None,
     ) -> None:
         if json_message and isinstance(json_message, str):
             self.message = loads(json_message)
+            if not self.message.get(MessageAttribute.WS_ATTR_TYPE):
+                self.message[MessageAttribute.WS_ATTR_TYPE] = MessageType.WS_TYPE_NONE
         else:
             self.message = {
                 MessageAttribute.WS_ATTR_TYPE: msg_type,
@@ -81,7 +84,7 @@ class Message(BaseObject):
 
     @classmethod
     def message_type(cls):
-        return None
+        return MessageType.WS_TYPE_NONE.value
 
     @property
     def token(self):
