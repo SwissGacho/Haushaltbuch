@@ -6,7 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 import aiomysql
 
-from core.app import app
+from core.app import App
 from core.status import Status
 from core.config import Config
 from core.app_logging import getLogger
@@ -48,10 +48,10 @@ class DB:
 @asynccontextmanager
 async def get_db():
     "Create a DB connection"
-    if app.status == Status.STATUS_DB_CFG:
-        LOG.debug(f"DB configuration: {app.configuration[Config.CONFIG_DB.value]=}")
+    if App.status == Status.STATUS_DB_CFG:
+        LOG.debug(f"DB configuration: {App.configuration[Config.CONFIG_DB.value]=}")
         db.connection = await aiomysql.connect(
-            **app.configuration[Config.CONFIG_DB.value]
+            **App.configuration[Config.CONFIG_DB.value]
         )
         try:
             await db.check()

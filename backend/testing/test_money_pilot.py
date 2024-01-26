@@ -25,8 +25,7 @@ class Test_Main(unittest.IsolatedAsyncioTestCase):
         )
         mock_get_websocket.return_value.__aenter__.name = "blabla"
         with (
-            # patch.object(App, "status"),
-            patch("money_pilot.app"),
+            patch("money_pilot.App"),
             self.assertLogs(level=logging.DEBUG) as logs,
             patch("money_pilot.get_db", mock_get_db),
             patch("money_pilot.get_websocket", mock_get_websocket),
