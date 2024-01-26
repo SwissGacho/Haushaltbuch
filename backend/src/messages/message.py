@@ -69,7 +69,7 @@ class Message(BaseObject):
         token: WSToken = None,
         status: str = None,
     ) -> None:
-        if isinstance(json_message, str):
+        if json_message and isinstance(json_message, str):
             self.message = loads(json_message)
         else:
             self.message = {
