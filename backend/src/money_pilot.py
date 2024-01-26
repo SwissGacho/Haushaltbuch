@@ -11,7 +11,7 @@ LOG = getLogger(__name__)
 
 
 async def main():
-    "connect DB and start serers"
+    "connect DB and start servers"
     LOG.debug(f"{app.status=}")
     async with (
         get_db() as db,
