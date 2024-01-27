@@ -28,23 +28,13 @@ class MessageAttribute(StrEnum):
 
 def json_encode(obj: Any) -> Any:
     "jsonize objects"
-    return (
-        str(obj)
-        if isinstance(obj, BaseObject)
-        # else obj.value
-        # if isinstance(obj, Enum)
-        else obj
-    )
+    return str(obj) if isinstance(obj, BaseObject) else obj
 
 
 def serialize(msg_dict: dict) -> dict:
     "serialize a message dictionary replacing keys by str(key)"
     return {
-        # k.value
-        # if isinstance(k, Enum)
-        # else
-        str(k): serialize(v) if isinstance(v, dict) else v
-        for k, v in msg_dict.items()
+        str(k): serialize(v) if isinstance(v, dict) else v for k, v in msg_dict.items()
     }
 
 
