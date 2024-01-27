@@ -16,8 +16,8 @@ class App:
         self._config = AppConfiguration()
         self._status.status = (
             Status.STATUS_DB_CFG
-            if self._config.configuration.get(Config.CONFIG_DB.value, {}).get(
-                Config.CONFIG_DB_DB.value
+            if self._config.configuration.get(Config.CONFIG_DB, {}).get(
+                Config.CONFIG_DB_DB
             )
             else Status.STATUS_NO_DB
         )

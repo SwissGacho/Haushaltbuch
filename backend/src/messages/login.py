@@ -21,13 +21,13 @@ class LoginMessage(Message):
 
     @classmethod
     def message_type(cls):
-        return MessageType.WS_TYPE_LOGIN.value
+        return MessageType.WS_TYPE_LOGIN
 
     async def handle_message(self, connection):
         "handle login message"
         LOG.debug(f"handle {self=} {self.message=}")
-        user = self.message.get(MessageAttribute.WS_ATTR_USER.value)
-        token = self.message.get(MessageAttribute.WS_ATTR_TOKEN.value)
+        user = self.message.get(MessageAttribute.WS_ATTR_USER)
+        token = self.message.get(MessageAttribute.WS_ATTR_TOKEN)
         connection._session = (
             Session.get_session_from_token(
                 ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),

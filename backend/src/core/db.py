@@ -49,10 +49,8 @@ class DB:
 async def get_db():
     "Create a DB connection"
     if app.status == Status.STATUS_DB_CFG:
-        LOG.debug(f"DB configuration: {app.configuration[Config.CONFIG_DB.value]=}")
-        db.connection = await aiomysql.connect(
-            **app.configuration[Config.CONFIG_DB.value]
-        )
+        LOG.debug(f"DB configuration: {app.configuration[Config.CONFIG_DB]=}")
+        db.connection = await aiomysql.connect(**app.configuration[Config.CONFIG_DB])
         try:
             await db.check()
             yield db

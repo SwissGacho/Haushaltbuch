@@ -1,11 +1,11 @@
 """ Store the current status of the backend and manage status changes
 """
 
-from enum import Enum
+from enum import StrEnum
 from core.base_object import BaseObject
 
 
-class Status(Enum):
+class Status(StrEnum):
     STATUS_UNCONFIGURED = "unconfigured"
     STATUS_NO_DB = "noDB"
     STATUS_DB_CFG = "DBconfigured"
@@ -26,9 +26,3 @@ class AppStatus(BaseObject):
     def status(self, value=None):
         if value is not None:
             self._status = Status(value)
-
-    def __str__(self) -> str:
-        return self._status.value
-
-    def __repr__(self) -> str:
-        return f"<Status({self._status.value})>"
