@@ -11,6 +11,7 @@ LOG = getLogger(__name__)
 
 
 async def main():
+    "connect DB and start servers"
     LOG.debug(f"{app.status=}")
     async with (
         get_db() as db,
@@ -21,8 +22,11 @@ async def main():
         await asyncio.Future()
 
 
+LOG.debug(f"{__name__} (main) module initialized")
+
 if __name__ == "__main__":
     try:
+        app.initialize()
         asyncio.run(main())
     except KeyboardInterrupt:
         LOG.info("Stopped by KeyboardInterrupt")

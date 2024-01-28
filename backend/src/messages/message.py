@@ -97,3 +97,6 @@ class Message(BaseObject):
     async def handle_message(self, connection):
         "Handle unknown message type"
         LOG.error(f"received unknown message ({self.message})")
+
+
+# LOG.debug("module imported")

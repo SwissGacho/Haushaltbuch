@@ -55,6 +55,7 @@ async def get_db():
         )
         try:
             await db.check()
+            LOG.debug("DB connected")
             yield db
         finally:
             db.connection.close()
@@ -64,3 +65,5 @@ async def get_db():
 
 
 db = DB()
+
+# LOG.debug("module imported")
