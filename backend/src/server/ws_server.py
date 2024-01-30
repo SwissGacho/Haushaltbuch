@@ -14,8 +14,8 @@ from core.app import App, WEBSOCKET_PORT
 
 # from server.session import Session
 from server.ws_token import WSToken
-from messages.message import Message
-from messages.login import HelloMessage
+from messages.message import Message, MessageType, MessageAttribute
+from messages.login import HelloMessage, ByeMessage
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -44,6 +44,10 @@ class WSProtocol(websockets.WebSocketServerProtocol):
         # user = gacho_cookie.get("user", None)
 
 
+class ConnectionClosed(Exception):
+    pass
+
+
 class WS_Connection:
     """Websocket connection created by the client"""
 
@@ -59,36 +63,61 @@ class WS_Connection:
     async def send_message(self, message: Message, status=False):
         "Send a message to the client"
         if status:
-            message.add({WS_ATTR_STATUS: App.status})
+            message.add({MessageAttribute.WS_ATTR_STATUS: App.status})
         await self._send(message.serialize())
 
     async def start_connection(self):
-        "say hello"
+        "say hello and expect Login"
         await self.send_message(HelloMessage(token=self._token, status=App.status))
+        try:
+            msg = Message(json_message=await self._socket.recv())
+            if msg.message_type() == MessageType.WS_TYPE_LOGIN:
+                await self.handle_message(msg)
+            else:
+                await self.abort_connection("Login expected")
+        except ConnectionClosed:
+            raise
+        except Exception:
+            LOG.error("Login failed.")
+            return False
+        else:
+            return True
+
+    async def abort_connection(self, reason: str = None, token=None, status=False):
+        "say goodbye"
+        await self.send_message(ByeMessage(token=token, reason=reason, status=status))
+        raise ConnectionClosed
 
     async def handle_message(self, message: Message):
         "accept a message from the client and trigger according actions"
         # LOG.debug(f"handle {message=} {message.message=} {message.token=}")
         if message.token != self._token:
             LOG.warning(f"Received invalid token {message.token}")
+            await self.abort_connection(reason="Invalid Token", token=message.token)
         else:
             await message.handle_message(self)
 
 
 class WS_Handler:
-    def __init__(self):
-        pass
-
     async def handler(self, websocket, path):
         "Handle a ws connection"
         # LOG.debug("connection opened")
         connection = WS_Connection(websocket)
         try:
-            await connection.start_connection()
-            async for ws_message in websocket:
-                LOG.debug(f"Client posted: {ws_message=}")
-                message = Message(json_message=ws_message)
-                await connection.handle_message(message=message)
+            if await connection.start_connection():
+                async for ws_message in websocket:
+                    LOG.debug(f"Client posted: {ws_message=}")
+                    try:
+                        message = Message(json_message=ws_message)
+                    except TypeError:
+                        LOG.warning(
+                            "message handler failed to create Message object"
+                            + f"from json: {ws_message}"
+                        )
+                        raise
+                    await connection.handle_message(message=message)
+        except Exception as exc:
+            LOG.error(f"Connection aborted by exception {exc}")
         finally:
             LOG.debug("Connection closed.")
 

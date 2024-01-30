@@ -16,6 +16,7 @@ class MessageType(Enum):
     WS_TYPE_HELLO = "Hello"
     WS_TYPE_LOGIN = "Login"
     WS_TYPE_WELCOME = "Welcome"
+    WS_TYPE_BYE = "Bye"
 
 
 class MessageAttribute(Enum):
@@ -25,6 +26,7 @@ class MessageAttribute(Enum):
     WS_ATTR_USER = "user"
     WS_ATTR_SES_TOKEN = "ses_token"
     WS_ATTR_PREV_TOKEN = "prev_token"
+    WS_ATTR_REASON = "reason"
 
 
 def json_encode(obj: Any) -> Any:
