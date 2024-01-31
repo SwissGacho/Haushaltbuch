@@ -11,24 +11,31 @@ WEBSOCKET_PORT = 8765
 class App:
     "keep status and configuration of the app"
 
-    def __init__(self) -> None:
-        self._status = AppStatus()
-        self._config = AppConfiguration()
-        self._status.status = (
+    _status = None
+    _config = None
+
+    @classmethod
+    def initialize(cls):
+        cls._status = AppStatus()
+        cls._config = AppConfiguration()
+        cls._status.status = (
             Status.STATUS_DB_CFG
-            if self._config.configuration.get(Config.CONFIG_DB, {}).get(
-                Config.CONFIG_DB_DB
+            if cls._config.configuration.get(Config.CONFIG_DB.value, {}).get(
+                Config.CONFIG_DB_DB.value
             )
             else Status.STATUS_NO_DB
         )
+        LOG.debug("app initialized")
 
+    @classmethod
     @property
-    def status(self):
-        return self._status.status
+    def status(cls):
+        return cls._status.status
 
+    @classmethod
     @property
-    def configuration(self):
-        return self._config.configuration
+    def configuration(cls):
+        return cls._config.configuration
 
 
-app = App()
+# LOG.debug("module imported")

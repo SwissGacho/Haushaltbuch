@@ -3,6 +3,9 @@
 
 from enum import StrEnum
 from core.base_object import BaseObject
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
 
 
 class Status(StrEnum):
@@ -26,3 +29,12 @@ class AppStatus(BaseObject):
     def status(self, value=None):
         if value is not None:
             self._status = Status(value)
+
+    def __str__(self) -> str:
+        return self._status.value
+
+    def __repr__(self) -> str:
+        return f"<Status({self._status.value})>"
+
+
+# LOG.debug("module imported")

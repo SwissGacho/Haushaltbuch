@@ -52,3 +52,6 @@ class WelcomeMessage(Message):
             msg_type=MessageType.WS_TYPE_WELCOME, token=token, status=status
         )
         self.message |= {MessageAttribute.WS_ATTR_SES_TOKEN: ses_token}
+
+
+# LOG.debug("module imported")

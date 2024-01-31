@@ -3,6 +3,9 @@
 from datetime import datetime, timedelta
 from secrets import token_hex as token
 from core.base_object import BaseObject
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
 
 
 class WSToken(BaseObject):
@@ -38,3 +41,6 @@ class WSToken(BaseObject):
 
     def __repr__(self) -> str:
         return f"<Token(valid_for_seconds={self._valid_for_seconds}) valid untill {self._expires}>"
+
+
+# LOG.debug("module imported")
