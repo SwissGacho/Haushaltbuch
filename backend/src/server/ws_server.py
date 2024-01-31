@@ -10,7 +10,7 @@ import logging
 
 # logging.basicConfig()
 
-from core.app import app, WEBSOCKET_PORT
+from core.app import App, WEBSOCKET_PORT
 
 # from server.session import Session
 from server.ws_token import WSToken
@@ -59,12 +59,12 @@ class WS_Connection:
     async def send_message(self, message: Message, status=False):
         "Send a message to the client"
         if status:
-            message.add({WS_ATTR_STATUS: app.status})
+            message.add({WS_ATTR_STATUS: App.status})
         await self._send(message.serialize())
 
     async def start_connection(self):
         "say hello"
-        await self.send_message(HelloMessage(token=self._token, status=app.status))
+        await self.send_message(HelloMessage(token=self._token, status=App.status))
 
     async def handle_message(self, message: Message):
         "accept a message from the client and trigger according actions"
