@@ -6,7 +6,7 @@
     # - user configurable attributes can be maintained by the frontend
 """
 
-from enum import Enum
+from enum import StrEnum
 import json
 import logging
 from core.app_logging import getLogger
@@ -16,7 +16,7 @@ LOG = getLogger(__name__)
 LOCAL_CFG_FILE = "configuration.json"
 
 
-class Config(Enum):
+class Config(StrEnum):
     CONFIG_DB = "db_cfg"
     CONFIG_DB_DB = "db"
 

@@ -1,14 +1,14 @@
 """ Store the current status of the backend and manage status changes
 """
 
-from enum import Enum
+from enum import StrEnum
 from core.base_object import BaseObject
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
 
-class Status(Enum):
+class Status(StrEnum):
     STATUS_UNCONFIGURED = "unconfigured"
     STATUS_NO_DB = "noDB"
     STATUS_DB_CFG = "DBconfigured"
