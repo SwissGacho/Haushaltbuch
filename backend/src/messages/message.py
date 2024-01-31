@@ -15,6 +15,7 @@ class MessageType(StrEnum):
     WS_TYPE_HELLO = "Hello"
     WS_TYPE_LOGIN = "Login"
     WS_TYPE_WELCOME = "Welcome"
+    WS_TYPE_BYE = "Bye"
 
 
 class MessageAttribute(StrEnum):
@@ -24,6 +25,7 @@ class MessageAttribute(StrEnum):
     WS_ATTR_USER = "user"
     WS_ATTR_SES_TOKEN = "ses_token"
     WS_ATTR_PREV_TOKEN = "prev_token"
+    WS_ATTR_REASON = "reason"
 
 
 def json_encode(obj: Any) -> Any:
@@ -53,12 +55,14 @@ class Message(BaseObject):
     def __init__(
         self,
         json_message: str = None,
-        msg_type: MessageType = None,
+        msg_type: MessageType = MessageType.WS_TYPE_NONE,
         token: WSToken = None,
         status: str = None,
     ) -> None:
-        if isinstance(json_message, str):
+        if json_message and isinstance(json_message, str):
             self.message = loads(json_message)
+            if not self.message.get(MessageAttribute.WS_ATTR_TYPE):
+                self.message[MessageAttribute.WS_ATTR_TYPE] = MessageType.WS_TYPE_NONE
         else:
             self.message = {
                 MessageAttribute.WS_ATTR_TYPE: msg_type,
@@ -69,7 +73,7 @@ class Message(BaseObject):
 
     @classmethod
     def message_type(cls):
-        return None
+        return MessageType.WS_TYPE_NONE.value
 
     @property
     def token(self):
