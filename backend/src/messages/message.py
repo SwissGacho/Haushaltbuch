@@ -1,7 +1,7 @@
 """ Websocket messages exchanged between backend and frontend
 """
 
-from enum import Enum
+from enum import StrEnum
 from json import dumps, loads
 from typing import Any
 from core.base_object import BaseObject
@@ -11,15 +11,14 @@ from core.app_logging import getLogger
 LOG = getLogger(__name__)
 
 
-class MessageType(Enum):
-    WS_TYPE_NONE = None
+class MessageType(StrEnum):
     WS_TYPE_HELLO = "Hello"
     WS_TYPE_LOGIN = "Login"
     WS_TYPE_WELCOME = "Welcome"
     WS_TYPE_BYE = "Bye"
 
 
-class MessageAttribute(Enum):
+class MessageAttribute(StrEnum):
     WS_ATTR_TYPE = "type"
     WS_ATTR_TOKEN = "token"
     WS_ATTR_STATUS = "status"
@@ -31,24 +30,13 @@ class MessageAttribute(Enum):
 
 def json_encode(obj: Any) -> Any:
     "jsonize objects"
-    return (
-        str(obj)
-        if isinstance(obj, BaseObject)
-        else obj.value
-        if isinstance(obj, Enum)
-        else obj
-    )
+    return str(obj) if isinstance(obj, BaseObject) else obj
 
 
 def serialize(msg_dict: dict) -> dict:
     "serialize a message dictionary replacing keys by str(key)"
     return {
-        k.value
-        if isinstance(k, Enum)
-        else str(k): serialize(v)
-        if isinstance(v, dict)
-        else v
-        for k, v in msg_dict.items()
+        str(k): serialize(v) if isinstance(v, dict) else v for k, v in msg_dict.items()
     }
 
 
@@ -58,11 +46,10 @@ class Message(BaseObject):
     def __new__(cls, json_message: str = None, **kwa):
         # LOG.debug(f"Message.__new__({cls=} {json_message=} {kwa=})")
         if json_message and isinstance(json_message, str):
-            message_type = loads(json_message).get(MessageAttribute.WS_ATTR_TYPE.value)
-            if message_type:
-                for sub in cls.__subclasses__():
-                    if sub.message_type() == message_type:
-                        return super().__new__(sub)
+            message_type = loads(json_message).get(MessageAttribute.WS_ATTR_TYPE)
+            for sub in cls.__subclasses__():
+                if sub.message_type() == message_type:
+                    return super().__new__(sub)
         return super().__new__(cls)
 
     def __init__(
@@ -91,7 +78,7 @@ class Message(BaseObject):
     @property
     def token(self):
         "connection token of the message"
-        return self.message.get(MessageAttribute.WS_ATTR_TOKEN.value)
+        return self.message.get(MessageAttribute.WS_ATTR_TOKEN)
 
     def add(self, attrs: dict):
         self.message |= attrs
