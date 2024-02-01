@@ -28,7 +28,7 @@ class LoginMessage(Message):
         LOG.debug(f"handle {self=} {self.message=}")
         user = self.message.get(MessageAttribute.WS_ATTR_USER)
         token = self.message.get(MessageAttribute.WS_ATTR_TOKEN)
-        connection._session = (
+        session = (
             Session.get_session_from_token(
                 ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
                 conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),

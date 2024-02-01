@@ -12,6 +12,7 @@ LOG = getLogger(__name__)
 
 
 class MessageType(StrEnum):
+    WS_TYPE_NONE = "None"
     WS_TYPE_HELLO = "Hello"
     WS_TYPE_LOGIN = "Login"
     WS_TYPE_WELCOME = "Welcome"
@@ -47,9 +48,10 @@ class Message(BaseObject):
         # LOG.debug(f"Message.__new__({cls=} {json_message=} {kwa=})")
         if json_message and isinstance(json_message, str):
             message_type = loads(json_message).get(MessageAttribute.WS_ATTR_TYPE)
-            for sub in cls.__subclasses__():
-                if sub.message_type() == message_type:
-                    return super().__new__(sub)
+            if message_type:
+                for sub in cls.__subclasses__():
+                    if sub.message_type() == message_type:
+                        return super().__new__(sub)
         return super().__new__(cls)
 
     def __init__(
@@ -73,7 +75,7 @@ class Message(BaseObject):
 
     @classmethod
     def message_type(cls):
-        return MessageType.WS_TYPE_NONE.value
+        return MessageType.WS_TYPE_NONE
 
     @property
     def token(self):
