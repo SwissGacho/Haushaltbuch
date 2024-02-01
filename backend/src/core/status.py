@@ -30,11 +30,5 @@ class AppStatus(BaseObject):
         if value is not None:
             self._status = Status(value)
 
-    def __str__(self) -> str:
-        return self._status.value
-
-    def __repr__(self) -> str:
-        return f"<Status({self._status.value})>"
-
 
 # LOG.debug("module imported")

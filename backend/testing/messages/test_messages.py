@@ -12,7 +12,7 @@ class TestMessage(unittest.IsolatedAsyncioTestCase):
             message.message[MessageAttribute.WS_ATTR_TYPE], MessageType.WS_TYPE_NONE
         )
         self.assertIsNone(message.message[MessageAttribute.WS_ATTR_TOKEN])
-        self.assertIsNone(message.message_type())
+        self.assertIs(message.message_type(), MessageType.WS_TYPE_NONE)
         self.assertIsNone(message.token)
 
     def test_002_message_from_json_without_type(self):
@@ -20,11 +20,14 @@ class TestMessage(unittest.IsolatedAsyncioTestCase):
         self.assertIs(
             message.message[MessageAttribute.WS_ATTR_TYPE], MessageType.WS_TYPE_NONE
         )
-        self.assertIsNone(message.message_type())
+        self.assertIs(message.message_type(), MessageType.WS_TYPE_NONE)
 
     def test_002_message_from_json_with_unknown_type(self):
-        message = Message('{"type": "unknownTestType", "text": "some attribute"}')
-        self.assertIs(
-            message.message[MessageAttribute.WS_ATTR_TYPE], MessageType.WS_TYPE_NONE
+        unknown_test_type = "unknownTestType"
+        message = Message(
+            '{"type": "' + unknown_test_type + '", "text": "some attribute"}'
         )
-        self.assertIsNone(message.message_type())
+        self.assertEqual(
+            message.message[MessageAttribute.WS_ATTR_TYPE], unknown_test_type
+        )
+        self.assertIs(message.message_type(), MessageType.WS_TYPE_NONE)

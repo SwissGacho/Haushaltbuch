@@ -50,9 +50,7 @@ async def get_db():
     "Create a DB connection"
     if App.status == Status.STATUS_DB_CFG:
         LOG.debug(f"DB configuration: {App.configuration[Config.CONFIG_DB.value]=}")
-        db.connection = await aiomysql.connect(
-            **App.configuration[Config.CONFIG_DB.value]
-        )
+        db.connection = await aiomysql.connect(**App.configuration[Config.CONFIG_DB])
         try:
             await db.check()
             LOG.debug("DB connected")
