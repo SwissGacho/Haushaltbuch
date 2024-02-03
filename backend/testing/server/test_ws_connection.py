@@ -1,4 +1,5 @@
 """ Test suite for websocket connections """
+
 import unittest
 from unittest.mock import Mock, AsyncMock, patch
 import inspect
@@ -9,7 +10,9 @@ from messages.message import MessageType, MessageAttribute
 
 class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.connection = WS_Connection(AsyncMock(name="mockSocket"))
+        self.connection = WS_Connection(
+            websocket=AsyncMock(name="mockSocket"), sock_nbr=99
+        )
         self.connection._token = "mockToken"
         self.MockApp = Mock(return_value="MockStatus")
         return super().setUp()
