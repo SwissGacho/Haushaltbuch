@@ -28,15 +28,10 @@ class LoginMessage(Message):
         LOG.debug(f"handle {self=} {self.message=}")
         user = self.message.get(MessageAttribute.WS_ATTR_USER)
         token = self.message.get(MessageAttribute.WS_ATTR_TOKEN)
-        session = (
-            Session.get_session_from_token(
-                ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
-                conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
-            )
-            or Session(user, token)
-            if user
-            else None
-        )
+        session = Session.get_session_from_token(
+            ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
+            conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
+        ) or (Session(user, token, connection) if user else None)
         if session:
             connection._session = session
             await connection.send_message(
