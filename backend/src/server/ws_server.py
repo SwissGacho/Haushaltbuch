@@ -37,27 +37,36 @@ class WSProtocol(websockets.WebSocketServerProtocol):
 
 
 class WS_Handler:
+    counter = 0
+
     async def handler(self, websocket, path):
         "Handle a ws connection"
-        # LOG.debug("connection opened")
-        connection = WS_Connection(websocket)
+        sock_nbr = WS_Handler.counter
+        WS_Handler.counter += 1
+        self.LOG = getLogger(f"{WS_Handler.__module__}(sock #{sock_nbr})")
+        self.LOG.debug("connection opened")
+        connection = WS_Connection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
             if await connection.start_connection():
+                self.LOG = getLogger(
+                    f"{WS_Handler.__module__}({connection.connection_id})"
+                )
+                self.LOG.debug(f"connection started from socket connection #{sock_nbr}")
                 async for ws_message in websocket:
-                    LOG.debug(f"Client posted: {ws_message=}")
+                    self.LOG.debug(f"Client posted: {ws_message=}")
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:
-                        LOG.warning(
+                        self.LOG.warning(
                             "message handler failed to create Message object"
                             + f"from json: {ws_message}"
                         )
                         raise
                     await connection.handle_message(message=message)
         except Exception as exc:
-            LOG.error(f"Connection aborted by exception {exc}")
+            self.LOG.error(f"Connection aborted by exception {exc}")
         finally:
-            LOG.debug("Connection closed.")
+            self.LOG.debug("Connection closed.")
 
 
 @asynccontextmanager
