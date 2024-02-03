@@ -11,13 +11,14 @@ LOG = getLogger(__name__)
 class Session:
     "a user session with limited lifetime"
 
-    _all_sessions = set()
+    _all_sessions = []
 
     def __init__(self, user, conn_token) -> None:
+        Session._all_sessions.append(self)
+        self._session_nbr = len(Session._all_sessions)
         self.token = WSToken()
         self.user = user
         self._tokens = {conn_token} if conn_token else set()
-        self._all_sessions.add(self)
 
     @classmethod
     def get_session_from_token(cls, ses_token: str, conn_token: str, session_user=None):
