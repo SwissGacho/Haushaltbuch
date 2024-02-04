@@ -166,3 +166,4 @@ cython_debug/
 
 # Backend configuration file
 backend/src/configuration.json
+.vscode/settings.json
