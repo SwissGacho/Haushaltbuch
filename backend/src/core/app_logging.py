@@ -5,16 +5,18 @@ import logging
 
 APPNAME = "moneypilot"
 root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
+root_logger.setLevel(logging.INFO)
+app_logger = logging.getLogger(APPNAME)
+app_logger.setLevel(logging.DEBUG)
 
-# create console handler and set level to debug
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-ch.setFormatter(
+root_handler = logging.StreamHandler()
+root_handler.setFormatter(
     logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 )
-root_logger.addHandler(ch)
+root_logger.addHandler(root_handler)
+
 root_logger.debug("root logger initialized.")
+app_logger.debug("app logger initialized.")
 
 
 def getLogger(name: str, level=logging.NOTSET) -> None:
