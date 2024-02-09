@@ -1,5 +1,6 @@
 """ Common constants
 """
+
 from core.app_logging import getLogger
 from core.config import AppConfiguration, Config
 from core.status import AppStatus, Status
@@ -20,9 +21,7 @@ class App:
         cls._config = AppConfiguration()
         cls._status.status = (
             Status.STATUS_DB_CFG
-            if cls._config.configuration.get(Config.CONFIG_DB, {}).get(
-                Config.CONFIG_DB_DB
-            )
+            if cls._config.configuration.get(Config.CONFIG_DB, {})
             else Status.STATUS_NO_DB
         )
         LOG.debug("app initialized")

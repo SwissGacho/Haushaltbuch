@@ -18,7 +18,11 @@ LOCAL_CFG_FILE = "configuration.json"
 
 class Config(StrEnum):
     CONFIG_DB = "db_cfg"
+    CONFIG_DB_FILE = "file"
+    CONFIG_DB_HOST = "host"
     CONFIG_DB_DB = "db"
+    CONFIG_DB_USER = "user"
+    CONFIG_DB_PW = "password"
 
 
 class AppConfiguration:
@@ -28,11 +32,14 @@ class AppConfiguration:
         try:
             with open(LOCAL_CFG_FILE) as cfg_file:
                 cfg = json.load(cfg_file)
-        except:
-            LOG.warning(f"Unable to read configuration from {LOCAL_CFG_FILE}")
+        except FileNotFoundError:
+            LOG.info(f"configuration file {LOCAL_CFG_FILE} not found.")
+            cfg = {}
+        except Exception as exc:
+            LOG.warning(f"Unable to read configuration from {LOCAL_CFG_FILE}: {exc}")
             cfg = {}
         self.configuration = cfg
-        LOG.info(f"configuration: {self.configuration}")
+        LOG.debug(f"configuration: {self.configuration}")
 
 
 # LOG.debug("module imported")
