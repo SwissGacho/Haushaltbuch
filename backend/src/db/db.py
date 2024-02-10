@@ -50,7 +50,7 @@ async def get_db():
 
     else:
         LOG.warning("No DB configuration available")
-    yield None
+    # yield None
 
 
 # LOG.debug("module imported")
