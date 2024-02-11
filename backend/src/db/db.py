@@ -23,9 +23,18 @@ async def get_db():
         # LOG.debug(f"DB configuration: {db_config.keys()=}")
         if db_config.keys() == {Config.CONFIG_DB_FILE}:
             LOG.debug("Connect to SQLite")
-            from db.sqlite import SQLiteDB
+            try:
+                from db.sqlite import SQLiteDB
 
-            db = SQLiteDB(**App.configuration[Config.CONFIG_DB])
+                db = SQLiteDB(**App.configuration[Config.CONFIG_DB])
+            except ModuleNotFoundError as exc:
+                LOG.error(f"{exc}")
+                if "aiosqlite" in str(exc):
+                    LOG.error(
+                        "Library 'aiosqlite' could not be imported. "
+                        "Please install using 'pip install aiosqlite'"
+                    )
+                db = None
         elif db_config.keys() == {
             Config.CONFIG_DB_HOST,
             Config.CONFIG_DB_DB,
@@ -33,13 +42,21 @@ async def get_db():
             Config.CONFIG_DB_PW,
         }:
             LOG.info("Connect to MySQL DB")
-            from db.mysql import MySQLDB
+            try:
+                from db.mysql import MySQLDB
 
-            db = MySQLDB(**App.configuration[Config.CONFIG_DB])
+                db = MySQLDB(**App.configuration[Config.CONFIG_DB])
+            except ModuleNotFoundError as exc:
+                LOG.error(f"{exc}")
+                if "aiomysql" in str(exc):
+                    LOG.error(
+                        "Library 'aiomysql' could not be imported. "
+                        "Please install using 'pip install aiomysql'"
+                    )
+                db = None
         else:
             LOG.warning(f"Invalid DB configuration: {db_config}")
             db = None
-            yield
         if db:
             try:
                 await db.check()
@@ -48,6 +65,8 @@ async def get_db():
             finally:
                 LOG.debug("DB disconnecting")
                 await db.close()
+        else:
+            yield
 
     else:
         LOG.warning("No DB configuration available")
