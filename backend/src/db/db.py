@@ -39,6 +39,7 @@ async def get_db():
         else:
             LOG.warning(f"Invalid DB configuration: {db_config}")
             db = None
+            yield
         if db:
             try:
                 await db.check()
@@ -50,7 +51,7 @@ async def get_db():
 
     else:
         LOG.warning("No DB configuration available")
-    # yield None
+        yield
 
 
 # LOG.debug("module imported")
