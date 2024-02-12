@@ -9,6 +9,12 @@ LOG = getLogger(__name__)
 class SQL(Enum):
     TABLE_LIST = auto()
 
+    def SELECT(columns, table):
+        sql = "SELECT "
+        sql += ",".join(columns)
+        sql += f" FROM {table}"
+        return sql
+
 
 class DB:
     "application Data Base"
@@ -18,10 +24,11 @@ class DB:
 
     def sql(self, sql: SQL, **kwargs) -> str:
         "return the DB specific SQL"
-        if isinstance(sql.value, str):
+        if callable(sql):
+            return sql(**kwargs)
+        elif isinstance(sql.value, str):
             return sql.value
-        elif callable(sql.value):
-            return sql.value(**kwargs)
+        raise ValueError(f"value of {sql} not defined")
 
     async def check(self):
         "Check DB for valid schema"
