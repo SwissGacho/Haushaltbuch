@@ -40,7 +40,7 @@ async def get_db():
     if db_config.keys() == {Config.CONFIG_DB_FILE}:
         LOG.debug("Connect to SQLite")
         try:
-            db = import_sqlite()(**App.configuration[Config.CONFIG_DB])
+            DB = import_sqlite()
         except ModuleNotFoundError as exc:
             LOG.error(f"{exc}")
             if "aiosqlite" in str(exc):
@@ -58,9 +58,8 @@ async def get_db():
     }:
         LOG.info("Connect to MySQL DB")
         try:
-            MySQLDB = import_mysql()
+            DB = import_mysql()
 
-            db = MySQLDB(**App.configuration[Config.CONFIG_DB])
         except ModuleNotFoundError as exc:
             LOG.error(f"{exc}")
             if "aiomysql" in str(exc):
@@ -75,6 +74,7 @@ async def get_db():
         yield
         return
     try:
+        db = DB(**App.configuration[Config.CONFIG_DB])
         await db.check()
         LOG.debug("DB ready")
         yield db
