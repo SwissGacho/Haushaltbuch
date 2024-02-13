@@ -32,6 +32,8 @@ class DB:
 
     async def check(self):
         "Check DB for valid schema"
+        if self.__class__ == DB:
+            raise TypeError("cannot check abstract DB")
         con = await self.connect()
         cur = await con.execute(self.sql(SQL.TABLE_LIST))
         num_tables = await cur.rowcount

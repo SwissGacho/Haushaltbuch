@@ -33,7 +33,7 @@ class SQLiteConnection(Connection):
 
     async def execute(self, sql: str):
         "execute an SQL statement and return a cursor"
-        cur = SQLiteCursor(await self._connection.cursor(), self)
+        cur = SQLiteCursor(cur=await self._connection.cursor(), con=self)
         await cur.execute(sql)
         return cur
 
