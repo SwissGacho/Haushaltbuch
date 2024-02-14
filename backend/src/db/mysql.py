@@ -1,14 +1,22 @@
 """ Connection to MySQL DB using aiomysql """
 
-import aiomysql
 from db.db_base import DB, Connection, Cursor, SQL
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
+try:
+    import aiomysql
+except ModuleNotFoundError:
+    AIOMYSQL_IMPORTED = False
+else:
+    AIOMYSQL_IMPORTED = True
+
 
 class MySQLDB(DB):
     def __init__(self, host, db, user, password) -> None:
+        if not AIOMYSQL_IMPORTED:
+            raise ModuleNotFoundError("No module named 'aiomysql'")
         self._host = host
         self._db = db
         self._user = user

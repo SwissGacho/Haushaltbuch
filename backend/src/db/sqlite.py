@@ -1,14 +1,22 @@
 """ Connection to SQLit DB using aiosqlite """
 
-import aiosqlite
 from db.db_base import DB, Connection, Cursor, SQL
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
+try:
+    import aiosqlite
+except ModuleNotFoundError:
+    AIOSQLITE_IMPORTED = False
+else:
+    AIOSQLITE_IMPORTED = True
+
 
 class SQLiteDB(DB):
     def __init__(self, file) -> None:
+        if not AIOSQLITE_IMPORTED:
+            raise ModuleNotFoundError("No module named 'aiosqlite'")
         self._db_file = file
         super().__init__()
 

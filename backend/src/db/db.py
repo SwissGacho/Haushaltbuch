@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from core.app import App
 from core.status import Status
 from core.config import Config
+from db.sqlite import SQLiteDB
+from db.mysql import MySQLDB
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -13,18 +15,6 @@ LOG = getLogger(__name__)
 
 class DBRestart(Exception):
     pass
-
-
-def import_sqlite():
-    from db.sqlite import SQLiteDB
-
-    return SQLiteDB
-
-
-def import_mysql():
-    from db.mysql import MySQLDB
-
-    return MySQLDB
 
 
 @asynccontextmanager
@@ -40,8 +30,9 @@ async def get_db():
     if db_config.keys() == {Config.CONFIG_DB_FILE}:
         LOG.debug("Connect to SQLite")
         try:
-            DB = import_sqlite()
+            db = SQLiteDB(**db_config)
         except ModuleNotFoundError as exc:
+            App.status = Status.STATUS_DB_UNSUPPORTED
             LOG.error(f"{exc}")
             if "aiosqlite" in str(exc):
                 LOG.error(
@@ -58,9 +49,9 @@ async def get_db():
     }:
         LOG.info("Connect to MySQL DB")
         try:
-            DB = import_mysql()
-
+            db = MySQLDB(**db_config)
         except ModuleNotFoundError as exc:
+            App.status = Status.STATUS_DB_UNSUPPORTED
             LOG.error(f"{exc}")
             if "aiomysql" in str(exc):
                 LOG.error(
@@ -70,11 +61,11 @@ async def get_db():
             yield
             return
     else:
+        App.status = Status.STATUS_DB_UNSUPPORTED
         LOG.warning(f"Invalid DB configuration: {db_config}")
         yield
         return
     try:
-        db = DB(**App.configuration[Config.CONFIG_DB])
         await db.check()
         LOG.debug("DB ready")
         yield db
