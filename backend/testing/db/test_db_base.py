@@ -40,22 +40,22 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
 
 class TestDBConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.db = Mock()
-        self.db._connections = set()
+        self.mock_db = Mock()
+        self.mock_db._connections = set()
         self.mock_con = AsyncMock()
-        self.con = db.db_base.Connection(self.db, self.mock_con)
+        self.con = db.db_base.Connection(self.mock_db, self.mock_con)
         return super().setUp()
 
     def test_001_Connection(self):
-        self.assertEqual(self.con._db, self.db)
+        self.assertEqual(self.con._db, self.mock_db)
         self.assertEqual(self.con._connection, self.mock_con)
-        self.assertEqual(self.db._connections, {self.con})
+        self.assertEqual(self.mock_db._connections, {self.con})
 
     async def test_201_close(self):
         self.con._connection.close = AsyncMock()
         await self.con.close()
         self.mock_con.close.assert_awaited_once_with()
-        self.assertEqual(self.db._connections, set())
+        self.assertEqual(self.mock_db._connections, set())
         self.assertIsNone(self.con._connection)
 
     def test_301_connection_prop(self):
@@ -63,7 +63,7 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
             "db.db_base.Connection.connection", new_callable=PropertyMock
         ) as mock_con:
             mock_con.return_value = "mock_con1"
-            con = db.db_base.Connection(self.db)
+            con = db.db_base.Connection(self.mock_db)
             self.assertEqual(con.connection, "mock_con1")
             con.connection = "mock_con2"
             self.assertEqual(mock_con.mock_calls, [call(), call("mock_con2")])
@@ -77,18 +77,19 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
 
 class TestCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.con = Mock()
-        # self.db._connections = set()
+        self.mock_con = Mock()
         self.mock_cur = AsyncMock()
-        self.cur = db.db_base.Cursor(self.mock_cur, self.con)
+        self.cur = db.db_base.Cursor(self.mock_cur, self.mock_con)
         return super().setUp()
 
     def test_001_Connection(self):
         self.assertEqual(self.cur._cursor, self.mock_cur)
-        self.assertEqual(self.cur._connection, self.con)
+        self.assertEqual(self.cur._connection, self.mock_con)
 
     async def test_101_rowcount_prop(self):
-        "TODO: find how to test an 'async @property'"
+        self.cur._rowcount = 99
+        reply = await self.cur.rowcount
+        self.assertEqual(reply, 99)
 
     async def test_201_fetchall(self):
         mock_fetchall = AsyncMock(return_value="mock_fetched")

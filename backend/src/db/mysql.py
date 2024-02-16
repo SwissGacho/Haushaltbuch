@@ -46,7 +46,7 @@ class MySQLConnection(Connection):
 
     async def execute(self, sql: str):
         "execute an SQL statement and return a cursor"
-        cur = MySQLCursor(await self._connection.cursor())
+        cur = MySQLCursor(cur=await self._connection.cursor(), con=self)
         await cur.execute(sql)
         return cur
 
