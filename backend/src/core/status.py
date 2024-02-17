@@ -12,6 +12,7 @@ class Status(StrEnum):
     STATUS_UNCONFIGURED = "unconfigured"
     STATUS_NO_DB = "noDB"
     STATUS_DB_CFG = "DBconfigured"
+    STATUS_DB_UNSUPPORTED = "DBunsuppoerted"
     STATUS_CHECK_DB = "checkingDBschema"
     STATUS_OLD_DB = "outdatedDBschema"
 

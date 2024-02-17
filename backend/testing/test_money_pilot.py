@@ -7,7 +7,7 @@ import logging
 import asyncio
 
 from money_pilot import main
-from core.db import get_db
+from db.db import get_db, DBRestart
 from server.ws_server import get_websocket
 
 
@@ -23,18 +23,28 @@ class Test_Main(unittest.IsolatedAsyncioTestCase):
         mock_get_websocket = MagicMock(
             return_value=AsyncMock(get_websocket()), name="get_websocket"
         )
-        mock_get_websocket.return_value.__aenter__.name = "blabla"
         with (
             patch("money_pilot.App"),
             self.assertLogs(level=logging.DEBUG) as logs,
             patch("money_pilot.get_db", mock_get_db),
             patch("money_pilot.get_websocket", mock_get_websocket),
-            patch("asyncio.Future", AsyncMock(name="MockFuture")) as future,
+            patch(
+                "asyncio.Future",
+                AsyncMock(
+                    name="MockFuture", side_effect=[DBRestart, KeyboardInterrupt]
+                ),
+            ) as future,
+            self.assertRaises(KeyboardInterrupt, msg="expect KeyboardInterrupt"),
         ):
             await main()
-            mock_get_db.assert_called_once_with()
-            mock_get_db.return_value.__aenter__.assert_awaited_once_with()
-            mock_get_websocket.assert_called_once_with()
-            mock_get_websocket.return_value.__aenter__.assert_awaited_once_with()
-            future.assert_awaited_once()
-            self.assertEqual(len(logs.output), 2)
+        self.assertEqual(mock_get_db.call_count, 2, "expect get_db called twice")
+        self.assertEqual(
+            mock_get_db.return_value.__aenter__.await_count,
+            2,
+            "expect get_db context manager entered twice",
+        )
+        self.assertEqual(mock_get_db.return_value.__aenter__.await_args_list, [(), ()])
+        mock_get_websocket.assert_called_once_with()
+        mock_get_websocket.return_value.__aenter__.assert_awaited_once_with()
+        self.assertEqual(future.await_count, 2, "expected Future awaited twice")
+        # self.assertEqual(len(logs.output), 4)

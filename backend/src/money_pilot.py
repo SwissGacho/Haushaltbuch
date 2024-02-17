@@ -3,7 +3,7 @@
 import asyncio
 
 from core.app import App
-from core.db import get_db
+from db.db import get_db, DBRestart
 from server.ws_server import get_websocket
 from core.app_logging import getLogger
 
@@ -13,13 +13,17 @@ LOG = getLogger(__name__)
 async def main():
     "connect DB and start servers"
     LOG.debug(f"{App.status=}")
-    async with (
-        get_db() as db,
-        get_websocket() as ws,
-    ):
-        LOG.info("App running")
+    async with get_websocket() as ws:
+        LOG.debug(f"got websocket {ws}")
+        while True:
+            try:
+                async with get_db() as db:
+                    LOG.debug(f"got {db=}")
+                    LOG.info("App running")
 
-        await asyncio.Future()
+                    await asyncio.Future()
+            except DBRestart:
+                LOG.info("DB restarted")
 
 
 LOG.debug(f"{__name__} (main) module initialized")
