@@ -66,6 +66,7 @@ async def get_db():
         yield
         return
     try:
+        App.db = db
         await db.check()
         LOG.debug("DB ready")
         yield db

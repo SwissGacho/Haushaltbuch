@@ -1,6 +1,8 @@
 """ Connection to MySQL DB using aiomysql """
 
-from db.db_base import DB, Connection, Cursor, SQL
+from db.db_base import DB, Connection, Cursor
+from db.sql import SQL
+from core.config import Config
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -14,35 +16,33 @@ else:
 
 
 class MySQLDB(DB):
-    def __init__(self, host, db, user, password) -> None:
+    def __init__(self, **cfg) -> None:
         if not AIOMYSQL_IMPORTED:
             raise ModuleNotFoundError("No module named 'aiomysql'")
-        self._host = host
-        self._db = db
-        self._user = user
-        self._password = password
-        super().__init__()
+        super().__init__(**cfg)
 
     async def connect(self):
         "Open a connection"
-        con = MySQLConnection(
-            self,
-            await aiomysql.connect(
-                host=self._host, db=self._db, user=self._user, password=self._password
-            ),
-        )
-        return con
+        return await MySQLConnection(db_obj=self, **self._cfg).connect()
 
-    def sql(self, sql: SQL, **kwargs) -> str:
-        if sql == SQL.TABLE_LIST:
+    def sql(self, query: SQL, **kwargs) -> str:
+        if query == SQL.TABLE_LIST:
             return f""" SELECT table_name FROM information_schema.tables 
-                        WHERE table_schema = '{self._db}'
+                        WHERE table_schema = '{self._cfg['db']}'
                     """
         else:
-            return super().sql(sql=sql, **kwargs)
+            return super().sql(query=query, **kwargs)
 
 
 class MySQLConnection(Connection):
+    async def connect(self):
+        self._connection = await aiomysql.connect(
+            host=self._cfg[Config.CONFIG_DB_HOST],
+            db=self._cfg[Config.CONFIG_DB_DB],
+            user=self._cfg[Config.CONFIG_DB_USER],
+            password=self._cfg[Config.CONFIG_DB_PW],
+        )
+        return self
 
     async def execute(self, sql: str):
         "execute an SQL statement and return a cursor"

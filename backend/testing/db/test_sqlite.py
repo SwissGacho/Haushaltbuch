@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call
 from contextlib import asynccontextmanager
 
+
 def restore_sys_modules_aiosqlite(module=None):
     # print("====================== restoring sys.modules['aiosqlite']")
     if module:
@@ -26,34 +27,42 @@ def setUpModule():
         importlib.reload(sys.modules.get("db.sqlite"))
     else:
         import db.sqlite
+
+
 import db.db_base
+import db.sql
 
 
 class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.db_filename = "sqlite_file.db"
-        self.db = db.sqlite.SQLiteDB(self.db_filename)
+        self.db_cfg = {"file": "sqlite_file.db"}
+        self.db = db.sqlite.SQLiteDB(**self.db_cfg)
         return super().setUp()
 
     def test_001_SQLiteDB(self):
-        self.assertEqual(self.db._db_file, self.db_filename)
+        self.assertEqual(self.db._cfg, self.db_cfg)
+
+    def test_002_SQLiteDB_no_lib(self):
+        save_aioaiosqlite = sys.modules["aiosqlite"]
+        sys.modules["aiosqlite"] = None
+        importlib.reload(sys.modules.get("db.sqlite"))
+        with self.assertRaises(ModuleNotFoundError):
+            db.sqlite.SQLiteDB(**self.db_cfg)
+        sys.modules["aiosqlite"] = save_aioaiosqlite
+        importlib.reload(sys.modules.get("db.sqlite"))
 
     async def test_101_connect(self):
-        mock_sqlite_connect = AsyncMock(return_value="mock_con")
-        sys.modules["aiosqlite"].connect = mock_sqlite_connect
-        Mock_Connection = Mock(return_value="connection")
-        with (
-            patch("db.sqlite.SQLiteConnection", Mock_Connection),
-        ):
+        mock_con_obj = AsyncMock()
+        mock_con_obj.connect = AsyncMock(return_value=mock_con_obj)
+        Mock_Connection = Mock(return_value=mock_con_obj)
+        with (patch("db.sqlite.SQLiteConnection", Mock_Connection),):
             reply = await self.db.connect()
-            self.assertEqual(reply, "connection")
-            Mock_Connection.assert_called_once_with(
-                self.db, mock_sqlite_connect.return_value
-            )
-            mock_sqlite_connect.assert_called_once_with(database=self.db_filename)
+            self.assertEqual(reply, mock_con_obj)
+            Mock_Connection.assert_called_once_with(db_obj=self.db, **self.db_cfg)
+            mock_con_obj.connect.assert_awaited_once_with()
 
     def test_201_sql_table_list(self):
-        reply = self.db.sql(db.db_base.SQL.TABLE_LIST)
+        reply = self.db.sql(db.sql.SQL.TABLE_LIST)
         re = "^ *SELECT.*FROM sqlite_master.*'table' *$"
         self.assertRegex(reply.replace("\n", " "), re)
 
@@ -63,21 +72,32 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
         with patch("db.db_base.DB.sql", mock_super):
             reply = self.db.sql("ANY", **params)
             self.assertEqual(reply, mock_super.return_value)
-            mock_super.assert_called_once_with(sql="ANY", **params)
+            mock_super.assert_called_once_with(query="ANY", **params)
 
 
 class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_db = Mock()
         self.mock_con = AsyncMock()
-        self.con = db.sqlite.SQLiteConnection(self.mock_db, self.mock_con)
+        self.db_cfg = {"file": "sqlite_file.db"}
+        self.con = db.sqlite.SQLiteConnection(self.mock_db, **self.db_cfg)
         return super().setUp()
 
-    async def test_101_execute(self):
+    def test_001_connection(self):
+        self.assertDictEqual(self.con._cfg, self.db_cfg)
+
+    async def test_101_connect(self):
+        mock_sqlite_connect = AsyncMock(return_value="mock_con")
+        sys.modules["aiosqlite"].connect = mock_sqlite_connect
+        reply = await self.con.connect()
+        self.assertEqual(reply, self.con)
+        mock_sqlite_connect.assert_awaited_once_with(database=self.db_cfg["file"])
+
+    async def test_201_execute(self):
         sql = "ANY_SQL"
         mock_cur = AsyncMock()
         MockCursor = Mock(return_value=mock_cur)
-        # self.con._connection = AsyncMock()
+        self.con._connection = AsyncMock()
         self.con._connection.cursor.return_value = "mock_cur"
         with (patch("db.sqlite.SQLiteCursor", MockCursor),):
             reply = await self.con.execute(sql)

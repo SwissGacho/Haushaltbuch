@@ -4,32 +4,34 @@ import unittest
 from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call
 
 import db.db_base
+import db.sql
 
 
 class TestDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.db = db.db_base.DB()
+        self.db_cfg = {"cfg1": "mick", "cfg2": "mack", "cfg3": "mock"}
+        self.db = db.db_base.DB(**self.db_cfg)
         return super().setUp()
 
-    def test_001_no_string_in_enum(self):
-        for sql in db.db_base.SQL:
-            self.assertNotIsInstance(sql.value, str, msg=f"SQL.{sql.name}")
+    def test_001_db(self):
+        self.assertDictEqual(self.db._cfg, self.db_cfg)
+        self.assertEqual(self.db._connections, set())
 
-    def test_002_sql_callable_SELECT(self):
+    def test_102_sql_callable_SELECT(self):
         params = {"columns": ["col1", "col2"], "table": "tab"}
-        reply = self.db.sql(db.db_base.SQL.SELECT, **params)
+        reply = self.db.sql(db.sql.SQL.SELECT, **params)
         print(f"{reply=}")
         self.assertEqual(reply, "SELECT col1,col2 FROM tab")
 
-    def test_003_sql_no_value(self):
+    def test_103_sql_no_value(self):
         with self.assertRaises(ValueError):
-            self.db.sql(db.db_base.SQL.TABLE_LIST)
+            self.db.sql(db.sql.SQL.TABLE_LIST)
 
-    async def test_101_check(self):
+    async def test_201_check(self):
         with self.assertRaises(TypeError):
             await self.db.check()
 
-    async def test_201_close(self):
+    async def test_301_close(self):
         con1 = AsyncMock()
         con2 = AsyncMock()
         self.db._connections = {con1, con2}
@@ -42,19 +44,23 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_db = Mock()
         self.mock_db._connections = set()
-        self.mock_con = AsyncMock()
-        self.con = db.db_base.Connection(self.mock_db, self.mock_con)
+        self.db_cfg = {"cfg1": "mick", "cfg2": "mack", "cfg3": "mock"}
+        self.con = db.db_base.Connection(db_obj=self.mock_db, **self.db_cfg)
         return super().setUp()
 
     def test_001_Connection(self):
+        self.assertDictEqual(self.con._cfg, self.db_cfg)
         self.assertEqual(self.con._db, self.mock_db)
-        self.assertEqual(self.con._connection, self.mock_con)
+        self.assertIsNone(self.con._connection)
         self.assertEqual(self.mock_db._connections, {self.con})
 
     async def test_201_close(self):
-        self.con._connection.close = AsyncMock()
+        mock_con = AsyncMock()
+        self.con._connection = mock_con
+        mock_close = AsyncMock()
+        mock_con.close = mock_close
         await self.con.close()
-        self.mock_con.close.assert_awaited_once_with()
+        mock_close.assert_awaited_once_with()
         self.assertEqual(self.mock_db._connections, set())
         self.assertIsNone(self.con._connection)
 
@@ -65,12 +71,12 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
             mock_con.return_value = "mock_con1"
             con = db.db_base.Connection(self.mock_db)
             self.assertEqual(con.connection, "mock_con1")
-            con.connection = "mock_con2"
-            self.assertEqual(mock_con.mock_calls, [call(), call("mock_con2")])
 
     async def test_401_commit(self):
+        mock_con = AsyncMock()
+        self.con._connection = mock_con
         mock_commit = AsyncMock()
-        self.con._connection.commit = mock_commit
+        mock_con.commit = mock_commit
         await self.con.commit()
         mock_commit.assert_awaited_once_with()
 

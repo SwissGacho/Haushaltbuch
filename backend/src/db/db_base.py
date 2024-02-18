@@ -1,34 +1,25 @@
 """ Base class for DB connections """
 
-from enum import Enum, auto
+from db.sql import SQL
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
 
-class SQL(Enum):
-    TABLE_LIST = auto()
-
-    def SELECT(columns, table):
-        sql = "SELECT "
-        sql += ",".join(columns)
-        sql += f" FROM {table}"
-        return sql
-
-
 class DB:
     "application Data Base"
 
-    def __init__(self) -> None:
+    def __init__(self, **cfg) -> None:
+        self._cfg = cfg
         self._connections = set()
 
-    def sql(self, sql: SQL, **kwargs) -> str:
+    def sql(self, query: SQL, **kwargs) -> str:
         "return the DB specific SQL"
-        if callable(sql):
-            return sql(**kwargs)
-        elif isinstance(sql.value, str):
-            return sql.value
-        raise ValueError(f"value of {sql} not defined")
+        if callable(query):
+            return query(self, **kwargs)
+        elif isinstance(query.value, str):
+            return query.value
+        raise ValueError(f"value of {query} not defined")
 
     async def check(self):
         "Check DB for valid schema"
@@ -47,6 +38,7 @@ class DB:
 
     async def connect(self):
         "Open a connection"
+        return self
 
     async def close(self):
         "close all activities"
@@ -57,9 +49,10 @@ class DB:
 class Connection:
     "Connection to the DB"
 
-    def __init__(self, db: DB, con=None) -> None:
-        self._connection = con
-        self._db = db
+    def __init__(self, db_obj: DB, **cfg) -> None:
+        self._cfg = cfg
+        self._connection = None
+        self._db = db_obj
         self._db._connections.add(self)
 
     async def connect(self):
@@ -75,12 +68,8 @@ class Connection:
 
     @property
     def connection(self):
-        "DB connection"
+        "'real' DB connection"
         return self._connection
-
-    @connection.setter
-    def connection(self, con):
-        self._connection = con
 
     async def execute(self, sql: str):
         "execute an SQL statement and return a cursor"
