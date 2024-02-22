@@ -1,5 +1,6 @@
 """ Handle a websocket connection """
 
+from core.exceptions import ConnectionClosed
 from core.app import App
 from server.ws_token import WSToken
 from messages.message import Message, MessageType, MessageAttribute
@@ -7,10 +8,6 @@ from messages.login import HelloMessage, ByeMessage
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
-
-
-class ConnectionClosed(Exception):
-    pass
 
 
 class WS_Connection:
