@@ -14,6 +14,7 @@ class App:
 
     _status = None
     _config = None
+    _db = None
 
     @classmethod
     def initialize(cls):
@@ -35,6 +36,15 @@ class App:
     @property
     def configuration(cls):
         return cls._config.configuration
+
+    @classmethod
+    @property
+    def db(cls):
+        return cls._db
+
+    @classmethod
+    def set_db(cls, val):
+        cls._db = val
 
 
 # LOG.debug("module imported")

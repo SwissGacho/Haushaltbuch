@@ -8,13 +8,13 @@ from core.status import Status
 from core.config import Config
 from db.sqlite import SQLiteDB
 from db.mysql import MySQLDB
+from db.schema_maintenance import check_db_schema
+
+# from persistance.business_object_base import BO_Base
+from data.management.db_schema import DB_Schema
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
-
-
-class DBRestart(Exception):
-    pass
 
 
 @asynccontextmanager
@@ -66,9 +66,14 @@ async def get_db():
         yield
         return
     try:
-        await db.check()
+        App.db = db
+        await check_db_schema()
         LOG.debug("DB ready")
         yield db
+    except TypeError:
+        App.status = Status.STATUS_NO_DB
+        yield
+        return
     finally:
         LOG.debug("DB disconnecting")
         await db.close()
