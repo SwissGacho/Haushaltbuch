@@ -27,9 +27,23 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             self.db.sql(db.sql.SQL.TABLE_LIST)
 
-    async def test_201_check(self):
-        with self.assertRaises(TypeError):
-            await self.db.check()
+    def _201_check_column(self, mock_sql):
+        mock_attr = ("mock_attr", None)
+        Mock_SQL = Mock()
+        Mock_SQL.CREATE_TABLE_COLUMN = "MOCK_CREATE_TABLE_COLUMN"
+        self.db.sql = Mock(return_value=mock_sql)
+        with (patch("db.db_base.SQL", Mock_SQL),):
+            result = self.db.check_column(mock_sql, mock_attr, "mock_tab")
+        self.db.sql.assert_called_once_with(
+            "MOCK_CREATE_TABLE_COLUMN", column=mock_attr
+        )
+        return result
+
+    def test_201_check_column(self):
+        self.assertTrue(self._201_check_column("MOCK SQL"))
+
+    def test_202_check_column_no_tabcol(self):
+        self.assertFalse(self._201_check_column(None))
 
     async def test_301_close(self):
         con1 = AsyncMock()

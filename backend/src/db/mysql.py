@@ -9,16 +9,16 @@ LOG = getLogger(__name__)
 
 try:
     import aiomysql
-except ModuleNotFoundError:
-    AIOMYSQL_IMPORTED = False
+except ModuleNotFoundError as err:
+    AIOMYSQL_IMPORT_ERROR = err
 else:
-    AIOMYSQL_IMPORTED = True
+    AIOMYSQL_IMPORT_ERROR = None
 
 
 class MySQLDB(DB):
     def __init__(self, **cfg) -> None:
-        if not AIOMYSQL_IMPORTED:
-            raise ModuleNotFoundError("No module named 'aiomysql'")
+        if not AIOMYSQL_IMPORT_ERROR:
+            raise ModuleNotFoundError(f"Import error: {err}")
         super().__init__(**cfg)
 
     async def connect(self):

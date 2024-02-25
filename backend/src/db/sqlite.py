@@ -9,20 +9,19 @@ from db.db_base import DB, Connection, Cursor
 from db.sql import SQL
 
 LOG = getLogger(__name__)
-
 try:
     import aiosqlite
     import sqlite3
-except ModuleNotFoundError:
-    AIOSQLITE_IMPORTED = False
+except ModuleNotFoundError as err:
+    AIOSQLITE_IMPORT_ERROR = err
 else:
-    AIOSQLITE_IMPORTED = True
+    AIOSQLITE_IMPORT_ERROR = None
 
 
 class SQLiteDB(DB):
     def __init__(self, **cfg) -> None:
-        if not AIOSQLITE_IMPORTED:
-            raise ModuleNotFoundError("No module named 'aiosqlite'")
+        if AIOSQLITE_IMPORT_ERROR:
+            raise ModuleNotFoundError(f"Import error: {AIOSQLITE_IMPORT_ERROR}")
         super().__init__(**cfg)
 
     async def connect(self):
@@ -90,12 +89,12 @@ class SQLiteCursor(Cursor):
         self._last_query = query
         self._close = close
         try:
-            # LOG.debug(f"Executing: ({query}, {params})")
+            # LOG.debug(f"Executing: ({query}, {params}, {close=})")
             await self._cursor.execute(query, params)
             self._rowcount = self._cursor.rowcount
         except sqlite3.OperationalError as err:
             raise OperationalError(err)
-        if close == 0:
+        if close is 0:
             await self._connection.close()
             return None
         return self

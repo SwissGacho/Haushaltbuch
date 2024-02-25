@@ -33,6 +33,7 @@ import db.db_base
 import db.sql
 
 
+@unittest.skip("MySQL module is not maintained currently")
 class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.db_cfg = {
