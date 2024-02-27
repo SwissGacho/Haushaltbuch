@@ -165,7 +165,7 @@ cython_debug/
 
 
 # db files
-.db
+*.db
 
 # Backend configuration file
 backend/src/configuration.json
