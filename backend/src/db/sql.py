@@ -14,6 +14,18 @@ class SQL(Enum):
             {table.lower()} ( {','.join(columns)} )"""
     )
     CREATE_TABLE_COLUMN = auto()
+    COUNT_ROWS = (
+        lambda obj, table, conditions: f"""SELECT COUNT(*) FROM {table}
+            """ + "WHERE " + "AND".join(["{key} = {value}" for key, value in conditions.items()]) if len(conditions) > 0 else ""
+    )
+
+    def SELECT_ID_BY_CONDITION(obj, table, conditions=None):
+        sql = f"SELECT id FROM {table}"
+        if conditions == None:
+            return sql
+        sql += "WHERE "
+        sql += " AND ".join([f"{k} = {v}" for k, v in conditions.items()])
+        return sql
 
     def SELECT(obj, table, columns=None, id=None, newest=None):
         if not columns:

@@ -72,6 +72,18 @@ class BO_Base:
             return dt
         return value
 
+    @classmethod
+    async def count_rows(cls)->int:
+        """Count the number of existing business objects in the DB table"""
+        sql = App.db.sql(SQL.COUNT_ROWS, table=cls.table, conditions={})
+        return await (await App.db.execute(sql, close=1)).fetchone()
+
+    @classmethod
+    async def get_matching_ids(cls, conditions: dict):
+        """Get the ids of business objects matching the conditions"""
+        sql = App.db.sql(SQL.SELECT_ID_BY_CONDITION, table=cls.table, conditions=conditions)
+        return await (await App.db.execute(sql, close=1))
+
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
         If 'id' is given, fetch the identified object
