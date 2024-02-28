@@ -26,12 +26,6 @@ class Session:
         self._tokens = {conn_token} if conn_token else set()
         self.LOG.debug(f"created session for user {username}")
     
-    def _sync_get_user_obj(self, username):
-        # This method acts as a bridge, invoking the event loop to run the async method
-        loop = asyncio.get_event_loop()
-        user = loop.run_until_complete(self.get_user_obj(username))
-        return user
-
     @property
     def session_id(self):
         return f"ses #{self._session_nbr}"
