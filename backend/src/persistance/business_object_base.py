@@ -75,14 +75,20 @@ class BO_Base:
     @classmethod
     async def count_rows(cls)->int:
         """Count the number of existing business objects in the DB table"""
+        LOG = getLogger(f"{cls.__module__}")
+        LOG.debug(SQL.COUNT_ROWS(None, table=cls.table, conditions={}))
         sql = App.db.sql(SQL.COUNT_ROWS, table=cls.table, conditions={})
-        return await (await App.db.execute(sql, close=1)).fetchone()
+        rslt = await(await App.db.execute(sql, close=1)).fetchone()
+        print(rslt)
+        return rslt['Count']
 
     @classmethod
     async def get_matching_ids(cls, conditions: dict):
         """Get the ids of business objects matching the conditions"""
+        LOG = getLogger(f"{cls.__module__}")
+        LOG.debug(SQL.SELECT_ID_BY_CONDITION(None, table=cls.table, conditions=conditions))
         sql = App.db.sql(SQL.SELECT_ID_BY_CONDITION, table=cls.table, conditions=conditions)
-        return await (await App.db.execute(sql, close=1))
+        return await App.db.execute(sql, close=1)
 
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
@@ -120,7 +126,7 @@ class BO_Base:
                         SQL.INSERT_ARGS,
                         table=self.table,
                         columns=values,
-                        returning=("id"),
+                        returning=["id"],
                     )
                     LOG.debug(f"{query=}  {values=}")
                     cur = await App.db.execute(
