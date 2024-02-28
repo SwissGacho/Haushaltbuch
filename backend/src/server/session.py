@@ -75,8 +75,8 @@ class Session:
         if matching_count > 1:
             raise ValueError(f"multiple users with name '{username}' found")
         if matching_count == 1:
-            rowMatch = await (await matchingUsers.fetchone())
-            user = User(id=rowMatch[0][0])
+            rowMatch = await matchingUsers.fetchone()
+            user = User(id=rowMatch['id'])
             self.user = user
             return user
         if matching_count == 0:
