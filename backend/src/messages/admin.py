@@ -39,4 +39,4 @@ class LogMessage(Message):
         level = self.message.get(MessageAttribute.WS_ATTR_LOGLEVEL)
         text = self.message.get(MessageAttribute.WS_ATTR_MESSAGE)
         caller = self.message.get(MessageAttribute.WS_ATTR_CALLER)
-        getLogger(caller).log(LOGGING_LEVEL.get(level), text)
+        getLogger(caller or "FrontEnd").log(LOGGING_LEVEL.get(level), text)
