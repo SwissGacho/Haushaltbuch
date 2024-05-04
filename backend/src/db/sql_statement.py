@@ -17,7 +17,9 @@ class SQL_data_type(Enum):
 
 
 class InvalidSQLStatementException(Exception):
-    """Raised when an SQL statement is already started"""
+    """
+    Exception raised when an invalid SQL statement is encountered.
+    """
     pass
 
 
@@ -61,6 +63,11 @@ class SQL(SQL_Executable):
         select = Select(column_list, distinct)
         self.sql_statement = select
         return select
+    
+    def insert(self, table:str, columns:list[str] = []):
+        insert = Insert(table, columns)
+        self.sql_statement = insert
+        return insert
 
     def execute(self, params=None, close=False, commit=False):
         self.rslt = self.db.execute(self.sql(), params, close, commit)
@@ -227,17 +234,23 @@ class Select(Table_Valued_Query):
         self.distinct = distinct
 
     from_statement: Table_Valued_Query = None
-    where: List[Where] = []
-    group_by: List[Group_By] = []
-    having: List[Having] = []
+    where: Where = None
+    group_by: Group_By = None
+    having: Having = None
 
     def sql(self)->str:
+        if self.from_statement is None:
+            raise InvalidSQLStatementException("SELECT statement must have a FROM clause.")
+        if self.column_list is None or len(self.column_list) == 0:
+            raise InvalidSQLStatementException("SELECT statement must have at least one column.")
         sql = f"SELECT {'DISTINCT' if self.distinct else ''} {', '.join(self.column_list)}"
         sql += " FROM " + self.from_statement.sql()
-        sql += " WHERE ".join([where.sql() for where in self.where])
-        sql += " GROUP BY ".join([group_by.sql() for group_by in self.group_by])
-        sql += " HAVING ".join([having.sql() for having in self.having])
-
+        if self.where is not None:
+            sql += " WHERE " + self.where.sql()
+        if self.group_by is not None:
+            sql += " GROUP BY " + self.group_by.sql()
+        if self.having is not None:
+            sql += " HAVING " + self.having.sql()
         return sql
     
     def Distinct(self, distinct:bool=True):
@@ -247,15 +260,20 @@ class Select(Table_Valued_Query):
     def Columns(self, column_list:list[str]):
         self.column_list = column_list
         return self
-    
+
     def From(self, table:str|Table_Valued_Query):
         from_table = From(table)
         self.from_statement = from_table
         return self
-    
+
     def Where(self, condition:SQL_expression):
         where = Where(condition)
         self.where = where
+        return self
+
+    def Having(self, condition:SQL_expression):
+        having = Having(condition)
+        self.having = having
         return self
 
 
@@ -265,7 +283,7 @@ class Value(SQL_statement):
 
     def sql(self)->str:
         return self.value
-    
+
 
 class Row(SQL_statement):
     def __init__(self, values:list[Value]):
@@ -275,56 +293,27 @@ class Row(SQL_statement):
         return f"({', '.join([value.sql() for value in self.values])})"
 
 
+class Values(SQL_statement):
+    def __init__(self, rows:list[Row]):
+        self.rows = rows
+
+    def sql(self)->str:
+        return f"VALUES {', '.join([row.sql() for row in self.rows])}"
+
+
 class Insert(SQL_statement):
-    def __init__(self, table:str, columns:list[str], rows:list[Row]):
+    def __init__(self, table:str, columns:list[str] = [], rows:Values | Select = None):
         self.table = table
         self.columns = columns
         self.rows = rows
 
-    rows: List[Row] = []
-
     def sql(self)->str:
-        return f"INSERT INTO {self.table} ({', '.join(self.columns)}) VALUES {', '.join([row.sql() for row in self.rows])}"
+        return f"INSERT INTO {self.table} ({', '.join(self.columns)}) {self.rows.sql()}"
 
-    def insert(self, table:str):
-        if len(self.sql) > 0:
-            raise InvalidSQLStatementException("Tried to insert INSERT INTO {table} into an already started SQL statement.")
-        self.sql += f"INSERT INTO {table}"
-        self.last_sql = SQL_term.INSERT
+    def values(self, values: Values | Select):
+        self.rows = values
         return self
 
-    def values(self, value_list:list):
-        if self.sql[:6] != "INSERT":
-            raise InvalidSQLStatementException("Tried to insert VALUES into an SQL statement that is not an INSERT statement.")
-        self.sql += f" VALUES ({', '.join(value_list)})"
-        self.last_sql = SQL_term.VALUES
-        return self
-    
-    def update(self, table:str):
-        if len(self.sql) > 0:
-            raise InvalidSQLStatementException("Tried to insert UPDATE into an already started SQL statement.")
-        self.sql += f"UPDATE {table}"
-        self.last_sql = SQL_term.UPDATE
-        return self
-    
-    def set(self, value_dict:dict):
-        if self.sql[:6] != "UPDATE":
-            raise InvalidSQLStatementException("Tried to insert SET into an SQL statement that is not an UPDATE statement.")
-        self.sql += f" SET " + ', '.join([f"{key} = {value_dict[key]}" for key in value_dict.keys()])
-        self.last_sql = SQL_term.SET
-        return self
-    
-    def from_table(self, table:str):
-        if self.last_sql != SQL_term.SELECT:
-            raise InvalidSQLStatementException("Tried to insert FROM {table} into an SQL statement that is not a SELECT statement.")
-        self.sql += f" FROM {table}"
-        self.last_sql = SQL_term.FROM
-        return self
-    
     def returning(self, column:str):
         self.sql += f" RETURNING {column}"
         return self
-
-
-class SQLite_statement(SQL_statement):
-    pass
