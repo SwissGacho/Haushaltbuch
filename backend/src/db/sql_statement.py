@@ -42,8 +42,10 @@ class SQL(SQL_Executable):
                 ("age",  SQL_data_type.INTEGER)
             ],
         ).execute()"""
-    @property
+    
     def sql(self)->str:
+        if self.sql_statement is None:
+            raise InvalidSQLStatementException("No SQL statement to execute.")
         return self.sql_statement.sql()
     
     rslt = None
@@ -57,19 +59,21 @@ class SQL(SQL_Executable):
     def create_table(self, table:str, columns:list[(str, SQL_data_type)]):
         create_table = Create_Table(table, columns, self)
         self.sql_statement = create_table
-        return self
+        return create_table
 
     def select(self, column_list:list[str] = [], distinct:bool=False):
-        select = Select(column_list, distinct)
+        select = Select(column_list, distinct, self)
         self.sql_statement = select
         return select
     
     def insert(self, table:str, columns:list[str] = []):
-        insert = Insert(table, columns)
+        insert = Insert(table, columns, parent=self)
         self.sql_statement = insert
         return insert
 
     def execute(self, params=None, close=False, commit=False):
+        if self.sql_statement is None:
+            raise InvalidSQLStatementException("No SQL statement to execute.")
         self.rslt = self.db.execute(self.sql(), params, close, commit)
         return self
 
@@ -79,7 +83,7 @@ class SQL(SQL_Executable):
 
 class SQL_statement(SQL_Executable):
 
-    def sql()->str:
+    def sql(self)->str:
         raise NotImplementedError("SQL_statement is an abstract class and should not be instantiated.")
 
 
@@ -119,7 +123,7 @@ class From(SQL_statement):
     def __init__(self, table:Table_Valued_Query|str, parent:'Select'=None):
         self.parent = parent
         self.table = table
-        self.joins = List[(join_operator, Table_Valued_Query|str, SQL_expression)]
+        self.joins: List[(join_operator, Table_Valued_Query|str, SQL_expression)] = []
 
     def sql(self)->str:
         sql = ""
@@ -229,9 +233,10 @@ class Having(SQL_statement):
 
 
 class Select(Table_Valued_Query):
-    def __init__(self, column_list:list[str] = [], distinct:bool=False):
+    def __init__(self, column_list:list[str] = [], distinct:bool=False, parent:SQL_Executable=None):
         self.column_list = column_list
         self.distinct = distinct
+        self.parent = parent
 
     from_statement: Table_Valued_Query = None
     where: Where = None
@@ -244,7 +249,7 @@ class Select(Table_Valued_Query):
         if self.column_list is None or len(self.column_list) == 0:
             raise InvalidSQLStatementException("SELECT statement must have at least one column.")
         sql = f"SELECT {'DISTINCT' if self.distinct else ''} {', '.join(self.column_list)}"
-        sql += " FROM " + self.from_statement.sql()
+        sql += self.from_statement.sql()
         if self.where is not None:
             sql += " WHERE " + self.where.sql()
         if self.group_by is not None:
@@ -302,10 +307,11 @@ class Values(SQL_statement):
 
 
 class Insert(SQL_statement):
-    def __init__(self, table:str, columns:list[str] = [], rows:Values | Select = None):
+    def __init__(self, table:str, columns:list[str] = [], rows:Values | Select = None, parent:SQL_Executable=None):
         self.table = table
         self.columns = columns
         self.rows = rows
+        self.parent = parent
 
     def sql(self)->str:
         return f"INSERT INTO {self.table} ({', '.join(self.columns)}) {self.rows.sql()}"
