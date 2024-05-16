@@ -8,6 +8,7 @@ from datetime import date, datetime, UTC
 from persistance.bo_descriptors import BO_int, BO_datetime
 from core.app import App
 from db.sql import SQL
+from db.sql_statement import SQL, eq, SQL_expression
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -52,12 +53,20 @@ class BO_Base:
 
     @classmethod
     async def sql_create_table(cls):
-        cols = [
+
+        sql = SQL().create_table(
+            cls.table,
+            [
+                c for c in cls.attribute_descriptions()
+            ]
+        ).execute(close = False)
+
+        """ cols = [
             App.db.sql(SQL.CREATE_TABLE_COLUMN, column=c)
             for c in cls.attribute_descriptions()
         ]
         sql = App.db.sql(SQL.CREATE_TABLE, table=cls.table, columns=cols)
-        await App.db.execute(query=sql, close=0)
+        await App.db.execute(query=sql, close=0) """
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
@@ -82,9 +91,19 @@ class BO_Base:
         if id is None:
             id = self.id
         if id is None and newest is None:
+            LOG.debug(f"fetching {self} without id or newest")
             return self
-        sql = App.db.sql(SQL.SELECT, table=self.table, id=id, newest=newest)
-        self._db_data = await (await App.db.execute(sql, close=1)).fetchone()
+        LOG.debug(f"fetching {self} with newest={newest}")
+        #sql = App.db.sql(SQL.SELECT, table=self.table, id=id, newest=newest)
+        
+        sql = SQL(App.db).select([], True)
+        if self.id is not None:
+            sql.From(self.table).Where(eq('id',id))
+        elif newest:
+            sql.From(self.table).Where(SQL_expression(f"id = (SELECT MAX(id) FROM {self.table})"))
+        db_data = await(await sql.execute(close = 1).rslt).fetchone()
+        self._db_data = db_data
+        #self._db_data = await (await App.db.execute(sql, close=1)).fetchone()
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
                 if attr == "u1.last_updated":
