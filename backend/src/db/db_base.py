@@ -1,7 +1,8 @@
 """ Base class for DB connections """
 
-from persistance.business_object_base import BO_Base
+#from persistance.business_object_base import BO_Base
 from db.sql import SQL
+from db.SQLFactory import SQLFactory
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -13,6 +14,8 @@ class DB:
     def __init__(self, **cfg) -> None:
         self._cfg = cfg
         self._connections = set()
+
+    sqlFactory = SQLFactory
 
     def sql(self, query: SQL, **kwargs) -> str:
         "return the DB specific SQL"
@@ -71,6 +74,7 @@ class DB:
     async def execute(self, query: str, params=None, close=False, commit=False):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
+        LOG.debug(f"execute: {query=}, {params=}, {close=}, {commit=}")
         return await (await self.connect()).execute(
             query=query, params=params, close=close, commit=commit
         )

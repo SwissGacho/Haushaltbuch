@@ -1,14 +1,32 @@
 import unittest
-from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call
+from unittest.mock import Mock
 
-from db.sql_statement import SQL_Executable, SQL, Select, Create_Table, Insert, InvalidSQLStatementException, SQL_data_type, SQL_statement, SQL_column_definition
+from db.sql_statement import SQL_Executable, SQL, Select, Create_Table, Insert, InvalidSQLStatementException, SQL_data_type, SQL_statement, SQL_column_definition, Table_Valued_Query, eq
 
-    
+
+class MockColumnDefinition:
+    def __init__(self, name:str, data_type:type):
+        self.name = name
+        self.data_type = str(data_type)
+
+    def sql(self):
+        return f"{self.name} {self.data_type}"
+
+
+class MockSQLFactory:
+
+    @classmethod
+    def getClass(self, sql_cls: type):
+        if sql_cls.__name__ == "SQL_column_definition":
+            return MockColumnDefinition
+        return sql_cls
+
 class MockDB:
     def execute(self, sql, params=None, close=False, commit=False):
         return "Mock execute"
     def close(self):
         return "Mock close"
+    sqlFactory = MockSQLFactory
 
 
 class TestSQLExecutable(unittest.TestCase):
@@ -18,7 +36,7 @@ class TestSQLExecutable(unittest.TestCase):
         mockParent.execute = Mock(return_value="Mock execute")
         mockParent.close = Mock(return_value="Mock close")
         self.sql = SQL_Executable()
-        self.sql.parent = mockParent()
+        self.sql.parent = mockParent
 
     def test001_execute(self):
         sql_executable = self.sql
@@ -132,6 +150,11 @@ class TestSQL(unittest.TestCase):
         result = self.sql.sql()
         self.assertEqual(result, "SELECT DISTINCT name, age FROM users")
 
+    def test112_sql_selectStart(self):
+
+        self.sql.select([], distinct=False).From("users").Where(eq('id',"'test'"))
+        result = self.sql.sql()
+        self.assertEqual(result.strip(), "SELECT * FROM users WHERE  (id = 'test')")
 
 class TestSQL_statement(unittest.TestCase):
 
@@ -145,15 +168,49 @@ class TestSQL_column_definition(unittest.TestCase):
 
     def test301_name(self):
         """ Test the name property """
-        result = SQL_column_definition("name", SQL_data_type.TEXT)
-        self.assertEqual(result.name, "name")
+        with self.assertRaises(NotImplementedError):
+            SQL_column_definition("name", SQL_data_type.TEXT)
 
-    def test302_data_type(self):
-        """ Test the data_type property """
+
+
+class TestCreate_Table(unittest.TestCase):
+
+    def setUp(self) -> None:
+
+        mockParent = Mock()
+        mockParent.sqlFactory = MockSQLFactory
+        self.mockParent = mockParent
+
+    def test401_parent(self):
+        """ Test setting the parent"""
+        test = Create_Table(parent=self.mockParent)
+        self.assertEqual(test.parent, self.mockParent)
+
+    def test402_table(self):
+        """ Test setting the table name"""
+
+        test = Create_Table(table='test', parent=self.mockParent)
+        self.assertEqual(test.table, 'test')
+        
+    def test403_table(self):
+        """ Test creating a table with a single column"""
+
         for type in SQL_data_type:
             with self.subTest(type=type):
-                result = SQL_column_definition("name", type)
-                self.assertEqual(result.data_type, type)
+                test = Create_Table(columns=[("name", type)], parent=self.mockParent)
+                self.assertEqual(len(test.columns), 1)
+                for column in test.columns:
+                    self.assertEqual(column.name, "name")
+                    self.assertEqual(column.data_type, "SQL_data_type."+type.name)
+
+
+class TestTableValuedQuery(unittest.TestCase):
+
+    def test501_parent(self):
+        """ Test the exception method """
+        with self.assertRaises(NotImplementedError):
+            Table_Valued_Query().sql()
+
 
 if __name__ == "__main__":
     unittest.main()

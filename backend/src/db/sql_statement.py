@@ -3,6 +3,7 @@
 from enum import Enum, auto
 from db.db_base import DB
 from core.app_logging import getLogger
+from db.SQLFactory import SQLFactory
 from typing import List
 from enum import Enum
 
@@ -28,9 +29,13 @@ class SQL_Executable(object):
 
     def execute(self, params=None, close=False, commit=False):
         return self.parent.execute(params=params, close=close, commit=commit)
-
+    
     def close(self):
         return self.parent.close()
+    
+    @property
+    def sqlFactory(self)->SQLFactory:
+        return self.parent.sqlFactory
 
 
 class SQL(SQL_Executable):
@@ -49,25 +54,29 @@ class SQL(SQL_Executable):
         return self.sql_statement.sql()
     
     rslt = None
+    sql_statement = None
 
-    db: DB = None
-    sql_statement:'SQL_statement' = None
+    @property
+    def sqlFactory(self)->SQLFactory:
+        return self.db.sqlFactory
 
     def __init__(self, db:DB):
         self.db = db
+        self.sql_statment:'SQL_statement' = None
 
-    def create_table(self, table:str, columns:list[(str, SQL_data_type)]):
-        create_table = Create_Table(table, columns, self)
+    def create_table(self, table:str, columns:list[(str, SQL_data_type)])->"Create_Table":
+        create_table = self.sqlFactory.getClass(Create_Table)(table, columns, self)
+        #create_table = Create_Table(table, columns, self)
         self.sql_statement = create_table
         return create_table
 
-    def select(self, column_list:list[str] = [], distinct:bool=False):
-        select = Select(column_list, distinct, self)
+    def select(self, column_list:list[str] = [], distinct:bool=False)->"Select":
+        select = self.sqlFactory.getClass(Select)(column_list, distinct, self)
         self.sql_statement = select
         return select
     
     def insert(self, table:str, columns:list[str] = []):
-        insert = Insert(table, columns, parent=self)
+        insert = self.sqlFactory.getClass(Insert)(table, columns, parent=self)
         self.sql_statement = insert
         return insert
 
@@ -88,22 +97,26 @@ class SQL_statement(SQL_Executable):
 
 
 class SQL_column_definition():
-    def __init__(self, name:str, data_type:SQL_data_type):
+    def __init__(self, name:str, data_type:type):
         self.name = name
         self.data_type = data_type
+        raise NotImplementedError("SQL_column_definition is an abstract class and should not be instantiated.")
 
     def sql(self)->str:
-        return f"{self.name} {self.data_type.name}"
+        return f"{self.name} {self.data_type}"
 
 
 class Create_Table(SQL_statement):
     def __init__(self, table:str='', columns:list[(str, SQL_data_type)]=[], parent:SQL_Executable=None):
         self.parent = parent
         self.table = table
-        self.columns = [SQL_column_definition(name, data_type) for name, data_type in columns]
+        sQL_column_definition = self.sqlFactory.getClass(SQL_column_definition)
+        self.columns = [sQL_column_definition(name, data_type) for name, data_type in columns]
         self.parent = parent
 
     def sql(self)->str:
+        if self.table is None or len(self.table) == 0:
+            raise InvalidSQLStatementException("CREATE TABLE statement must have a table name.")
         return f"CREATE TABLE {self.table} ({[column.sql() for column in self.columns]})"
 
 
@@ -131,7 +144,8 @@ class From(SQL_statement):
             sql = f" FROM ({self.table.sql()})"
         else:
             sql = f" FROM {self.table}"
-        " ".join(["{join[0]} {join[1]} ON {join[2].sql()}" for join in self.joins])
+            if(len(self.joins) > 0):
+                sql += f" ".join(["{join[0]} {join[1]} ON {join[2].sql()}" for join in self.joins])
         return sql
     
     def join(
@@ -145,6 +159,8 @@ class From(SQL_statement):
 
 class SQL_expression(SQL_statement):
     def __init__(self, expression:str):
+        if expression is None:
+            expression = 'Null'
         self.expression = expression
 
     def sql(self)->str:
@@ -246,16 +262,16 @@ class Select(Table_Valued_Query):
     def sql(self)->str:
         if self.from_statement is None:
             raise InvalidSQLStatementException("SELECT statement must have a FROM clause.")
+        sql = f"SELECT {'DISTINCT ' if self.distinct else ''}{', '.join(self.column_list)}"
         if self.column_list is None or len(self.column_list) == 0:
-            raise InvalidSQLStatementException("SELECT statement must have at least one column.")
-        sql = f"SELECT {'DISTINCT' if self.distinct else ''} {', '.join(self.column_list)}"
+            sql += "*"
         sql += self.from_statement.sql()
         if self.where is not None:
-            sql += " WHERE " + self.where.sql()
+            sql += self.where.sql()
         if self.group_by is not None:
-            sql += " GROUP BY " + self.group_by.sql()
+            sql += self.group_by.sql()
         if self.having is not None:
-            sql += " HAVING " + self.having.sql()
+            sql += self.having.sql()
         return sql
     
     def Distinct(self, distinct:bool=True):
@@ -267,17 +283,17 @@ class Select(Table_Valued_Query):
         return self
 
     def From(self, table:str|Table_Valued_Query):
-        from_table = From(table)
+        from_table = self.sqlFactory.getClass(From)(table)
         self.from_statement = from_table
         return self
 
     def Where(self, condition:SQL_expression):
-        where = Where(condition)
+        where = self.sqlFactory.getClass(Where)(condition)
         self.where = where
         return self
 
     def Having(self, condition:SQL_expression):
-        having = Having(condition)
+        having = self.sqlFactory.getClass(Having)(condition)
         self.having = having
         return self
 
