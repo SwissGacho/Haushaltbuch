@@ -5,12 +5,13 @@ from db.sql_statement import SQL_Executable, SQL, Select, Create_Table, Insert, 
 
 
 class MockColumnDefinition:
-    def __init__(self, name:str, data_type:type):
+    def __init__(self, name:str, data_type:type, constraint:str=None):
         self.name = name
+        self.constraint = constraint
         self.data_type = str(data_type)
 
     def sql(self):
-        return f"{self.name} {self.data_type}"
+        return f"{self.name} {self.data_type} {self.constraint}"
 
 
 class MockSQLFactory:
@@ -70,7 +71,7 @@ class TestSQL(unittest.TestCase):
         sql = self.sql
 
         # Test the create_table method
-        result = sql.create_table("users", [("name", "TEXT"), ("age", "INTEGER")])
+        result = sql.create_table("users", [("name", "TEXT", None), ("age", "INTEGER", None)])
         self.checkPrimaryStatement(result, Create_Table)
 
     def test102_select(self):
@@ -100,7 +101,7 @@ class TestSQL(unittest.TestCase):
         """ Test direct execute method when an SQL statement is set """
 
         # Test the execute method
-        self.sql.create_table("users", [("name", SQL_data_type.TEXT), ("age", SQL_data_type.INTEGER)])
+        self.sql.create_table("users", [("name", SQL_data_type.TEXT, None), ("age", SQL_data_type.INTEGER, None)])
         self.sql.execute()
         self.sql.db.execute.assert_called_once()
 
@@ -108,7 +109,7 @@ class TestSQL(unittest.TestCase):
         """ Test indirect execute method when an SQL statement is set """
 
         # Test the execute method
-        self.sql.create_table("users", [("name", SQL_data_type.TEXT), ("age", SQL_data_type.INTEGER)])
+        self.sql.create_table("users", [("name", SQL_data_type.TEXT, None), ("age", SQL_data_type.INTEGER, None)])
         self.sql.sql_statement.execute()
         self.sql.db.execute.assert_called_once()
 
@@ -116,7 +117,7 @@ class TestSQL(unittest.TestCase):
         """ Test direct execute method when an SQL statement is set """
 
         # Test the close method
-        self.sql.create_table("users", [("name", SQL_data_type.TEXT), ("age", SQL_data_type.INTEGER)])
+        self.sql.create_table("users", [("name", SQL_data_type.TEXT, None), ("age", SQL_data_type.INTEGER, None)])
         self.sql.close()
         self.sql.db.close.assert_called_once()
 
@@ -124,7 +125,7 @@ class TestSQL(unittest.TestCase):
         """ Test indirect execute method when an SQL statement is set """
 
         # Test the close method
-        self.sql.create_table("users", [("name", SQL_data_type.TEXT), ("age", SQL_data_type.INTEGER)])
+        self.sql.create_table("users", [("name", SQL_data_type.TEXT, None), ("age", SQL_data_type.INTEGER, None)])
         self.sql.sql_statement.close()
         self.sql.db.close.assert_called_once()
 
@@ -197,7 +198,7 @@ class TestCreate_Table(unittest.TestCase):
 
         for type in SQL_data_type:
             with self.subTest(type=type):
-                test = Create_Table(columns=[("name", type)], parent=self.mockParent)
+                test = Create_Table(columns=[("name", type, "constraintFor"+str(type))], parent=self.mockParent)
                 self.assertEqual(len(test.columns), 1)
                 for column in test.columns:
                     self.assertEqual(column.name, "name")
@@ -209,7 +210,13 @@ class TestTableValuedQuery(unittest.TestCase):
     def test501_parent(self):
         """ Test the exception method """
         with self.assertRaises(NotImplementedError):
-            Table_Valued_Query().sql()
+            Table_Valued_Query(Mock()).sql()
+
+    def test502_setParent(self):
+        """ Test setting the parent """
+        mockParent = Mock()
+        test = Table_Valued_Query(mockParent())
+        self.assertEqual(test.parent, mockParent())
 
 
 if __name__ == "__main__":

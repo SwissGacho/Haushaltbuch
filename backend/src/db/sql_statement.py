@@ -33,6 +33,9 @@ class SQL_Executable(object):
     def close(self):
         return self.parent.close()
     
+    def get_class(self, sql_cls:type)->type:
+        return self.sqlFactory.getClass(sql_cls)
+    
     @property
     def sqlFactory(self)->SQLFactory:
         return self.parent.sqlFactory
@@ -47,12 +50,12 @@ class SQL(SQL_Executable):
                 ("age",  SQL_data_type.INTEGER)
             ],
         ).execute()"""
-    
+
     def sql(self)->str:
         if self.sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
         return self.sql_statement.sql()
-    
+
     rslt = None
     sql_statement = None
 
@@ -65,20 +68,29 @@ class SQL(SQL_Executable):
         self.sql_statment:'SQL_statement' = None
 
     def create_table(self, table:str, columns:list[(str, SQL_data_type)])->"Create_Table":
-        create_table = self.sqlFactory.getClass(Create_Table)(table, columns, self)
+        create_table = self.get_class(Create_Table)(table, columns, self)
         #create_table = Create_Table(table, columns, self)
         self.sql_statement = create_table
         return create_table
 
     def select(self, column_list:list[str] = [], distinct:bool=False)->"Select":
-        select = self.sqlFactory.getClass(Select)(column_list, distinct, self)
+        select = self.get_class(Select)(column_list, distinct, self)
         self.sql_statement = select
         return select
-    
-    def insert(self, table:str, columns:list[str] = []):
-        insert = self.sqlFactory.getClass(Insert)(table, columns, parent=self)
+
+    def insert(self, table:str, columns:list[str] = [])->"Insert":
+        insert = self.get_class(Insert)(table, columns, parent=self)
         self.sql_statement = insert
         return insert
+
+    def update(self, table:str)->"Update":
+        update = self.get_class(Update)(table, parent=self)
+        self.sql_statement = update
+        return update
+
+    def script(self, script:str)->"SQL_script":
+        self.sql_statement = self.get_class(SQL_script)(script, self)
+        return self.sql_statement
 
     def execute(self, params=None, close=False, commit=False):
         if self.sql_statement is None:
@@ -92,37 +104,48 @@ class SQL(SQL_Executable):
 
 class SQL_statement(SQL_Executable):
 
+    def __init__(self, parent:SQL_Executable = None):
+        self.parent = parent
+
     def sql(self)->str:
         raise NotImplementedError("SQL_statement is an abstract class and should not be instantiated.")
 
 
-class SQL_column_definition():
-    def __init__(self, name:str, data_type:type):
+class SQL_script(SQL_statement):
+    def __init__(self, script:str, parent:SQL_Executable=None):
+        self.script = script
+        super().__init__(parent)
+
+    def sql(self)->str:
+        return self.script
+
+
+class SQL_column_definition(SQL_statement):
+    def __init__(self, name:str, data_type:type, constraint:str=None):
         self.name = name
         self.data_type = data_type
+        self.constraint = constraint
         raise NotImplementedError("SQL_column_definition is an abstract class and should not be instantiated.")
 
     def sql(self)->str:
-        return f"{self.name} {self.data_type}"
+        return f"{self.name} {self.data_type} {self.constraint}"
 
 
 class Create_Table(SQL_statement):
-    def __init__(self, table:str='', columns:list[(str, SQL_data_type)]=[], parent:SQL_Executable=None):
-        self.parent = parent
+    def __init__(self, table:str='', columns:list[(str, SQL_data_type, str)]=[], parent:SQL_Executable=None):
         self.table = table
+        super().__init__(parent)
         sQL_column_definition = self.sqlFactory.getClass(SQL_column_definition)
-        self.columns = [sQL_column_definition(name, data_type) for name, data_type in columns]
-        self.parent = parent
+        self.columns = [sQL_column_definition(name, data_type, constraint) for name, data_type,  constraint in columns]
+
+    def column(self, name:str, data_type:SQL_data_type, constraint:str=None):
+        self.columns.append(self.sqlFactory.getClass(SQL_column_definition)(name, data_type, constraint))
+        return self
 
     def sql(self)->str:
         if self.table is None or len(self.table) == 0:
             raise InvalidSQLStatementException("CREATE TABLE statement must have a table name.")
         return f"CREATE TABLE {self.table} ({[column.sql() for column in self.columns]})"
-
-
-class Table_Valued_Query(SQL_statement):
-    def sql(self)->str:
-        raise NotImplementedError("Table_Valued_Query is an abstract class and should not be instantiated.")
 
 
 class join_operator(Enum):
@@ -133,8 +156,7 @@ class join_operator(Enum):
 
 
 class From(SQL_statement):
-    def __init__(self, table:Table_Valued_Query|str, parent:'Select'=None):
-        self.parent = parent
+    def __init__(self, table):
         self.table = table
         self.joins: List[(join_operator, Table_Valued_Query|str, SQL_expression)] = []
 
@@ -150,14 +172,14 @@ class From(SQL_statement):
     
     def join(
             self,
-            table: Table_Valued_Query|str = None,
+            table = None,
             join_constraint: "SQL_expression" = None,
             join_operator:join_operator = join_operator.FULL
         ):
         self.joins.append((join_operator, table, join_constraint))
 
 
-class SQL_expression(SQL_statement):
+class SQL_expression():
     def __init__(self, expression:str):
         if expression is None:
             expression = 'Null'
@@ -205,6 +227,7 @@ class eq(SQL_binary_expression):
 
 
 class SQL_ternary_expression(SQL_expression):
+
     def __init__(self, first:SQL_expression|str, second:SQL_expression|str, third:SQL_expression|str):
         self.first = first if isinstance(first, SQL_expression) else SQL_expression(first)
         self.second = second if isinstance(second, SQL_expression) else SQL_expression(second)
@@ -224,7 +247,54 @@ class SQL_between(SQL_ternary_expression):
     operator_two = 'AND'
 
 
-class Where(SQL_statement):
+class Value(SQL_expression):
+    def _init__(self, value:str):
+        self.value = value
+
+    def sql(self)->str:
+        return self.value
+
+
+class Row(SQL_expression):
+    def __init__(self, values:list[Value]):
+        self.values = values
+
+    def value(self, value:Value):
+        self.values.append(value)
+        return self
+
+    def sql(self)->str:
+        return f"({', '.join([value.sql() for value in self.values])})"
+
+
+class Values(SQL_expression):
+    def __init__(self, rows:list[Row]):
+        self.rows = rows
+
+    def row(self, value:Row):
+        self.rows.append(value)
+        return self
+
+    def sql(self)->str:
+        return f"VALUES {', '.join([row.sql() for row in self.rows])}"
+
+
+class Assignment(SQL_expression):
+    def __init__(self, columns:list[str] | str, value:Value, ):
+        if type(columns) == str:
+            columns = [columns]
+        self.columns = columns
+        self.value = value
+        self.where:Where = None
+
+    def sql(self)->str:
+        sql = "{','.join([f'{column}' for column in self.columns])} = {self.value.sql()}"
+        if self.where is not None:
+            sql += self.where.sql()
+        return sql
+
+
+class Where(SQL_expression):
     def __init__(self, condition:SQL_expression):
         self.condition = condition
 
@@ -232,15 +302,15 @@ class Where(SQL_statement):
         return f" WHERE {self.condition.sql()}"
 
 
-class Group_By(SQL_statement):
+class Group_By(SQL_expression):
     def __init__(self, column_list:list[str]):
         self.column_list = column_list
 
     def sql(self)->str:
         " GROUP BY {', '.join(self.column_list)}"
-    
 
-class Having(SQL_statement):
+
+class Having(SQL_expression):
     def __init__(self, condition:SQL_expression):
         self.condition = condition
 
@@ -248,11 +318,20 @@ class Having(SQL_statement):
         return f" HAVING {self.condition.sql()}"
 
 
+class Table_Valued_Query(SQL_statement):
+
+    def __init__(self, parent:SQL_Executable):
+        super().__init__(parent)
+
+    def sql(self)->str:
+        raise NotImplementedError("Table_Valued_Query is an abstract class and should not be instantiated.")
+
+
 class Select(Table_Valued_Query):
     def __init__(self, column_list:list[str] = [], distinct:bool=False, parent:SQL_Executable=None):
         self.column_list = column_list
         self.distinct = distinct
-        self.parent = parent
+        super().__init__(parent)
 
     from_statement: Table_Valued_Query = None
     where: Where = None
@@ -298,44 +377,51 @@ class Select(Table_Valued_Query):
         return self
 
 
-class Value(SQL_statement):
-    def _init__(self, value:str):
-        self.value = value
-
-    def sql(self)->str:
-        return self.value
-
-
-class Row(SQL_statement):
-    def __init__(self, values:list[Value]):
-        self.values = values
-
-    def sql(self)->str:
-        return f"({', '.join([value.sql() for value in self.values])})"
-
-
-class Values(SQL_statement):
-    def __init__(self, rows:list[Row]):
-        self.rows = rows
-
-    def sql(self)->str:
-        return f"VALUES {', '.join([row.sql() for row in self.rows])}"
-
-
 class Insert(SQL_statement):
-    def __init__(self, table:str, columns:list[str] = [], rows:Values | Select = None, parent:SQL_Executable=None):
+    def __init__(self, table:str, columns:list[str] = [], rows = None, parent:SQL_Executable=None):
         self.table = table
         self.columns = columns
         self.rows = rows
-        self.parent = parent
+        super().__init__(parent)
+        self._return_str:str = ""
 
     def sql(self)->str:
-        return f"INSERT INTO {self.table} ({', '.join(self.columns)}) {self.rows.sql()}"
-
-    def values(self, values: Values | Select):
+        sql = f"INSERT INTO {self.table} ({', '.join(self.columns)}) {self.rows.sql()}"
+        return sql + self._return_str
+    
+    def column(self, column:str):
+        self.columns.append(column)
+        return self
+    
+    def values(self, values):
         self.rows = values
+        return self
+
+    def returning(self, column:str):
+        self._return_str = f" RETURNING {column}"
+        return self
+
+
+class Update(SQL_statement):
+    def __init__(self, table:str, parent:SQL_Executable=None):
+        self.table = table
+        self.assignments:List[Assignment] = []
+        super().__init__(parent)
+
+    def assignment(self, columns:list[str] | str, value:Value):
+        self.assignments.append(self.sqlFactory.getClass(Assignment)(columns, value))
+        return self
+    
+    def Where(self, condition:SQL_expression):
+        where:Where = self.sqlFactory.getClass(Where)(condition)
+        self.where = where
         return self
 
     def returning(self, column:str):
         self.sql += f" RETURNING {column}"
         return self
+    
+    def sql(self)->str:
+        sql = f"UPDATE {self.table} SET {', '.join([assignment.sql() for assignment in self.assignments])}"
+
+        return sql

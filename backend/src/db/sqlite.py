@@ -6,7 +6,8 @@ from core.exceptions import OperationalError
 from core.config import Config
 from core.app_logging import getLogger
 from db.db_base import DB, Connection, Cursor
-from db.sql import SQL, SQLFactory
+from db.sql_statement import SQL, SQL_column_definition
+from db.SQLFactory import SQLFactory
 
 LOG = getLogger(__name__)
 try:
@@ -17,7 +18,7 @@ except ModuleNotFoundError as err:
 else:
     AIOSQLITE_IMPORT_ERROR = None
 
-class SQLiteColumnDefinition(SQL.ColumnDefinition):
+class SQLiteColumnDefinition(SQL_column_definition):
 
     type_map = {
         int: "INTEGER",
@@ -26,7 +27,7 @@ class SQLiteColumnDefinition(SQL.ColumnDefinition):
         datetime.datetime: "TEXT"
     }
 
-    def __init__(self, name:str, data_type:type):
+    def __init__(self, name:str, data_type:type, constraint:str=None):
         if type in self.type_map:
             self.data_type = self.type_map[type]
             self.name = name
