@@ -88,9 +88,9 @@ class BO_Base:
         
         sql = SQL(App.db).select([], True).From(self.table)
         if self.id is not None:
-            sql.Where(eq('id',id))
+            sql.Where(sql.get_class(eq)('id',id))
         elif newest:
-            sql.Where(SQL_expression(f"id = (SELECT MAX(id) FROM {self.table})"))
+            sql.Where(sql.get_class(SQL_expression)(f"id = (SELECT MAX(id) FROM {self.table})"))
         self.db_data = await(await sql.execute(close = 1).rslt).fetchone()
 
         if self._db_data:
