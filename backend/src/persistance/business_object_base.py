@@ -8,7 +8,7 @@ from datetime import date, datetime, UTC
 from persistance.bo_descriptors import BO_int, BO_datetime
 from core.app import App
 from db.sql import SQL
-from db.sql_statement import SQL, eq, SQL_expression
+from db.sql_statement import SQL, eq, SQL_expression, Values, Row, Value, Insert, Create_Table
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -54,19 +54,11 @@ class BO_Base:
     @classmethod
     async def sql_create_table(cls):
 
-        sql = SQL().create_table(
-            cls.table,
-            [
-                c for c in cls.attribute_descriptions()
-            ]
-        ).execute(close = False)
-
-        """ cols = [
-            App.db.sql(SQL.CREATE_TABLE_COLUMN, column=c)
-            for c in cls.attribute_descriptions()
-        ]
-        sql = App.db.sql(SQL.CREATE_TABLE, table=cls.table, columns=cols)
-        await App.db.execute(query=sql, close=0) """
+        attributes = cls.attribute_descriptions()
+        sql:Create_Table = SQL(App.db).create_table(cls.table)
+        for attr in attributes:
+            sql.column(attr[0], attr[1], attr[2])
+        sql.execute(close = 0)
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
@@ -87,23 +79,20 @@ class BO_Base:
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
-        # LOG.debug(f"{self}.fetch({id=},{newest=})")
         if id is None:
             id = self.id
         if id is None and newest is None:
             LOG.debug(f"fetching {self} without id or newest")
             return self
         LOG.debug(f"fetching {self} with newest={newest}")
-        #sql = App.db.sql(SQL.SELECT, table=self.table, id=id, newest=newest)
         
-        sql = SQL(App.db).select([], True)
+        sql = SQL(App.db).select([], True).From(self.table)
         if self.id is not None:
-            sql.From(self.table).Where(eq('id',id))
+            sql.Where(eq('id',id))
         elif newest:
-            sql.From(self.table).Where(SQL_expression(f"id = (SELECT MAX(id) FROM {self.table})"))
-        db_data = await(await sql.execute(close = 1).rslt).fetchone()
-        self._db_data = db_data
-        #self._db_data = await (await App.db.execute(sql, close=1)).fetchone()
+            sql.Where(SQL_expression(f"id = (SELECT MAX(id) FROM {self.table})"))
+        self.db_data = await(await sql.execute(close = 1).rslt).fetchone()
+
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
                 if attr == "u1.last_updated":
@@ -116,54 +105,45 @@ class BO_Base:
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
-        # LOG.debug(f"{self}.store()")
         if self.id is None:
-            try:
-                values = {
-                    k: v for k, v in self._data.items() if v is not None and k != "id"
-                }
-                if values:
-                    query = App.db.sql(
-                        SQL.INSERT_ARGS,
-                        table=self.table,
-                        columns=values,
-                        returning=("id"),
-                    )
-                    LOG.debug(f"{query=}  {values=}")
-                    cur = await App.db.execute(
-                        query=query,
-                        params=values,
-                        close=1,
-                        commit=True,
-                    )
-                    returned = await cur.fetchone()
-                    self.id = returned.get("id")
-            except Exception as err:
-                LOG.error(f"Error during INSERT of {self} into DB: {err}")
-            else:
-                await self.fetch()
+            self._insert_self()
         else:
-            try:
-                self.last_updated = datetime.now(UTC)
-                values = {
-                    k: v
-                    for k, v in self._data.items()
-                    if k != "id"
-                    and self._data[k]
-                    != self.convert_from_db(
-                        self._db_data[k], self.attributes_as_dict()[k]
-                    )
-                }
-                query = App.db.sql(SQL.UPDATE_ARGS, table=self.table, columns=values)
-                # LOG.debug(f"{query=}  {self._data=}")
-                await App.db.execute(
-                    query=query,
-                    params=self._data,
-                    close=0,
-                    commit=True,
+            self._update_self()
+
+    async def _insert_self(self):
+        assert self.id is None, "id must be None for insert operation"
+        sql = SQL(App.db)
+        value_class = sql.get_class(Value)
+        insert:Insert = sql.insert(self.table)
+        values = sql.get_class(Values)()
+        row = sql.get_class(Row)()
+        for k, v in self._data.items():
+            if v is not None and k != "id":
+                insert.column(k)
+                row.value(value_class(v))
+        insert.values(row).returning("id")
+        LOG.debug(sql.sql())
+        cur = await sql.execute(close=1, commit=True).rslt
+        returned = await cur.fetchone()
+        self.id = returned.get("id")
+
+    async def _update_self(self):
+        assert self.id is not None, "id must not be None for update operation"
+        sql = SQL(App.db)
+        value_class = sql.get_class(Value)
+        try:
+            sql = sql.update(self.table)
+            {
+                sql.assignment(k, value_class(v)) for k, v in self._data.items()
+                if k != "id"
+                and self._data[k]
+                != self.convert_from_db(
+                    self._db_data[k], self.attributes_as_dict()[k]
                 )
-            finally:
-                await self.fetch()
+            }
+            await sql.execute(close=0, commit=True)
+        finally:
+            await self.fetch()
 
 
 LOG.debug(f"module {__name__} initialized")

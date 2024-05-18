@@ -20,7 +20,7 @@ class PersistantAttr:
         elif self._current_date_time:
             cols = (name, self.data_type(), "dt")
         else:
-            cols = (name, self.data_type())
+            cols = (name, self.data_type(), None)
         if not owner._attributes.get(owner.__name__):
             owner._attributes[owner.__name__] = []
         owner._attributes[owner.__name__].append(cols)
