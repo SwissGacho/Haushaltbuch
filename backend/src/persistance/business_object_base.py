@@ -8,7 +8,16 @@ from datetime import date, datetime, UTC
 from persistance.bo_descriptors import BO_int, BO_datetime
 from core.app import App
 from db.sql import SQL
-from db.sql_statement import SQL, eq, SQL_expression, Values, Row, Value, Insert, Create_Table
+from db.sql_statement import (
+    SQL,
+    eq,
+    SQL_expression,
+    Values,
+    Row,
+    Value,
+    Insert,
+    Create_Table,
+)
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -55,10 +64,10 @@ class BO_Base:
     async def sql_create_table(cls):
 
         attributes = cls.attribute_descriptions()
-        sql:Create_Table = SQL(App.db).create_table(cls.table)
+        sql: Create_Table = SQL(App.db).create_table(cls.table)
         for attr in attributes:
             sql.column(attr[0], attr[1], attr[2])
-        sql.execute(close = 0)
+        sql.execute(close=0)
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
@@ -85,13 +94,17 @@ class BO_Base:
             LOG.debug(f"fetching {self} without id or newest")
             return self
         LOG.debug(f"fetching {self} with newest={newest}")
-        
+
         sql = SQL(App.db).select([], True).From(self.table)
         if self.id is not None:
-            sql.Where(sql.get_sql_class(eq)('id',id))
+            sql.Where(sql.get_sql_class(eq)("id", id))
         elif newest:
-            sql.Where(sql.get_class(SQL_expression)(f"id = (SELECT MAX(id) FROM {self.table})"))
-        self.db_data = await(await sql.execute(close = 1)).fetchone()
+            sql.Where(
+                sql.get_class(SQL_expression)(
+                    f"id = (SELECT MAX(id) FROM {self.table})"
+                )
+            )
+        self.db_data = await (await sql.execute(close=1)).fetchone()
 
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
@@ -113,15 +126,10 @@ class BO_Base:
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
         sql = SQL(App.db)
-        value_class = sql.get_sql_class(Value)
-        insert:Insert = sql.insert(self.table)
-        values = sql.get_sql_class(Values)()
-        row = sql.get_sql_class(Row)()
-        for k, v in self._data.items():
-            if v is not None and k != "id":
-                insert.column(k)
-                row.value(value_class(v))
-        insert.values(row).returning("id")
+        insert: Insert = sql.insert(self.table)
+        insert.single_row(
+            [(k, v) for k, v in self._data.items() if k != "id" and v is not None]
+        ).returning("id")
         LOG.debug(sql.sql())
         cur = await sql.execute(close=1, commit=True)
         returned = await cur.fetchone()
@@ -133,14 +141,12 @@ class BO_Base:
         value_class = sql.get_sql_class(Value)
         try:
             sql = sql.update(self.table)
-            {
-                sql.assignment(k, value_class(v)) for k, v in self._data.items()
-                if k != "id"
-                and self._data[k]
-                != self.convert_from_db(
+            for k, v in self._data.items():
+                if k != "id" and self._data[k] != self.convert_from_db(
                     self._db_data[k], self.attributes_as_dict()[k]
-                )
-            }
+                ):
+
+                    sql.assignment(k, value_class(v))
             await sql.execute(close=0, commit=True)
         finally:
             await self.fetch()
