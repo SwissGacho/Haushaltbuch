@@ -36,7 +36,7 @@ class SQLiteColumnDefinition(SQL_column_definition):
 
 class SQLiteSQLFactory(SQLFactory):
 
-    def getClass(self, sql_cls: type):
+    def get_sql_class(self, sql_cls: type):
         if sql_cls.__name__ in [b.__name__ for b in SQLiteColumnDefinition.__bases__ ]:
             return SQLiteColumnDefinition
         return super.getClass(sql_cls)

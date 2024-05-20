@@ -33,8 +33,8 @@ class SQL_Executable(object):
     def close(self):
         return self.parent.close()
     
-    def get_class(self, sql_cls:type)->type:
-        return self.sqlFactory.getClass(sql_cls)
+    def get_sql_class(self, sql_cls:type)->type:
+        return self.sqlFactory.get_sql_class(sql_cls)
     
     @property
     def sqlFactory(self)->SQLFactory:
@@ -67,35 +67,35 @@ class SQL(SQL_Executable):
         self.sql_statment:'SQL_statement' = None
 
     def create_table(self, table:str, columns:list[(str, SQL_data_type)])->"Create_Table":
-        create_table = self.get_class(Create_Table)(table, columns, self)
+        create_table = self.get_sql_class(Create_Table)(table, columns, self)
         #create_table = Create_Table(table, columns, self)
         self.sql_statement = create_table
         return create_table
 
     def select(self, column_list:list[str] = [], distinct:bool=False)->"Select":
-        select = self.get_class(Select)(column_list, distinct, self)
+        select = self.get_sql_class(Select)(column_list, distinct, self)
         self.sql_statement = select
         return select
 
     def insert(self, table:str, columns:list[str] = [])->"Insert":
-        insert = self.get_class(Insert)(table, columns, parent=self)
+        insert = self.get_sql_class(Insert)(table, columns, parent=self)
         self.sql_statement = insert
         return insert
 
     def update(self, table:str)->"Update":
-        update = self.get_class(Update)(table, parent=self)
+        update = self.get_sql_class(Update)(table, parent=self)
         self.sql_statement = update
         return update
 
     def script(self, script:str)->"SQL_script":
-        self.sql_statement = self.get_class(SQL_script)(script, self)
+        self.sql_statement = self.get_sql_class(SQL_script)(script, self)
         return self.sql_statement
 
     def execute(self, params=None, close=False, commit=False):
         if self.sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
-        self.rslt = self.db.execute(self.sql(), params, close, commit)
-        return self
+        return self.db.execute(self.sql(), params, close, commit)
+        #return self
 
     def close(self):
         self.db.close()
@@ -134,11 +134,11 @@ class Create_Table(SQL_statement):
     def __init__(self, table:str='', columns:list[(str, SQL_data_type, str)]=[], parent:SQL_Executable=None):
         self.table = table
         super().__init__(parent)
-        sQL_column_definition = self.sqlFactory.getClass(SQL_column_definition)
+        sQL_column_definition = self.sqlFactory.get_sql_class(SQL_column_definition)
         self.columns = [sQL_column_definition(name, data_type, constraint) for name, data_type,  constraint in columns]
 
     def column(self, name:str, data_type:SQL_data_type, constraint:str=None):
-        self.columns.append(self.sqlFactory.getClass(SQL_column_definition)(name, data_type, constraint))
+        self.columns.append(self.sqlFactory.get_sql_class(SQL_column_definition)(name, data_type, constraint))
         return self
 
     def sql(self)->str:
@@ -360,17 +360,17 @@ class Select(Table_Valued_Query):
         return self
 
     def From(self, table:str|Table_Valued_Query):
-        from_table = self.sqlFactory.getClass(From)(table)
+        from_table = self.sqlFactory.get_sql_class(From)(table)
         self.from_statement = from_table
         return self
 
     def Where(self, condition:SQL_expression):
-        where = self.sqlFactory.getClass(Where)(condition)
+        where = self.sqlFactory.get_sql_class(Where)(condition)
         self.where = where
         return self
 
     def Having(self, condition:SQL_expression):
-        having = self.sqlFactory.getClass(Having)(condition)
+        having = self.sqlFactory.get_sql_class(Having)(condition)
         self.having = having
         return self
 
@@ -407,11 +407,11 @@ class Update(SQL_statement):
         super().__init__(parent)
 
     def assignment(self, columns:list[str] | str, value:Value):
-        self.assignments.append(self.sqlFactory.getClass(Assignment)(columns, value))
+        self.assignments.append(self.sqlFactory.get_sql_class(Assignment)(columns, value))
         return self
     
     def Where(self, condition:SQL_expression):
-        where:Where = self.sqlFactory.getClass(Where)(condition)
+        where:Where = self.sqlFactory.get_sql_class(Where)(condition)
         self.where = where
         return self
 

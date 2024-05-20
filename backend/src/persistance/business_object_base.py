@@ -88,7 +88,7 @@ class BO_Base:
         
         sql = SQL(App.db).select([], True).From(self.table)
         if self.id is not None:
-            sql.Where(sql.get_class(eq)('id',id))
+            sql.Where(sql.get_sql_class(eq)('id',id))
         elif newest:
             sql.Where(sql.get_class(SQL_expression)(f"id = (SELECT MAX(id) FROM {self.table})"))
         self.db_data = await(await sql.execute(close = 1).rslt).fetchone()
@@ -113,10 +113,10 @@ class BO_Base:
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
         sql = SQL(App.db)
-        value_class = sql.get_class(Value)
+        value_class = sql.get_sql_class(Value)
         insert:Insert = sql.insert(self.table)
-        values = sql.get_class(Values)()
-        row = sql.get_class(Row)()
+        values = sql.get_sql_class(Values)()
+        row = sql.get_sql_class(Row)()
         for k, v in self._data.items():
             if v is not None and k != "id":
                 insert.column(k)
@@ -130,7 +130,7 @@ class BO_Base:
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
         sql = SQL(App.db)
-        value_class = sql.get_class(Value)
+        value_class = sql.get_sql_class(Value)
         try:
             sql = sql.update(self.table)
             {
