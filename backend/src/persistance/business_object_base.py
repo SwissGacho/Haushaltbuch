@@ -91,7 +91,7 @@ class BO_Base:
             sql.Where(sql.get_sql_class(eq)('id',id))
         elif newest:
             sql.Where(sql.get_class(SQL_expression)(f"id = (SELECT MAX(id) FROM {self.table})"))
-        self.db_data = await(await sql.execute(close = 1).rslt).fetchone()
+        self.db_data = await(await sql.execute(close = 1)).fetchone()
 
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
@@ -123,7 +123,7 @@ class BO_Base:
                 row.value(value_class(v))
         insert.values(row).returning("id")
         LOG.debug(sql.sql())
-        cur = await sql.execute(close=1, commit=True).rslt
+        cur = await sql.execute(close=1, commit=True)
         returned = await cur.fetchone()
         self.id = returned.get("id")
 

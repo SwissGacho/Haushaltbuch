@@ -27,11 +27,11 @@ class InvalidSQLStatementException(Exception):
 class SQL_Executable(object):
     parent:'SQL_Executable' = None
 
-    def execute(self, params=None, close=False, commit=False):
-        return self.parent.execute(params=params, close=close, commit=commit)
+    async def execute(self, params=None, close=False, commit=False):
+        return await self.parent.execute(params=params, close=close, commit=commit)
     
-    def close(self):
-        return self.parent.close()
+    async def close(self):
+        await self.parent.close()
     
     def get_sql_class(self, sql_cls:type)->type:
         return self.sqlFactory.get_sql_class(sql_cls)
@@ -91,14 +91,13 @@ class SQL(SQL_Executable):
         self.sql_statement = self.get_sql_class(SQL_script)(script, self)
         return self.sql_statement
 
-    def execute(self, params=None, close=False, commit=False):
+    async def execute(self, params=None, close=False, commit=False):
         if self.sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
-        return self.db.execute(self.sql(), params, close, commit)
-        #return self
+        return await self.db.execute(self.sql(), params, close, commit)
 
-    def close(self):
-        self.db.close()
+    async def close(self):
+        await self.db.close()
 
 
 class SQL_statement(SQL_Executable):
