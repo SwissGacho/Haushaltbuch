@@ -56,15 +56,14 @@ class SQL(SQL_Executable):
             raise InvalidSQLStatementException("No SQL statement to execute.")
         return self.sql_statement.sql()
 
-    rslt = None
-    sql_statement = None
-
     @property
     def sqlFactory(self)->SQLFactory:
         return self.db.sqlFactory
 
     def __init__(self, db:DB):
         self.db = db
+        self.rslt = None
+        self.sql_statement = None
         self.sql_statment:'SQL_statement' = None
 
     def create_table(self, table:str, columns:list[(str, SQL_data_type)])->"Create_Table":
@@ -331,12 +330,11 @@ class Select(Table_Valued_Query):
     def __init__(self, column_list:list[str] = [], distinct:bool=False, parent:SQL_Executable=None):
         self.column_list = column_list
         self.distinct = distinct
+        self.from_statement:Table_Valued_Query = None
+        self.where: Where = None
+        self.group_by: Group_By = None
+        self.having: Having = None
         super().__init__(parent)
-
-    from_statement: Table_Valued_Query = None
-    where: Where = None
-    group_by: Group_By = None
-    having: Having = None
 
     def sql(self)->str:
         if self.from_statement is None:

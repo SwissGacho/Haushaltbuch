@@ -37,7 +37,7 @@ class SQLiteColumnDefinition(SQL_column_definition):
 class SQLiteSQLFactory(SQLFactory):
 
     def getClass(self, sql_cls: type):
-        if sql_cls.__name__ == "SQL_column_definition":
+        if sql_cls.__name__ in [b.__name__ for b in SQLiteColumnDefinition.__bases__ ]:
             return SQLiteColumnDefinition
         return super.getClass(sql_cls)
 
@@ -47,7 +47,9 @@ class SQLiteDB(DB):
             raise ModuleNotFoundError(f"Import error: {AIOSQLITE_IMPORT_ERROR}")
         super().__init__(**cfg)
 
-    sqlFactory = SQLiteSQLFactory
+    @property
+    def sqlFactory():
+        return SQLiteSQLFactory
 
     async def connect(self):
         "Open a connection"

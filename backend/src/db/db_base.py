@@ -15,7 +15,9 @@ class DB:
         self._cfg = cfg
         self._connections = set()
 
-    sqlFactory = SQLFactory
+    @property
+    def sqlFactory():
+        raise NotImplementedError("sqlFactory not defined on base class")
 
     def sql(self, query: SQL, **kwargs) -> str:
         "return the DB specific SQL"
