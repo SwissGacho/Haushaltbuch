@@ -77,7 +77,7 @@ class WS_Connection:
         "accept a message from the client and trigger according actions"
         # self.LOG.debug(f"handle {message=} {message.message=} {message.token=}")
         if message.token == self._token:
-            self.LOG.debug(f"Received login")
+            self.LOG.debug(f"Received message")
             await message.handle_message(self)
         else:
             self.LOG.warning(f"Received invalid token {message.token}")
