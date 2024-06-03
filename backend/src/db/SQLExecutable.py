@@ -145,10 +145,10 @@ class Create_Table(SQL_statement):
         self.columns = [] if columns is None else columns
         self.table = table
         super().__init__(parent)
-        sQL_column_definition = self.sqlFactory.get_sql_class(SQL_column_definition)
+        sql_column_definition = self.sqlFactory.get_sql_class(SQL_column_definition)
         self.columns = [
-            sQL_column_definition(name, data_type, constraint)
-            for name, data_type, constraint in columns
+            sql_column_definition(name, data_type, constraint)
+            for name, data_type, constraint in self.columns
         ]
 
     def column(self, name: str, data_type: SQLDataType, constraint: str = None):
@@ -280,6 +280,7 @@ class Insert(SQL_statement):
 class Update(SQL_statement):
     def __init__(self, table: str, parent: SQLExecutable = None):
         self.table = table
+        self.where: Where = None
         self.assignments: List[Assignment] = []
         super().__init__(parent)
 
