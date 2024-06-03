@@ -3,7 +3,6 @@
 from enum import Enum
 from typing import List
 
-from db.SQLExecutable import SQLExecutable
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -16,33 +15,7 @@ class join_operator(Enum):
     FULL = "FULL OUTER JOIN"
 
 
-class From(SQL_statement):
-    def __init__(self, table):
-        self.table = table
-        self.joins: List[(join_operator, Table_Valued_Query | str, SQL_expression)] = []
-
-    def sql(self) -> str:
-        sql = ""
-        if isinstance(self.table, Table_Valued_Query):
-            sql = f" FROM ({self.table.sql()})"
-        else:
-            sql = f" FROM {self.table}"
-            if len(self.joins) > 0:
-                sql += f" ".join(
-                    ["{join[0]} {join[1]} ON {join[2].sql()}" for join in self.joins]
-                )
-        return sql
-
-    def join(
-        self,
-        table=None,
-        join_constraint: "SQL_expression" = None,
-        join_operator: join_operator = join_operator.FULL,
-    ):
-        self.joins.append((join_operator, table, join_constraint))
-
-
-class SQL_expression:
+class SQLExpression:
     def __init__(self, expression: str):
         expression = "Null" if expression is None else expression
         self.expression = expression
@@ -51,8 +24,30 @@ class SQL_expression:
         return self.expression
 
 
-class SQL_multi_expression(SQL_expression):
-    def __init__(self, arguments: List[SQL_expression]):
+class From(SQLExpression):
+    def __init__(self, table):
+        self.table = table
+        self.joins: List[(join_operator, str, SQLExpression)] = []
+
+    def sql(self) -> str:
+        sql = f" FROM {self.table}"
+        if len(self.joins) > 0:
+            sql += f" ".join(
+                ["{join[0]} {join[1]} ON {join[2].sql()}" for join in self.joins]
+            )
+        return sql
+
+    def join(
+        self,
+        table=None,
+        join_constraint: "SQLExpression" = None,
+        join_operator: join_operator = join_operator.FULL,
+    ):
+        self.joins.append((join_operator, table, join_constraint))
+
+
+class SQL_multi_expression(SQLExpression):
+    def __init__(self, arguments: List[SQLExpression]):
         self.arguments = arguments
 
     operator: str = None
@@ -73,12 +68,10 @@ class OR(SQL_multi_expression):
     operator = "OR"
 
 
-class SQL_binary_expression(SQL_expression):
-    def __init__(self, left: SQL_expression | str, right: SQL_expression | str):
-        self.left = left if isinstance(left, SQL_expression) else SQL_expression(left)
-        self.right = (
-            right if isinstance(right, SQL_expression) else SQL_expression(right)
-        )
+class SQL_binary_expression(SQLExpression):
+    def __init__(self, left: SQLExpression | str, right: SQLExpression | str):
+        self.left = left if isinstance(left, SQLExpression) else SQLExpression(left)
+        self.right = right if isinstance(right, SQLExpression) else SQLExpression(right)
 
     operator = None
 
@@ -94,23 +87,19 @@ class eq(SQL_binary_expression):
     operator = "="
 
 
-class SQL_ternary_expression(SQL_expression):
+class SQL_ternary_expression(SQLExpression):
 
     def __init__(
         self,
-        first: SQL_expression | str,
-        second: SQL_expression | str,
-        third: SQL_expression | str,
+        first: SQLExpression | str,
+        second: SQLExpression | str,
+        third: SQLExpression | str,
     ):
-        self.first = (
-            first if isinstance(first, SQL_expression) else SQL_expression(first)
-        )
+        self.first = first if isinstance(first, SQLExpression) else SQLExpression(first)
         self.second = (
-            second if isinstance(second, SQL_expression) else SQL_expression(second)
+            second if isinstance(second, SQLExpression) else SQLExpression(second)
         )
-        self.third = (
-            third if isinstance(third, SQL_expression) else SQL_expression(third)
-        )
+        self.third = third if isinstance(third, SQLExpression) else SQLExpression(third)
 
     operator_one = None
     operator_two = None
@@ -130,7 +119,7 @@ class SQL_between(SQL_ternary_expression):
     operator_two = "AND"
 
 
-class Value(SQL_expression):
+class Value(SQLExpression):
     def _init__(self, value: str):
         self.value = value
 
@@ -138,7 +127,7 @@ class Value(SQL_expression):
         return self.value
 
 
-class Row(SQL_expression):
+class Row(SQLExpression):
     def __init__(self, values: list[Value]):
         self.values = values
 
@@ -150,7 +139,7 @@ class Row(SQL_expression):
         return f"({', '.join([value.sql() for value in self.values])})"
 
 
-class Values(SQL_expression):
+class Values(SQLExpression):
     def __init__(self, rows: list[Row]):
         self.rows = rows
 
@@ -162,7 +151,7 @@ class Values(SQL_expression):
         return f"VALUES {', '.join([row.sql() for row in self.rows])}"
 
 
-class Assignment(SQL_expression):
+class Assignment(SQLExpression):
     def __init__(
         self,
         columns: list[str] | str,
@@ -181,15 +170,15 @@ class Assignment(SQL_expression):
         return sql
 
 
-class Where(SQL_expression):
-    def __init__(self, condition: SQL_expression):
+class Where(SQLExpression):
+    def __init__(self, condition: SQLExpression):
         self.condition = condition
 
     def sql(self) -> str:
         return f" WHERE {self.condition.sql()}"
 
 
-class Group_By(SQL_expression):
+class Group_By(SQLExpression):
     def __init__(self, column_list: list[str]):
         self.column_list = column_list
 
@@ -197,9 +186,27 @@ class Group_By(SQL_expression):
         "GROUP BY {', '.join(self.column_list)}"
 
 
-class Having(SQL_expression):
-    def __init__(self, condition: SQL_expression):
+class Having(SQLExpression):
+    def __init__(self, condition: SQLExpression):
         self.condition = condition
 
     def sql(self) -> str:
         return f" HAVING {self.condition.sql()}"
+
+
+class SQL_column_definition(SQLExpression):
+
+    type_map = {}
+
+    def __init__(self, name: str, data_type: type, constraint: str = None):
+        self.name = name
+        if data_type in self.type_map:
+            self.data_type = self.__class__.type_map[data_type]
+        else:
+            raise ValueError(
+                f"Unsupported data type for a {self.__class__.__name__}: {type}"
+            )
+        self.constraint = constraint
+
+    def sql(self) -> str:
+        return f"{self.name} {self.data_type} {self.constraint}"

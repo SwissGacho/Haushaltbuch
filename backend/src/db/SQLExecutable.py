@@ -1,7 +1,17 @@
 from enum import Enum, auto
+from db.SQLExpression import (
+    SQLExpression,
+    SQL_column_definition,
+    Value,
+    Row,
+    Values,
+    Assignment,
+    Where,
+    Group_By,
+    Having,
+)
 from db.SQLFactory import SQLFactory
 from db.db_base import DB
-from db.sql_statement import Create_Table
 
 
 class InvalidSQLStatementException(Exception):
@@ -123,24 +133,6 @@ class SQL_script(SQL_statement):
         return self.script
 
 
-class SQL_column_definition(SQL_statement):
-
-    type_map = {}
-
-    def __init__(self, name: str, data_type: type, constraint: str = None):
-        self.name = name
-        if data_type in self.type_map:
-            self.data_type = self.__class__.type_map[data_type]
-        else:
-            raise ValueError(
-                f"Unsupported data type for a {self.__class__.__name__}: {type}"
-            )
-        self.constraint = constraint
-
-    def sql(self) -> str:
-        return f"{self.name} {self.data_type} {self.constraint}"
-
-
 class Create_Table(SQL_statement):
     def __init__(
         self,
@@ -174,7 +166,7 @@ class Create_Table(SQL_statement):
         )
 
 
-class Table_Valued_Query(SQL_statement):
+class TableValuedQuery(SQL_statement):
 
     def __init__(self, parent: SQLExecutable):
         super().__init__(parent)
@@ -185,7 +177,7 @@ class Table_Valued_Query(SQL_statement):
         )
 
 
-class Select(Table_Valued_Query):
+class Select(TableValuedQuery):
     def __init__(
         self,
         column_list: list[str] = None,
@@ -195,7 +187,7 @@ class Select(Table_Valued_Query):
         column_list = [] if column_list is None else column_list
         self.column_list = column_list
         self.distinct = distinct
-        self.from_statement: Table_Valued_Query = None
+        self.from_statement: TableValuedQuery = None
         self.where: Where = None
         self.group_by: Group_By = None
         self.having: Having = None
@@ -226,17 +218,17 @@ class Select(Table_Valued_Query):
         self.column_list = column_list
         return self
 
-    def From(self, table: str | Table_Valued_Query):
+    def From(self, table: str | TableValuedQuery):
         from_table = self.sqlFactory.get_sql_class(From)(table)
         self.from_statement = from_table
         return self
 
-    def Where(self, condition: SQL_expression):
+    def Where(self, condition: SQLExpression):
         where = self.sqlFactory.get_sql_class(Where)(condition)
         self.where = where
         return self
 
-    def Having(self, condition: SQL_expression):
+    def Having(self, condition: SQLExpression):
         having = self.sqlFactory.get_sql_class(Having)(condition)
         self.having = having
         return self
@@ -293,7 +285,7 @@ class Update(SQL_statement):
         )
         return self
 
-    def Where(self, condition: SQL_expression):
+    def Where(self, condition: SQLExpression):
         where: Where = self.sqlFactory.get_sql_class(Where)(condition)
         self.where = where
         return self

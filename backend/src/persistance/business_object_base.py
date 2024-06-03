@@ -7,11 +7,10 @@ from datetime import date, datetime, UTC
 
 from persistance.bo_descriptors import BO_int, BO_datetime
 from core.app import App
-from db.sql import SQL
-from db.sql_statement import (
+from db.SQLExpression import (
     SQL,
     eq,
-    SQL_expression,
+    SQLExpression,
     Values,
     Row,
     Value,
@@ -100,9 +99,7 @@ class BO_Base:
             sql.Where(sql.get_sql_class(eq)("id", id))
         elif newest:
             sql.Where(
-                sql.get_class(SQL_expression)(
-                    f"id = (SELECT MAX(id) FROM {self.table})"
-                )
+                sql.get_class(SQLExpression)(f"id = (SELECT MAX(id) FROM {self.table})")
             )
         self.db_data = await (await sql.execute(close=1)).fetchone()
 
@@ -145,7 +142,6 @@ class BO_Base:
                 if k != "id" and self._data[k] != self.convert_from_db(
                     self._db_data[k], self.attributes_as_dict()[k]
                 ):
-
                     sql.assignment(k, value_class(v))
             await sql.execute(close=0, commit=True)
         finally:

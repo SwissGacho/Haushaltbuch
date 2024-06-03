@@ -6,7 +6,7 @@ from core.exceptions import OperationalError
 from core.config import Config
 from core.app_logging import getLogger
 from db.db_base import DB, Connection, Cursor
-from db.sql_statement import SQL, SQL_column_definition
+from db.SQLExecutable import SQL, SQL_column_definition
 from db.SQLFactory import SQLFactory
 
 LOG = getLogger(__name__)
@@ -18,28 +18,19 @@ except ModuleNotFoundError as err:
 else:
     AIOSQLITE_IMPORT_ERROR = None
 
+
 class SQLiteColumnDefinition(SQL_column_definition):
 
-    type_map = {
-        int: "INTEGER",
-        float: "REAL",
-        str: "TEXT",
-        datetime.datetime: "TEXT"
-    }
+    type_map = {int: "INTEGER", float: "REAL", str: "TEXT", datetime.datetime: "TEXT"}
 
-    def __init__(self, name:str, data_type:type, constraint:str=None):
-        if type in self.type_map:
-            self.data_type = self.type_map[type]
-            self.name = name
-        else:
-            raise ValueError(f"Unsupported data type for an SQLite Column definition: {type}")
 
 class SQLiteSQLFactory(SQLFactory):
 
     def get_sql_class(self, sql_cls: type):
-        if sql_cls.__name__ in [b.__name__ for b in SQLiteColumnDefinition.__bases__ ]:
+        if sql_cls.__name__ in [b.__name__ for b in SQLiteColumnDefinition.__bases__]:
             return SQLiteColumnDefinition
         return super.getClass(sql_cls)
+
 
 class SQLiteDB(DB):
     def __init__(self, **cfg) -> None:
@@ -48,7 +39,7 @@ class SQLiteDB(DB):
         super().__init__(**cfg)
 
     @property
-    def sqlFactory():
+    def sqlFactory(self):
         return SQLiteSQLFactory
 
     async def connect(self):
