@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 
 from db.SQLExpression import (
     eq,
@@ -53,8 +53,8 @@ class AsyncTestSQLExecutable(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
         mockParent = SQLExecutable()
-        mockParent.execute = Mock(return_value="Mock execute")
-        mockParent.close = Mock(return_value="Mock close")
+        mockParent.execute = AsyncMock(return_value="Mock execute")
+        mockParent.close = AsyncMock(return_value="Mock close")
         self.sql = SQLExecutable()
         self.sql.parent = mockParent
 
@@ -62,33 +62,82 @@ class AsyncTestSQLExecutable(unittest.IsolatedAsyncioTestCase):
         SQLExecutable = self.sql
 
         # Test the execute method
-        SQLExecutable.execute(params="params", close=True, commit=False)
+        await SQLExecutable.execute(params="params", close=True, commit=False)
         SQLExecutable.parent.execute.assert_called_once()
 
-
-class TestSQLExecutable(unittest.TestCase):
-
-    def setUp(self) -> None:
-        mockParent = SQLExecutable()
-        mockParent.execute = Mock(return_value="Mock execute")
-        mockParent.close = Mock(return_value="Mock close")
-        self.sql = SQLExecutable()
-        self.sql.parent = mockParent
-
-    def test002_close(self):
+    async def test002_close(self):
         SQLExecutable = self.sql
 
         # Test the close method
-        SQLExecutable.close()
+        await SQLExecutable.close()
         SQLExecutable.parent.close.assert_called_once()
+
+
+class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self) -> None:
+        mockDB = MockDB()
+        mockDB.execute = AsyncMock(return_value="Mock execute")
+        mockDB.close = AsyncMock(return_value="Mock close")
+        self.sql = SQL(mockDB)
+
+    async def test104_execute_default(self):
+        """Test exception when no SQL statement is set"""
+        # Test the execute method
+        with self.assertRaises(InvalidSQLStatementException):
+            await self.sql.execute()
+
+    async def test105_execute(self):
+        """Test direct execute method when an SQL statement is set"""
+
+        # Test the execute method
+        self.sql.create_table(
+            "users",
+            [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
+        )
+        await self.sql.execute()
+        self.sql.db.execute.assert_called_once()
+
+    async def test106_execute_indirect(self):
+        """Test indirect execute method when an SQL statement is set"""
+
+        # Test the execute method
+        self.sql.create_table(
+            "users",
+            [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
+        )
+        await self.sql.sql_statement.execute()
+        self.sql.db.execute.assert_called_once()
+
+    async def test107_close(self):
+        """Test direct execute method when an SQL statement is set"""
+
+        # Test the close method
+        self.sql.create_table(
+            "users",
+            [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
+        )
+        await self.sql.close()
+        self.sql.db.close.assert_called_once()
+
+    async def test108_close_indirect(self):
+        """Test indirect execute method when an SQL statement is set"""
+
+        # Test the close method
+        self.sql.create_table(
+            "users",
+            [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
+        )
+        await self.sql.sql_statement.close()
+        self.sql.db.close.assert_called_once()
 
 
 class TestSQL(unittest.TestCase):
 
     def setUp(self) -> None:
         mockDB = MockDB()
-        mockDB.execute = Mock(return_value="Mock execute")
-        mockDB.close = Mock(return_value="Mock close")
+        mockDB.execute = AsyncMock(return_value="Mock execute")
+        mockDB.close = AsyncMock(return_value="Mock close")
         self.sql = SQL(mockDB)
 
     def checkPrimaryStatement(self, statement: SQL_statement, type):
@@ -121,56 +170,6 @@ class TestSQL(unittest.TestCase):
         # Test the insert method
         result = sql.insert("users", ["name", "age"])
         self.checkPrimaryStatement(result, Insert)
-
-    def test104_execute_default(self):
-        """Test exception when no SQL statement is set"""
-        # Test the execute method
-        with self.assertRaises(InvalidSQLStatementException):
-            self.sql.execute()
-
-    def test105_execute(self):
-        """Test direct execute method when an SQL statement is set"""
-
-        # Test the execute method
-        self.sql.create_table(
-            "users",
-            [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
-        )
-        self.sql.execute()
-        self.sql.db.execute.assert_called_once()
-
-    def test106_execute_indirect(self):
-        """Test indirect execute method when an SQL statement is set"""
-
-        # Test the execute method
-        self.sql.create_table(
-            "users",
-            [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
-        )
-        self.sql.sql_statement.execute()
-        self.sql.db.execute.assert_called_once()
-
-    def test107_close(self):
-        """Test direct execute method when an SQL statement is set"""
-
-        # Test the close method
-        self.sql.create_table(
-            "users",
-            [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
-        )
-        self.sql.close()
-        self.sql.db.close.assert_called_once()
-
-    def test108_close_indirect(self):
-        """Test indirect execute method when an SQL statement is set"""
-
-        # Test the close method
-        self.sql.create_table(
-            "users",
-            [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
-        )
-        self.sql.sql_statement.close()
-        self.sql.db.close.assert_called_once()
 
     def test109_sql(self):
         """Test the sql method"""
