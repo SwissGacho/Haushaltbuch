@@ -1,5 +1,6 @@
 from enum import Enum, auto
-from db.SQLExpression import (
+from typing import List
+from .SQLExpression import (
     SQLExpression,
     SQL_column_definition,
     Value,
@@ -10,8 +11,9 @@ from db.SQLExpression import (
     Group_By,
     Having,
 )
-from db.SQLFactory import SQLFactory
-from db.db_base import DB
+from .SQLExpression import From
+from .SQLFactory import SQLFactory
+from .db_base import DB
 
 
 class InvalidSQLStatementException(Exception):
@@ -137,9 +139,10 @@ class Create_Table(SQL_statement):
     def __init__(
         self,
         table: str = "",
-        columns: list[(str, SQLDataType, str)] = [],
+        columns: list[(str, SQLDataType, str)] = None,
         parent: SQLExecutable = None,
     ):
+        self.columns = [] if columns is None else columns
         self.table = table
         super().__init__(parent)
         sQL_column_definition = self.sqlFactory.get_sql_class(SQL_column_definition)
@@ -238,10 +241,11 @@ class Insert(SQL_statement):
     def __init__(
         self,
         table: str,
-        columns: list[str] = [],
+        columns: list[str] = None,
         rows=None,
         parent: SQLExecutable = None,
     ):
+        self.columns = [] if columns is None else columns
         self.table = table
         self.columns = columns
         self.rows = rows
