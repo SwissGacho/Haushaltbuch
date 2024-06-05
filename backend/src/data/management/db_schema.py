@@ -1,7 +1,7 @@
 """ Maintain database schemas """
 
 from persistance.business_object_base import BO_Base
-from persistance.bo_descriptors import BO_int
+from persistance.bo_descriptors import BOInt
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -9,7 +9,7 @@ LOG = getLogger(__name__)
 
 class DB_Schema(BO_Base):
     _table = "schema_versions"
-    version_nr = BO_int()
+    version_nr = BOInt()
 
     def __init__(self, id=None, v_nr: int = None) -> None:
         super().__init__(id=id)

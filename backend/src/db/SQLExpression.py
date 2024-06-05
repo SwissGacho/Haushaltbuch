@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import List
 
-from core.app_logging import getLogger
+from ..core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
@@ -46,7 +46,7 @@ class From(SQLExpression):
         self.joins.append((join_operator, table, join_constraint))
 
 
-class SQL_multi_expression(SQLExpression):
+class SQLMultiExpressin(SQLExpression):
     def __init__(self, arguments: List[SQLExpression]):
         self.arguments = arguments
 
@@ -60,15 +60,15 @@ class SQL_multi_expression(SQLExpression):
         return self.operator.join([expression.sql() for expression in self.expression])
 
 
-class AND(SQL_multi_expression):
+class And(SQLMultiExpressin):
     operator = "AND"
 
 
-class OR(SQL_multi_expression):
+class Or(SQLMultiExpressin):
     operator = "OR"
 
 
-class SQL_binary_expression(SQLExpression):
+class SQLBinaryExpression(SQLExpression):
     def __init__(self, left: SQLExpression | str, right: SQLExpression | str):
         self.left = left if isinstance(left, SQLExpression) else SQLExpression(left)
         self.right = right if isinstance(right, SQLExpression) else SQLExpression(right)
@@ -83,11 +83,11 @@ class SQL_binary_expression(SQLExpression):
         return f" ({self.left.sql()} {self.__class__.operator} {self.right.sql()}) "
 
 
-class eq(SQL_binary_expression):
+class Eq(SQLBinaryExpression):
     operator = "="
 
 
-class SQL_ternary_expression(SQLExpression):
+class SQLTernaryExpression(SQLExpression):
 
     def __init__(
         self,
@@ -114,7 +114,7 @@ class SQL_ternary_expression(SQLExpression):
         return f" ({self.first.sql()} {self.__class__.operator_one} {self.second.sql()} {self.__class__.operator_two} {self.third.sql()}) "
 
 
-class SQL_between(SQL_ternary_expression):
+class SQLBetween(SQLTernaryExpression):
     operator_one = "BETWEEN"
     operator_two = "AND"
 
@@ -178,7 +178,7 @@ class Where(SQLExpression):
         return f" WHERE {self.condition.sql()}"
 
 
-class Group_By(SQLExpression):
+class GroupBy(SQLExpression):
     def __init__(self, column_list: list[str]):
         self.column_list = column_list
 
@@ -194,7 +194,7 @@ class Having(SQLExpression):
         return f" HAVING {self.condition.sql()}"
 
 
-class SQL_column_definition(SQLExpression):
+class SQLColumnDefinition(SQLExpression):
 
     type_map = {}
 

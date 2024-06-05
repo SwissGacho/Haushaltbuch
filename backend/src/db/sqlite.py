@@ -6,7 +6,7 @@ from core.exceptions import OperationalError
 from core.config import Config
 from core.app_logging import getLogger
 from db.db_base import DB, Connection, Cursor
-from db.SQLExecutable import SQL, SQL_column_definition
+from db.SQLExecutable import SQL, SQLColumnDefinition
 from db.SQLFactory import SQLFactory
 
 LOG = getLogger(__name__)
@@ -19,7 +19,7 @@ else:
     AIOSQLITE_IMPORT_ERROR = None
 
 
-class SQLiteColumnDefinition(SQL_column_definition):
+class SQLiteColumnDefinition(SQLColumnDefinition):
 
     type_map = {int: "INTEGER", float: "REAL", str: "TEXT", datetime.datetime: "TEXT"}
 
@@ -29,7 +29,7 @@ class SQLiteSQLFactory(SQLFactory):
     def get_sql_class(self, sql_cls: type):
         if sql_cls.__name__ in [b.__name__ for b in SQLiteColumnDefinition.__bases__]:
             return SQLiteColumnDefinition
-        return super.getClass(sql_cls)
+        return super().get_sql_class(sql_cls)
 
 
 class SQLiteDB(DB):

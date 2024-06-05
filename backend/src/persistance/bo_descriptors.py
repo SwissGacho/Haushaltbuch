@@ -12,6 +12,10 @@ class PersistantAttr:
         self._auto_inc = auto_inc
         self._current_date_time = current_dt
 
+    @classmethod
+    def data_type(cls):
+        raise NotImplementedError
+
     def __set_name__(self, owner, name):
         self.my_name = name
         # LOG.debug(f"__set_name__ {owner=} {name} {self.data_type()=} {self._pk=} {self._auto_inc=}")
@@ -36,7 +40,7 @@ class PersistantAttr:
         pass
 
 
-class BO_int(PersistantAttr):
+class BOInt(PersistantAttr):
     @classmethod
     def data_type(cls):
         return int
@@ -45,7 +49,7 @@ class BO_int(PersistantAttr):
         return isinstance(value, int)
 
 
-class BO_str(PersistantAttr):
+class BOStr(PersistantAttr):
     @classmethod
     def data_type(cls):
         return str
@@ -54,7 +58,7 @@ class BO_str(PersistantAttr):
         return isinstance(value, str)
 
 
-class BO_datetime(PersistantAttr):
+class BODatetime(PersistantAttr):
     @classmethod
     def data_type(cls):
         return datetime
@@ -63,7 +67,7 @@ class BO_datetime(PersistantAttr):
         return isinstance(value, datetime)
 
 
-class BO_date(PersistantAttr):
+class BODate(PersistantAttr):
     @classmethod
     def data_type(cls):
         return date

@@ -5,18 +5,18 @@
 
 from datetime import date, datetime, UTC
 
-from persistance.bo_descriptors import BO_int, BO_datetime
+from persistance.bo_descriptors import BOInt, BODatetime
 from core.app import App
-from db.SQLExecutable import SQL, Insert, Create_Table
-from db.SQLExpression import eq, SQLExpression, Values, Row, Value
+from db.SQLExecutable import SQL, Insert, CreateTable
+from db.SQLExpression import Eq, SQLExpression, Values, Row, Value
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
 
 class BO_Base:
-    id = BO_int(primary_key=True, auto_inc=True)
-    last_updated = BO_datetime(current_dt=True)
+    id = BOInt(primary_key=True, auto_inc=True)
+    last_updated = BODatetime(current_dt=True)
     _table = None
     _attributes = {}
     _business_objects = {}
@@ -55,7 +55,7 @@ class BO_Base:
     async def sql_create_table(cls):
 
         attributes = cls.attribute_descriptions()
-        sql: Create_Table = SQL(App.db).create_table(cls.table)
+        sql: CreateTable = SQL(App.db).create_table(cls.table)
         for attr in attributes:
             sql.column(attr[0], attr[1], attr[2])
         sql.execute(close=0)
@@ -86,12 +86,14 @@ class BO_Base:
             return self
         LOG.debug(f"fetching {self} with newest={newest}")
 
-        sql = SQL(App.db).select([], True).From(self.table)
+        sql = SQL().select([], True).from_(self.table)
         if self.id is not None:
-            sql.Where(sql.get_sql_class(eq)("id", id))
+            sql.Where(sql.get_sql_class(Eq)("id", id))
         elif newest:
             sql.Where(
-                sql.get_class(SQLExpression)(f"id = (SELECT MAX(id) FROM {self.table})")
+                sql.get_sql_class(SQLExpression)(
+                    f"id = (SELECT MAX(id) FROM {self.table})"
+                )
             )
         self.db_data = await (await sql.execute(close=1)).fetchone()
 
@@ -114,27 +116,35 @@ class BO_Base:
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
-        sql = SQL(App.db)
-        insert: Insert = sql.insert(self.table)
-        insert.single_row(
-            [(k, v) for k, v in self._data.items() if k != "id" and v is not None]
-        ).returning("id")
-        LOG.debug(sql.sql())
-        cur = await sql.execute(close=1, commit=True)
-        returned = await cur.fetchone()
-        self.id = returned.get("id")
+
+        self.id = (
+            await (
+                await (
+                    SQL()
+                    .insert(self.table)
+                    .single_row(
+                        [
+                            (k, v)
+                            for k, v in self._data.items()
+                            if k != "id" and v is not None
+                        ]
+                    )
+                    .returning("id")
+                ).execute(close=1, commit=True)
+            ).fetchone()
+        ).get("id")
 
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
-        sql = SQL(App.db)
+        sql = SQL()
         value_class = sql.get_sql_class(Value)
+        sql = sql.update(self.table).where(Eq("id", self.id))
+        for k, v in self._data.items():
+            if k != "id" and v != self.convert_from_db(
+                self._db_data[k], self.attributes_as_dict()[k]
+            ):
+                sql.assignment(k, value_class(v))
         try:
-            sql = sql.update(self.table)
-            for k, v in self._data.items():
-                if k != "id" and self._data[k] != self.convert_from_db(
-                    self._db_data[k], self.attributes_as_dict()[k]
-                ):
-                    sql.assignment(k, value_class(v))
             await sql.execute(close=0, commit=True)
         finally:
             await self.fetch()
