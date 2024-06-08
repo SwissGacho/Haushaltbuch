@@ -18,7 +18,7 @@ class PersistantAttr:
 
     def __set_name__(self, owner, name):
         self.my_name = name
-        # LOG.debug(f"__set_name__ {owner=} {name} {self.data_type()=} {self._pk=} {self._auto_inc=}")
+        # LOG.debug(f"__set_name__ {owner=} {name} {self.__class__.data_type()=} {self._pk=} {self._auto_inc=}")
         if self._pk:
             cols = (
                 name,
