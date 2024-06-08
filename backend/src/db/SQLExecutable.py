@@ -48,11 +48,11 @@ class SQLExecutable(object):
         await self._parent.close()
 
     def get_sql_class(self, sql_cls: type) -> type:
-        return self.sqlFactory.get_sql_class(sql_cls)
+        return self.sql_factory.get_sql_class(sql_cls)
 
     @property
-    def sqlFactory(self) -> SQLFactory:
-        return self._parent.sqlFactory
+    def sql_factory(self) -> SQLFactory:
+        return self._parent.sql_factory
 
 
 class SQL(SQLExecutable):
@@ -81,7 +81,7 @@ class SQL(SQLExecutable):
         return self._sql_statement.sql()
 
     @property
-    def sqlFactory(self) -> SQLFactory:
+    def sql_factory(self) -> SQLFactory:
         return self._get_db().sqlFactory
 
     def create_table(
@@ -124,8 +124,6 @@ class SQL(SQLExecutable):
 
 
 class SQLStatement(SQLExecutable):
-    def __init__(self, parent: SQLExecutable = None):
-        super().__init__(parent)
 
     def sql(self) -> str:
         raise NotImplementedError(
@@ -152,7 +150,7 @@ class CreateTable(SQLStatement):
         super().__init__(parent)
         cols = [] if columns is None else columns
         self._table = table
-        sql_column_definition = self.sqlFactory.get_sql_class(SQLColumnDefinition)
+        sql_column_definition = self.sql_factory.get_sql_class(SQLColumnDefinition)
         self._columns = [
             sql_column_definition(name, data_type, constraint)
             for name, data_type, constraint in cols
@@ -160,7 +158,7 @@ class CreateTable(SQLStatement):
 
     def column(self, name: str, data_type: SQLDataType, constraint: str = None):
         self._columns.append(
-            self.sqlFactory.get_sql_class(SQLColumnDefinition)(
+            self.sql_factory.get_sql_class(SQLColumnDefinition)(
                 name, data_type, constraint
             )
         )
@@ -222,9 +220,14 @@ class Select(TableValuedQuery):
             sql += self._having.sql()
         return sql
 
-    def distinct(self, distinct: bool = True):
-        """Sets the distinct flag for the select statement. Default is False."""
-        self._distinct = distinct
+    def distinct(self):
+        """Sets the distinct flag for the select statement. If not called select will not be distinct."""
+        self._distinct = True
+        return self
+
+    def all(self):
+        """Removes the distinct flag for the select statement."""
+        self._distinct = False
         return self
 
     def columns(self, column_list: list[str]):
@@ -234,19 +237,19 @@ class Select(TableValuedQuery):
 
     def from_(self, table: str | TableValuedQuery):
         """Sets the from clause for the select statement. The statement will not execute without a from clause."""
-        from_table = self.sqlFactory.get_sql_class(From)(table)
+        from_table = self.sql_factory.get_sql_class(From)(table)
         self._from_statement = from_table
         return self
 
-    def Where(self, condition: SQLExpression):
+    def where(self, condition: SQLExpression):
         """Sets the where clause for the select statement. Optional."""
-        where = self.sqlFactory.get_sql_class(Where)(condition)
+        where = self.sql_factory.get_sql_class(Where)(condition)
         self._where = where
         return self
 
-    def Having(self, condition: SQLExpression):
+    def having(self, condition: SQLExpression):
         """Sets the having clause for the select statement. Optional."""
-        having = self.sqlFactory.get_sql_class(Having)(condition)
+        having = self.sql_factory.get_sql_class(Having)(condition)
         self._having = having
         return self
 
@@ -302,12 +305,12 @@ class Update(SQLStatement):
 
     def assignment(self, columns: list[str] | str, value: Value):
         self.assignments.append(
-            self.sqlFactory.get_sql_class(Assignment)(columns, value)
+            self.sql_factory.get_sql_class(Assignment)(columns, value)
         )
         return self
 
     def where(self, condition: SQLExpression):
-        where: Where = self.sqlFactory.get_sql_class(Where)(condition)
+        where: Where = self.sql_factory.get_sql_class(Where)(condition)
         self._where = where
         return self
 

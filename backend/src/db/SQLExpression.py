@@ -8,7 +8,7 @@ from ..core.app_logging import getLogger
 LOG = getLogger(__name__)
 
 
-class join_operator(Enum):
+class JoinOperator(Enum):
     INNER = "INNER JOIN"
     LEFT = "LEFT JOIN"
     RIGHT = "RIGHT JOIN"
@@ -18,16 +18,16 @@ class join_operator(Enum):
 class SQLExpression:
     def __init__(self, expression: str):
         expression = "Null" if expression is None else expression
-        self.expression = expression
+        self._expression = expression
 
     def sql(self) -> str:
-        return self.expression
+        return self._expression
 
 
 class From(SQLExpression):
     def __init__(self, table):
         self.table = table
-        self.joins: List[(join_operator, str, SQLExpression)] = []
+        self.joins: List[(JoinOperator, str, SQLExpression)] = []
 
     def sql(self) -> str:
         sql = f" FROM {self.table}"
@@ -41,7 +41,7 @@ class From(SQLExpression):
         self,
         table=None,
         join_constraint: "SQLExpression" = None,
-        join_operator: join_operator = join_operator.FULL,
+        join_operator: JoinOperator = JoinOperator.FULL,
     ):
         self.joins.append((join_operator, table, join_constraint))
 
@@ -53,30 +53,33 @@ class SQLMultiExpressin(SQLExpression):
     operator: str = None
 
     def sql(self) -> str:
-        if self.operator is None:
+        if self.__class__.operator is None:
             raise NotImplementedError(
                 "SQL_multi_expression is an abstract class and should not be instantiated."
             )
-        return self.operator.join([expression.sql() for expression in self.expression])
+        return self.__class__.operator.join(
+            [expression.sql() for expression in self._expression]
+        )
 
 
 class And(SQLMultiExpressin):
-    operator = "AND"
+    operator = " AND "
 
 
 class Or(SQLMultiExpressin):
-    operator = "OR"
+    operator = " OR "
 
 
 class SQLBinaryExpression(SQLExpression):
     def __init__(self, left: SQLExpression | str, right: SQLExpression | str):
+        super().__init__(None)
         self.left = left if isinstance(left, SQLExpression) else SQLExpression(left)
         self.right = right if isinstance(right, SQLExpression) else SQLExpression(right)
 
     operator = None
 
     def sql(self) -> str:
-        if self.operator is None:
+        if self.__class__.operator is None:
             raise NotImplementedError(
                 "SQL_binary_expression is an abstract class and should not be instantiated."
             )
@@ -84,7 +87,7 @@ class SQLBinaryExpression(SQLExpression):
 
 
 class Eq(SQLBinaryExpression):
-    operator = "="
+    operator = " = "
 
 
 class SQLTernaryExpression(SQLExpression):
@@ -95,6 +98,7 @@ class SQLTernaryExpression(SQLExpression):
         second: SQLExpression | str,
         third: SQLExpression | str,
     ):
+        super().__init__(None)
         self.first = first if isinstance(first, SQLExpression) else SQLExpression(first)
         self.second = (
             second if isinstance(second, SQLExpression) else SQLExpression(second)
@@ -105,8 +109,6 @@ class SQLTernaryExpression(SQLExpression):
     operator_two = None
 
     def sql(self) -> str:
-        print("""__CLASS.__NAME___""")
-        print(self.__class__.operator_one)
         if self.__class__.operator_one is None or self.__class__.operator_two is None:
             raise NotImplementedError(
                 "SQL_binary_expression is an abstract class and should not be instantiated."
@@ -115,8 +117,8 @@ class SQLTernaryExpression(SQLExpression):
 
 
 class SQLBetween(SQLTernaryExpression):
-    operator_one = "BETWEEN"
-    operator_two = "AND"
+    operator_one = " BETWEEN "
+    operator_two = " AND "
 
 
 class Value(SQLExpression):

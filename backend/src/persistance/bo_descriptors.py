@@ -20,11 +20,15 @@ class PersistantAttr:
         self.my_name = name
         # LOG.debug(f"__set_name__ {owner=} {name} {self.data_type()=} {self._pk=} {self._auto_inc=}")
         if self._pk:
-            cols = (name, self.data_type(), "pkinc" if self._auto_inc else "pk")
+            cols = (
+                name,
+                self.__class__.data_type(),
+                "pkinc" if self._auto_inc else "pk",
+            )
         elif self._current_date_time:
-            cols = (name, self.data_type(), "dt")
+            cols = (name, self.__class__.data_type(), "dt")
         else:
-            cols = (name, self.data_type(), None)
+            cols = (name, self.__class__.data_type(), None)
         if not owner._attributes.get(owner.__name__):
             owner._attributes[owner.__name__] = []
         owner._attributes[owner.__name__].append(cols)

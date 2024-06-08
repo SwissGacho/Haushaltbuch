@@ -14,7 +14,7 @@ from core.app_logging import getLogger
 LOG = getLogger(__name__)
 
 
-class BO_Base:
+class BOBase:
     id = BOInt(primary_key=True, auto_inc=True)
     last_updated = BODatetime(current_dt=True)
     _table = None
@@ -28,8 +28,8 @@ class BO_Base:
 
     @classmethod
     def register_persistant_class(cls):
-        BO_Base._business_objects |= {cls.__name__: cls}
-        LOG.debug(f"registered class {cls.__name__}: {BO_Base._business_objects}")
+        BOBase._business_objects |= {cls.__name__: cls}
+        LOG.debug(f"registered class {cls.__name__}: {BOBase._business_objects}")
 
     @classmethod
     @property
@@ -43,12 +43,12 @@ class BO_Base:
 
     @classmethod
     def attributes_as_dict(cls):
-        super_cols = {} if cls == BO_Base else cls.__base__.attributes_as_dict()
+        super_cols = {} if cls == BOBase else cls.__base__.attributes_as_dict()
         return super_cols | {a[0]: a[1] for a in cls._attributes.get(cls.__name__, [])}
 
     @classmethod
     def attribute_descriptions(cls):
-        super_cols = [] if cls == BO_Base else cls.__base__.attribute_descriptions()
+        super_cols = [] if cls == BOBase else cls.__base__.attribute_descriptions()
         return super_cols + cls._attributes.get(cls.__name__, [])
 
     @classmethod
@@ -88,9 +88,9 @@ class BO_Base:
 
         sql = SQL().select([], True).from_(self.table)
         if self.id is not None:
-            sql.Where(sql.get_sql_class(Eq)("id", id))
+            sql.where(sql.get_sql_class(Eq)("id", id))
         elif newest:
-            sql.Where(
+            sql.where(
                 sql.get_sql_class(SQLExpression)(
                     f"id = (SELECT MAX(id) FROM {self.table})"
                 )

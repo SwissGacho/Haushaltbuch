@@ -1,6 +1,6 @@
 """ User business object """
 
-from persistance.business_object_base import BO_Base
+from persistance.business_object_base import BOBase
 from persistance.bo_descriptors import BOStr
 
 from core.app_logging import getLogger
@@ -8,7 +8,7 @@ from core.app_logging import getLogger
 LOG = getLogger(__name__)
 
 
-class User(BO_Base):
+class User(BOBase):
     name = BOStr()
     role = BOStr()
 
