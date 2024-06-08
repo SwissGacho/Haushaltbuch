@@ -197,8 +197,7 @@ class Select(TableValuedQuery):
         parent: SQLExecutable = None,
     ):
         super().__init__(parent)
-        column_list = [] if column_list is None else column_list
-        self._column_list = column_list
+        self._column_list = [] if column_list is None else column_list
         self._distinct = distinct
         self._from_statement: TableValuedQuery = None
         self._where: Where = None

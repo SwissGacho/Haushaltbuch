@@ -27,8 +27,9 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
 class SQLiteSQLFactory(SQLFactory):
 
     def get_sql_class(self, sql_cls: type):
-        if sql_cls.__name__ in [b.__name__ for b in SQLiteColumnDefinition.__bases__]:
-            return SQLiteColumnDefinition
+        for sqlite_class in [SQLiteColumnDefinition]:
+            if sql_cls.__name__ in [b.__name__ for b in sqlite_class.__bases__]:
+                return sqlite_class
         return super().get_sql_class(sql_cls)
 
 
@@ -39,7 +40,7 @@ class SQLiteDB(DB):
         super().__init__(**cfg)
 
     @property
-    def sqlFactory(self):
+    def sql_factory(self):
         return SQLiteSQLFactory
 
     async def connect(self):

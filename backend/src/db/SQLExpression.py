@@ -17,8 +17,7 @@ class join_operator(Enum):
 
 class SQLExpression:
     def __init__(self, expression: str):
-        expression = "Null" if expression is None else expression
-        self.expression = expression
+        self.expression =  "Null" if expression is None else expression
 
     def sql(self) -> str:
         return self.expression
@@ -32,8 +31,8 @@ class From(SQLExpression):
     def sql(self) -> str:
         sql = f" FROM {self.table}"
         if len(self.joins) > 0:
-            sql += f" ".join(
-                ["{join[0]} {join[1]} ON {join[2].sql()}" for join in self.joins]
+            sql += " ".join(
+                [f"{join[0]} {join[1]} ON {join[2].sql()}" for join in self.joins]
             )
         return sql
 
@@ -53,7 +52,7 @@ class SQLMultiExpressin(SQLExpression):
     operator: str = None
 
     def sql(self) -> str:
-        if self.operator is None:
+        if self.__class__.operator is None:
             raise NotImplementedError(
                 "SQL_multi_expression is an abstract class and should not be instantiated."
             )
@@ -61,11 +60,11 @@ class SQLMultiExpressin(SQLExpression):
 
 
 class And(SQLMultiExpressin):
-    operator = "AND"
+    operator = " AND "
 
 
 class Or(SQLMultiExpressin):
-    operator = "OR"
+    operator = " OR "
 
 
 class SQLBinaryExpression(SQLExpression):
@@ -76,7 +75,7 @@ class SQLBinaryExpression(SQLExpression):
     operator = None
 
     def sql(self) -> str:
-        if self.operator is None:
+        if self.__class__.operator is None:
             raise NotImplementedError(
                 "SQL_binary_expression is an abstract class and should not be instantiated."
             )
@@ -157,9 +156,7 @@ class Assignment(SQLExpression):
         columns: list[str] | str,
         value: Value,
     ):
-        if isinstance(columns, str):
-            columns = [columns]
-        self.columns = columns
+        self.columns = [columns] if isinstance(columns, str) else columns
         self.value = value
         self.where: Where = None
 
@@ -183,7 +180,7 @@ class GroupBy(SQLExpression):
         self.column_list = column_list
 
     def sql(self) -> str:
-        "GROUP BY {', '.join(self.column_list)}"
+        f"GROUP BY {', '.join(self.column_list)}"
 
 
 class Having(SQLExpression):
@@ -204,7 +201,7 @@ class SQLColumnDefinition(SQLExpression):
             self.data_type = self.__class__.type_map[data_type]
         else:
             raise ValueError(
-                f"Unsupported data type for a {self.__class__.__name__}: {type}"
+                f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
             )
         self.constraint = constraint
 
