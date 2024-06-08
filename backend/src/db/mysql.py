@@ -2,6 +2,7 @@
 
 from db.db_base import DB, Connection, Cursor
 from db.sql import SQL
+from db.sqlfactory import SQLFactory
 from core.config import Config
 from core.app_logging import getLogger
 
@@ -20,6 +21,10 @@ class MySQLDB(DB):
         if not AIOMYSQL_IMPORT_ERROR:
             raise ModuleNotFoundError(f"Import error: {err}")
         super().__init__(**cfg)
+
+    @property
+    def sqlFactory():
+        return SQLFactory
 
     async def connect(self):
         "Open a connection"

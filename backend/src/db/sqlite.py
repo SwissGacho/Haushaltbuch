@@ -6,7 +6,9 @@ from core.exceptions import OperationalError
 from core.config import Config
 from core.app_logging import getLogger
 from db.db_base import DB, Connection, Cursor
-from db.sql import SQL
+from backend.src.db.sqlexecutable import SQL
+from backend.src.db.sqlexpression import SQLColumnDefinition
+from backend.src.db.sqlfactory import SQLFactory
 
 LOG = getLogger(__name__)
 try:
@@ -18,11 +20,29 @@ else:
     AIOSQLITE_IMPORT_ERROR = None
 
 
+class SQLiteColumnDefinition(SQLColumnDefinition):
+
+    type_map = {int: "INTEGER", float: "REAL", str: "TEXT", datetime.datetime: "TEXT"}
+
+
+class SQLiteSQLFactory(SQLFactory):
+
+    def get_sql_class(self, sql_cls: type):
+        for sqlite_class in [SQLiteColumnDefinition]:
+            if sql_cls.__name__ in [b.__name__ for b in sqlite_class.__bases__]:
+                return sqlite_class
+        return super().get_sql_class(sql_cls)
+
+
 class SQLiteDB(DB):
     def __init__(self, **cfg) -> None:
         if AIOSQLITE_IMPORT_ERROR:
             raise ModuleNotFoundError(f"Import error: {AIOSQLITE_IMPORT_ERROR}")
         super().__init__(**cfg)
+
+    @property
+    def sql_factory(self):
+        return SQLiteSQLFactory
 
     async def connect(self):
         "Open a connection"
