@@ -1,12 +1,12 @@
 import unittest
 from unittest.mock import Mock, AsyncMock
 
-from ..db.SQLExpression import (
+from db.sqlexpression import (
     Eq,
     SQLBetween,
 )
 
-from ..db.SQLExecutable import (
+from db.sqlexecutable import (
     SQLExecutable,
     SQL,
     Select,

@@ -1,7 +1,7 @@
 from enum import Enum, auto
 from core.app import App
 from typing import List
-from .SQLExpression import (
+from .sqlexpression import (
     SQLExpression,
     SQLColumnDefinition,
     Value,
@@ -12,8 +12,8 @@ from .SQLExpression import (
     GroupBy,
     Having,
 )
-from .SQLExpression import From
-from .SQLFactory import SQLFactory
+from .sqlexpression import From
+from .sqlfactory import SQLFactory
 from .db_base import DB
 
 

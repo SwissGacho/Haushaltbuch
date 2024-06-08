@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import List
 
-from ..core.app_logging import getLogger
+from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 

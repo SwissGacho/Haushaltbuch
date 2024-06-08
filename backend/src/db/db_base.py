@@ -1,8 +1,8 @@
 """ Base class for DB connections """
 
-#from persistance.business_object_base import BO_Base
+# from persistance.business_object_base import BO_Base
 from db.sql import SQL
-from db.SQLFactory import SQLFactory
+from db.sqlfactory import SQLFactory
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)

@@ -6,8 +6,9 @@ from core.exceptions import OperationalError
 from core.config import Config
 from core.app_logging import getLogger
 from db.db_base import DB, Connection, Cursor
-from db.SQLExecutable import SQL, SQLColumnDefinition
-from db.SQLFactory import SQLFactory
+from backend.src.db.sqlexecutable import SQL
+from backend.src.db.sqlexpression import SQLColumnDefinition
+from backend.src.db.sqlfactory import SQLFactory
 
 LOG = getLogger(__name__)
 try:
