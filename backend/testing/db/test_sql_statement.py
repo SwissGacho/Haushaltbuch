@@ -1,10 +1,8 @@
 import unittest
 from unittest.mock import Mock, AsyncMock
+from unittest.mock import patch
 
-from db.sqlexpression import (
-    Eq,
-    SQLBetween,
-)
+from db.sqlexpression import Eq, SQLBetween, Row, Value
 
 from db.sqlexecutable import (
     SQLExecutable,
@@ -26,7 +24,7 @@ class MockColumnDefinition:
         self.constraint = constraint
         self.data_type = str(data_type)
 
-    def sql(self):
+    def get_sql(self):
         return f"{self.name} {self.data_type} {self.constraint}"
 
 
@@ -49,6 +47,10 @@ class MockDB:
     sqlFactory = MockSQLFactory
 
 
+class MockApp:
+    db = MockDB()
+
+
 class AsyncTestSQLExecutable(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
@@ -56,30 +58,30 @@ class AsyncTestSQLExecutable(unittest.IsolatedAsyncioTestCase):
         mockParent.execute = AsyncMock(return_value="Mock execute")
         mockParent.close = AsyncMock(return_value="Mock close")
         self.sql = SQLExecutable()
-        self.sql.parent = mockParent
+        self.sql._parent = mockParent
 
     async def test001_execute(self):
-        SQLExecutable = self.sql
+        sql_executable = self.sql
 
         # Test the execute method
-        await SQLExecutable.execute(params="params", close=True, commit=False)
-        SQLExecutable.parent.execute.assert_called_once()
+        await sql_executable.execute(params="params", close=True, commit=False)
+        sql_executable._parent.execute.assert_called_once()
 
     async def test002_close(self):
-        SQLExecutable = self.sql
+        sql_executable = self.sql
 
         # Test the close method
-        await SQLExecutable.close()
-        SQLExecutable.parent.close.assert_called_once()
+        await sql_executable.close()
+        sql_executable._parent.close.assert_called_once()
 
 
 class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
-        mockDB = MockDB()
-        mockDB.execute = AsyncMock(return_value="Mock execute")
-        mockDB.close = AsyncMock(return_value="Mock close")
-        self.sql = SQL(mockDB)
+        mock_db = MockDB()
+        mock_db.execute = AsyncMock(return_value="Mock execute")
+        mock_db.close = AsyncMock(return_value="Mock close")
+        self.sql = SQL()
 
     async def test104_execute_default(self):
         """Test exception when no SQL statement is set"""
@@ -91,7 +93,7 @@ class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
         """Test direct execute method when an SQL statement is set"""
 
         # Test the execute method
-        self.sql.CreateTable(
+        self.sql.create_table(
             "users",
             [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
         )
@@ -102,7 +104,7 @@ class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
         """Test indirect execute method when an SQL statement is set"""
 
         # Test the execute method
-        self.sql.CreateTable(
+        self.sql.create_table(
             "users",
             [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
         )
@@ -113,7 +115,7 @@ class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
         """Test direct execute method when an SQL statement is set"""
 
         # Test the close method
-        self.sql.CreateTable(
+        self.sql.create_table(
             "users",
             [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
         )
@@ -124,7 +126,7 @@ class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
         """Test indirect execute method when an SQL statement is set"""
 
         # Test the close method
-        self.sql.CreateTable(
+        self.sql.Create_Table(
             "users",
             [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
         )
@@ -132,24 +134,30 @@ class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
         self.sql.db.close.assert_called_once()
 
 
+@patch("db.sqlexecutable.App", MockApp)
 class TestSQL(unittest.TestCase):
 
     def setUp(self) -> None:
-        mockDB = MockDB()
-        mockDB.execute = AsyncMock(return_value="Mock execute")
-        mockDB.close = AsyncMock(return_value="Mock close")
-        self.sql = SQL(mockDB)
+        # mock_db = MockDB()
+        # mock_db.execute = AsyncMock(return_value="Mock execute")
+        # mock_db.close = AsyncMock(return_value="Mock close")
+
+        self.sql = SQL()
 
     def checkPrimaryStatement(self, statement: SQLStatement, type):
         self.assertIsInstance(statement, type)
-        self.assertEqual(self.sql.SQLStatement, statement)
-        self.assertEqual(statement.parent, self.sql)
+        self.assertEqual(self.sql._sql_statement, statement)
+        self.assertEqual(statement._parent, self.sql)
+
+    def test113_get_db(self):
+        db = SQL._get_db()
+        self.assertEqual(db, MockApp.db)
 
     def test101_CreateTable(self):
         sql = self.sql
 
         # Test the CreateTable method
-        result = sql.CreateTable(
+        result = sql.create_table(
             "users", [("name", "TEXT", None), ("age", "INTEGER", None)]
         )
         self.checkPrimaryStatement(result, CreateTable)
@@ -161,7 +169,7 @@ class TestSQL(unittest.TestCase):
         # Test the select method
         result = sql.select(["name", "age"], distinct=True)
         self.checkPrimaryStatement(result, Select)
-        self.assertTrue(sql.SQLStatement.distinct)
+        self.assertTrue(sql._sql_statement._distinct)
 
     def test103_insert(self):
         """Test the insert method"""
@@ -189,14 +197,14 @@ class TestSQL(unittest.TestCase):
         """Test sql method when a select statement is set"""
 
         # Test the sql method
-        self.sql.select(["name", "age"], distinct=True).From("users")
-        result = self.sql.sql()
+        self.sql.select(["name", "age"], distinct=True).from_("users")
+        result = self.sql.get_sql()
         self.assertEqual(result, "SELECT DISTINCT name, age FROM users")
 
     def test112_sql_selectStart(self):
 
-        self.sql.select([], distinct=False).From("users").Where(eq("id", "'test'"))
-        result = self.sql.sql()
+        self.sql.select([], distinct=False).from_("users").where(Eq("id", "'test'"))
+        result = self.sql.get_sql()
         self.assertEqual(result.strip(), "SELECT * FROM users WHERE  (id = 'test')")
 
 
@@ -227,27 +235,27 @@ class TestCreateTable(unittest.TestCase):
     def test401_parent(self):
         """Test setting the parent"""
         test = CreateTable(parent=self.mockParent)
-        self.assertEqual(test.parent, self.mockParent)
+        self.assertEqual(test._parent, self.mockParent)
 
     def test402_table(self):
         """Test setting the table name"""
 
         test = CreateTable(table="test", parent=self.mockParent)
-        self.assertEqual(test.table, "test")
+        self.assertEqual(test._table, "test")
 
     def test403_table(self):
         """Test creating a table with a single column"""
 
-        for type in SQLDataType:
-            with self.subTest(type=type):
+        for cur_type in SQLDataType:
+            with self.subTest(type=cur_type):
                 test = CreateTable(
-                    columns=[("name", type, "constraintFor" + str(type))],
+                    columns=[("name", cur_type, "constraintFor" + str(cur_type))],
                     parent=self.mockParent,
                 )
-                self.assertEqual(len(test.columns), 1)
-                for column in test.columns:
+                self.assertEqual(len(test._columns), 1)
+                for column in test._columns:
                     self.assertEqual(column.name, "name")
-                    self.assertEqual(column.data_type, "SQLDataType." + type.name)
+                    self.assertEqual(column.data_type, "SQLDataType." + cur_type.name)
 
 
 class TestTableValuedQuery(unittest.TestCase):
@@ -261,7 +269,7 @@ class TestTableValuedQuery(unittest.TestCase):
         """Test setting the parent"""
         mockParent = Mock()
         test = TableValuedQuery(mockParent())
-        self.assertEqual(test.parent, mockParent())
+        self.assertEqual(test._parent, mockParent())
 
 
 class TestSelect(unittest.TestCase):
@@ -269,28 +277,28 @@ class TestSelect(unittest.TestCase):
 
     def setUp(self) -> None:
 
-        mockParent = Mock()
-        mockFrom = Mock()
-        mockParent.sqlFactory = MockSQLFactory
-        self.mockParent = mockParent
-        self.mockFrom = mockFrom
+        mock_parent = Mock()
+        mock_from = Mock()
+        mock_parent.sqlFactory = MockSQLFactory
+        self.mock_parent = mock_parent
+        self.mock_from = mock_from
 
     def test701_parent(self):
         """Test setting the parent"""
-        test = Select(parent=self.mockParent)
-        self.assertEqual(test.parent, self.mockParent)
+        test = Select(parent=self.mock_parent)
+        self.assertEqual(test._parent, self.mock_parent)
 
     def test702_init_with_column_list(self):
         """Test initializing with a column list"""
 
-        test = Select(["name", "age"], parent=self.mockParent)
-        self.assertEqual(test.column_list, ["name", "age"])
+        test = Select(["name", "age"], parent=self.mock_parent)
+        self.assertEqual(test._column_list, ["name", "age"])
 
     def test703_init_without_column_list(self):
         """Test initializing without a column list"""
 
-        test = Select(parent=self.mockParent)
-        self.assertEqual(test.column_list, [])
+        test = Select(parent=self.mock_parent)
+        self.assertEqual(test._column_list, [])
 
     def test704_init_with_distinct(self):
         """Test initializing with distinct"""
@@ -302,28 +310,88 @@ class TestSelect(unittest.TestCase):
         """Test initializing without distinct"""
 
         test = Select()
-        self.assertFalse(test.distinct)
+        self.assertFalse(test._distinct)
 
     def test706_test_from_required(self):
         """Test that a from statement is required before calling sql"""
 
-        test = Select(parent=self.mockParent)
+        test = Select(parent=self.mock_parent)
         with self.assertRaises(InvalidSQLStatementException):
             test.sql()
 
     def test707_test_distinct_method(self):
         """Test the distinct method"""
 
-        test = Select(parent=self.mockParent)
-        test.Distinct()
-        self.assertTrue(test.distinct)
+        test = Select(parent=self.mock_parent)
+        test.distinct()
+        self.assertTrue(test._distinct)
 
 
 class TestSQL_between(unittest.TestCase):
 
     def test601_between(self):
-        result = SQL_between("age", 18, 25)
-        self.assertEqual(result.sql(), " (age BETWEEN 18 AND 25) ")
+        result = SQLBetween("age", 18, 25)
+        self.assertEqual(result.sql(), " (age  BETWEEN  18  AND  25) ")
+
+
+class TestSQL_Value(unittest.TestCase):
+
+    def setUp(self) -> None:
+        Value._last_key = 0
+        Value._keys = set()
+
+    def test701_value(self):
+        val = Value(value="test", key="id")
+        self.assertEqual(val.value(), {"id": "test"})
+
+    def test701_defaultkey(self):
+        val = Value(value="test")
+        self.assertEqual(val.value(), {"1": "test"})
+
+    def test702_sql(self):
+        val = Value(value="test", key="id")
+        self.assertEqual(Value._keys, {"id"})
+        self.assertEqual(val.sql(), (":id", {"id": "test"}))
+
+    def test703_uniquekeysql(self):
+        Value(value="test", key="id")
+        val2 = Value(value="test", key="id")
+        self.assertEqual(Value._last_key, 1)
+        self.assertEqual(Value._keys, {"id", "id1"})
+        self.assertEqual(val2.sql(), (":id1", {"id1": "test"}))
+
+
+class TestSQL_row(unittest.TestCase):
+
+    def test801_row(self):
+        val = Value(value="test", key="id")
+        row = Row([val])
+        self.assertEqual(row.sql(), (" (:id) ", {"id": "test"}))
+
+    def test802_value(self):
+        val = Value(value="test", key="id")
+        val2 = Value(value="test2", key="name")
+        row = Row([val])
+        row.value(val2)
+        self.assertEqual(row._values, [val, val2])
+        val3 = Value("test")
+        row.value(val3)
+        self.assertEqual(row._values, [val, val2, val3])
+        self.assertEqual(
+            row.sql(),
+            (" (:id, :name, :1) ", {"id": "test", "name": "test2", "1": "test"}),
+        )
+
+    def test803_multipleRows(self):
+        val = Value(value="test", key="id")
+        val2 = Value(value="test2", key="name")
+        Row([val, val2])
+        val3 = Value(value="test3", key="id")
+        val4 = Value(value="test4", key="name")
+        row2 = Row([val3, val4])
+        self.assertEqual(
+            row2.sql(), (" (:id1, :name2) ", {"id1": "test3", "name2": "test4"})
+        )
 
 
 if __name__ == "__main__":

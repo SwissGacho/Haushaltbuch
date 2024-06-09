@@ -1,7 +1,7 @@
 """This module defines a SQLExecutable class that is used to create and execute SQL statements."""
 
 from enum import Enum, auto
-from typing import List
+from typing import List, Tuple
 
 from core.app import App
 from .sqlexpression import (
@@ -39,10 +39,12 @@ class SQLExecutable(object):
 
     def __init__(self, parent: "SQLExecutable" = None):
         self._parent = parent
+        self._parameters = {}
+        self._children: List[SQLExecutable] = []
 
     async def execute(
         self,
-        params=None,
+        params: dict[str, str] = None,
         close=False,
         commit=False,
     ):
@@ -65,7 +67,7 @@ class SQLExecutable(object):
 
 class SQL(SQLExecutable):
     """Usage:
-    sql = SQL_statement(db).create_table(
+    sql = SQL_statement().create_table(
         "users",
         [
             ("name", SQL_data_type.TEXT),
@@ -76,19 +78,24 @@ class SQL(SQLExecutable):
     def __init__(self):
         super().__init__(None)
         self._rslt = None
-        self._sql_statement = None
-        self._sql_statment: "SQLStatement" = None
+        self._sql_statement: "SQLStatement" = None
 
     @classmethod
     def _get_db(cls):
         """Get the current database connection."""
         return App.db
 
-    def sql(self) -> str:
+    def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
-        return self._sql_statement.sql()
+        return self._sql_statement.get_sql()
+
+    def get_params(self) -> dict[str, str]:
+        """Get the parameters for the current SQL statement."""
+        if self._sql_statement is None:
+            raise InvalidSQLStatementException("No SQL statement to execute.")
+        return self._sql_statement.get_params()
 
     @property
     def sql_factory(self) -> SQLFactory:
@@ -141,12 +148,25 @@ class SQL(SQLExecutable):
 class SQLStatement(SQLExecutable):
     """Base class for SQL statements. Should not be instantiated directly."""
 
-    def sql(self) -> str:
-        """Get a string representation of the current SQL statement.
-        Must be implemented by subclasses."""
+    def __init__(self, parent: SQLExecutable = None):
+        super().__init__(parent)
+        self._params = {}
+        self._key_count = 0
+
+    def get_params(self) -> dict[str, str]:
+        """Get the parameters for the current SQL statement."""
+        return self._params
+
+    def get_sql(self) -> str:
+        """Get the SQL statement."""
         raise NotImplementedError(
             "SQL_statement is an abstract class and should not be instantiated."
         )
+
+    def sql(self) -> tuple[str, dict[str, str]]:
+        """Get a string representation of the current SQL statement.
+        Must be implemented by subclasses."""
+        return self.get_sql(), self.get_params()
 
 
 class SQLScript(SQLStatement):
@@ -156,7 +176,7 @@ class SQLScript(SQLStatement):
         super().__init__(parent)
         self._script = script
 
-    def sql(self) -> str:
+    def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         return self._script
 
@@ -175,7 +195,7 @@ class CreateTable(SQLStatement):
         cols = [] if columns is None else columns
         self._table = table
         sql_column_definition = self.sql_factory.get_sql_class(SQLColumnDefinition)
-        self._columns = [
+        self._columns: list[SQLColumnDefinition] = [
             sql_column_definition(name, data_type, constraint)
             for name, data_type, constraint in cols
         ]
@@ -190,15 +210,19 @@ class CreateTable(SQLStatement):
         )
         return self
 
-    def sql(self) -> str:
+    def get_params(self):
+        value_dict = {}
+        for column in self._columns:
+            value_dict.update(column.get_params())
+        return value_dict
+
+    def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         if self._table is None or len(self._table) == 0:
             raise InvalidSQLStatementException(
                 "CREATE TABLE statement must have a table name."
             )
-        return (
-            f"CREATE TABLE {self._table} ({[column.sql() for column in self._columns]})"
-        )
+        return f"CREATE TABLE {self._table} ({[column.get_sql() for column in self._columns]})"
 
 
 class TableValuedQuery(SQLStatement):
@@ -208,7 +232,7 @@ class TableValuedQuery(SQLStatement):
     def __init__(self, parent: SQLExecutable):
         super().__init__(parent)
 
-    def sql(self) -> str:
+    def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         raise NotImplementedError(
             "Table_Valued_Query is an abstract class and should not be instantiated."
@@ -232,7 +256,19 @@ class Select(TableValuedQuery):
         self._group_by: GroupBy = None
         self._having: Having = None
 
-    def sql(self) -> str:
+    def get_params(self):
+        value_dict = {}
+        if self._from_statement is not None:
+            value_dict.update(self._from_statement.get_params())
+        if self._where is not None:
+            value_dict.update(self._where.get_params())
+        if self._group_by is not None:
+            value_dict.update(self._group_by.get_params())
+        if self._having is not None:
+            value_dict.update(self._having.get_params())
+        return value_dict
+
+    def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         if self._from_statement is None:
             raise InvalidSQLStatementException(
@@ -305,11 +341,12 @@ class Insert(SQLStatement):
         self._rows = rows
         self._return_str: str = ""
 
-    def sql(self) -> str:
+    def get_params(self):
+        return self._rows.get_params()
+
+    def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
-        sql = (
-            f"INSERT INTO {self._table} ({', '.join(self._columns)}) {self._rows.sql()}"
-        )
+        sql = f"INSERT INTO {self._table} ({', '.join(self._columns)}) {self._rows.get_sql()}"
         return sql + self._return_str
 
     def single_row(self, row: list[(str, str | Value)]):
@@ -320,11 +357,11 @@ class Insert(SQLStatement):
             row (list[(str, str | Value)]):
                 A list of tuples, representing the fields in the row and their values.
         """
-        row = self.get_sql_class(Row)()
+        row_obj: Row = self.get_sql_class(Row)()
         for column_name, value in row:
             self.column(column_name)
-            row.value(value)
-        self._rows = self.get_sql_class(Values)([row])
+            row_obj.value(value)
+        self._rows: Values = self.get_sql_class(Values)([row_obj])
         return self
 
     def column(self, column: str):
@@ -377,9 +414,17 @@ class Update(SQLStatement):
         self.sql += f" RETURNING {column}"
         return self
 
-    def sql(self) -> str:
+    def get_params(self):
+        value_dict = {}
+        for assignment in self.assignments:
+            value_dict.update(assignment.get_params())
+        if self._where is not None:
+            value_dict.update(self._where.get_params())
+        return value_dict
+
+    def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         sql = f"""UPDATE {self._table}
-            SET {', '.join([assignment.sql() for assignment in self.assignments])}"""
+            SET {', '.join([assignment.get_sql() for assignment in self.assignments])}"""
 
         return sql

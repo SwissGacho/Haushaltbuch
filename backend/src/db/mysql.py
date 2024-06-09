@@ -23,7 +23,7 @@ class MySQLDB(DB):
         super().__init__(**cfg)
 
     @property
-    def sqlFactory():
+    def sql_factory(self):
         return SQLFactory
 
     async def connect(self):
