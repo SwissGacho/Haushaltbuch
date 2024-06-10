@@ -10,4 +10,4 @@ class DBRestart(Exception):
 
 
 class ConnectionClosed(Exception):
-    pass
+    "a Web socket connection has been closed unexpectedly"
