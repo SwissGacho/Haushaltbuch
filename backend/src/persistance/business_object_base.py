@@ -7,7 +7,7 @@ from datetime import date, datetime, UTC
 
 from persistance.bo_descriptors import BOInt, BODatetime
 from core.app import App
-from backend.backend.src.db.sqlexecutable import SQL, CreateTable
+from db.sqlexecutable import SQL, CreateTable
 from db.sqlexpression import Eq, SQLExpression, Value
 from core.app_logging import getLogger
 
