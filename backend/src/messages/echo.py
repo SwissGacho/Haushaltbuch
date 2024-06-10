@@ -1,10 +1,8 @@
-""" Administrative messages.
-    (for login related messages see login.py)
+""" Helper for dev & debug
 """
 
-from enum import StrEnum
-import logging
 from messages.message import Message, MessageType, MessageAttribute
+from server.ws_connection import WS_Connection
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -17,7 +15,7 @@ class Echo(Message):
     def message_type(cls):
         return MessageType.WS_TYPE_ECHO
 
-    async def handle_message(self, connection):
+    async def handle_message(self, connection: WS_Connection):
         "Return the payload to the requsted component"
         await connection.send_message_to_component(
             self.message.get(MessageAttribute.WS_ATTR_COMPONENT),

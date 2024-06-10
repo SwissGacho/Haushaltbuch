@@ -1,5 +1,6 @@
 """ Handle a websocket connection """
 
+from typing import List
 from core.exceptions import ConnectionClosed
 from core.app import App
 from server.ws_token import WSToken
@@ -13,7 +14,7 @@ LOG = getLogger(__name__)
 class WS_Connection:
     """Websocket connection created by the client"""
 
-    connections = {}
+    connections: List["WS_Connection"] = {}
 
     def __init__(self, websocket, sock_nbr) -> None:
         self._socket = websocket
@@ -24,6 +25,7 @@ class WS_Connection:
 
     @property
     def connection_id(self):
+        "identifying string (for logging)"
         if self._session:
             return f"{self._session.session_id},conn #{self._conn_nbr}"
         else:
@@ -31,6 +33,7 @@ class WS_Connection:
 
     @property
     def session(self):
+        "session this connection is contained in"
         return self._session
 
     @session.setter

@@ -23,6 +23,7 @@ class MessageType(StrEnum):
 
 
 class MessageAttribute(StrEnum):
+    "Key used in message paylod"
     WS_ATTR_TYPE = "type"
     WS_ATTR_TOKEN = "token"
     WS_ATTR_STATUS = "status"
@@ -91,6 +92,7 @@ class Message(BaseObject):
 
     @classmethod
     def message_type(cls):
+        "type of the message"
         return MessageType.WS_TYPE_NONE
 
     @property
@@ -99,9 +101,11 @@ class Message(BaseObject):
         return self.message.get(MessageAttribute.WS_ATTR_TOKEN)
 
     def add(self, attrs: dict):
+        "Add items to the payload"
         self.message |= attrs
 
     def serialize(self):
+        "Serialize to JSON"
         return dumps(serialize(self.message), default=json_encode)
 
     async def handle_message(self, connection):
