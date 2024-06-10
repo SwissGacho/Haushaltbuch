@@ -19,6 +19,7 @@ class MessageType(StrEnum):
     WS_TYPE_WELCOME = "Welcome"
     WS_TYPE_BYE = "Bye"
     WS_TYPE_LOG = "Log"
+    WS_TYPE_ECHO = "Echo"
 
 
 class MessageAttribute(StrEnum):
@@ -38,6 +39,10 @@ class MessageAttribute(StrEnum):
     WS_ATTR_LOGLEVEL = "log_level"
     WS_ATTR_MESSAGE = "message"
     WS_ATTR_CALLER = "caller"
+
+    # Echo
+    WS_ATTR_PAYLOAD = "payload"
+    WS_ATTR_COMPONENT = "component"
 
 
 def json_encode(obj: Any) -> Any:

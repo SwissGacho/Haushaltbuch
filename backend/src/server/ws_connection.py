@@ -13,6 +13,8 @@ LOG = getLogger(__name__)
 class WS_Connection:
     """Websocket connection created by the client"""
 
+    connections = {}
+
     def __init__(self, websocket, sock_nbr) -> None:
         self._socket = websocket
         self._session = None
@@ -39,13 +41,25 @@ class WS_Connection:
 
     async def _send(self, payload):
         await self._socket.send(payload)
-        # self.LOG.debug(f"sent message: {payload}")
+        self.LOG.debug(f"sent message: {payload}")
 
     async def send_message(self, message: Message, status=False):
-        "Send a message to the client"
+        "Send a message to the client using current connection"
         if status:
             message.add({MessageAttribute.WS_ATTR_STATUS: App.status})
         await self._send(message.serialize())
+
+    async def send_message_to_component(self, comp, msg):
+        """
+        Send a message to component(s) on a specified connection or
+        list of connections (if 'comp=="*" send to all component connections).
+        """
+        if comp == "*":
+            conns = WS_Connection.connections.values()
+        else:
+            conns = [WS_Connection.connections.get(comp, self)]
+        for conn in conns:
+            await conn._send(msg)
 
     async def start_connection(self):
         "say hello and expect Login"
@@ -56,6 +70,7 @@ class WS_Connection:
             self.LOG.debug(f"reply is {json_message}")
             msg = Message(json_message=json_message)
             if msg.message_type() == MessageType.WS_TYPE_LOGIN:
+                WS_Connection.connections |= {msg.component: self}
                 await self.handle_message(msg)
             else:
                 await self.abort_connection("Login expected")
