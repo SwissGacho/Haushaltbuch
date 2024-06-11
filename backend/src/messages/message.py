@@ -7,6 +7,7 @@ from typing import Any
 from core.base_object import BaseObject
 from server.ws_token import WSToken
 from core.app_logging import getLogger
+import messages
 
 LOG = getLogger(__name__)
 
@@ -17,16 +18,26 @@ class MessageType(StrEnum):
     WS_TYPE_LOGIN = "Login"
     WS_TYPE_WELCOME = "Welcome"
     WS_TYPE_BYE = "Bye"
+    WS_TYPE_LOG = "Log"
 
 
 class MessageAttribute(StrEnum):
     WS_ATTR_TYPE = "type"
     WS_ATTR_TOKEN = "token"
     WS_ATTR_STATUS = "status"
+
+    # Login
     WS_ATTR_USER = "user"
     WS_ATTR_SES_TOKEN = "ses_token"
     WS_ATTR_PREV_TOKEN = "prev_token"
+
+    # Bye
     WS_ATTR_REASON = "reason"
+
+    # Log
+    WS_ATTR_LOGLEVEL = "log_level"
+    WS_ATTR_MESSAGE = "message"
+    WS_ATTR_CALLER = "caller"
 
 
 def json_encode(obj: Any) -> Any:
