@@ -1,7 +1,7 @@
 """This module defines a SQLExecutable class that is used to create and execute SQL statements."""
 
 from enum import Enum, auto
-from typing import List, Tuple
+from typing import List
 
 from core.app import App
 from .sqlexpression import (
@@ -17,6 +17,7 @@ from .sqlexpression import (
 )
 from .sqlexpression import From
 from .sqlfactory import SQLFactory
+from .sqlkeymanager import SQLKeyManager
 
 
 class InvalidSQLStatementException(Exception):
@@ -139,19 +140,18 @@ class SQL(SQLExecutable):
         Must create the statement before calling this method"""
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
-        return await self._get_db().execute(self.sql(), params, close, commit)
+        return await self._get_db().execute(self.get_sql(), params, close, commit)
 
     async def close(self):
         await self._get_db().close()
 
 
-class SQLStatement(SQLExecutable):
+class SQLStatement(SQLExecutable, SQLKeyManager):
     """Base class for SQL statements. Should not be instantiated directly."""
 
     def __init__(self, parent: SQLExecutable = None):
         super().__init__(parent)
         self._params = {}
-        self._key_count = 0
 
     def get_params(self) -> dict[str, str]:
         """Get the parameters for the current SQL statement."""
@@ -196,7 +196,7 @@ class CreateTable(SQLStatement):
         self._table = table
         sql_column_definition = self.sql_factory.get_sql_class(SQLColumnDefinition)
         self._columns: list[SQLColumnDefinition] = [
-            sql_column_definition(name, data_type, constraint)
+            sql_column_definition(name, data_type, constraint, self)
             for name, data_type, constraint in cols
         ]
 
@@ -205,7 +205,7 @@ class CreateTable(SQLStatement):
         The column will be added to the end of the column list."""
         self._columns.append(
             self.sql_factory.get_sql_class(SQLColumnDefinition)(
-                name, data_type, constraint
+                name, data_type, constraint, self
             )
         )
         return self
@@ -306,19 +306,19 @@ class Select(TableValuedQuery):
     def from_(self, table: str | TableValuedQuery):
         """Sets the from clause for the select statement.
         The statement will not execute without a from clause."""
-        from_table = self.sql_factory.get_sql_class(From)(table)
+        from_table = self.sql_factory.get_sql_class(From)(table, self)
         self._from_statement = from_table
         return self
 
     def where(self, condition: SQLExpression):
         """Sets the where clause for the select statement. Optional."""
-        where = self.sql_factory.get_sql_class(Where)(condition)
+        where = self.sql_factory.get_sql_class(Where)(condition, self)
         self._where = where
         return self
 
     def having(self, condition: SQLExpression):
         """Sets the having clause for the select statement. Optional."""
-        having = self.sql_factory.get_sql_class(Having)(condition)
+        having = self.sql_factory.get_sql_class(Having)(condition, self)
         self._having = having
         return self
 
@@ -361,7 +361,7 @@ class Insert(SQLStatement):
         for column_name, value in row:
             self.column(column_name)
             row_obj.value(value)
-        self._rows: Values = self.get_sql_class(Values)([row_obj])
+        self._rows: Values = self.get_sql_class(Values)([row_obj], self)
         return self
 
     def column(self, column: str):
@@ -399,13 +399,13 @@ class Update(SQLStatement):
             value (Value):
                 The value to be assigned to the column(s)."""
         self.assignments.append(
-            self.sql_factory.get_sql_class(Assignment)(columns, value)
+            self.sql_factory.get_sql_class(Assignment)(columns, value, self)
         )
         return self
 
     def where(self, condition: SQLExpression):
         """Set the where clause for the update statement."""
-        where: Where = self.sql_factory.get_sql_class(Where)(condition)
+        where: Where = self.sql_factory.get_sql_class(Where)(condition, self)
         self._where = where
         return self
 

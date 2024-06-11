@@ -4,6 +4,7 @@ from enum import Enum
 from typing import List
 
 from core.app_logging import getLogger
+from .sqlkeymanager import SQLKeyManager
 
 LOG = getLogger(__name__)
 
@@ -21,9 +22,17 @@ class SQLExpression:
     """Base class for an SQL expression.
     Can be instantiated directly to create an expression verbatim from a string."""
 
-    def __init__(self, expression: str):
+    def __init__(self, expression: str = None, key_manager: SQLKeyManager = None):
+        self._key_manager = key_manager
         self._expression = "Null" if expression is None else expression
         self._params: dict[str, str] = {}
+
+    def create_param(self, key: str, value):
+        if self._key_manager is None:
+            raise ValueError("No key manager provided to create a parameter.")
+        key = self._key_manager.register_key(key)
+        self._params[key] = value
+        return key
 
     def get_params(self):
         """Return a dictionary holding the parameters for the expression."""
@@ -41,8 +50,8 @@ class SQLExpression:
 class From(SQLExpression):
     """Class for the FROM clause of an SQL statement."""
 
-    def __init__(self, table):
-        super().__init__(None)
+    def __init__(self, table, key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
         self._table = table
         self._joins: List[tuple[JoinOperator, str, SQLExpression]] = []
 
@@ -71,8 +80,10 @@ class SQLMultiExpression(SQLExpression):
     """Abstract class to combine any number of SQL expressions with an operator.
     Should not be instantiated directly."""
 
-    def __init__(self, arguments: List[SQLExpression]):
-        super().__init__(None)
+    def __init__(
+        self, arguments: List[SQLExpression], key_manager: SQLKeyManager = None
+    ):
+        super().__init__(key_manager=key_manager)
         self._arguments = arguments
 
     operator: str = None
@@ -114,8 +125,13 @@ class SQLBinaryExpression(SQLExpression):
     """Abstract class to combine exactly two SQL expressions with an operator.
     Should not be instantiated directly."""
 
-    def __init__(self, left: SQLExpression | str, right: SQLExpression | str):
-        super().__init__(None)
+    def __init__(
+        self,
+        left: SQLExpression | str,
+        right: SQLExpression | str,
+        key_manager: SQLKeyManager = None,
+    ):
+        super().__init__(key_manager=key_manager)
         self.left = left if isinstance(left, SQLExpression) else SQLExpression(left)
         self.right = right if isinstance(right, SQLExpression) else SQLExpression(right)
 
@@ -151,8 +167,9 @@ class SQLTernaryExpression(SQLExpression):
         first: SQLExpression | str,
         second: SQLExpression | str,
         third: SQLExpression | str,
+        key_manager: SQLKeyManager = None,
     ):
-        super().__init__(None)
+        super().__init__(key_manager=key_manager)
         self.first = first if isinstance(first, SQLExpression) else SQLExpression(first)
         self.second = (
             second if isinstance(second, SQLExpression) else SQLExpression(second)
@@ -194,13 +211,11 @@ class SQLBetween(SQLTernaryExpression):
 class Value(SQLExpression):
     """Represents a value in an SQL statement."""
 
-    def __init__(self, value: str, key: str = ""):
-        super().__init__(None)
-        if key in self.__class__._keys or key == "":
-            key += self.__class__.generate_key()
-        self.__class__._keys |= {key}
+    def __init__(self, value: str, key_manager: SQLKeyManager, key: str = ""):
+        super().__init__(key_manager=key_manager)
+        key = self.create_param(key, value)
         self._value = value
-        self._key = key if key is not None else self.__class__.generate_key()
+        self._key = key
 
     _last_key = 0
     _keys: set[str] = set()
@@ -223,8 +238,8 @@ class Value(SQLExpression):
 class Row(SQLExpression):
     """Represents a list of values defining a row in an SQL statement such as an INSERT."""
 
-    def __init__(self, values: list[Value]):
-        super().__init__(None)
+    def __init__(self, values: list[Value], key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
         self._values = values
 
     def value(self, value: Value):
@@ -246,8 +261,8 @@ class Row(SQLExpression):
 class Values(SQLExpression):
     """Represents a list of rows in an SQL statement such as an INSERT."""
 
-    def __init__(self, rows: list[Row]):
-        super().__init__(None)
+    def __init__(self, rows: list[Row], key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
         self._rows = rows
 
     def row(self, value: Row):
@@ -276,8 +291,9 @@ class Assignment(SQLExpression):
         self,
         columns: list[str] | str,
         value: Value,
+        key_manager: SQLKeyManager = None,
     ):
-        super().__init__(None)
+        super().__init__(key_manager=key_manager)
         self._columns = [columns] if isinstance(columns, str) else columns
         self._value = value
         self._where: Where = None
@@ -298,8 +314,8 @@ class Assignment(SQLExpression):
 class Where(SQLExpression):
     """Represents a WHERE clause in an SQL statement."""
 
-    def __init__(self, condition: SQLExpression):
-        super().__init__(None)
+    def __init__(self, condition: SQLExpression, key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
         self._condition = condition
 
     def get_params(self):
@@ -312,8 +328,8 @@ class Where(SQLExpression):
 class GroupBy(SQLExpression):
     """Represents a GROUP BY clause in an SQL statement."""
 
-    def __init__(self, column_list: list[str]):
-        super().__init__(None)
+    def __init__(self, column_list: list[str], key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
         self.column_list = column_list
 
     def get_sql(self):
@@ -323,8 +339,8 @@ class GroupBy(SQLExpression):
 class Having(SQLExpression):
     """Represents a HAVING clause in an SQL statement."""
 
-    def __init__(self, condition: SQLExpression):
-        super().__init__(None)
+    def __init__(self, condition: SQLExpression, key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
         self._condition = condition
 
     def get_params(self):
@@ -339,8 +355,14 @@ class SQLColumnDefinition(SQLExpression):
 
     type_map = {}
 
-    def __init__(self, name: str, data_type: type, constraint: str = None):
-        super().__init__(None)
+    def __init__(
+        self,
+        name: str,
+        data_type: type,
+        constraint: str = None,
+        key_manager: SQLKeyManager = None,
+    ):
+        super().__init__(key_manager=key_manager)
         self.name = name
         if data_type in self.type_map:
             self.data_type = self.__class__.type_map[data_type]
