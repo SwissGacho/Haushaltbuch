@@ -23,11 +23,17 @@ else:
 class SQLiteColumnDefinition(SQLColumnDefinition):
 
     type_map = {int: "INTEGER", float: "REAL", str: "TEXT", datetime.datetime: "TEXT"}
+    constraint_map = {
+        "pk": "PRIMARY KEY",
+        "pkinc": "PRIMARY KEY AUTOINCREMENT",
+        "dt": "DEFAULT CURRENT_TIMESTAMP",
+    }
 
 
 class SQLiteSQLFactory(SQLFactory):
 
-    def get_sql_class(self, sql_cls: type):
+    @classmethod
+    def get_sql_class(cls, sql_cls: type):
         for sqlite_class in [SQLiteColumnDefinition]:
             if sql_cls.__name__ in [b.__name__ for b in sqlite_class.__bases__]:
                 return sqlite_class
@@ -109,7 +115,7 @@ class SQLiteCursor(Cursor):
         self._last_query = query
         self._close = close
         try:
-            # LOG.debug(f"Executing: ({query}, {params}, {close=})")
+            LOG.debug(f"Executing: {query=}, {params=}, {close=}")
             await self._cursor.execute(query, params)
             self._rowcount = self._cursor.rowcount
         except sqlite3.OperationalError as err:
