@@ -257,7 +257,6 @@ class SQLColumnDefinition(SQLExpression):
     """Represents the definition of a column in an SQL table."""
 
     type_map = {}
-    constraint_map = {}
 
     def __init__(self, name: str, data_type: type, constraint: str = None):
         super().__init__(None)
@@ -268,14 +267,7 @@ class SQLColumnDefinition(SQLExpression):
             raise ValueError(
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
             )
-        if not constraint:
-            self.constraint = ""
-        elif constraint in self.constraint_map:
-            self.constraint = self.__class__.constraint_map[constraint]
-        else:
-            raise ValueError(
-                f"Unsupported column constraint for a {self.__class__.__name__}: {constraint}"
-            )
+        self.constraint = constraint
 
     def sql(self) -> str:
         """Return the SQL expression as a string."""
