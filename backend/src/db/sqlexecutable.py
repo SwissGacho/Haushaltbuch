@@ -17,9 +17,6 @@ from .sqlexpression import (
 )
 from .sqlexpression import From
 from .sqlfactory import SQLFactory
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
 
 
 class InvalidSQLStatementException(Exception):
@@ -96,13 +93,12 @@ class SQL(SQLExecutable):
     @property
     def sql_factory(self) -> SQLFactory:
         """Get the SQLFactory of the current database. Usually call get_sql_class instead."""
-        return self._get_db().sql_factory
+        return self._get_db().sqlFactory
 
     def create_table(
         self, table: str, columns: list[(str, SQLDataType)] = None
     ) -> "CreateTable":
         """Sets the SQL statement to create a table and returns a create_table object"""
-        # LOG.debug(f"SQL.create_table({table=}, {columns=})")
         create_table = self.get_sql_class(CreateTable)(table, columns, self)
         # create_table = Create_Table(table, columns, self)
         self._sql_statement = create_table
@@ -200,7 +196,9 @@ class CreateTable(SQLStatement):
             raise InvalidSQLStatementException(
                 "CREATE TABLE statement must have a table name."
             )
-        return f"CREATE TABLE {self._table} ({', '.join([column.sql() for column in self._columns])})"
+        return (
+            f"CREATE TABLE {self._table} ({[column.sql() for column in self._columns]})"
+        )
 
 
 class TableValuedQuery(SQLStatement):
