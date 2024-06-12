@@ -55,10 +55,10 @@ class BOBase:
     async def sql_create_table(cls):
 
         attributes = cls.attribute_descriptions()
-        sql: CreateTable = SQL(App.db).create_table(cls.table)
+        sql: CreateTable = SQL().create_table(cls.table)
         for attr in attributes:
             sql.column(attr[0], attr[1], attr[2])
-        sql.execute(close=0)
+        await sql.execute(close=0)
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
