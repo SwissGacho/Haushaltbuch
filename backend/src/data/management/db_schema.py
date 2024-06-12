@@ -7,7 +7,7 @@ from core.app_logging import getLogger
 LOG = getLogger(__name__)
 
 
-class DB_Schema(BOBase):
+class DBSchema(BOBase):
     _table = "schema_versions"
     version_nr = BOInt()
 
@@ -16,4 +16,4 @@ class DB_Schema(BOBase):
         self.version_nr = v_nr
 
     def __repr__(self) -> str:
-        return f"<DB_Schema (id:{self.id}, version:{self.version_nr})>"
+        return f"<DBSchema (id:{self.id}, version:{self.version_nr})>"

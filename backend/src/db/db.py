@@ -11,7 +11,7 @@ from db.mysql import MySQLDB
 from db.schema_maintenance import check_db_schema
 
 # from persistance.business_object_base import BO_Base
-from data.management.db_schema import DB_Schema
+from data.management.db_schema import DBSchema
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)

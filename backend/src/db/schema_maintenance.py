@@ -5,7 +5,7 @@ import db
 import persistance
 
 # import data.management
-from data.management.db_schema import DB_Schema
+from data.management.db_schema import DBSchema
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -46,14 +46,14 @@ async def check_db_schema():
         persistance.business_object_base.BOBase.all_business_objects.values()
     )
     try:
-        db_schema = await DB_Schema().fetch(newest=True)
+        db_schema = await DBSchema().fetch(newest=True)
     except core.exceptions.OperationalError as err:
-        db_schema = DB_Schema()
+        db_schema = DBSchema()
     except Exception as err:
         LOG.error(
             f"An error occurred fetching DB schema version in check_db_schema(): {err}"
         )
-        db_schema = DB_Schema()
+        db_schema = DBSchema()
     if (
         db_schema.version_nr is None
         or db_schema.version_nr < CURRENT_DB_SCHEMA_VERSION
@@ -75,4 +75,4 @@ async def check_db_schema():
     if not ok:
         raise TypeError("DB schema not compatible")
     if upgraded:
-        await DB_Schema(v_nr=CURRENT_DB_SCHEMA_VERSION).store()
+        await DBSchema(v_nr=CURRENT_DB_SCHEMA_VERSION).store()
