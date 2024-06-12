@@ -16,7 +16,7 @@ COMPATIBLE_DB_SCHEMA_VERSIONS = [1]
 
 async def create_all_tables(db, objects):
     for bo in objects:
-        LOG.info(f"creating table '{bo.table}'")
+        LOG.info(f"creating table '{bo.table}' for business class '{bo.__name__}'")
         await bo.sql_create_table()
 
 
@@ -35,6 +35,7 @@ async def check_db_schema():
     database = core.app.App.db
     if database.__class__ == db.db_base.DB:
         raise TypeError("cannot check abstract DB")
+    LOG.debug("checking DB Schema")
     # cur = await database.execute(database.sql(query=db.sql.SQL.TABLE_LIST), close=True)
     # num_tables = await cur.rowcount
     # LOG.debug(f"Found {num_tables} tables in DB:")
@@ -42,7 +43,7 @@ async def check_db_schema():
     # LOG.debug(f"{tables=}")
 
     all_business_objects = (
-        persistance.business_object_base.BO_Base.all_business_objects.values()
+        persistance.business_object_base.BOBase.all_business_objects.values()
     )
     try:
         db_schema = await DB_Schema().fetch(newest=True)
