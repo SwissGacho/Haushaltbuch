@@ -6,7 +6,7 @@ from core.exceptions import OperationalError
 from core.config import Config
 from core.app_logging import getLogger
 from db.db_base import DB, Connection, Cursor
-from db.sqlexecutable import SQL
+from db.sqlexecutable import SQL, SQLExecutable, SQLTemplate
 from db.sqlexpression import SQLColumnDefinition
 from db.sqlfactory import SQLFactory
 
@@ -20,6 +20,17 @@ else:
     AIOSQLITE_IMPORT_ERROR = None
 
 
+class SQLiteSQLFactory(SQLFactory):
+
+    @classmethod
+    def get_sql_class(cls, sql_cls: type):
+        # LOG.debug(f"SQLiteSQLFactory.get_sql_class({sql_cls=})")
+        for sqlite_class in [SQLiteColumnDefinition, SQLiteTemplate]:
+            if sql_cls.__name__ in [b.__name__ for b in sqlite_class.__bases__]:
+                return sqlite_class
+        return super().get_sql_class(sql_cls)
+
+
 class SQLiteColumnDefinition(SQLColumnDefinition):
 
     type_map = {int: "INTEGER", float: "REAL", str: "TEXT", datetime.datetime: "TEXT"}
@@ -30,14 +41,45 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
     }
 
 
-class SQLiteSQLFactory(SQLFactory):
+class SQLiteTemplate(SQLTemplate):
+    """A SQL statement built from a template and optional arguments"""
 
-    @classmethod
-    def get_sql_class(cls, sql_cls: type):
-        for sqlite_class in [SQLiteColumnDefinition]:
-            if sql_cls.__name__ in [b.__name__ for b in sqlite_class.__bases__]:
-                return sqlite_class
-        return super().get_sql_class(sql_cls)
+    def __init__(self, template: str, parent: SQLExecutable = None, **kwargs):
+        # LOG.debug(f"SQLiteTemplate({template=}, {parent=}, {kwargs=})")
+        if template == "TABLE_INFO":
+            # SQL statement returning a result set with info on DB table 'table' with the following columns:
+            # column_name:    name of table column
+            # column_type:    data type of column
+            # pk:             primary key constraint: 0=none; 1=PK,no auto inc; 2=PK,auto inc
+            # dflt_value:     default value
+            table = kwargs.get("table")
+            script = f""" SELECT 
+                            column_name
+                            ,column_type
+                            ,CONCAT(
+                                CASE WHEN pk=0 THEN ''
+                                    WHEN autoinc=0 THEN 'PRIMARY KEY'
+                                    ELSE 'PRIMARY KEY AUTOINCREMENT'
+                                    END
+                                ,CASE WHEN LENGTH(dflt_value) IS NULL THEN ''
+                                    ELSE CONCAT('DEFAULT ',dflt_value)
+                                    END
+                            ) AS "constraint"
+                        FROM (SELECT name AS column_name, type AS column_type, pk, dflt_value
+                                FROM pragma_table_info('{table}')) c
+                                FULL OUTER JOIN (SELECT INSTR(sql,'PRIMARY KEY AUTOINCREMENT')>0 AS autoinc
+                                                FROM sqlite_master WHERE type='table' AND name = '{table}') s
+                    """
+        elif template == "TABLELIST":
+            # SQL statement returning list of tables
+            script = """ SELECT name as table_name FROM sqlite_master
+                        WHERE type = 'table' and substr(name,1,7) <> 'sqlite_'
+                    """
+        else:
+            raise NotImplementedError(
+                f"SQL template '{template}' not implemented for SQLite"
+            )
+        super().__init__(script=script, parent=parent)
 
 
 class SQLiteDB(DB):
