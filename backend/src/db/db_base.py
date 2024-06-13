@@ -1,8 +1,9 @@
 """ Base class for DB connections """
 
 # from persistance.business_object_base import BO_Base
-from db.sql import SQL
 from db.sqlfactory import SQLFactory
+from db.sqlexecutable import SQL
+from db.sqlexpression import SQLColumnDefinition
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -31,8 +32,8 @@ class DB:
 
     def check_column(self, col, attr, tab):
         "check compatibility of a DB column with a business object attribute"
-        attr_sql = self.sql(SQL.CREATE_TABLE_COLUMN, column=attr)
-        # LOG.debug(f"check column '{col}' against '{attr}' ")
+        # LOG.debug(f"DB.check_column({col=}, {attr=})")
+        attr_sql = SQL().sql_factory.get_sql_class(SQLColumnDefinition)(*attr).sql()
         if col is None:
             LOG.error(
                 f"column '{attr[0]}' in DB table '{tab}' is undefined in the DB instead of '{attr_sql}'"
@@ -45,26 +46,17 @@ class DB:
             return False
         return True
 
-    async def check_table(self, obj):
+    async def check_table(self, obj: "BOBase"):
         "check compatibility of a DB table with a business object"
+        LOG.debug(f"Checking table {obj.table}")
         tab_info = {
-            c["column_name"]: f"{c['column_name']} {c['column_type']}"
-            + self.sql(
-                SQL.CREATE_TABLE_COLUMN,
-                column=(
-                    "",
-                    None,
-                    ("pkinc" if c["pk"] == 2 else "pk" if c["pk"] == 1 else None),
-                ),
+            c["column_name"]: " ".join(
+                [c["column_name"], c["column_type"], c["constraint"]]
             )
-            + ("" if c["dflt_value"] is None else f" DEFAULT {c['dflt_value']}")
             for c in await (
-                await self.execute(
-                    self.sql(query=SQL.TABLE_INFO, table=obj.table), close=True
-                )
+                await SQL().template("TABLE_INFO", table=obj.table).execute()
             ).fetchall()
         }
-        # LOG.debug(f"{tab_info=}")
         ok = True
         for attr in obj.attribute_descriptions():
             ok = self.check_column(tab_info.get(attr[0]), attr, obj.table) and ok
