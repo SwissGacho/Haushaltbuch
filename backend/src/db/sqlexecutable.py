@@ -4,19 +4,19 @@ from enum import Enum, auto
 from typing import List
 
 from core.app import App
-from .sqlexpression import (
+from db.sqlexpression import (
     SQLExpression,
     SQLColumnDefinition,
     Value,
     Row,
     Values,
+    From,
     Assignment,
     Where,
     GroupBy,
     Having,
 )
-from .sqlexpression import From
-from .sqlfactory import SQLFactory
+from db.sqlfactory import SQLFactory
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -131,6 +131,13 @@ class SQL(SQLExecutable):
         self._sql_statement = self.get_sql_class(SQLScript)(script, self)
         return self._sql_statement
 
+    def template(self, tmpl: str, **kwargs) -> "SQLTemplate":
+        """Set the SQL statement to execute the specific template supplied"""
+        self._sql_statement = self.get_sql_class(SQLTemplate)(
+            parent=self, template=tmpl, **kwargs
+        )
+        return self._sql_statement
+
     async def execute(self, params=None, close=False, commit=False):
         """Execute the current SQL statement on the database.
         Must create the statement before calling this method"""
@@ -163,6 +170,13 @@ class SQLScript(SQLStatement):
     def sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         return self._script
+
+
+class SQLTemplate(SQLScript):
+    """A SQL statement built from a template and optional arguments"""
+
+    # This class should be derived by DB module, final initialization done by SQLScript
+    pass
 
 
 class CreateTable(SQLStatement):
@@ -291,52 +305,50 @@ class Select(TableValuedQuery):
 
 class Insert(SQLStatement):
     """A SQLStatement representing an INSERT statement.
-    Default implementation complies with SQLite syntax."""
+    Multiple rows may be inserted. It is assumed that all rows have the same columns.
+    Rows are represented as a list of Values.
+    Values are Value objects or a tuple of column name and value
+    Default implementation complies with SQLite syntax.
+    """
 
     def __init__(
         self,
         table: str,
-        columns: list[str] = None,
-        rows: Values = None,
+        rows: (
+            list[list[tuple[str, any] | Value]] | list[tuple[str, any] | Value]
+        ) = None,
         parent: SQLExecutable = None,
     ):
         super().__init__(parent)
-        self._columns = [] if columns is None else columns
         self._table = table
-        self._columns = columns
-        self._rows = rows
+        self._values = self.get_sql_class(Values)([])
         self._return_str: str = ""
+        if rows is not None:
+            self.rows(rows=rows)
 
     def sql(self) -> str:
         """Get a string representation of the current SQL statement."""
-        sql = (
-            f"INSERT INTO {self._table} ({', '.join(self._columns)}) {self._rows.sql()}"
-        )
+        sql = f"INSERT INTO {self._table} {self._values.names()} {self._values.sql()}"
+        LOG.debug(f"Insert.sql() -> {sql + self._return_str}")
         return sql + self._return_str
 
-    def single_row(self, row: list[(str, str | Value)]):
-        """
-        Set the statement to insert a single row of data defined by the supplied parameters.
-
-        Args:
-            row (list[(str, str | Value)]):
-                A list of tuples, representing the fields in the row and their values.
-        """
-        row = self.get_sql_class(Row)()
-        for column_name, value in row:
-            self.column(column_name)
-            row.value(value)
-        self._rows = self.get_sql_class(Values)([row])
+    def single_row(self, cols: list[tuple[str, any] | Value]):
+        """Add a single row of values to be inserted"""
+        LOG.debug(f"Insert.single_row({cols=})")
+        row = self.get_sql_class(Row)(
+            [c if isinstance(c, Value) else Value(name=c[0], value=c[1]) for c in cols]
+        )
+        LOG.debug(f"{row.sql()=}")
+        self._values.row(row)
+        LOG.debug(f"{self.sql()=}")
         return self
 
-    def column(self, column: str):
-        """Add a column to the end of the list of columns to be inserted."""
-        self._columns.append(column)
-        return self
-
-    def values(self, values: Values):
-        """Set the values to be inserted."""
-        self._rows = values
+    def rows(
+        self, rows: list[list[tuple[str, any] | Value]] | list[tuple[str, any] | Value]
+    ):
+        """Add rows of values to be inserted"""
+        for row in rows if isinstance(rows, list) else [rows]:
+            self.single_row(row)
         return self
 
     def returning(self, column: str):
