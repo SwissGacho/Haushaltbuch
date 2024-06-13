@@ -95,7 +95,7 @@ class BOBase:
                     f"id = (SELECT MAX(id) FROM {self.table})"
                 )
             )
-        self.db_data = await (await sql.execute(close=1)).fetchone()
+        self._db_data = await (await sql.execute(close=1)).fetchone()
 
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
@@ -110,9 +110,9 @@ class BOBase:
         Else the existing row is updated
         """
         if self.id is None:
-            self._insert_self()
+            await self._insert_self()
         else:
-            self._update_self()
+            await self._update_self()
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
