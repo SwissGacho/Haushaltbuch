@@ -336,7 +336,14 @@ class Insert(SQLStatement):
         """Add a single row of values to be inserted"""
         LOG.debug(f"Insert.single_row({cols=})")
         row = self.get_sql_class(Row)(
-            [c if isinstance(c, Value) else Value(name=c[0], value=c[1]) for c in cols]
+            [
+                (
+                    col
+                    if isinstance(col, Value)
+                    else self.get_sql_class(Value)(name=col[0], value=col[1])
+                )
+                for col in cols
+            ]
         )
         LOG.debug(f"{row.sql()=}")
         self._values.row(row)
