@@ -37,6 +37,12 @@ class SQLDataType(Enum):
     BLOB = auto()
 
 
+class SQLTemplate(Enum):
+    "Keys for dialect specific SQL templates used in SQLScript"
+    TABLEINFO = auto()
+    TABLELIST = auto()
+
+
 class SQLExecutable(object):
     """Base class for SQL operations. Should not be instantiated directly."""
 
@@ -126,15 +132,16 @@ class SQL(SQLExecutable):
         self._sql_statement = update
         return update
 
-    def script(self, script: str) -> "SQLScript":
-        """Set the SQL statement to execute the specific script supplied"""
-        self._sql_statement = self.get_sql_class(SQLScript)(script, self)
-        return self._sql_statement
-
-    def template(self, tmpl: str, **kwargs) -> "SQLTemplate":
-        """Set the SQL statement to execute the specific template supplied"""
-        self._sql_statement = self.get_sql_class(SQLTemplate)(
-            parent=self, template=tmpl, **kwargs
+    def script(self, script_or_template: str | SQLTemplate, **kwargs) -> "SQLScript":
+        """Set the SQL statement to execute the specific script or
+        use a template to build an SQLScript
+        """
+        if "parent" in kwargs:
+            raise ValueError(
+                f"'parent={kwargs['parent']}' must not be a template argument"
+            )
+        self._sql_statement = self.get_sql_class(SQLScript)(
+            script_or_template, parent=self, **kwargs
         )
         return self._sql_statement
 
@@ -163,20 +170,24 @@ class SQLStatement(SQLExecutable):
 class SQLScript(SQLStatement):
     """A SQL statement that executes a script verbatim"""
 
-    def __init__(self, script: str, parent: SQLExecutable = None):
+    sql_templates = {}
+
+    def __init__(
+        self,
+        script_or_template: str | SQLTemplate,
+        parent: SQLExecutable = None,
+        **kwargs,
+    ):
         super().__init__(parent)
-        self._script = script
+        self._script = (
+            script_or_template
+            if isinstance(script_or_template, str)
+            else self.__class__.sql_templates.get(script_or_template).format(**kwargs)
+        )
 
     def sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         return self._script
-
-
-class SQLTemplate(SQLScript):
-    """A SQL statement built from a template and optional arguments"""
-
-    # This class should be derived by DB module, final initialization done by SQLScript
-    pass
 
 
 class CreateTable(SQLStatement):
