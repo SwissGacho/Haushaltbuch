@@ -211,11 +211,18 @@ class SQLBetween(SQLTernaryExpression):
 class Value(SQLExpression):
     """Represents a value in an SQL statement."""
 
-    def __init__(self, value: str, key_manager: SQLKeyManager, key: str = ""):
+    def ___init__(
+        self, name: str, value: any, key_manager: SQLKeyManager, key: str = ""
+    ):
+        # LOG.debug(f"Value({name=}, {value=})")
         super().__init__(key_manager=key_manager)
         key = self.create_param(key, value)
+        self._name = name
         self._value = value
-        self._key = key
+
+    def name(self) -> str:
+        "Name of the value"
+        return self._name
 
     _last_key = 0
     _keys: set[str] = set()
@@ -238,30 +245,33 @@ class Value(SQLExpression):
 class Row(SQLExpression):
     """Represents a list of values defining a row in an SQL statement such as an INSERT."""
 
-    def __init__(self, values: list[Value], key_manager: SQLKeyManager = None):
+    def __init__(self, values: list[Value] = None, key_manager: SQLKeyManager = None):
+        # LOG.debug(f"Row({values=})")
         super().__init__(key_manager=key_manager)
-        self._values = values
+        self._values = [] if values is None else values
 
     def value(self, value: Value):
         """Add a value to the end of the row."""
         self._values.append(value)
         return self
 
+    def names(self) -> str:
+        "List of value names"
+        return f"({', '.join([v.name() for v in self.values])})"
+
     def get_params(self):
         return {k: v for value in self._values for k, v in value.get_params().items()}
 
-    def sql(self):
+    def get_sql(self):
         """Return the SQL expression as a string."""
-        return (
-            f" ({', '.join([value.sql()[0] for value in self._values])}) ",
-            self.get_params(),
-        )
+        return f"({', '.join([v.sql() for v in self.values])})"
 
 
 class Values(SQLExpression):
     """Represents a list of rows in an SQL statement such as an INSERT."""
 
     def __init__(self, rows: list[Row], key_manager: SQLKeyManager = None):
+        # LOG.debug(f"Values({rows=})")
         super().__init__(key_manager=key_manager)
         self._rows = rows
 
@@ -270,18 +280,19 @@ class Values(SQLExpression):
         self._rows.append(value)
         return self
 
+    def names(self) -> str:
+        "List of value names"
+        return self.rows[0].names()
+
     def get_params(self):
         value_dict: dict[str, str] = {}
         for row in self._rows:
             value_dict.update(row.get_params())
         return value_dict
 
-    def sql(self):
+    def get_sql(self):
         """Return the SQL expression as a string."""
-        return (
-            f"VALUES {', '.join([row.sql()[0] for row in self._rows])}",
-            self.get_params(),
-        )
+        return f"VALUES {', '.join([row.sql()[0] for row in self._rows])}"
 
 
 class Assignment(SQLExpression):
@@ -354,6 +365,7 @@ class SQLColumnDefinition(SQLExpression):
     """Represents the definition of a column in an SQL table."""
 
     type_map = {}
+    constraint_map = {}
 
     def __init__(
         self,
@@ -370,7 +382,14 @@ class SQLColumnDefinition(SQLExpression):
             raise ValueError(
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
             )
-        self._constraint = constraint
+        if not constraint:
+            self._constraint = ""
+        elif constraint in self.constraint_map:
+            self._constraint = self.__class__.constraint_map[constraint]
+        else:
+            raise ValueError(
+                f"Unsupported column constraint for a {self.__class__.__name__}: {constraint}"
+            )
 
     def get_sql(self):
         return f"{self.name} {self.data_type} {self._constraint}"

@@ -4,20 +4,23 @@ from enum import Enum, auto
 from typing import List
 
 from core.app import App
-from .sqlexpression import (
+from db.sqlexpression import (
     SQLExpression,
     SQLColumnDefinition,
     Value,
     Row,
     Values,
+    From,
     Assignment,
     Where,
     GroupBy,
     Having,
 )
-from .sqlexpression import From
-from .sqlfactory import SQLFactory
-from .sqlkeymanager import SQLKeyManager
+from db.sqlfactory import SQLFactory
+from db.sqlkeymanager import SQLKeyManager
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
 
 
 class InvalidSQLStatementException(Exception):
@@ -33,6 +36,12 @@ class SQLDataType(Enum):
     INTEGER = auto()
     REAL = auto()
     BLOB = auto()
+
+
+class SQLTemplate(Enum):
+    "Keys for dialect specific SQL templates used in SQLScript"
+    TABLEINFO = auto()
+    TABLELIST = auto()
 
 
 class SQLExecutable(object):
@@ -101,12 +110,13 @@ class SQL(SQLExecutable):
     @property
     def sql_factory(self) -> SQLFactory:
         """Get the SQLFactory of the current database. Usually call get_sql_class instead."""
-        return self._get_db().sqlFactory
+        return self._get_db().sql_factory
 
     def create_table(
         self, table: str, columns: list[(str, SQLDataType)] = None
     ) -> "CreateTable":
         """Sets the SQL statement to create a table and returns a create_table object"""
+        # LOG.debug(f"SQL.create_table({table=}, {columns=})")
         create_table = self.get_sql_class(CreateTable)(table, columns, self)
         # create_table = Create_Table(table, columns, self)
         self._sql_statement = create_table
@@ -130,9 +140,17 @@ class SQL(SQLExecutable):
         self._sql_statement = update
         return update
 
-    def script(self, script: str) -> "SQLScript":
-        """Set the SQL statement to execute the specific script supplied"""
-        self._sql_statement = self.get_sql_class(SQLScript)(script, self)
+    def script(self, script_or_template: str | SQLTemplate, **kwargs) -> "SQLScript":
+        """Set the SQL statement to execute the specific script or
+        use a template to build an SQLScript
+        """
+        if "parent" in kwargs:
+            raise ValueError(
+                f"'parent={kwargs['parent']}' must not be a template argument"
+            )
+        self._sql_statement = self.get_sql_class(SQLScript)(
+            script_or_template, parent=self, **kwargs
+        )
         return self._sql_statement
 
     async def execute(self, params=None, close=False, commit=False):
@@ -172,9 +190,20 @@ class SQLStatement(SQLExecutable, SQLKeyManager):
 class SQLScript(SQLStatement):
     """A SQL statement that executes a script verbatim"""
 
-    def __init__(self, script: str, parent: SQLExecutable = None):
+    sql_templates = {}
+
+    def __init__(
+        self,
+        script_or_template: str | SQLTemplate,
+        parent: SQLExecutable = None,
+        **kwargs,
+    ):
         super().__init__(parent)
-        self._script = script
+        self._script = (
+            script_or_template
+            if isinstance(script_or_template, str)
+            else self.__class__.sql_templates.get(script_or_template).format(**kwargs)
+        )
 
     def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
@@ -222,7 +251,7 @@ class CreateTable(SQLStatement):
             raise InvalidSQLStatementException(
                 "CREATE TABLE statement must have a table name."
             )
-        return f"CREATE TABLE {self._table} ({[column.get_sql() for column in self._columns]})"
+        return f"CREATE TABLE {self._table} ({', '.join([column.get_sql() for column in self._columns])})"
 
 
 class TableValuedQuery(SQLStatement):
@@ -325,53 +354,62 @@ class Select(TableValuedQuery):
 
 class Insert(SQLStatement):
     """A SQLStatement representing an INSERT statement.
-    Default implementation complies with SQLite syntax."""
+    Multiple rows may be inserted. It is assumed that all rows have the same columns.
+    Rows are represented as a list of Values.
+    Values are Value objects or a tuple of column name and value
+    Default implementation complies with SQLite syntax.
+    """
 
     def __init__(
         self,
         table: str,
-        columns: list[str] = None,
-        rows: Values = None,
+        rows: (
+            list[list[tuple[str, any] | Value]] | list[tuple[str, any] | Value]
+        ) = None,
         parent: SQLExecutable = None,
     ):
         super().__init__(parent)
-        self._columns = [] if columns is None else columns
         self._table = table
-        self._columns = columns
-        self._rows = rows
+        self._values = self.get_sql_class(Values)([])
         self._return_str: str = ""
+        if rows is not None:
+            self.rows(rows=rows)
 
     def get_params(self):
         return self._rows.get_params()
 
     def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
-        sql = f"INSERT INTO {self._table} ({', '.join(self._columns)}) {self._rows.get_sql()}"
+        sql = (
+            f"INSERT INTO {self._table} {self._values.names()} {self._values.get_sql()}"
+        )
+        LOG.debug(f"Insert.sql() -> {sql + self._return_str}")
         return sql + self._return_str
 
-    def single_row(self, row: list[(str, str | Value)]):
-        """
-        Set the statement to insert a single row of data defined by the supplied parameters.
-
-        Args:
-            row (list[(str, str | Value)]):
-                A list of tuples, representing the fields in the row and their values.
-        """
-        row_obj: Row = self.get_sql_class(Row)()
-        for column_name, value in row:
-            self.column(column_name)
-            row_obj.value(value)
-        self._rows: Values = self.get_sql_class(Values)([row_obj], self)
+    def _single_row(self, cols: list[tuple[str, any] | Value]):
+        """Add a single row of values to be inserted"""
+        LOG.debug(f"Insert.single_row({cols=})")
+        row = self.get_sql_class(Row)(
+            [
+                (
+                    col
+                    if isinstance(col, Value)
+                    else self.get_sql_class(Value)(name=col[0], value=col[1])
+                )
+                for col in cols
+            ]
+        )
+        LOG.debug(f"{row.get_sql()=}")
+        self._values.row(row)
+        LOG.debug(f"{self.get_sql()=}")
         return self
 
-    def column(self, column: str):
-        """Add a column to the end of the list of columns to be inserted."""
-        self._columns.append(column)
-        return self
-
-    def values(self, values: Values):
-        """Set the values to be inserted."""
-        self._rows = values
+    def rows(
+        self, rows: list[list[tuple[str, any] | Value]] | list[tuple[str, any] | Value]
+    ):
+        """Add rows of values to be inserted"""
+        for row in rows if isinstance(rows, list) else [rows]:
+            self._single_row(row)
         return self
 
     def returning(self, column: str):
