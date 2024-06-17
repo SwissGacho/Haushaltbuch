@@ -154,35 +154,47 @@ class SQLBetween(SQLTernaryExpression):
 class Value(SQLExpression):
     """Represents a value in an SQL statement."""
 
-    def _init__(self, value: str):
+    def __init__(self, name: str, value: any):
+        # LOG.debug(f"Value({name=}, {value=})")
         super().__init__(None)
+        self._name = name
         self._value = value
 
+    def name(self) -> str:
+        "Name of the value"
+        return self._name
+
     def sql(self) -> str:
-        return self._value
+        return str(self._value)
 
 
 class Row(SQLExpression):
     """Represents a list of values defining a row in an SQL statement such as an INSERT."""
 
-    def __init__(self, values: list[Value]):
+    def __init__(self, values: list[Value] = None):
+        # LOG.debug(f"Row({values=})")
         super().__init__(None)
-        self.values = values
+        self.values = [] if values is None else values
 
     def value(self, value: Value):
         """Add a value to the end of the row."""
         self.values.append(value)
         return self
 
+    def names(self) -> str:
+        "List of value names"
+        return f"({', '.join([v.name() for v in self.values])})"
+
     def sql(self) -> str:
         """Return the SQL expression as a string."""
-        return f"({', '.join([value.sql() for value in self.values])})"
+        return f"({', '.join([v.sql() for v in self.values])})"
 
 
 class Values(SQLExpression):
     """Represents a list of rows in an SQL statement such as an INSERT."""
 
     def __init__(self, rows: list[Row]):
+        # LOG.debug(f"Values({rows=})")
         super().__init__(None)
         self.rows = rows
 
@@ -190,6 +202,10 @@ class Values(SQLExpression):
         """Add a row to the end of the list."""
         self.rows.append(value)
         return self
+
+    def names(self) -> str:
+        "List of value names"
+        return self.rows[0].names()
 
     def sql(self) -> str:
         """Return the SQL expression as a string."""
@@ -257,6 +273,7 @@ class SQLColumnDefinition(SQLExpression):
     """Represents the definition of a column in an SQL table."""
 
     type_map = {}
+    constraint_map = {}
 
     def __init__(self, name: str, data_type: type, constraint: str = None):
         super().__init__(None)
@@ -267,7 +284,14 @@ class SQLColumnDefinition(SQLExpression):
             raise ValueError(
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
             )
-        self.constraint = constraint
+        if not constraint:
+            self.constraint = ""
+        elif constraint in self.constraint_map:
+            self.constraint = self.__class__.constraint_map[constraint]
+        else:
+            raise ValueError(
+                f"Unsupported column constraint for a {self.__class__.__name__}: {constraint}"
+            )
 
     def sql(self) -> str:
         """Return the SQL expression as a string."""

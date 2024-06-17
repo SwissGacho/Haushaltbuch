@@ -55,10 +55,10 @@ class BOBase:
     async def sql_create_table(cls):
 
         attributes = cls.attribute_descriptions()
-        sql: CreateTable = SQL(App.db).create_table(cls.table)
+        sql: CreateTable = SQL().create_table(cls.table)
         for attr in attributes:
             sql.column(attr[0], attr[1], attr[2])
-        sql.execute(close=0)
+        await sql.execute(close=0)
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
@@ -95,7 +95,7 @@ class BOBase:
                     f"id = (SELECT MAX(id) FROM {self.table})"
                 )
             )
-        self.db_data = await (await sql.execute(close=1)).fetchone()
+        self._db_data = await (await sql.execute(close=1)).fetchone()
 
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
@@ -110,9 +110,9 @@ class BOBase:
         Else the existing row is updated
         """
         if self.id is None:
-            self._insert_self()
+            await self._insert_self()
         else:
-            self._update_self()
+            await self._update_self()
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
@@ -122,7 +122,7 @@ class BOBase:
                 await (
                     SQL()
                     .insert(self.table)
-                    .single_row(
+                    .rows(
                         [
                             (k, v)
                             for k, v in self._data.items()

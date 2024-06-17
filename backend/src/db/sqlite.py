@@ -6,7 +6,7 @@ from core.exceptions import OperationalError
 from core.config import Config
 from core.app_logging import getLogger
 from db.db_base import DB, Connection, Cursor
-from db.sqlexecutable import SQL
+from db.sqlexecutable import SQL, SQLExecutable, SQLTemplate, SQLScript
 from db.sqlexpression import SQLColumnDefinition
 from db.sqlfactory import SQLFactory
 
@@ -20,18 +20,56 @@ else:
     AIOSQLITE_IMPORT_ERROR = None
 
 
-class SQLiteColumnDefinition(SQLColumnDefinition):
-
-    type_map = {int: "INTEGER", float: "REAL", str: "TEXT", datetime.datetime: "TEXT"}
-
-
 class SQLiteSQLFactory(SQLFactory):
 
-    def get_sql_class(self, sql_cls: type):
-        for sqlite_class in [SQLiteColumnDefinition]:
+    @classmethod
+    def get_sql_class(cls, sql_cls: type):
+        # LOG.debug(f"SQLiteSQLFactory.get_sql_class({sql_cls=})")
+        for sqlite_class in [SQLiteColumnDefinition, SQLiteScript]:
             if sql_cls.__name__ in [b.__name__ for b in sqlite_class.__bases__]:
                 return sqlite_class
         return super().get_sql_class(sql_cls)
+
+
+class SQLiteColumnDefinition(SQLColumnDefinition):
+
+    type_map = {int: "INTEGER", float: "REAL", str: "TEXT", datetime.datetime: "TEXT"}
+    constraint_map = {
+        "pk": "PRIMARY KEY",
+        "pkinc": "PRIMARY KEY AUTOINCREMENT",
+        "dt": "DEFAULT CURRENT_TIMESTAMP",
+    }
+
+
+class SQLiteScript(SQLScript):
+    sql_templates = {
+        # SQL statement returning a result set with info on DB table 'table' with the following columns:
+        # column_name:    name of table column
+        # column_type:    data type of column
+        # pk:             primary key constraint: 0=none; 1=PK,no auto inc; 2=PK,auto inc
+        # dflt_value:     default value
+        SQLTemplate.TABLEINFO: """ SELECT
+                                    column_name
+                                    ,column_type
+                                    ,CONCAT(
+                                        CASE WHEN pk=0 THEN ''
+                                            WHEN autoinc=0 THEN 'PRIMARY KEY'
+                                            ELSE 'PRIMARY KEY AUTOINCREMENT'
+                                            END
+                                        ,CASE WHEN LENGTH(dflt_value) IS NULL THEN ''
+                                            ELSE CONCAT('DEFAULT ',dflt_value)
+                                            END
+                                    ) AS "constraint"
+                                FROM (SELECT name AS column_name, type AS column_type, pk, dflt_value
+                                        FROM pragma_table_info('{table}')) c
+                                        FULL OUTER JOIN (SELECT INSTR(sql,'PRIMARY KEY AUTOINCREMENT')>0 AS autoinc
+                                                        FROM sqlite_master WHERE type='table' AND name = '{table}') s
+                            """,
+        # SQL statement returning list of tables
+        SQLTemplate.TABLELIST: """ SELECT name as table_name FROM sqlite_master
+                                    WHERE type = 'table' and substr(name,1,7) <> 'sqlite_'
+                                """,
+    }
 
 
 class SQLiteDB(DB):
@@ -47,39 +85,6 @@ class SQLiteDB(DB):
     async def connect(self):
         "Open a connection"
         return await SQLiteConnection(db_obj=self, **self._cfg).connect()
-
-    def sql(self, query: SQL, **kwargs) -> str:
-        if query == SQL.TABLE_LIST:
-            return f""" SELECT name as table_name FROM sqlite_master
-                        WHERE type = 'table' and substr(name,1,7) <> 'sqlite_'
-                    """
-        elif query == SQL.TABLE_INFO:
-            return f""" SELECT column_name, column_type, CASE WHEN pk=0 THEN 0 WHEN autoinc=0 THEN 1 ELSE 2 END AS pk,dflt_value
-                        FROM (SELECT name AS column_name, type AS column_type, pk, dflt_value FROM pragma_table_info('{kwargs['table']}')) c
-                        FULL OUTER JOIN (SELECT INSTR(sql,'PRIMARY KEY AUTOINCREMENT')>0 AS autoinc
-                        FROM sqlite_master WHERE type='table' AND name = '{kwargs['table']}') s
-                    """
-        elif query == SQL.CREATE_TABLE_COLUMN:
-            column = kwargs.get("column")
-            col_def = [column[0]]
-            if column[1] == int:
-                col_def.append("INTEGER")
-            if column[1] == str:
-                col_def.append("TEXT")
-            if column[1] == datetime.datetime:
-                col_def.append("DATETIME")
-            if column[1] == datetime.date:
-                col_def.append("DATE")
-            if len(column) > 2:
-                if column[2] == "pkinc":
-                    col_def.append("PRIMARY KEY AUTOINCREMENT")
-                if column[2] == "pk":
-                    col_def.append("PRIMARY KEY")
-                if column[2] == "dt":
-                    col_def.append("DEFAULT CURRENT_TIMESTAMP")
-            return " ".join(col_def)
-        else:
-            return super().sql(query=query, **kwargs)
 
 
 class SQLiteConnection(Connection):
@@ -109,7 +114,7 @@ class SQLiteCursor(Cursor):
         self._last_query = query
         self._close = close
         try:
-            # LOG.debug(f"Executing: ({query}, {params}, {close=})")
+            # LOG.debug(f"Executing: {query=}, {params=}, {close=}")
             await self._cursor.execute(query, params)
             self._rowcount = self._cursor.rowcount
         except sqlite3.OperationalError as err:

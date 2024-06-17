@@ -19,9 +19,11 @@ class MessageType(StrEnum):
     WS_TYPE_WELCOME = "Welcome"
     WS_TYPE_BYE = "Bye"
     WS_TYPE_LOG = "Log"
+    WS_TYPE_ECHO = "Echo"
 
 
 class MessageAttribute(StrEnum):
+    "Key used in message paylod"
     WS_ATTR_TYPE = "type"
     WS_ATTR_TOKEN = "token"
     WS_ATTR_STATUS = "status"
@@ -38,6 +40,10 @@ class MessageAttribute(StrEnum):
     WS_ATTR_LOGLEVEL = "log_level"
     WS_ATTR_MESSAGE = "message"
     WS_ATTR_CALLER = "caller"
+
+    # Echo
+    WS_ATTR_PAYLOAD = "payload"
+    WS_ATTR_COMPONENT = "component"
 
 
 def json_encode(obj: Any) -> Any:
@@ -86,6 +92,7 @@ class Message(BaseObject):
 
     @classmethod
     def message_type(cls):
+        "type of the message"
         return MessageType.WS_TYPE_NONE
 
     @property
@@ -94,9 +101,11 @@ class Message(BaseObject):
         return self.message.get(MessageAttribute.WS_ATTR_TOKEN)
 
     def add(self, attrs: dict):
+        "Add items to the payload"
         self.message |= attrs
 
     def serialize(self):
+        "Serialize to JSON"
         return dumps(serialize(self.message), default=json_encode)
 
     async def handle_message(self, connection):
