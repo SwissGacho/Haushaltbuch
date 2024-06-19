@@ -122,7 +122,7 @@ class BOBase:
                 await (
                     SQL()
                     .insert(self.table)
-                    .single_row(
+                    .rows(
                         [
                             (k, v)
                             for k, v in self._data.items()

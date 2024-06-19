@@ -2,7 +2,7 @@
 
 # from persistance.business_object_base import BO_Base
 from db.sqlfactory import SQLFactory
-from db.sqlexecutable import SQL
+from db.sqlexecutable import SQL, SQLTemplate
 from db.sqlexpression import SQLColumnDefinition
 from core.app_logging import getLogger
 
@@ -54,7 +54,7 @@ class DB:
                 [c["column_name"], c["column_type"], c["constraint"]]
             )
             for c in await (
-                await SQL().template("TABLE_INFO", table=obj.table).execute()
+                await SQL().script(SQLTemplate.TABLEINFO, table=obj.table).execute()
             ).fetchall()
         }
         ok = True
@@ -69,7 +69,7 @@ class DB:
     async def execute(self, query: str, params=None, close=False, commit=False):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
-        LOG.debug(f"execute: {query=}, {params=}, {close=}, {commit=}")
+        # LOG.debug(f"execute: {query=}, {params=}, {close=}, {commit=}")
         return await (await self.connect()).execute(
             query=query, params=params, close=close, commit=commit
         )

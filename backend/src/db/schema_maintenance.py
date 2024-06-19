@@ -7,6 +7,7 @@ import persistance
 # import data.management
 from data.management.db_schema import DBSchema
 from core.app_logging import getLogger
+from db.sqlexecutable import SQL, SQLTemplate
 
 LOG = getLogger(__name__)
 
@@ -36,11 +37,11 @@ async def check_db_schema():
     if database.__class__ == db.db_base.DB:
         raise TypeError("cannot check abstract DB")
     LOG.debug("checking DB Schema")
-    # cur = await database.execute(database.sql(query=db.sql.SQL.TABLE_LIST), close=True)
-    # num_tables = await cur.rowcount
-    # LOG.debug(f"Found {num_tables} tables in DB:")
-    # tables = await cur.fetchall()
-    # LOG.debug(f"{tables=}")
+    cur = await SQL().script(SQLTemplate.TABLELIST).execute()
+    LOG.debug(f"Found {await cur.rowcount} tables in DB:")
+    LOG.debug(
+        f"    tables: {', '.join([t['table_name'] for t in await cur.fetchall()])}"
+    )
 
     all_business_objects = (
         persistance.business_object_base.BOBase.all_business_objects.values()
