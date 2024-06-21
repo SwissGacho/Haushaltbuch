@@ -65,8 +65,10 @@ class WS_Handler:
                     await connection.handle_message(message=message)
         except Exception as exc:
             self.LOG.error(f"Connection aborted by exception {exc}")
+            raise
         finally:
             self.LOG.debug("Connection closed.")
+            connection.connection_closed()
 
 
 @asynccontextmanager

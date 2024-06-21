@@ -31,7 +31,7 @@ LOG.debug(f"{__name__} (main) module initialized")
 
 if __name__ == "__main__":
     try:
-        App.initialize()
+        App.initialize(__file__)
         asyncio.run(main())
     except KeyboardInterrupt:
         LOG.info("Stopped by KeyboardInterrupt")
