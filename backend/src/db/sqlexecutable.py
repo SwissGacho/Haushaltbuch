@@ -345,7 +345,7 @@ class Insert(SQLStatement):
 
     def _single_row(self, cols: list[tuple[str, any] | Value]):
         """Add a single row of values to be inserted"""
-        LOG.debug(f"Insert.single_row({cols=})")
+        # LOG.debug(f"Insert._single_row({cols=})")
         row = self.get_sql_class(Row)(
             [
                 (
@@ -365,7 +365,8 @@ class Insert(SQLStatement):
         self, rows: list[list[tuple[str, any] | Value]] | list[tuple[str, any] | Value]
     ):
         """Add rows of values to be inserted"""
-        for row in rows if isinstance(rows, list) else [rows]:
+        # LOG.debug(f"Insert.rows({rows=})")
+        for row in rows if not rows or isinstance(rows[0], list) else [rows]:
             self._single_row(row)
         return self
 

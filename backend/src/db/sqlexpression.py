@@ -200,11 +200,14 @@ class Values(SQLExpression):
 
     def row(self, value: Row):
         """Add a row to the end of the list."""
+        # LOG.debug(f"Values.row({value=})")
         self.rows.append(value)
         return self
 
     def names(self) -> str:
         "List of value names"
+        if not self.rows:
+            return ""
         return self.rows[0].names()
 
     def sql(self) -> str:
