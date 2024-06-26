@@ -2,8 +2,8 @@
 """
 
 import logging
+from core.const import APPNAME
 
-APPNAME = "moneypilot"
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 app_logger = logging.getLogger(APPNAME)

@@ -26,8 +26,9 @@ async def get_db():
         return
 
     db_config = App.configuration[Config.CONFIG_DB]
-    # LOG.debug(f"DB configuration: {db_config.keys()=}")
-    if db_config.keys() == {Config.CONFIG_DB_FILE}:
+    db_type = db_config.get(Config.CONFIG_DB_DB)
+    LOG.debug(f"DB configuration: {db_config=}, {db_type=}")
+    if db_type == "SQLite":
         LOG.debug("Connect to SQLite")
         try:
             db = SQLiteDB(**db_config)
@@ -41,12 +42,7 @@ async def get_db():
                 )
             yield
             return
-    elif db_config.keys() == {
-        Config.CONFIG_DB_HOST,
-        Config.CONFIG_DB_DB,
-        Config.CONFIG_DB_USER,
-        Config.CONFIG_DB_PW,
-    }:
+    elif db_type == "MySQL":
         LOG.info("Connect to MySQL DB")
         try:
             db = MySQLDB(**db_config)

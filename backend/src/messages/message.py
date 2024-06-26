@@ -34,6 +34,7 @@ class MessageAttribute(StrEnum):
     WS_ATTR_TYPE = "type"
     WS_ATTR_TOKEN = "token"
     WS_ATTR_STATUS = "status"
+    WS_ATTR_PAYLOAD = "payload"
 
     # Fetch
     WS_ATTR_OBJECT = "object"
@@ -56,7 +57,6 @@ class MessageAttribute(StrEnum):
     WS_ATTR_CALLER = "caller"
 
     # Echo
-    WS_ATTR_PAYLOAD = "payload"
     WS_ATTR_COMPONENT = "component"
 
 

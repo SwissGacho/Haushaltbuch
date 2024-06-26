@@ -1,6 +1,7 @@
 """ Connection to SQLit DB using aiosqlite """
 
 import datetime
+from pathlib import Path
 
 from core.exceptions import OperationalError
 from core.config import Config
@@ -93,9 +94,16 @@ class SQLiteConnection(Connection):
             fields = [column[0] for column in cursor.description]
             return {key: value for key, value in zip(fields, row)}
 
-        self._connection = await aiosqlite.connect(
-            database=self._cfg[Config.CONFIG_DB_FILE]
-        )
+        db_path = Path(self._cfg[Config.CONFIG_DB_FILE])
+        LOG.debug(f"Connecting to {db_path=}, {db_path.parent.exists()=}")
+        if not db_path.parent.exists():
+            LOG.info(f"Create missing directory '{db_path.parent}' for SQLite DB.")
+            db_path.parent.mkdir(parents=True)
+        if not db_path.parent.is_dir():
+            raise FileExistsError(
+                f"Path containing SQLite DB exists and is not a directory: {db_path.parent}"
+            )
+        self._connection = await aiosqlite.connect(database=db_path)
         self._connection.row_factory = row_factory
         return self
 
