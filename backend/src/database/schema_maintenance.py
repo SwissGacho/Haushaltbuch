@@ -1,7 +1,7 @@
 """ Manage DB schema versins and check compatibility """
 
 import core
-import database.db as db
+import database
 import persistance
 
 # import data.management
@@ -33,8 +33,8 @@ async def check_db_schema():
     upgrade if necessary
     verify compatibility of the persistance tables
     """
-    database = core.app.App.db
-    if database.__class__ == db.db_base.DB:
+    this_database = core.app.App.db
+    if this_database.__class__ == database.db_base.DB:
         raise TypeError("cannot check abstract DB")
     LOG.debug("checking DB Schema")
     cur = await SQL().script(SQLTemplate.TABLELIST).execute()
@@ -61,7 +61,7 @@ async def check_db_schema():
         or db_schema.version_nr not in COMPATIBLE_DB_SCHEMA_VERSIONS
     ):
         await upgrade_db_schema(
-            database,
+            this_database,
             db_schema.version_nr,
             CURRENT_DB_SCHEMA_VERSION,
             all_business_objects,
@@ -72,7 +72,7 @@ async def check_db_schema():
 
     ok = True
     for bo in all_business_objects:
-        ok = await database.check_table(bo) and ok
+        ok = await this_database.check_table(bo) and ok
     if not ok:
         raise TypeError("DB schema not compatible")
     if upgraded:
