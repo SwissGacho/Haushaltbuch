@@ -7,8 +7,8 @@ from typing import Self, TypeAlias
 from datetime import date, datetime, UTC
 
 from persistance.bo_descriptors import BOInt, BODatetime
-from db.sqlexecutable import SQL, CreateTable
-from db.sqlexpression import Eq, SQLExpression, Value
+from database.sqlexecutable import SQL, CreateTable
+from database.sqlexpression import Eq, SQLExpression, Value
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)

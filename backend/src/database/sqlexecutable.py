@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import TypeAlias
 
 from core.app import App
-from db.sqlexpression import (
+from database.sqlexpression import (
     SQLExpression,
     SQLColumnDefinition,
     Value,
@@ -16,7 +16,7 @@ from db.sqlexpression import (
     GroupBy,
     Having,
 )
-from db.sqlfactory import SQLFactory
+from database.sqlfactory import SQLFactory
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)

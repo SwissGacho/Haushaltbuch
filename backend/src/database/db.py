@@ -7,9 +7,9 @@ from core.app import App
 from core.status import Status
 from core.config import Config
 from core.app_logging import getLogger
-from db.sqlite import SQLiteDB
-from db.mysql import MySQLDB
-from db.schema_maintenance import check_db_schema
+from database.sqlite import SQLiteDB
+from database.mysql import MySQLDB
+from database.schema_maintenance import check_db_schema
 
 
 LOG = getLogger(__name__)

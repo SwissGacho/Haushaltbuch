@@ -1,13 +1,13 @@
 """ Manage DB schema versins and check compatibility """
 
 import core
-import db
+import Haushaltbuch.backend.src.database.db as db
 import persistance
 
 # import data.management
 from data.management.db_schema import DBSchema
 from core.app_logging import getLogger
-from db.sqlexecutable import SQL, SQLTemplate
+from database.sqlexecutable import SQL, SQLTemplate
 
 LOG = getLogger(__name__)
 

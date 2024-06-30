@@ -1,8 +1,8 @@
 """ Connection to MySQL DB using aiomysql """
 
-from db.db_base import DB, Connection, Cursor
-from db.sql import SQL
-from db.sqlfactory import SQLFactory
+from database.db_base import DB, Connection, Cursor
+from database.sql import SQL
+from database.sqlfactory import SQLFactory
 from core.config import Config
 from core.app_logging import getLogger
 

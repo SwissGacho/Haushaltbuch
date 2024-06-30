@@ -7,7 +7,7 @@ from core.app import App
 from core.status import Status
 from core.config import Config
 from core.app_logging import getLogger
-from db.db import get_db
+from database.db import get_db
 from server.ws_server import get_websocket
 
 LOG = getLogger(__name__)
