@@ -1,5 +1,7 @@
 """ Data descriptors used in business objects """
 
+import json
+
 from datetime import date, datetime
 from core.app_logging import getLogger
 
@@ -78,3 +80,19 @@ class BODate(PersistantAttr):
 
     def validate(self, value):
         return isinstance(value, date)
+
+
+class BOJSONable(PersistantAttr):
+    @classmethod
+    def data_type(cls):
+        return str
+
+    def validate(self, value):
+        try:
+            json.dumps(value, separators=(",", ":"))
+        except (ValueError, TypeError, RecursionError) as exc:
+            raise TypeError(f"{value} is not serializable by JSON: {exc}") from exc
+        return True
+
+    def __str__(self) -> str:
+        return json.dumps(self, separators=(",", ":"))

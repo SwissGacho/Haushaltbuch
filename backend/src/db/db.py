@@ -6,13 +6,11 @@ from contextlib import asynccontextmanager
 from core.app import App
 from core.status import Status
 from core.config import Config
+from core.app_logging import getLogger
 from db.sqlite import SQLiteDB
 from db.mysql import MySQLDB
 from db.schema_maintenance import check_db_schema
 
-# from persistance.business_object_base import BO_Base
-from data.management.db_schema import DBSchema
-from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
@@ -20,13 +18,17 @@ LOG = getLogger(__name__)
 @asynccontextmanager
 async def get_db():
     "Create a DB connection"
-    if App.status != Status.STATUS_DB_CFG:
+    if App.status != Status.STATUS_DB_CFG:  # pylint: disable=comparison-with-callable
         LOG.warning("No DB configuration available")
         yield
         return
 
-    db_config = App.configuration[Config.CONFIG_DB]
+    db_config = App.configuration.get(Config.CONFIG_DB)
     db_type = db_config.get(Config.CONFIG_DB_DB)
+    if not (db_config and db_type):
+        LOG.error(f"Invalid DB configuration: {App.configuration}")
+        yield
+        return
     LOG.debug(f"DB configuration: {db_config=}, {db_type=}")
     if db_type == "SQLite":
         LOG.debug("Connect to SQLite")

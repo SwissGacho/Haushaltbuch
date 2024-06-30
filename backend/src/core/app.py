@@ -1,6 +1,7 @@
 """ Common constants
 """
 
+from asyncio import Event
 from enum import StrEnum
 from typing import ClassVar, TypeAlias
 
@@ -29,6 +30,11 @@ class App:
     _status_enum_class: ClassVar[StatusEnum] = None
     _config_class: ClassVar[GlobalConfiguration] = None
     _config_enum_class: ClassVar[ConfigEnum] = None
+    db_available: ClassVar = Event()
+    db_failure: ClassVar = Event()
+    db_restart: ClassVar = Event()
+    db_request_restart: ClassVar = Event()
+
     _app: ClassVar = None
     _status: ClassVar = None
     _config: ClassVar = None
@@ -50,12 +56,12 @@ class App:
         if not callable(cls._config_class):
             raise TypeError("Configuration class not callable.")
         cls._config = cls._config_class(app_location)  # pylint: disable=not-callable
-        cls._status.status = (
-            cls._status_enum_class.STATUS_DB_CFG
-            # if cls._config.configuration().get(Config.CONFIG_DB, {})
-            if cls._config.configuration().get(cls._config_enum_class.CONFIG_DB, {})
-            else cls._status_enum_class.STATUS_NO_DB
-        )
+        # cls._status.status = (
+        #     cls._status_enum_class.STATUS_DB_CFG
+        #     # if cls._config.configuration().get(Config.CONFIG_DB, {})
+        #     if cls._config.configuration().get(cls._config_enum_class.CONFIG_DB, {})
+        #     else cls._status_enum_class.STATUS_NO_DB
+        # )
         # LOG.debug(f"App: {str(Config.CONFIG_DB)=}   {cls._config.configuration()=}")
         LOG.debug("app initialized")
 

@@ -10,16 +10,22 @@ from pathlib import Path
 from enum import StrEnum
 import platform
 import json
+import asyncio
 
+from data.management.configuration import Configuration
 from core.app import App
 from core.setup_config import parse_commandline, cfg_searchpaths
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
+WAIT_AVAILABLE_TASK = "wait_for_available"
+WAIT_FAILURE_TASK = "wait_for_failure"
 
 
 class Config(StrEnum):
     "Configuration keys"
+    CONFIG_APP = "app"
+    CONFIG_APP_USRMODE = "app/userMode"
     CONFIG_DBCFG_FILE = "dbcfg_file"
     CONFIG_DB = "db_cfg"
     CONFIG_DB_FILE = "file"
@@ -30,6 +36,17 @@ class Config(StrEnum):
     CONFIG_CFG_SEARCH_PATH = "config_search_path"
     CONFIG_SYSTEM = "system"
     CONFIG_DB_LOCATIONS = "db_paths"
+    CONFIG_ADMINUSER = "adminuser"
+
+
+class _SetupConfigKeys(StrEnum):
+    CONFIG = "configuration"
+    CFG_APP = "configuration/app"
+    DBCFG_CFG_FILE = "dbcfg_file"
+    # DBCFG = "db_cfg"
+    CFG_DBCFG = "configuration/db_cfg"
+    APP = "app"
+    ADM_USER = "adminuser"
 
 
 class ConfigIndex(StrEnum):
@@ -45,6 +62,11 @@ class AppConfiguration:
         self._global_configuration = None
         self._user_configuration = None
         self._app_location = app_location
+
+    def _get_config_item(self, cfg: dict, key: Config):
+        for key_part in key.split("/"):
+            cfg = cfg.get(key_part)
+        return cfg
 
     def _read_db_config_file(self, cfg_searchpath: list[Path]) -> dict:
         dbcfg_file = Path(self._cmdline_configuration.get(Config.CONFIG_DBCFG_FILE))
@@ -106,18 +128,55 @@ class AppConfiguration:
             self._global_configuration or self._init_setup_configuration()
         ) | self._cmdline_configuration
 
-    def write_db_cfg_file(self, filename: str):
-        "Write the DB configuration to the indicated file"
-        with open(file=filename, mode="w") as cfg_file:
-            LOG.debug(f"{filename=}")
-            LOG.debug(
-                f"{json.dumps({Config.CONFIG_DB: self._setup_configuration.get(Config.CONFIG_DB)})=}"
+    async def _wait_for_db(self) -> bool:
+        LOG.debug("Request DB restart.")
+        App.db_request_restart.set()
+        # LOG.debug("Wait for restart.")
+        await App.db_restart.wait()
+        # LOG.debug("Restart detected; wait for DB.")
+        done, pending = await asyncio.wait(
+            [
+                asyncio.create_task(App.db_available.wait(), name=WAIT_AVAILABLE_TASK),
+                asyncio.create_task(App.db_failure.wait(), name=WAIT_FAILURE_TASK),
+            ],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        # LOG.debug("Restart done.")
+        for task in pending:
+            task.cancel()
+        return WAIT_AVAILABLE_TASK in [t.get_name() for t in done]
+
+    async def setup_configuration(self, setup_cfg: dict):
+        """Setup configuration.
+        -  write DB configuration file
+        -  create configuration business object
+        """
+        db_filename = self._get_config_item(setup_cfg, _SetupConfigKeys.DBCFG_CFG_FILE)
+        db_cfg = {
+            Config.CONFIG_DB: self._get_config_item(
+                setup_cfg, _SetupConfigKeys.CFG_DBCFG
             )
-            cfg_file.write(
-                json.dumps(
-                    {Config.CONFIG_DB: self._setup_configuration.get(Config.CONFIG_DB)}
-                )
+        }
+        # LOG.debug(f"AppConfiguration.setup_configuration({setup_cfg=}")
+        # pylint: disable=unspecified-encoding
+        with open(file=db_filename, mode="w") as cfg_file:
+            cfg_file.write(json.dumps(db_cfg))
+        self._setup_configuration |= db_cfg
+        configuration = {
+            Config.CONFIG_APP: self._get_config_item(
+                setup_cfg, _SetupConfigKeys.CFG_APP
             )
+        }
+        if await self._wait_for_db():
+            LOG.debug(f"AppConfiguration.setup_configuration: {configuration=}")
+            bo = Configuration(cfg=configuration)
+            LOG.debug(f"{bo=}")
+            # await bo.store()
+        else:
+            LOG.error("Start DB failed with new configuration.")
+
+        if self._get_config_item(configuration, Config.CONFIG_APP_USRMODE) == "multi":
+            adm_user = self._get_config_item(setup_cfg, _SetupConfigKeys.ADM_USER)
 
     def handle_fetch_configuration(self, index: str) -> str:
         "return a requested part of the configuration"

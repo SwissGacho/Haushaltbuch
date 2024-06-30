@@ -95,7 +95,7 @@ class SQLiteConnection(Connection):
             return {key: value for key, value in zip(fields, row)}
 
         db_path = Path(self._cfg[Config.CONFIG_DB_FILE])
-        LOG.debug(f"Connecting to {db_path=}, {db_path.parent.exists()=}")
+        # LOG.debug(f"Connecting to {db_path=}")
         if not db_path.parent.exists():
             LOG.info(f"Create missing directory '{db_path.parent}' for SQLite DB.")
             db_path.parent.mkdir(parents=True)
