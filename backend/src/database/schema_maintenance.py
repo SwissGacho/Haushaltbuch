@@ -1,7 +1,7 @@
 """ Manage DB schema versins and check compatibility """
 
 import core
-import Haushaltbuch.backend.src.database.db as db
+import database.db as db
 import persistance
 
 # import data.management
