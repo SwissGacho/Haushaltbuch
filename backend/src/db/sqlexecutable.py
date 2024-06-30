@@ -1,7 +1,7 @@
 """This module defines a SQLExecutable class that is used to create and execute SQL statements."""
 
 from enum import Enum, auto
-from typing import List
+from typing import TypeAlias
 
 from core.app import App
 from db.sqlexpression import (
@@ -314,6 +314,10 @@ class Select(TableValuedQuery):
         return self
 
 
+NamedValue: TypeAlias = tuple[str, any] | Value
+NamedValueList: TypeAlias = list[NamedValue]
+
+
 class Insert(SQLStatement):
     """A SQLStatement representing an INSERT statement.
     Multiple rows may be inserted. It is assumed that all rows have the same columns.
@@ -325,9 +329,7 @@ class Insert(SQLStatement):
     def __init__(
         self,
         table: str,
-        rows: (
-            list[list[tuple[str, any] | Value]] | list[tuple[str, any] | Value]
-        ) = None,
+        rows: list[NamedValueList] | NamedValueList = None,
         parent: SQLExecutable = None,
     ):
         super().__init__(parent)
@@ -343,7 +345,7 @@ class Insert(SQLStatement):
         LOG.debug(f"Insert.sql() -> {sql + self._return_str}")
         return sql + self._return_str
 
-    def _single_row(self, cols: list[tuple[str, any] | Value]):
+    def _single_row(self, cols: NamedValueList):
         """Add a single row of values to be inserted"""
         # LOG.debug(f"Insert._single_row({cols=})")
         row = self.get_sql_class(Row)(
@@ -361,9 +363,7 @@ class Insert(SQLStatement):
         LOG.debug(f"{self.sql()=}")
         return self
 
-    def rows(
-        self, rows: list[list[tuple[str, any] | Value]] | list[tuple[str, any] | Value]
-    ):
+    def rows(self, rows: list[NamedValueList] | NamedValueList):
         """Add rows of values to be inserted"""
         # LOG.debug(f"Insert.rows({rows=})")
         for row in rows if not rows or isinstance(rows[0], list) else [rows]:
@@ -384,7 +384,7 @@ class Update(SQLStatement):
         super().__init__(parent)
         self._table = table
         self._where: Where = None
-        self.assignments: List[Assignment] = []
+        self.assignments: list[Assignment] = []
 
     def assignment(self, columns: list[str] | str, value: Value):
         """Add an assignment to the list of assignments to be made in the update statement.

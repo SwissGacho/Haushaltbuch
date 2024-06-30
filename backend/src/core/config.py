@@ -11,6 +11,7 @@ from enum import StrEnum
 import platform
 import json
 
+from core.app import App
 from core.setup_config import parse_commandline, cfg_searchpaths
 from core.app_logging import getLogger
 
@@ -128,4 +129,5 @@ class AppConfiguration:
         return ""
 
 
+App.set_config_class(AppConfiguration, Config)
 # LOG.debug("module imported")

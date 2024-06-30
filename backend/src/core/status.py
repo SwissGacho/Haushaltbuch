@@ -2,6 +2,7 @@
 """
 
 from enum import StrEnum
+from core.app import App
 from core.base_object import BaseObject
 from core.app_logging import getLogger
 
@@ -33,4 +34,5 @@ class AppStatus(BaseObject):
             self._status = Status(value)
 
 
+App.set_status_class(AppStatus, Status)
 # LOG.debug("module imported")

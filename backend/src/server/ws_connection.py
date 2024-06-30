@@ -30,11 +30,11 @@ class WS_Connection:
     def _register_connection(self, key: str = None) -> None:
         # remove existing entry
         self._unregister_connection()
-        LOG.debug(f"add connection '{self.connection_id if key is None else key}'")
+        # LOG.debug(f"add connection '{self.connection_id if key is None else key}'")
         WS_Connection.connections |= {
             (self.connection_id if key is None else key): self
         }
-        LOG.debug(f"{WS_Connection.connections=}")
+        # LOG.debug(f"{WS_Connection.connections=}")
 
     def _unregister_connection(self):
         for key in [k for k, v in WS_Connection.connections.items() if v is self]:
@@ -122,7 +122,7 @@ class WS_Connection:
 
     async def handle_message(self, message: Message):
         "accept a message from the client and trigger according actions"
-        self.LOG.debug(f"handle {message=} {message.message=} {message.token=}")
+        # self.LOG.debug(f"handle {message=} {message.message=} {message.token=}")
         if message.token == self._token:
             # self.LOG.debug(f"Received message")
             await message.handle_message(self)
