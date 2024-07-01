@@ -82,10 +82,10 @@ class BODate(PersistantAttr):
         return isinstance(value, date)
 
 
-class BOJSONable(PersistantAttr):
+class BODict(PersistantAttr):
     @classmethod
     def data_type(cls):
-        return str
+        return dict
 
     def validate(self, value):
         try:
@@ -94,5 +94,15 @@ class BOJSONable(PersistantAttr):
             raise TypeError(f"{value} is not serializable by JSON: {exc}") from exc
         return True
 
-    def __str__(self) -> str:
-        return json.dumps(self, separators=(",", ":"))
+
+class BOList(PersistantAttr):
+    @classmethod
+    def data_type(cls):
+        return list
+
+    def validate(self, value):
+        try:
+            json.dumps(value, separators=(",", ":"))
+        except (ValueError, TypeError, RecursionError) as exc:
+            raise TypeError(f"{value} is not serializable by JSON: {exc}") from exc
+        return True

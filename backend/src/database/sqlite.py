@@ -2,6 +2,7 @@
 
 import datetime
 from pathlib import Path
+import json
 
 from core.exceptions import OperationalError
 from core.config import Config
@@ -32,14 +33,41 @@ class SQLiteSQLFactory(SQLFactory):
         return super().get_sql_class(sql_cls)
 
 
+SQLITE_JSON_TYPE = "JSON"
+
+
 class SQLiteColumnDefinition(SQLColumnDefinition):
 
-    type_map = {int: "INTEGER", float: "REAL", str: "TEXT", datetime.datetime: "TEXT"}
+    type_map = {
+        int: "INTEGER",
+        float: "REAL",
+        str: "TEXT",
+        datetime.datetime: "TEXT",
+        dict: SQLITE_JSON_TYPE,
+        list: SQLITE_JSON_TYPE,
+    }
     constraint_map = {
         "pk": "PRIMARY KEY",
         "pkinc": "PRIMARY KEY AUTOINCREMENT",
         "dt": "DEFAULT CURRENT_TIMESTAMP",
     }
+
+
+def _adapt_dict(value: dict) -> str:
+    return json.dumps(value, separators=(",", ":"))
+
+
+def _adapt_list(value: list) -> str:
+    return json.dumps(value, separators=(",", ":"))
+
+
+def _convert_json(value: bytes) -> dict | list:
+    return json.loads(value)
+
+
+sqlite3.register_adapter(dict, _adapt_dict)
+sqlite3.register_adapter(list, _adapt_list)
+sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
 
 
 class SQLiteScript(SQLScript):
@@ -103,7 +131,9 @@ class SQLiteConnection(Connection):
             raise FileExistsError(
                 f"Path containing SQLite DB exists and is not a directory: {db_path.parent}"
             )
-        self._connection = await aiosqlite.connect(database=db_path)
+        self._connection = await aiosqlite.connect(
+            database=db_path, detect_types=sqlite3.PARSE_DECLTYPES
+        )
         self._connection.row_factory = row_factory
         return self
 

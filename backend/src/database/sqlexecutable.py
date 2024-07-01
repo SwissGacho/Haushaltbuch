@@ -342,7 +342,7 @@ class Insert(SQLStatement):
     def sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         sql = f"INSERT INTO {self._table} {self._values.names()} {self._values.sql()}"
-        LOG.debug(f"Insert.sql() -> {sql + self._return_str}")
+        # LOG.debug(f"Insert.sql() -> {sql + self._return_str}")
         return sql + self._return_str
 
     def _single_row(self, cols: NamedValueList):
@@ -358,9 +358,8 @@ class Insert(SQLStatement):
                 for col in cols
             ]
         )
-        LOG.debug(f"{row.sql()=}")
         self._values.row(row)
-        LOG.debug(f"{self.sql()=}")
+        # LOG.debug(f"{self.sql()=}")
         return self
 
     def rows(self, rows: list[NamedValueList] | NamedValueList):

@@ -1,18 +1,20 @@
 """Store app configuration"""
 
 from persistance.business_object_base import BOBase
-from persistance.bo_descriptors import BOJSONable
+from persistance.bo_descriptors import BODict, BOInt
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
 
 class Configuration(BOBase):
-    configuration = BOJSONable()
+    user_id = BOInt()
+    configuration = BODict()
 
-    def __init__(self, id=None, cfg: any = None) -> None:
+    def __init__(self, id: int = None, cfg: any = None, user_id: int = None) -> None:
         super().__init__(id=id)
-        self.config = cfg
+        self.user_id = user_id
+        self.configuration = cfg
 
     def __repr__(self) -> str:
-        return f"<Configuration (id:{self.id}, cfg:{repr(self.config)})>"
+        return f"<Configuration (id:{self.id}, user_id:{self.user_id}, cfg:'{repr(self.configuration)}')>"

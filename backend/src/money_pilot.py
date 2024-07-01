@@ -19,7 +19,7 @@ async def main():
     async with get_websocket() as ws:
         # LOG.debug(f"got websocket {ws=}")
         while True:
-            LOG.debug(f"Start DB, config: {App.configuration}")
+            # LOG.debug(f"Start DB, config: {App.configuration}")
             App.status_object.status = (
                 Status.STATUS_DB_CFG
                 if App.configuration.get(Config.CONFIG_DB)
@@ -29,10 +29,11 @@ async def main():
                 async with get_db() as db:
                     App.db_restart.clear()
                     if db:
-                        LOG.debug("DB available")
+                        # LOG.debug("DB available")
                         App.db_available.set()
+                        App.db_ready()
                     else:
-                        LOG.debug("DB NOT available.")
+                        # LOG.debug("DB NOT available.")
                         App.db_failure.set()
                     LOG.info(f"App running. (Status: {App.status})")
 

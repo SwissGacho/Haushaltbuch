@@ -62,7 +62,7 @@ class WS_Connection:
 
     async def _send(self, payload):
         await self._socket.send(payload)
-        self.LOG.debug(f"sent message: {payload}")
+        # self.LOG.debug(f"sent message: {payload}")
 
     async def send_message(self, message: Message, status=False):
         "Send a message to the client using current connection"
@@ -89,7 +89,7 @@ class WS_Connection:
         await self.send_message(HelloMessage(token=self._token, status=App.status))
         try:
             while json_message := await self._socket.recv():
-                self.LOG.debug(f"reply is {json_message}")
+                # self.LOG.debug(f"reply is {json_message}")
                 msg = Message(json_message=json_message)
                 if isinstance(msg, LoginMessage):
                     self._register_connection(msg.component)

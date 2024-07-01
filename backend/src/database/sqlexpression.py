@@ -2,6 +2,7 @@
 
 from enum import Enum
 from typing import List
+import json
 
 from core.app_logging import getLogger
 
@@ -165,6 +166,10 @@ class Value(SQLExpression):
         return self._name
 
     def sql(self) -> str:
+        if isinstance(self._value, str):
+            return f"'{self._value}'"
+        if isinstance(self._value, dict | list):
+            return f"""'{json.dumps(self._value, separators=(",", ":"))}'"""
         return str(self._value)
 
 

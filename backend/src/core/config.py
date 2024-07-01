@@ -59,30 +59,42 @@ class AppConfiguration:
     def __init__(self, app_location: str) -> None:
         self._cmdline_configuration = None
         self._setup_configuration = None
-        self._global_configuration = None
+        self._global_configuration: Configuration = None
         self._user_configuration = None
         self._app_location = app_location
+
+    async def _init_configuration(self):
+        LOG.debug("AppConfiguration._init_configuration: DB available")
+        self._global_configuration = await Configuration().fetch(newest=True)
+        LOG.debug(
+            f"AppConfiguration._init_configuration: {self._global_configuration.configuration=}"
+        )
+        # LOG.debug(f"AppConfiguration._init_configuration: {self._global_configuration.configuration.get(Config.CONFIG_APP,{}).get(Config.CONFIG_APP_USRMODE)=}")
 
     def _get_config_item(self, cfg: dict, key: Config):
         for key_part in key.split("/"):
             cfg = cfg.get(key_part)
         return cfg
 
-    def _read_db_config_file(self, cfg_searchpath: list[Path]) -> dict:
-        dbcfg_file = Path(self._cmdline_configuration.get(Config.CONFIG_DBCFG_FILE))
-        LOG.debug(f"{dbcfg_file=}")
+    def _read_db_config_file(
+        self, cfg_searchpath: list[Path], dbcfg_filename: str = None
+    ) -> dict:
+        dbcfg_file = Path(
+            dbcfg_filename or self._cmdline_configuration.get(Config.CONFIG_DBCFG_FILE)
+        )
+        # LOG.debug(f"AppConfiguration._read_db_config_file: {dbcfg_file=}")
         try:
             for filename in (
                 [dbcfg_file]
                 if dbcfg_file.is_absolute()
                 else [Path(path, dbcfg_file) for path in (cfg_searchpath)]
             ):
-                LOG.debug(f"{filename=}")
+                # LOG.debug(f"Searching file: {str(filename)}")
                 try:
                     with open(filename, encoding="utf-8") as cfg_file:
-                        cfg = json.load(cfg_file)
-                    LOG.debug(f"{cfg=}")
-                    return cfg
+                        db_config_from_cfg_file = json.load(cfg_file)
+                    # LOG.debug(f"Found DB configuration: {db_config_from_cfg_file}")
+                    return db_config_from_cfg_file
                 except FileNotFoundError:
                     continue
             LOG.info(f"configuration file {dbcfg_file} not found.")
@@ -117,16 +129,16 @@ class AppConfiguration:
             Config.CONFIG_SYSTEM: platform.system(),
         }
         self._setup_configuration |= self._read_db_config_file(cfg_searchpath)
-        LOG.debug(
-            f"AppConfiguration._init_setup_configuration() -> {self._setup_configuration}"
-        )
+        # LOG.debug(f"AppConfiguration._init_setup_configuration() -> {self._setup_configuration}")
         return self._setup_configuration
 
     def configuration(self) -> dict:
         "global configuration"
-        return (
+        cfg = (
             self._global_configuration or self._init_setup_configuration()
         ) | self._cmdline_configuration
+        LOG.debug(f"AppConfiguration.configuration() -> {cfg}")
+        return cfg
 
     async def _wait_for_db(self) -> bool:
         LOG.debug("Request DB restart.")
@@ -161,17 +173,20 @@ class AppConfiguration:
         # pylint: disable=unspecified-encoding
         with open(file=db_filename, mode="w") as cfg_file:
             cfg_file.write(json.dumps(db_cfg))
-        self._setup_configuration |= db_cfg
+        self._setup_configuration |= self._read_db_config_file(
+            [Path(db_filename).parent], Path(db_filename).name
+        )
+        # self._setup_configuration |= db_cfg
         configuration = {
             Config.CONFIG_APP: self._get_config_item(
                 setup_cfg, _SetupConfigKeys.CFG_APP
             )
         }
         if await self._wait_for_db():
-            LOG.debug(f"AppConfiguration.setup_configuration: {configuration=}")
             bo = Configuration(cfg=configuration)
             LOG.debug(f"{bo=}")
-            # await bo.store()
+            await bo.store()
+            LOG.debug(f"{bo=}")
         else:
             LOG.error("Start DB failed with new configuration.")
 

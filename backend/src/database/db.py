@@ -29,7 +29,7 @@ async def get_db():
         LOG.error(f"Invalid DB configuration: {App.configuration}")
         yield
         return
-    LOG.debug(f"DB configuration: {db_config=}, {db_type=}")
+    # LOG.debug(f"DB configuration: {db_config=}, {db_type=}")
     if db_type == "SQLite":
         LOG.debug("Connect to SQLite")
         try:
