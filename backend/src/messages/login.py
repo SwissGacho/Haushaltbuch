@@ -5,6 +5,8 @@ from server.ws_token import WSToken
 from server.session import Session
 from messages.message import Message, MessageType, MessageAttribute
 from core.app_logging import getLogger
+from core.status import Status
+from core.app import App
 
 LOG = getLogger(__name__)
 
@@ -25,7 +27,11 @@ class LoginMessage(Message):
 
     async def handle_message(self, connection):
         "handle login message"
-        user = self.message.get(MessageAttribute.WS_ATTR_USER)
+        # pylint: disable=comparison-with-callable
+        user = self.message.get(
+            MessageAttribute.WS_ATTR_USER,
+            ("<single user>" if App.status == Status.STATUS_SINGLE_USER else None),
+        )
         token = self.message.get(MessageAttribute.WS_ATTR_TOKEN)
         session = Session.get_session_from_token(
             ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
@@ -33,7 +39,9 @@ class LoginMessage(Message):
         ) or (Session(user, token, connection) if user else None)
         if session:
             connection.session = session
-            LOG = getLogger(f"{LoginMessage.__module__}({connection.connection_id})")
+            LOG = getLogger(  # pylint: disable=invalid-name,redefined-outer-name
+                f"{LoginMessage.__module__}({connection.connection_id})"
+            )
             await connection.send_message(
                 WelcomeMessage(token=token, ses_token=session.token)
             )

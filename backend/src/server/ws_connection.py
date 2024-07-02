@@ -23,31 +23,39 @@ class WS_Connection:
         self._socket = websocket
         self._session = None
         self._conn_nbr = sock_nbr
+        self._comp = None
         self._token = WSToken()
+        self.LOG = getLogger(  # pylint: disable=invalid-name
+            f"{WS_Connection.__module__}({self.connection_id})"
+        )
         self._register_connection()
-        self.LOG = getLogger(f"{WS_Connection.__module__}({self.connection_id})")
 
     def _register_connection(self, key: str = None) -> None:
+        if key:
+            self._comp = key
         # remove existing entry
         self._unregister_connection()
-        # LOG.debug(f"add connection '{self.connection_id if key is None else key}'")
-        WS_Connection.connections |= {
-            (self.connection_id if key is None else key): self
-        }
-        # LOG.debug(f"{WS_Connection.connections=}")
+        # self.LOG.debug(
+        #     f"WS_Connection._register_connection({key=}): adding '{key or self.connection_id}'"
+        # )
+        WS_Connection.connections |= {(key or self.connection_id): self}
+        # self.LOG.debug(f"{WS_Connection.connections=}")
 
     def _unregister_connection(self):
         for key in [k for k, v in WS_Connection.connections.items() if v is self]:
-            LOG.debug(f"del connection {key}")
+            # self.LOG.debug(
+            #     f"WS_Connection._unregister_connection(): del connection {key}"
+            # )
             del WS_Connection.connections[key]
 
     @property
     def connection_id(self):
         "identifying string (for logging)"
+        myself = self._comp or str(self._conn_nbr)
         if self._session:
-            return f"{self._session.session_id},conn #{self._conn_nbr}"
+            return f"{self._session.session_id},conn {myself}"
         else:
-            return str(self._conn_nbr)
+            return myself
 
     @property
     def session(self):
@@ -89,22 +97,30 @@ class WS_Connection:
         await self.send_message(HelloMessage(token=self._token, status=App.status))
         try:
             while json_message := await self._socket.recv():
-                # self.LOG.debug(f"reply is {json_message}")
+                self.LOG.debug(
+                    f"WS_Connection.start_connection(): reply to hello is {json_message}"
+                )
                 msg = Message(json_message=json_message)
                 if isinstance(msg, LoginMessage):
-                    self._register_connection(msg.component)
+                    self._register_connection(
+                        msg.message.get(MessageAttribute.WS_ATTR_COMPONENT)
+                    )
                     await self.handle_message(msg)
                     break
                 if isinstance(msg, (FetchSetupMessage, StoreSetupMessage, EchoMessage)):
                     await self.handle_message(msg)
-            await self.abort_connection("Login expected")
+                self.LOG.error(
+                    f"WS_Connection.start_connection(): unhandled {msg.__class__.__name__}"
+                )
+                await self.abort_connection("Login expected")
         except websockets.exceptions.ConnectionClosed as exc:
-            LOG.debug(f"Connection closed: {exc}")
+            self.LOG.debug(f"Connection closed by socket: {exc}")
             return False
-        except core.exceptions.ConnectionClosed:
-            raise
+        except core.exceptions.ConnectionClosed as exc:
+            self.LOG.debug(f"Connection closed by handler: {exc}")
+            return False
         except Exception as exc:
-            self.LOG.error(f"Login failed ({exc})")
+            self.LOG.error(f"Start connection failed in handler ({exc})")
             raise
             return False
         else:
@@ -114,7 +130,7 @@ class WS_Connection:
     async def abort_connection(self, reason: str = None, token=None, status=False):
         "say goodbye"
         await self.send_message(ByeMessage(token=token, reason=reason, status=status))
-        raise core.exceptions.ConnectionClosed
+        raise core.exceptions.ConnectionClosed(f"Connection aborted ({reason})")
 
     def connection_closed(self):
         "call when connection has been closed"

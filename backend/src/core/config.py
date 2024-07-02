@@ -15,6 +15,7 @@ import asyncio
 from data.management.configuration import Configuration
 from core.app import App
 from core.setup_config import parse_commandline, cfg_searchpaths
+from core.status import Status
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -63,18 +64,23 @@ class AppConfiguration:
         self._user_configuration = None
         self._app_location = app_location
 
-    async def _init_configuration(self):
-        LOG.debug("AppConfiguration._init_configuration: DB available")
-        self._global_configuration = await Configuration().fetch(newest=True)
-        LOG.debug(
-            f"AppConfiguration._init_configuration: {self._global_configuration.configuration=}"
-        )
-        # LOG.debug(f"AppConfiguration._init_configuration: {self._global_configuration.configuration.get(Config.CONFIG_APP,{}).get(Config.CONFIG_APP_USRMODE)=}")
-
     def _get_config_item(self, cfg: dict, key: Config):
         for key_part in key.split("/"):
             cfg = cfg.get(key_part)
         return cfg
+
+    async def _init_configuration(self):
+        LOG.debug("AppConfiguration._init_configuration: DB available")
+        self._global_configuration = await Configuration().fetch(newest=True)
+        user_mode = self._get_config_item(
+            self._global_configuration.configuration, Config.CONFIG_APP_USRMODE
+        )
+        LOG.debug(f"AppConfiguration._init_configuration: {user_mode=}")
+        App.status = (
+            Status.STATUS_SINGLE_USER
+            if user_mode == "single"
+            else Status.STATUS_MULTI_USER
+        )
 
     def _read_db_config_file(
         self, cfg_searchpath: list[Path], dbcfg_filename: str = None

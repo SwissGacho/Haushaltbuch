@@ -57,9 +57,9 @@ class WS_Handler:
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:
-                        self.LOG.warning(
+                        self.LOG.warning(  # pylint: disable=logging-not-lazy
                             "message handler failed to create Message object"
-                            + f"from json: {ws_message}"
+                            f"from json: {ws_message}"
                         )
                         raise
                     await connection.handle_message(message=message)
@@ -67,7 +67,7 @@ class WS_Handler:
             self.LOG.error(f"Connection aborted by exception {exc}")
             raise
         finally:
-            self.LOG.debug("Connection closed.")
+            self.LOG.debug("Connection ended.")
             connection.connection_closed()
 
 

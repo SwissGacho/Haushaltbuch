@@ -17,6 +17,8 @@ class Status(StrEnum):
     STATUS_DB_UNSUPPORTED = "DBunsuppoerted"
     STATUS_CHECK_DB = "checkingDBschema"
     STATUS_OLD_DB = "outdatedDBschema"
+    STATUS_SINGLE_USER = "singleUser"
+    STATUS_MULTI_USER = "multiUser"
 
 
 class AppStatus(BaseObject):
