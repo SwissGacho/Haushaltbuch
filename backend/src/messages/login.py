@@ -38,6 +38,7 @@ class LoginMessage(Message):
             conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
         ) or (Session(user, token, connection) if user else None)
         if session:
+            await session.get_user_obj()
             connection.session = session
             LOG = getLogger(  # pylint: disable=invalid-name,redefined-outer-name
                 f"{LoginMessage.__module__}({connection.connection_id})"
