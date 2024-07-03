@@ -1,7 +1,7 @@
 """Classes for building SQL expressions that can be used in SQLStatements."""
 
 from enum import Enum
-from typing import List
+from typing import TypeAlias
 import json
 
 from core.app_logging import getLogger
@@ -23,7 +23,7 @@ class SQLExpression:
     Can be instantiated directly to create an expression verbatim from a string."""
 
     def __init__(self, expression: str):
-        self._expression = "Null" if expression is None else expression
+        self._expression = "NULL" if expression is None else expression
 
     def sql(self) -> str:
         """Return the SQL expression as a string."""
@@ -36,7 +36,7 @@ class From(SQLExpression):
     def __init__(self, table):
         super().__init__(None)
         self.table = table
-        self.joins: List[(JoinOperator, str, SQLExpression)] = []
+        self.joins: list[(JoinOperator, str, SQLExpression)] = []
 
     def sql(self) -> str:
         """Return the SQL expression as a string."""
@@ -57,11 +57,11 @@ class From(SQLExpression):
         self.joins.append((join_operator, table, join_constraint))
 
 
-class SQLMultiExpressin(SQLExpression):
+class SQLMultiExpression(SQLExpression):
     """Abstract class to combine any number of SQL expressions with an operator.
     Should not be instantiated directly."""
 
-    def __init__(self, arguments: List[SQLExpression]):
+    def __init__(self, arguments: list[SQLExpression]):
         super().__init__(None)
         self.arguments = arguments
 
@@ -74,17 +74,17 @@ class SQLMultiExpressin(SQLExpression):
                 "SQL_multi_expression is an abstract class and should not be instantiated."
             )
         return self.__class__.operator.join(
-            [expression.sql() for expression in self._expression]
+            [expression.sql() for expression in self.arguments]
         )
 
 
-class And(SQLMultiExpressin):
+class And(SQLMultiExpression):
     """Represents a SQL AND expression."""
 
     operator = " AND "
 
 
-class Or(SQLMultiExpressin):
+class Or(SQLMultiExpression):
     """Represents a SQL OR expression."""
 
     operator = " OR "
@@ -96,6 +96,7 @@ class SQLBinaryExpression(SQLExpression):
 
     def __init__(self, left: SQLExpression | str, right: SQLExpression | str):
         super().__init__(None)
+        # LOG.debug(f"SQLBinaryExpression({left=}, {right=})")
         self.left = left if isinstance(left, SQLExpression) else SQLExpression(left)
         self.right = right if isinstance(right, SQLExpression) else SQLExpression(right)
 
@@ -114,6 +115,69 @@ class Eq(SQLBinaryExpression):
     """Represents a SQL = expression."""
 
     operator = " = "
+
+
+class Is(SQLBinaryExpression):
+    """Represents a SQL 'is' expression."""
+
+    operator = " is "
+
+
+class IsNull(Is):
+    "Represents test for NULL"
+
+    def __init__(self, left: SQLExpression | str):
+        super().__init__(left, right=None)
+
+
+class ColumnName(SQLExpression):
+    """Represents a column name"""
+
+    def __init__(self, name: str):
+        super().__init__(None)
+        self._name = name
+
+    def sql(self) -> str:
+        return self._name
+
+
+class SQLString(SQLExpression):
+    """Represents a string value"""
+
+    def __init__(self, value: str):
+        super().__init__(None)
+        self._value = value
+
+    def sql(self) -> str:
+        return f"'{self._value}'"
+
+
+FilterItem: TypeAlias = SQLExpression | str
+
+
+class Filter(And):
+    """Represent a filter condition matching all items.
+    Keys and values of 'filter' are rendered in quotes if they have the class str.
+    SQLExpressions are rendered according to their class.
+    (Use ColumnName() to avoid rendering in quotes)
+    """
+
+    def __init__(self, filters: dict[FilterItem, FilterItem]):
+        super().__init__(
+            [
+                (
+                    Eq(
+                        var if isinstance(var, SQLExpression) else SQLString(var),
+                        val if isinstance(val, SQLExpression) else SQLString(val),
+                    )
+                    if val is not None
+                    else IsNull(
+                        var if isinstance(var, SQLExpression) else SQLString(var)
+                    )
+                )
+                for var, val in filters.items()
+            ]
+        )
 
 
 class SQLTernaryExpression(SQLExpression):

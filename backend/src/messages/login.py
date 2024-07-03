@@ -7,6 +7,8 @@ from messages.message import Message, MessageType, MessageAttribute
 from core.app_logging import getLogger
 from core.status import Status
 from core.app import App
+from data.management.user import User
+from database.sqlexpression import ColumnName
 
 LOG = getLogger(__name__)
 
@@ -27,28 +29,35 @@ class LoginMessage(Message):
 
     async def handle_message(self, connection):
         "handle login message"
+        LOG = getLogger(  # pylint: disable=invalid-name,redefined-outer-name
+            f"{LoginMessage.__module__})"
+        )
         # pylint: disable=comparison-with-callable
         user = self.message.get(
             MessageAttribute.WS_ATTR_USER,
             ("<single user>" if App.status == Status.STATUS_SINGLE_USER else None),
         )
         token = self.message.get(MessageAttribute.WS_ATTR_TOKEN)
-        session = Session.get_session_from_token(
-            ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
-            conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
-        ) or (Session(user, token, connection) if user else None)
-        if session:
+        try:
+            session = Session.get_session_from_token(
+                ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
+                conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
+            ) or (Session(user, token, connection) if user else None)
+            if not session:
+                raise PermissionError(f"Failed to create session for user '{user}'")
             await session.get_user_obj()
             connection.session = session
-            LOG = getLogger(  # pylint: disable=invalid-name,redefined-outer-name
+            LOG = getLogger(  # pylint: disable=invalid-name
                 f"{LoginMessage.__module__}({connection.connection_id})"
             )
             await connection.send_message(
                 WelcomeMessage(token=token, ses_token=session.token)
             )
             LOG.debug("login successful")
-        else:
+        except PermissionError:
             await connection.abort_connection(reason="Access denied")
+        except ValueError as exc:
+            raise RuntimeError("Login Failure.") from exc
 
 
 class WelcomeMessage(Message):

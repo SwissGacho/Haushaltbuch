@@ -8,7 +8,7 @@ from datetime import date, datetime, UTC
 
 from persistance.bo_descriptors import BOInt, BODatetime
 from database.sqlexecutable import SQL, CreateTable
-from database.sqlexpression import Eq, SQLExpression, Value
+from database.sqlexpression import Eq, Filter, SQLExpression, Value
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -53,7 +53,7 @@ class BOBase:
     @_classproperty
     def table(self) -> str:
         "Name of the BO's DB table"
-        return self._table if self._table else self._name() + "s"
+        return self._table or self._name() + "s"
 
     @classmethod
     def attributes_as_dict(cls) -> dict:
@@ -98,26 +98,23 @@ class BOBase:
         return value
 
     @classmethod
-    async def count_rows(cls) -> int:
-        """Count the number of existing business objects in the DB table"""
-        LOG = getLogger(f"{cls.__module__}")
-        LOG.debug(SQL.COUNT_ROWS(None, table=cls.table, conditions={}))
-        sql = App.db.sql(SQL.COUNT_ROWS, table=cls.table, conditions={})
-        rslt = await (await App.db.execute(sql, close=1)).fetchone()
-        print(rslt)
-        return rslt["Count"]
+    async def count_rows(cls, conditions: dict = None) -> int:
+        """Count the number of existing business objects in the DB table matching the conditions"""
+        sql = SQL().select(["count(*) as count"]).from_(cls.table)
+        if conditions:
+            sql.where(sql.get_sql_class(Filter)(conditions))
+        result = await (await sql.execute(close=1)).fetchone()
+        # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
+        return result["count"]
 
     @classmethod
-    async def get_matching_ids(cls, conditions: dict):
+    async def get_matching_ids(cls, conditions: dict) -> list[int]:
         """Get the ids of business objects matching the conditions"""
-        LOG = getLogger(f"{cls.__module__}")
-        LOG.debug(
-            SQL.SELECT_ID_BY_CONDITION(None, table=cls.table, conditions=conditions)
-        )
-        sql = App.db.sql(
-            SQL.SELECT_ID_BY_CONDITION, table=cls.table, conditions=conditions
-        )
-        return await App.db.execute(sql, close=1)
+        sql = SQL().select(["id"]).from_(cls.table)
+        sql.where(sql.get_sql_class(Filter)(conditions))
+        result = await (await sql.execute(close=1)).fetchall()
+        LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
+        return [id["id"] for id in result]
 
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
