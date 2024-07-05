@@ -29,8 +29,7 @@ class InvalidSQLStatementException(Exception):
 
 
 class SQLDataType(Enum):
-    """Basic SQL data types compliant with SQLite. DB implementations should override this enum."""
-
+    "Basic SQL data types compliant with SQLite. DB implementations should override this enum."
     TEXT = auto()
     INTEGER = auto()
     REAL = auto()
@@ -41,6 +40,7 @@ class SQLTemplate(Enum):
     "Keys for dialect specific SQL templates used in SQLScript"
     TABLEINFO = auto()
     TABLELIST = auto()
+    TABLESQL = auto()
 
 
 class SQLExecutable(object):
@@ -197,24 +197,25 @@ class CreateTable(SQLStatement):
     def __init__(
         self,
         table: str = "",
-        columns: list[(str, SQLDataType, str)] = None,
+        columns: list[(str, SQLDataType, str, dict)] = None,
         parent: SQLExecutable = None,
     ):
         super().__init__(parent)
-        cols = [] if columns is None else columns
+        cols = columns or []
         self._table = table
-        sql_column_definition = self.sql_factory.get_sql_class(SQLColumnDefinition)
+        sql_column_definition_cls = self.sql_factory.get_sql_class(SQLColumnDefinition)
         self._columns = [
-            sql_column_definition(name, data_type, constraint)
-            for name, data_type, constraint in cols
+            sql_column_definition_cls(name, data_type, constraint, **pars)
+            for name, data_type, constraint, pars in cols
         ]
 
-    def column(self, name: str, data_type: SQLDataType, constraint: str = None):
+    def column(self, name: str, data_type: SQLDataType, constraint: str = None, **pars):
         """Add a column to the table to be created.
         The column will be added to the end of the column list."""
+        # LOG.debug(f"CreateTable.column({name=}, {data_type=}, {constraint=}, {pars=})")
         self._columns.append(
             self.sql_factory.get_sql_class(SQLColumnDefinition)(
-                name, data_type, constraint
+                name, data_type, constraint, **pars
             )
         )
         return self
@@ -225,7 +226,7 @@ class CreateTable(SQLStatement):
             raise InvalidSQLStatementException(
                 "CREATE TABLE statement must have a table name."
             )
-        return f"CREATE TABLE {self._table} ({', '.join([column.sql() for column in self._columns])})"
+        return f"CREATE TABLE IF NOT EXISTS {self._table} ({', '.join([column.sql() for column in self._columns])})"
 
 
 class TableValuedQuery(SQLStatement):

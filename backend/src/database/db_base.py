@@ -30,36 +30,53 @@ class DB:
             return query.value
         raise ValueError(f"value of {query} not defined")
 
-    def check_column(self, col, attr, tab):
+    def check_column(self, tab, col, name, data_type, constraint, **pars):
         "check compatibility of a DB column with a business object attribute"
-        # LOG.debug(f"DB.check_column({col=}, {attr=})")
-        attr_sql = SQL().sql_factory.get_sql_class(SQLColumnDefinition)(*attr).sql()
+        # LOG.debug(
+        #     f"DB.check_column({col=}, {name=}, {data_type=}, {constraint=}, {pars=})"
+        # )
+        attr_sql = (
+            SQL()
+            .sql_factory.get_sql_class(SQLColumnDefinition)(
+                name, data_type, constraint, **pars
+            )
+            .sql()
+        )
         if col is None:
             LOG.error(
-                f"column '{attr[0]}' in DB table '{tab}' is undefined in the DB instead of '{attr_sql}'"
+                f"column '{name}' in DB table '{tab}' is undefined in the DB instead of '{attr_sql}'"
             )
             return False
-        if col != attr_sql:
+        if col.strip() != attr_sql.strip():
             LOG.error(
-                f"column '{attr[0]}' in DB table '{tab}' is defined '{col}' in the DB instead of '{attr_sql}'"
+                f"column '{name}' in DB table '{tab}' is defined '{col}' in the DB instead of '{attr_sql}'"
             )
             return False
         return True
 
-    async def check_table(self, obj: "BOBase"):
-        "check compatibility of a DB table with a business object"
-        LOG.debug(f"Checking table {obj.table}")
-        tab_info = {
+    async def _get_table_info(self, table_name: str) -> dict[str, str]:
+        return {
             c["column_name"]: " ".join(
-                [c["column_name"], c["column_type"], c["constraint"]]
+                [c["column_name"], c["column_type"], c["constraint"], c["params"]]
             )
             for c in await (
-                await SQL().script(SQLTemplate.TABLEINFO, table=obj.table).execute()
+                await SQL().script(SQLTemplate.TABLEINFO, table=table_name).execute()
             ).fetchall()
         }
+
+    async def check_table(self, obj: "BOBase"):
+        "check compatibility of a DB table with a business object"
+        # LOG.debug(f"Checking table '{obj.table}'")
+        tab_info = await self._get_table_info(obj.table)
         ok = True
-        for attr in obj.attribute_descriptions():
-            ok = self.check_column(tab_info.get(attr[0]), attr, obj.table) and ok
+        for name, data_type, constraint, pars in obj.attribute_descriptions():
+            ok = (
+                self.check_column(
+                    obj.table, tab_info.get(name), name, data_type, constraint, **pars
+                )
+                and ok
+            )
+        LOG.debug(f"Check table '{obj.table}': {'OK'if ok else 'FAIL'}")
         return ok
 
     async def connect(self):

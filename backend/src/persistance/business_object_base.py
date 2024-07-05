@@ -6,7 +6,7 @@
 from typing import Self, TypeAlias
 from datetime import date, datetime, UTC
 
-from persistance.bo_descriptors import BOInt, BODatetime
+from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
 from database.sqlexecutable import SQL, CreateTable
 from database.sqlexpression import Eq, Filter, SQLExpression, Value
 from core.app_logging import getLogger
@@ -22,10 +22,10 @@ class _classproperty(property):
 AttributeDescription: TypeAlias = tuple[str, str, str | None]
 
 
-class BOBase:
+class BOBase(BOBaseBase):
     "Business Object baseclass"
-    id = BOInt(primary_key=True, auto_inc=True)
-    last_updated = BODatetime(current_dt=True)
+    id = BOInt(BOColumnFlag.BOC_PK_INC)
+    last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR)
     _table = None
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, Self] = {}
@@ -80,8 +80,10 @@ class BOBase:
         "Create a DB table for this class"
         attributes = cls.attribute_descriptions()
         sql: CreateTable = SQL().create_table(cls.table)
-        for attr in attributes:
-            sql.column(attr[0], attr[1], attr[2])
+        # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+        for name, data_type, constraint, pars in attributes:
+            # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
+            sql.column(name, data_type, constraint, **pars)
         await sql.execute(close=0)
 
     def convert_from_db(self, value, typ):

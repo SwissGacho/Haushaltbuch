@@ -109,6 +109,7 @@ class WS_Connection:
                     break
                 if isinstance(msg, (FetchSetupMessage, StoreSetupMessage, EchoMessage)):
                     await self.handle_message(msg)
+                    continue
                 self.LOG.error(
                     f"WS_Connection.start_connection(): unhandled {msg.__class__.__name__}"
                 )

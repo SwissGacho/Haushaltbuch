@@ -347,11 +347,13 @@ class SQLColumnDefinition(SQLExpression):
     type_map = {}
     constraint_map = {}
 
-    def __init__(self, name: str, data_type: type, constraint: str = None):
+    def __init__(self, name: str, data_type: type, constraint: str = None, **pars):
+        # LOG.debug(f"SQLColumnDefinition({name=}, {data_type=}, {constraint=}, {pars=})")
         super().__init__(None)
         self.name = name
         if data_type in self.type_map:
             self.data_type = self.__class__.type_map[data_type]
+            # LOG.debug(f" - data_type={self.data_type}")
         else:
             raise ValueError(
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
@@ -359,7 +361,13 @@ class SQLColumnDefinition(SQLExpression):
         if not constraint:
             self.constraint = ""
         elif constraint in self.constraint_map:
-            self.constraint = self.__class__.constraint_map[constraint]
+            self.constraint = self.__class__.constraint_map[constraint].format(
+                **{
+                    k: v.table if hasattr(v, "table") else str(v).lower()
+                    for k, v in pars.items()
+                }
+            )
+            # LOG.debug(f" - constraint={self.constraint}")
         else:
             raise ValueError(
                 f"Unsupported column constraint for a {self.__class__.__name__}: {constraint}"
