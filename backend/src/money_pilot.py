@@ -4,7 +4,7 @@ import asyncio
 
 from core.exceptions import DBRestart
 from core.app import App
-from db.db import get_db
+from database.db import get_db
 from server.ws_server import get_websocket
 from core.app_logging import getLogger
 

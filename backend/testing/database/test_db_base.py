@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call
 
-import db.db_base
-import db.sql
+import database.db_base
+import database.sql
 
 
 class TestDB(unittest.IsolatedAsyncioTestCase):

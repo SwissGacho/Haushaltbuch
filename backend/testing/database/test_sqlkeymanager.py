@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
-from db.sqlkeymanager import SQLKeyManager
+from database.sqlkeymanager import SQLKeyManager
 
 
 class TestSQLKeyManager(unittest.TestCase):

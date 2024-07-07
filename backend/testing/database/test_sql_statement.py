@@ -2,9 +2,9 @@ import unittest
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
-from db.sqlexpression import Eq, SQLBetween, Row, Value
+from database.sqlexpression import Eq, SQLBetween, Row, Value
 
-from db.sqlexecutable import (
+from database.sqlexecutable import (
     SQLExecutable,
     SQL,
     Select,

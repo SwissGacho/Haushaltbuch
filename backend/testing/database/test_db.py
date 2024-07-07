@@ -6,7 +6,7 @@ from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from contextlib import _AsyncGeneratorContextManager
 from core.status import Status
 from core.config import Config
-import db.db
+import database.db
 
 
 class DB_ContextManager(unittest.IsolatedAsyncioTestCase):

@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call
 
-import db.sql
+import database.sql
 
 
 class TestSQL(unittest.TestCase):

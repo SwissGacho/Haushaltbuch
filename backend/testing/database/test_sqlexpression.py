@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
-from db.sqlexpression import (
+from database.sqlexpression import (
     SQLExpression,
     From,
     JoinOperator,
@@ -13,7 +13,7 @@ from db.sqlexpression import (
     Eq,
 )
 
-from db.sqlexpression import Value, Row
+from database.sqlexpression import Value, Row
 
 
 class MockKeyManager:
