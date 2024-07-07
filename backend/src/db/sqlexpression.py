@@ -211,12 +211,13 @@ class SQLBetween(SQLTernaryExpression):
 class Value(SQLExpression):
     """Represents a value in an SQL statement."""
 
-    def ___init__(
+    def __init__(
         self, name: str, value: any, key_manager: SQLKeyManager, key: str = ""
     ):
         # LOG.debug(f"Value({name=}, {value=})")
         super().__init__(key_manager=key_manager)
         key = self.create_param(key, value)
+        self._key = key
         self._name = name
         self._value = value
 
@@ -237,9 +238,8 @@ class Value(SQLExpression):
         """Get a dictionary of the value to be used in an SQL cursor"""
         return {self._key: self._value}
 
-    def sql(self):
-        """Return the SQL expression as parametrized string."""
-        return (":" + self._key, self.get_params())
+    def get_sql(self):
+        return ":" + self._key
 
 
 class Row(SQLExpression):
@@ -257,14 +257,14 @@ class Row(SQLExpression):
 
     def names(self) -> str:
         "List of value names"
-        return f"({', '.join([v.name() for v in self.values])})"
+        return f"({', '.join([v.name() for v in self._values])})"
 
     def get_params(self):
         return {k: v for value in self._values for k, v in value.get_params().items()}
 
     def get_sql(self):
         """Return the SQL expression as a string."""
-        return f"({', '.join([v.sql() for v in self.values])})"
+        return f"({', '.join([v.get_sql() for v in self._values])})"
 
 
 class Values(SQLExpression):
@@ -282,7 +282,7 @@ class Values(SQLExpression):
 
     def names(self) -> str:
         "List of value names"
-        return self.rows[0].names()
+        return self._rows[0].names()
 
     def get_params(self):
         value_dict: dict[str, str] = {}
@@ -292,7 +292,7 @@ class Values(SQLExpression):
 
     def get_sql(self):
         """Return the SQL expression as a string."""
-        return f"VALUES {', '.join([row.sql()[0] for row in self._rows])}"
+        return f"VALUES {', '.join([row.get_sql() for row in self._rows])}"
 
 
 class Assignment(SQLExpression):
@@ -308,15 +308,16 @@ class Assignment(SQLExpression):
         self._columns = [columns] if isinstance(columns, str) else columns
         self._value = value
         self._where: Where = None
+        self._eq = Eq(",".join(self._columns), self._value)
 
     def get_params(self):
-        value_dict = self._value.get_params()
+        value_dict = self._eq.get_params()
         if self._where is not None:
             value_dict.update(self._where.get_params())
         return value_dict
 
     def get_sql(self):
-        sql = Eq(",".join(self._columns), self._value.sql()[0]).get_sql()
+        sql = self._eq.get_sql()
         if self._where is not None:
             sql += self._where.get_sql()
         return sql
