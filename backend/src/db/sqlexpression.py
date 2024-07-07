@@ -56,14 +56,17 @@ class From(SQLExpression):
         self._joins: List[tuple[JoinOperator, str, SQLExpression]] = []
 
     def get_params(self) -> dict:
-        return {k: v for join in self._joins for k, v in join[2].get_params().items()}
-
+        return {
+            k: v 
+            for join in self._joins 
+            if join[2] is not None
+            for k, v in join[2].get_params().items()
+        }
+    
     def get_sql(self) -> str:
         sql = f" FROM {self._table} "
         if len(self._joins) > 0:
-            sql += " ".join(
-                [f"{join[0]} {join[1]} ON {join[2].sql()}" for join in self._joins]
-            )
+            sql += " ".join([f"{join[0].value} {join[1]} {"ON "+join[2].get_sql() if join[2] is not None else ""}" for join in self._joins])
         return sql
 
     def join(
@@ -224,15 +227,6 @@ class Value(SQLExpression):
     def name(self) -> str:
         "Name of the value"
         return self._name
-
-    _last_key = 0
-    _keys: set[str] = set()
-
-    @classmethod
-    def generate_key(cls):
-        """Generate a new unique id for a value"""
-        cls._last_key += 1
-        return str(cls._last_key)
 
     def get_params(self):
         """Get a dictionary of the value to be used in an SQL cursor"""

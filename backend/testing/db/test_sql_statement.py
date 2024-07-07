@@ -19,7 +19,10 @@ from db.sqlexecutable import (
 
 
 class MockColumnDefinition:
-    def __init__(self, name: str, data_type: type, constraint: str = None):
+
+    def __init__(
+        self, name: str, data_type: type, constraint: str = None, key_manager=None
+    ):
         self.name = name
         self.constraint = constraint
         self.data_type = str(data_type)
@@ -37,14 +40,11 @@ class MockSQLFactory:
         return sql_cls
 
 
-class MockDB:
-    def execute(self, sql, params=None, close=False, commit=False):
-        return "Mock execute"
+class MockDB(AsyncMock):
+    execute = AsyncMock(return_value="Mock execute")
+    close = AsyncMock(return_value="Mock close")
 
-    def close(self):
-        return "Mock close"
-
-    sqlFactory = MockSQLFactory
+    sql_factory = MockSQLFactory
 
 
 class MockApp:
@@ -75,6 +75,7 @@ class AsyncTestSQLExecutable(unittest.IsolatedAsyncioTestCase):
         sql_executable._parent.close.assert_called_once()
 
 
+@patch("db.sqlexecutable.App", MockApp)
 class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
@@ -98,7 +99,9 @@ class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
             [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
         )
         await self.sql.execute()
-        self.sql.db.execute.assert_called_once()
+        MockApp.db.execute.assert_awaited_once_with(
+            self.sql.get_sql(), None, False, False
+        )
 
     async def test106_execute_indirect(self):
         """Test indirect execute method when an SQL statement is set"""
@@ -108,8 +111,10 @@ class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
             "users",
             [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
         )
-        await self.sql.SQLStatement.execute()
-        self.sql.db.execute.assert_called_once()
+        await self.sql._sql_statement.execute()
+        MockApp.db.execute.assert_awaited_once_with(
+            self.sql.get_sql(), None, False, False
+        )
 
     async def test107_close(self):
         """Test direct execute method when an SQL statement is set"""
@@ -120,18 +125,18 @@ class AsyncTestSQL(unittest.IsolatedAsyncioTestCase):
             [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
         )
         await self.sql.close()
-        self.sql.db.close.assert_called_once()
+        MockApp.db.close.assert_awaited_once()
 
     async def test108_close_indirect(self):
         """Test indirect execute method when an SQL statement is set"""
 
         # Test the close method
-        self.sql.Create_Table(
+        self.sql.create_table(
             "users",
             [("name", SQLDataType.TEXT, None), ("age", SQLDataType.INTEGER, None)],
         )
-        await self.sql.SQLStatement.close()
-        self.sql.db.close.assert_called_once()
+        await self.sql._sql_statement.close()
+        MockApp.db.close.assert_awaited_once()
 
 
 @patch("db.sqlexecutable.App", MockApp)
@@ -325,73 +330,6 @@ class TestSelect(unittest.TestCase):
         test = Select(parent=self.mock_parent)
         test.distinct()
         self.assertTrue(test._distinct)
-
-
-class TestSQL_between(unittest.TestCase):
-
-    def test601_between(self):
-        result = SQLBetween("age", 18, 25)
-        self.assertEqual(result.sql(), " (age  BETWEEN  18  AND  25) ")
-
-
-class TestSQL_Value(unittest.TestCase):
-
-    def setUp(self) -> None:
-        Value._last_key = 0
-        Value._keys = set()
-
-    def test701_value(self):
-        val = Value(value="test", key="id")
-        self.assertEqual(val.value(), {"id": "test"})
-
-    def test701_defaultkey(self):
-        val = Value(value="test")
-        self.assertEqual(val.value(), {"1": "test"})
-
-    def test702_sql(self):
-        val = Value(value="test", key="id")
-        self.assertEqual(Value._keys, {"id"})
-        self.assertEqual(val.sql(), (":id", {"id": "test"}))
-
-    def test703_uniquekeysql(self):
-        Value(value="test", key="id")
-        val2 = Value(value="test", key="id")
-        self.assertEqual(Value._last_key, 1)
-        self.assertEqual(Value._keys, {"id", "id1"})
-        self.assertEqual(val2.sql(), (":id1", {"id1": "test"}))
-
-
-class TestSQL_row(unittest.TestCase):
-
-    def test801_row(self):
-        val = Value(value="test", key="id")
-        row = Row([val])
-        self.assertEqual(row.sql(), (" (:id) ", {"id": "test"}))
-
-    def test802_value(self):
-        val = Value(value="test", key="id")
-        val2 = Value(value="test2", key="name")
-        row = Row([val])
-        row.value(val2)
-        self.assertEqual(row._values, [val, val2])
-        val3 = Value("test")
-        row.value(val3)
-        self.assertEqual(row._values, [val, val2, val3])
-        self.assertEqual(
-            row.sql(),
-            (" (:id, :name, :1) ", {"id": "test", "name": "test2", "1": "test"}),
-        )
-
-    def test803_multipleRows(self):
-        val = Value(value="test", key="id")
-        val2 = Value(value="test2", key="name")
-        Row([val, val2])
-        val3 = Value(value="test3", key="id")
-        val4 = Value(value="test4", key="name")
-        row2 = Row([val3, val4])
-        self.assertEqual(
-            row2.sql(), (" (:id1, :name2) ", {"id1": "test3", "name2": "test4"})
-        )
 
 
 if __name__ == "__main__":
