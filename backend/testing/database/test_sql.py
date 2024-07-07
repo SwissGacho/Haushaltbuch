@@ -8,5 +8,5 @@ import db.sql
 
 class TestSQL(unittest.TestCase):
     def test_001_no_string_in_enum(self):
-        for sql in db.sql.SQL:
+        for sql in database.sql.SQL:
             self.assertNotIsInstance(sql.value, str, msg=f"SQL.{sql.name}")

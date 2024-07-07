@@ -6,9 +6,9 @@ from contextlib import asynccontextmanager
 from core.app import App
 from core.status import Status
 from core.config import Config
-from db.sqlite import SQLiteDB
-from db.mysql import MySQLDB
-from db.schema_maintenance import check_db_schema
+from database.sqlite import SQLiteDB
+from database.mysql import MySQLDB
+from database.schema_maintenance import check_db_schema
 
 # from persistance.business_object_base import BO_Base
 from data.management.db_schema import DBSchema

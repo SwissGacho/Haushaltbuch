@@ -50,26 +50,26 @@ class TestSQLiteDB__init__(unittest.TestCase):
         return super().setUp()
 
     def test_001_SQLiteDB(self):
-        db.sqlite.AIOSQLITE_IMPORT_ERROR = None
+        database.sqlite.AIOSQLITE_IMPORT_ERROR = None
         with patch("db.db_base.DB.__init__") as mock_db_init:
-            self.db = db.sqlite.SQLiteDB(**self.db_cfg)
+            self.db = database.sqlite.SQLiteDB(**self.db_cfg)
             mock_db_init.assert_called_once_with(**self.db_cfg)
 
     def test_002_SQLiteDB_no_lib(self):
-        db.sqlite.AIOSQLITE_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
+        database.sqlite.AIOSQLITE_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
         with (
             self.assertRaises(ModuleNotFoundError),
             patch("db.db_base.DB.__init__") as mock_db_init,
         ):
-            db.sqlite.SQLiteDB(**self.db_cfg)
+            database.sqlite.SQLiteDB(**self.db_cfg)
             mock_db_init.assert_not_called()
 
 
 class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.db_cfg = {"file": "sqlite_file.db"}
-        db.sqlite.AIOSQLITE_IMPORT_ERROR = None
-        self.db = db.sqlite.SQLiteDB(**self.db_cfg)
+        database.sqlite.AIOSQLITE_IMPORT_ERROR = None
+        self.db = database.sqlite.SQLiteDB(**self.db_cfg)
         return super().setUp()
 
     async def test_101_connect(self):
@@ -83,14 +83,14 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
             mock_con_obj.connect.assert_awaited_once_with()
 
     def test_201_sql_table_list(self):
-        reply = self.db.sql(db.sql.SQL.TABLE_LIST)
+        reply = self.db.sql(database.sql.SQL.TABLE_LIST)
         re = "^ *SELECT.*FROM sqlite_master.*'table'"
         re += ".*substr.*'sqlite_' *$"
         self.assertRegex(reply.replace("\n", " "), re)
 
     def test_202_sql_table_info(self):
         mock_table = "mock_table"
-        reply = self.db.sql(db.sql.SQL.TABLE_INFO, table=mock_table)
+        reply = self.db.sql(database.sql.SQL.TABLE_INFO, table=mock_table)
         re = "^ *SELECT column_name, column_type,.*END AS pk,dflt_value"
         re += f".*WHERE type='table' AND name = '{mock_table}'.*$"
         self.assertRegex(reply.replace("\n", " "), re)
@@ -98,49 +98,49 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
     def test_221_sql_create_table_anytype_column(self):
         mock_col_name = "mock_col_name"
         mock_column = (mock_col_name, "Mock")
-        reply = self.db.sql(db.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
+        reply = self.db.sql(database.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
         re = f"^{mock_col_name}$"
         self.assertRegex(reply.replace("\n", " "), re)
 
     def test_222_sql_create_table_PK_column(self):
         mock_col_name = "mock_col_name"
         mock_column = (mock_col_name, int, "pkinc")
-        reply = self.db.sql(db.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
+        reply = self.db.sql(database.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
         re = f"^{mock_col_name} INTEGER PRIMARY KEY AUTOINCREMENT$"
         self.assertRegex(reply.replace("\n", " "), re)
 
     def test_223_sql_create_table_int_column(self):
         mock_col_name = "mock_col_name"
         mock_column = (mock_col_name, int)
-        reply = self.db.sql(db.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
+        reply = self.db.sql(database.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
         re = f"^{mock_col_name} INTEGER$"
         self.assertRegex(reply.replace("\n", " "), re)
 
     def test_224_sql_create_table_str_column(self):
         mock_col_name = "mock_col_name"
         mock_column = (mock_col_name, str)
-        reply = self.db.sql(db.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
+        reply = self.db.sql(database.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
         re = f"^{mock_col_name} TEXT$"
         self.assertRegex(reply.replace("\n", " "), re)
 
     def test_225_sql_create_table_dt_column(self):
         mock_col_name = "mock_col_name"
         mock_column = (mock_col_name, dt)
-        reply = self.db.sql(db.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
+        reply = self.db.sql(database.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
         re = f"^{mock_col_name} DATETIME$"
         self.assertRegex(reply.replace("\n", " "), re)
 
     def test_226_sql_create_table_dt_column_default(self):
         mock_col_name = "mock_col_name"
         mock_column = (mock_col_name, dt, "dt")
-        reply = self.db.sql(db.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
+        reply = self.db.sql(database.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
         re = f"^{mock_col_name} DATETIME DEFAULT CURRENT_TIMESTAMP$"
         self.assertRegex(reply.replace("\n", " "), re)
 
     def test_227_sql_create_table_dt_column(self):
         mock_col_name = "mock_col_name"
         mock_column = (mock_col_name, date)
-        reply = self.db.sql(db.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
+        reply = self.db.sql(database.sql.SQL.CREATE_TABLE_COLUMN, column=mock_column)
         re = f"^{mock_col_name} DATE$"
         self.assertRegex(reply.replace("\n", " "), re)
 
@@ -158,7 +158,7 @@ class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
         self.mock_db = Mock()
         self.mock_con = AsyncMock()
         self.db_cfg = {"file": "mock_sqlite_file.db"}
-        self.con = db.sqlite.SQLiteConnection(self.mock_db, **self.db_cfg)
+        self.con = database.sqlite.SQLiteConnection(self.mock_db, **self.db_cfg)
         return super().setUp()
 
     def test_001_connection(self):
@@ -256,7 +256,7 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_con = Mock(name="mock_connection")
         self.mock_aiocursor = AsyncMock(name="mock_aiocursor")
-        self.cur = db.sqlite.SQLiteCursor(self.mock_aiocursor, self.mock_con)
+        self.cur = database.sqlite.SQLiteCursor(self.mock_aiocursor, self.mock_con)
         self.mock_con_close = AsyncMock(name="mock_conclose")
         self.mock_con.close = self.mock_con_close
         return super().setUp()

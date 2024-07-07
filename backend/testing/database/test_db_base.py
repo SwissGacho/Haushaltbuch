@@ -10,7 +10,7 @@ import db.sql
 class TestDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.db_cfg = {"cfg1": "mick", "cfg2": "mack", "cfg3": "mock"}
-        self.db = db.db_base.DB(**self.db_cfg)
+        self.db = database.db_base.DB(**self.db_cfg)
         return super().setUp()
 
     def test_001_db(self):
@@ -19,13 +19,13 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
 
     def test_102_sql_callable_SELECT(self):
         params = {"columns": ["col1", "col2"], "table": "tab"}
-        reply = self.db.sql(db.sql.SQL.SELECT, **params)
+        reply = self.db.sql(database.sql.SQL.SELECT, **params)
         print(f"{reply=}")
         self.assertEqual(reply, "SELECT col1,col2 FROM tab")
 
     def test_103_sql_no_value(self):
         with self.assertRaises(ValueError):
-            self.db.sql(db.sql.SQL.TABLE_LIST)
+            self.db.sql(database.sql.SQL.TABLE_LIST)
 
     def _201_check_column(self, mock_sql):
         mock_attr = ("mock_attr", None)
@@ -59,7 +59,7 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
         self.mock_db = Mock()
         self.mock_db._connections = set()
         self.db_cfg = {"cfg1": "mick", "cfg2": "mack", "cfg3": "mock"}
-        self.con = db.db_base.Connection(db_obj=self.mock_db, **self.db_cfg)
+        self.con = database.db_base.Connection(db_obj=self.mock_db, **self.db_cfg)
         return super().setUp()
 
     def test_001_Connection(self):
@@ -83,7 +83,7 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
             "db.db_base.Connection.connection", new_callable=PropertyMock
         ) as mock_con:
             mock_con.return_value = "mock_con1"
-            con = db.db_base.Connection(self.mock_db)
+            con = database.db_base.Connection(self.mock_db)
             self.assertEqual(con.connection, "mock_con1")
 
     async def test_401_commit(self):
@@ -99,7 +99,7 @@ class TestCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_con = Mock()
         self.mock_cur = AsyncMock()
-        self.cur = db.db_base.Cursor(self.mock_cur, self.mock_con)
+        self.cur = database.db_base.Cursor(self.mock_cur, self.mock_con)
         return super().setUp()
 
     def test_001_Connection(self):

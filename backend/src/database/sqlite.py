@@ -5,10 +5,10 @@ import datetime
 from core.exceptions import OperationalError
 from core.config import Config
 from core.app_logging import getLogger
-from db.db_base import DB, Connection, Cursor
-from db.sqlexecutable import SQL, SQLExecutable, SQLTemplate, SQLScript
-from db.sqlexpression import SQLColumnDefinition
-from db.sqlfactory import SQLFactory
+from database.db_base import DB, Connection, Cursor
+from database.sqlexecutable import SQL, SQLExecutable, SQLTemplate, SQLScript
+from database.sqlexpression import SQLColumnDefinition
+from database.sqlfactory import SQLFactory
 
 LOG = getLogger(__name__)
 try:

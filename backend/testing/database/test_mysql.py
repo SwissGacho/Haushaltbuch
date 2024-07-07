@@ -42,7 +42,7 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
             "user": "mockuser",
             "password": "mockpw",
         }
-        self.db = db.mysql.MySQLDB(**self.db_cfg)
+        self.db = database.mysql.MySQLDB(**self.db_cfg)
         return super().setUp()
 
     def test_001_MySQLDB(self):
@@ -53,7 +53,7 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
         sys.modules["aiomysql"] = None
         importlib.reload(sys.modules.get("db.mysql"))
         with self.assertRaises(ModuleNotFoundError):
-            db.mysql.MySQLDB(**self.db_cfg)
+            database.mysql.MySQLDB(**self.db_cfg)
         sys.modules["aiomysql"] = save_aiomysql
         importlib.reload(sys.modules.get("db.mysql"))
 
@@ -68,7 +68,7 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
             mock_con_obj.connect.assert_awaited_once_with()
 
     def test_201_sql_table_list(self):
-        reply = self.db.sql(db.sql.SQL.TABLE_LIST)
+        reply = self.db.sql(database.sql.SQL.TABLE_LIST)
         re = f"^ *SELECT.*FROM information_schema.tables.*'{self.db_cfg['db']}' *$"
         self.assertRegex(reply.replace("\n", " "), re)
 
@@ -91,7 +91,7 @@ class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
             "user": "mock_user",
             "password": "mock_pw",
         }
-        self.con = db.mysql.MySQLConnection(self.mock_db, **self.db_cfg)
+        self.con = database.mysql.MySQLConnection(self.mock_db, **self.db_cfg)
         return super().setUp()
 
     def test_001_connection(self):
@@ -130,7 +130,7 @@ class TestMySQLCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_con = Mock()
         self.mock_cur = AsyncMock()
-        self.cur = db.mysql.MySQLCursor(self.mock_cur, self.mock_con)
+        self.cur = database.mysql.MySQLCursor(self.mock_cur, self.mock_con)
         return super().setUp()
 
     async def test_101_execute(self):
