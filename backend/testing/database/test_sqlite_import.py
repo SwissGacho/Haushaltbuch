@@ -31,18 +31,22 @@ class SQLiteImport(unittest.TestCase):
 
     def test_101_successful_import(self):
         with patch.dict("sys.modules", {"aiosqlite": types.ModuleType("aiosqlite")}):
-            import db.sqlite
+            import database.sqlite
 
-            self.assertIsNone(db.sqlite.AIOSQLITE_IMPORT_ERROR)
+            self.assertIsNone(database.sqlite.AIOSQLITE_IMPORT_ERROR)
 
     def test_101_failed_aiosqlite_import(self):
         with patch.dict("sys.modules", {"aiosqlite": None}):
-            import db.sqlite
+            import database.sqlite
 
-            self.assertIsInstance(db.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError)
+            self.assertIsInstance(
+                database.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError
+            )
 
     def test_101_failed_sqlite3_import(self):
         with patch.dict("sys.modules", {"sqlite3": None}):
-            import db.sqlite
+            import database.sqlite
 
-            self.assertIsInstance(db.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError)
+            self.assertIsInstance(
+                database.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError
+            )

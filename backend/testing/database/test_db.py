@@ -6,7 +6,7 @@ from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from contextlib import _AsyncGeneratorContextManager
 from core.status import Status
 from core.config import Config
-import db.db
+import database.db
 
 
 class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
@@ -28,7 +28,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
     async def test_001_get_db_no_db_config(self):
         self.MockApp.status = Status.STATUS_NO_DB
         with self.patch:
-            ctx_mgr = db.db.get_db()
+            ctx_mgr = database.db.get_db()
             self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
 
             ctx_bind = await ctx_mgr.__aenter__()
@@ -45,7 +45,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         self.MockApp.configuration = {Config.CONFIG_DB: {"invalid": "Config"}}
 
         with self.patch:
-            ctx_mgr = db.db.get_db()
+            ctx_mgr = database.db.get_db()
             self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
 
             ctx_bind = await ctx_mgr.__aenter__()
@@ -65,7 +65,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         }
         with self.patch:
             # test creation of context manager
-            ctx_mgr = db.db.get_db()
+            ctx_mgr = database.db.get_db()
             self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
 
             # test context entrance
@@ -94,7 +94,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         )
         with self.patch:
             # test creation of context manager
-            ctx_mgr = db.db.get_db()
+            ctx_mgr = database.db.get_db()
             self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
 
             # test context entrance
@@ -123,7 +123,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         self.MockApp.configuration = {Config.CONFIG_DB: self.mock_db_config}
         with self.patch:
             # test creation of context manager
-            ctx_mgr = db.db.get_db()
+            ctx_mgr = database.db.get_db()
             self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
 
             # test context entrance
@@ -154,7 +154,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         self.MockMySQLDB.side_effect = ModuleNotFoundError("No module named 'aiomysql'")
         with self.patch:
             # test creation of context manager
-            ctx_mgr = db.db.get_db()
+            ctx_mgr = database.db.get_db()
             self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
 
             # test context entrance
