@@ -7,6 +7,7 @@ from messages.message import Message, MessageType, MessageAttribute
 from core.app_logging import getLogger
 from core.status import Status
 from core.app import App
+from core.validation import check_login
 from data.management.user import User
 from database.sqlexpression import ColumnName
 
@@ -33,19 +34,36 @@ class LoginMessage(Message):
             f"{LoginMessage.__module__})"
         )
         # pylint: disable=comparison-with-callable
-        user = self.message.get(
+        single_user_mode = App.status == Status.STATUS_SINGLE_USER
+        user_name = self.message.get(
             MessageAttribute.WS_ATTR_USER,
-            ("<single user>" if App.status == Status.STATUS_SINGLE_USER else None),
+            ("<single user>" if single_user_mode else None),
         )
         token = self.message.get(MessageAttribute.WS_ATTR_TOKEN)
+        if single_user_mode:
+            user = User(name=user_name)
+        else:
+            user = await check_login(self.message)
+            if not user:
+                await connection.send_message(
+                    ByeMessage(reason="Password not matching")
+                )
+                LOG.debug("login failed (password)")
+                return
         try:
-            session = Session.get_session_from_token(
-                ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
-                conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
-            ) or (Session(user, token, connection) if user else None)
+            session = (
+                Session.get_session_from_token(
+                    ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
+                    conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
+                )
+                or Session(user, token, connection)
+                or None
+            )
             if not session:
-                raise PermissionError(f"Failed to create session for user '{user}'")
-            await session.get_user_obj()
+                raise PermissionError(
+                    f"Failed to create session for user '{user_name}'"
+                )
+            user = await session.get_user_obj()
             connection.session = session
             LOG = getLogger(  # pylint: disable=invalid-name
                 f"{LoginMessage.__module__}({connection.connection_id})"

@@ -59,9 +59,9 @@ class App:
         LOG.debug("app initialized")
 
     @classmethod
-    def db_ready(cls):
+    async def db_ready(cls):
         "Run when DB is ready"
-        create_task(cls._config._init_configuration(), name="init_configuration")
+        await cls._config.get_configuration_from_db()
 
     @_classproperty
     def status_object(self) -> GlobalStatus:

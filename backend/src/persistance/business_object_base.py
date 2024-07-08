@@ -124,12 +124,13 @@ class BOBase(BOBaseBase):
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
+        # LOG.debug(f'BOBase.fetch({id=}, {newest=})')
         if id is None:
             id = self.id
         if id is None and newest is None:
             LOG.debug(f"fetching {self} without id or newest")
             return self
-        LOG.debug(f"fetching {self} with newest={newest}")
+        # LOG.debug(f"fetching {self} with newest={newest}")
 
         sql = SQL().select([], True).from_(self.table)
         if self.id is not None:

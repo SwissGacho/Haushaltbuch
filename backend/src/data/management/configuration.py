@@ -1,14 +1,15 @@
 """Store app configuration"""
 
 from persistance.business_object_base import BOBase
-from persistance.bo_descriptors import BODict, BOInt
+from persistance.bo_descriptors import BODict, BORelation
+from data.management.user import User
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
 
 class Configuration(BOBase):
-    user_id = BOInt()
+    user_id = BORelation(flag_values={"relation": User})
     configuration = BODict()
 
     def __init__(self, id: int = None, cfg: any = None, user_id: int = None) -> None:

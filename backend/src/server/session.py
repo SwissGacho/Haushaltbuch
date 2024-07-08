@@ -4,8 +4,9 @@
 
 from data.management.user import User
 from server.ws_token import WSToken
+
+# from server.ws_connection import WS_Connection
 from core.app_logging import getLogger
-from database.sqlexpression import ColumnName
 
 LOG = getLogger(__name__)
 
@@ -15,14 +16,17 @@ class Session:
 
     _all_sessions = []
 
-    def __init__(self, username, conn_token, connection) -> None:
+    def __init__(
+        self, user: User, conn_token: WSToken, connection  #: "WS_Connection"
+    ) -> None:
         Session._all_sessions.append(self)
         self._session_nbr = len(Session._all_sessions)
-        self.LOG = getLogger(f"{Session.__module__}({self.session_id})")
+        self.LOG = getLogger(  # pylint: disable=invalid-name
+            f"{Session.__module__}({self.session_id})"
+        )
         self.connections = [connection]
         self.token = WSToken()
-        self.username = username
-        self.user: User = None
+        self.user: User = user
         self._tokens = {conn_token} if conn_token else set()
 
     @property
@@ -58,25 +62,9 @@ class Session:
         if token:
             self._tokens.add(token)
 
-    async def get_user_obj(self) -> User:
-        "get Business Object for user logging in"
-        username = self.username
-        self.LOG.debug(f"get_user_obj for {username}")
-        matching_users = await User.get_matching_ids({ColumnName("name"): username})
-        matching_count = len(matching_users)
-        self.LOG.debug(matching_count)
-        if matching_count > 1:
-            raise ValueError(f"multiple users with name '{username}' found")
-        if matching_count < 1:
-            raise PermissionError(f"User '{username} not found.")
-        row_match = await matching_users.fetchone()
-        user = User(id=row_match["id"])
-        self.user = user
-        return user
-
     def __repr__(self) -> str:
         return (
-            f"<Session[#{self._session_nbr}](user={self.username},"
+            f"<Session[#{self._session_nbr}](user={self.user},"
             f"token={self.token},conn_token={self._tokens})>"
         )
 

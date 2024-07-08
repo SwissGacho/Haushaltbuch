@@ -13,10 +13,12 @@ import json
 import asyncio
 
 from data.management.configuration import Configuration
+from data.management.user import User, UserRole
 from core.app import App
 from core.setup_config import parse_commandline, cfg_searchpaths
 from core.status import Status
 from core.app_logging import getLogger
+from core.exceptions import ConfigurationError
 
 LOG = getLogger(__name__)
 WAIT_AVAILABLE_TASK = "wait_for_available"
@@ -50,6 +52,11 @@ class _SetupConfigKeys(StrEnum):
     ADM_USER = "adminuser"
 
 
+class _SetupConfigValues(StrEnum):
+    SINGLE_USER = "single"
+    MULTI_USER = "multi"
+
+
 class ConfigIndex(StrEnum):
     CFGIX_SEARCHPATH = "search_path"
 
@@ -63,24 +70,35 @@ class AppConfiguration:
         self._global_configuration: Configuration = None
         self._user_configuration = None
         self._app_location = app_location
+        self._db_config_lock = asyncio.Lock()
 
     def _get_config_item(self, cfg: dict, key: Config):
+        if not cfg:
+            return None
         for key_part in key.split("/"):
             cfg = cfg.get(key_part)
         return cfg
 
-    async def _init_configuration(self):
-        LOG.debug("AppConfiguration._init_configuration: DB available")
-        self._global_configuration = await Configuration().fetch(newest=True)
-        user_mode = self._get_config_item(
-            self._global_configuration.configuration, Config.CONFIG_APP_USRMODE
-        )
-        LOG.debug(f"AppConfiguration._init_configuration: {user_mode=}")
-        App.status = (
-            Status.STATUS_SINGLE_USER
-            if user_mode == "single"
-            else Status.STATUS_MULTI_USER
-        )
+    async def get_configuration_from_db(self):
+        "Fetch configuration from database"
+        async with self._db_config_lock:
+            LOG.debug("AppConfiguration.get_configuration_from_db: DB available")
+            self._global_configuration = await Configuration().fetch(newest=True)
+            user_mode = self._get_config_item(
+                self._global_configuration.configuration, Config.CONFIG_APP_USRMODE
+            )
+            if not user_mode in [
+                _SetupConfigValues.SINGLE_USER,
+                _SetupConfigValues.MULTI_USER,
+            ]:
+                self._global_configuration = None
+                raise ConfigurationError(f"User mode: '{user_mode}'")
+            LOG.debug(f"AppConfiguration.get_configuration_from_db: {user_mode=}")
+            App.status = (
+                Status.STATUS_SINGLE_USER
+                if user_mode == _SetupConfigValues.SINGLE_USER
+                else Status.STATUS_MULTI_USER
+            )
 
     def _read_db_config_file(
         self, cfg_searchpath: list[Path], dbcfg_filename: str = None
@@ -143,7 +161,7 @@ class AppConfiguration:
         cfg = (
             self._global_configuration or self._init_setup_configuration()
         ) | self._cmdline_configuration
-        LOG.debug(f"AppConfiguration.configuration() -> {cfg}")
+        # LOG.debug(f"AppConfiguration.configuration() -> {cfg}")
         return cfg
 
     async def _wait_for_db(self) -> bool:
@@ -182,22 +200,30 @@ class AppConfiguration:
         self._setup_configuration |= self._read_db_config_file(
             [Path(db_filename).parent], Path(db_filename).name
         )
-        # self._setup_configuration |= db_cfg
         configuration = {
             Config.CONFIG_APP: self._get_config_item(
                 setup_cfg, _SetupConfigKeys.CFG_APP
             )
         }
-        if await self._wait_for_db():
-            bo = Configuration(cfg=configuration)
-            LOG.debug(f"{bo=}")
-            await bo.store()
-            LOG.debug(f"{bo=}")
-        else:
-            LOG.error("Start DB failed with new configuration.")
+        async with self._db_config_lock:
+            if await self._wait_for_db():
+                bo = Configuration(cfg=configuration)
+                await bo.store()
+            else:
+                LOG.error("Start DB failed with new configuration.")
 
-        if self._get_config_item(configuration, Config.CONFIG_APP_USRMODE) == "multi":
-            adm_user = self._get_config_item(setup_cfg, _SetupConfigKeys.ADM_USER)
+            if (
+                self._get_config_item(configuration, Config.CONFIG_APP_USRMODE)
+                == "multi"
+            ):
+                adm_user = self._get_config_item(setup_cfg, _SetupConfigKeys.ADM_USER)
+                user = User(
+                    name=adm_user["name"],
+                    pw=adm_user["password"],
+                    role=UserRole.ROLE_ADMIN,
+                )
+                LOG.debug(f"AppConfiguration.setup_configuration(): {user=}")
+                await user.store()
 
     def handle_fetch_configuration(self, index: str) -> str:
         "return a requested part of the configuration"
