@@ -22,7 +22,7 @@ def setUpModule() -> None:
         if mod in sys.modules:
             del sys.modules[mod]
 
-    remove("db.sqlite")
+    remove("database.sqlite")
     remove("aiosqlite")
     remove("sqlite3")
 

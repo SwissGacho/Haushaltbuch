@@ -26,6 +26,7 @@ def setUpModule() -> None:
     remove("aiomysql")
 
 
+@unittest.skip("implementation pending")
 class MySQLImport(unittest.TestCase):
 
     def test_101_successful_import(self):

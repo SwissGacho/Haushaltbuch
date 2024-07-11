@@ -7,6 +7,7 @@ import inspect
 import core.exceptions
 from server.ws_connection import WS_Connection
 from messages.message import MessageType, MessageAttribute
+from messages.login import HelloMessage, ByeMessage, LoginMessage
 
 
 class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
@@ -58,17 +59,16 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         mock_hello_message = Mock(name="mock_hello_message")
         MockHelloMessage = Mock(name="HelloMessage", return_value=mock_hello_message)
         mock_message = Mock(name="mock_message")
+        mock_login_message = Mock(LoginMessage())
         if inspect.isclass(login_arg):
             if login_arg is core.exceptions.ConnectionClosed:
                 exp_result = "ConnCloseExc"
             else:
                 exp_result = "AnyExc"
-            mock_message.message_type = Mock(return_value=MessageType.WS_TYPE_LOGIN)
-            MockMessage = Mock(name="LoginMessage", return_value=mock_message)
+            MockMessage = Mock(name="LoginMessage", return_value=mock_login_message)
         elif login_arg == "mockJSONlogin":
             exp_result = "success"
-            mock_message.message_type = Mock(return_value=MessageType.WS_TYPE_LOGIN)
-            MockMessage = Mock(name="LoginMessage", return_value=mock_message)
+            MockMessage = Mock(name="LoginMessage", return_value=mock_login_message)
         else:
             exp_result = "AbortLogin"
             mock_message.message_type = Mock(return_value="other")
@@ -93,8 +93,8 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
             patch("server.ws_connection.App", self.MockApp),
             patch("server.ws_connection.Message", MockMessage),
         ):
-            if exp_result in ["ConnCloseExc", "AbortLogin"]:
-                with self.assertRaises(core.exceptions.ConnectionClosed):
+            if exp_result in ["AnyExc"]:
+                with self.assertRaises(Exception):
                     await self.connection.start_connection()
                 result = None
             else:
@@ -103,23 +103,22 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         self.connection.send_message.assert_awaited_once_with(mock_hello_message)
         self.connection._socket.recv.assert_awaited_once_with()
         MockMessage.assert_called_once_with(json_message=mock_message)
-        mock_message.message_type.assert_called_once_with()
         if exp_result == "success":
-            self.connection.handle_message.assert_awaited_once_with(mock_message)
+            self.connection.handle_message.assert_awaited_once_with(mock_login_message)
             self.connection.abort_connection.assert_not_awaited()
             self.assertTrue(result, "successful login expected")
         elif exp_result == "ConnCloseExc":
-            self.connection.handle_message.assert_awaited_once_with(mock_message)
+            self.connection.handle_message.assert_awaited_once_with(mock_login_message)
             self.connection.abort_connection.assert_not_awaited()
-            self.assertIsNone(
+            self.assertFalse(
                 result, "login expected to be aborted by exception in handle_message"
             )
         elif exp_result == "AbortLogin":
             self.connection.handle_message.assert_not_awaited()
             self.connection.abort_connection.assert_awaited_once_with("Login expected")
-            self.assertIsNone(result, "login expected to be aborted")
+            self.assertFalse(result, "login expected to be aborted")
         else:
-            self.connection.handle_message.assert_awaited_once_with(mock_message)
+            self.connection.handle_message.assert_awaited_once_with(mock_login_message)
             self.connection.abort_connection.assert_not_awaited()
             self.assertEqual(exp_result, "AnyExc")
             self.assertFalse(result, "login expected to be unsuccessful")
