@@ -19,7 +19,7 @@ async def main():
     async with get_websocket() as ws:
         # LOG.debug(f"got websocket {ws=}")
         while True:
-            LOG.debug(f"Start DB, config")
+            LOG.debug("Start DB, config")
             App.status_object.status = (
                 Status.STATUS_DB_CFG
                 if App.configuration.get(Config.CONFIG_DB)

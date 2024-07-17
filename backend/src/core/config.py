@@ -19,27 +19,11 @@ from core.setup_config import parse_commandline, cfg_searchpaths
 from core.status import Status
 from core.app_logging import getLogger
 from core.exceptions import ConfigurationError
+from core.base_objects import ConfigurationBaseClass, Config
 
 LOG = getLogger(__name__)
 WAIT_AVAILABLE_TASK = "wait_for_available"
 WAIT_FAILURE_TASK = "wait_for_failure"
-
-
-class Config(StrEnum):
-    "Configuration keys"
-    CONFIG_APP = "app"
-    CONFIG_APP_USRMODE = "app/userMode"
-    CONFIG_DBCFG_FILE = "dbcfg_file"
-    CONFIG_DB = "db_cfg"
-    CONFIG_DB_FILE = "file"
-    CONFIG_DB_HOST = "host"
-    CONFIG_DB_DB = "db"
-    CONFIG_DB_USER = "user"
-    CONFIG_DB_PW = "password"
-    CONFIG_CFG_SEARCH_PATH = "config_search_path"
-    CONFIG_SYSTEM = "system"
-    CONFIG_DB_LOCATIONS = "db_paths"
-    CONFIG_ADMINUSER = "adminuser"
 
 
 class _SetupConfigKeys(StrEnum):
@@ -61,7 +45,7 @@ class ConfigIndex(StrEnum):
     CFGIX_SEARCHPATH = "search_path"
 
 
-class AppConfiguration:
+class AppConfiguration(ConfigurationBaseClass):
     "read app configuration"
 
     def __init__(self, app_location: str) -> None:

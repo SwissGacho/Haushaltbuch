@@ -5,7 +5,7 @@ import pathlib
 from enum import StrEnum
 from json import dumps, loads
 from typing import Any
-from core.base_object import BaseObject
+from core.base_objects import BaseObject
 from server.ws_token import WSToken
 from core.app_logging import getLogger
 import messages

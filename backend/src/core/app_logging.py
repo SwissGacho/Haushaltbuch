@@ -19,5 +19,5 @@ root_logger.debug("root logger initialized.")
 app_logger.debug("app logger initialized.")
 
 
-def getLogger(name: str, level=logging.NOTSET) -> None:
+def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
     return logging.getLogger(APPNAME if name == "__main__" else (APPNAME + "." + name))

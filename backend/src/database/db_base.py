@@ -4,12 +4,13 @@
 from database.sqlfactory import SQLFactory
 from database.sqlexecutable import SQL, SQLTemplate
 from database.sqlexpression import SQLColumnDefinition
+from core.base_objects import DBBaseClass
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
 
-class DB:
+class DB(DBBaseClass):
     "application Data Base"
 
     def __init__(self, **cfg) -> None:
