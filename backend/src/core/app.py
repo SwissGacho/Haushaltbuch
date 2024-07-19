@@ -1,15 +1,16 @@
 """ Common constants
 """
 
-from asyncio import Event, create_task
+from asyncio import Event
 from enum import StrEnum
 from typing import ClassVar, TypeAlias
 
-import core
-from core.app_logging import getLogger
+from core.app_logging import getLogger, logExit
 
 LOG = getLogger(__name__)
-WEBSOCKET_PORT = 8765
+
+# pylint: disable=wrong-import-position
+import core
 
 
 class _classproperty(property):
@@ -110,4 +111,4 @@ class App:
         cls._config_enum_class = cfg_unum
 
 
-# LOG.debug("module imported")
+logExit(LOG)

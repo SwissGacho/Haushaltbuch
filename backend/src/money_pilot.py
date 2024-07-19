@@ -2,15 +2,16 @@
 
 import asyncio
 
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
+
 from core.exceptions import DBRestart, DBSchemaError, ConfigurationError
 from core.app import App
 from core.status import Status
 from core.config import Config
-from core.app_logging import getLogger
 from database.db import get_db
 from server.ws_server import get_websocket
-
-LOG = getLogger(__name__)
 
 
 async def main():

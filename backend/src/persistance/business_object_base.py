@@ -6,12 +6,15 @@
 from typing import Self, TypeAlias
 from datetime import date, datetime, UTC
 
+from core.app_logging import getLogger, logExit
+
+LOG = getLogger(__name__)
+
+# pylint: disable=wrong-import-position
+
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
 from database.sqlexecutable import SQL, CreateTable
 from database.sqlexpression import Eq, Filter, SQLExpression, Value
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
 
 
 class _classproperty(property):
@@ -196,4 +199,4 @@ class BOBase(BOBaseBase):
             await self.fetch()
 
 
-LOG.debug(f"module {__name__} initialized")
+logExit(LOG)

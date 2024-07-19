@@ -5,10 +5,11 @@ import platform
 from pathlib import Path
 import argparse
 
-from core.const import APPNAME, APPDESC, DBCFG_FILE_NAME
-from core.app_logging import getLogger
+from core.app_logging import getLogger, logExit
 
 LOG = getLogger(__name__)
+
+from core.const import APPNAME, APPDESC, DBCFG_FILE_NAME
 
 
 def cfg_searchpaths(app_location: str) -> tuple[list[Path], list[Path]]:
@@ -84,3 +85,6 @@ def parse_commandline(dbcfg_file_key: str) -> dict:
     for cfg in args.cfg:
         _update_dicts(result, cfg)
     return result
+
+
+logExit(LOG)

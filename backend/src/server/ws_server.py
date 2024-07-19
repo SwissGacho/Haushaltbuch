@@ -4,13 +4,13 @@ from contextlib import asynccontextmanager
 import websockets
 import socket
 
-from core.app import WEBSOCKET_PORT
-
-from server.ws_connection import WS_Connection
-from messages.message import Message
-from core.app_logging import getLogger
+from core.app_logging import getLogger, logExit
 
 LOG = getLogger(__name__)
+
+from core.const import WEBSOCKET_PORT
+from server.ws_connection import WS_Connection
+from messages.message import Message
 
 
 class WSProtocol(websockets.WebSocketServerProtocol):
@@ -95,4 +95,4 @@ async def get_websocket():
         ws_server.close()
 
 
-# LOG.debug("module imported")
+logExit(LOG)

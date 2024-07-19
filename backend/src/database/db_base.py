@@ -1,12 +1,13 @@
 """ Base class for DB connections """
 
+from core.app_logging import getLogger, logExit
+
+LOG = getLogger(__name__)
+
 # from persistance.business_object_base import BO_Base
 from database.sqlfactory import SQLFactory
 from database.sqlexecutable import SQL, SQLTemplate
 from database.sqlexpression import SQLColumnDefinition
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
 
 
 class DB:
@@ -196,4 +197,4 @@ class Cursor:
             self._cursor = None
 
 
-LOG.debug(f"module {__name__} initialized")
+logExit(LOG)

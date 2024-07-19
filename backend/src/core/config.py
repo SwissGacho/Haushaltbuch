@@ -12,15 +12,17 @@ import platform
 import json
 import asyncio
 
+from core.app_logging import getLogger, logExit
+
+LOG = getLogger(__name__)
+
 from data.management.configuration import Configuration
 from data.management.user import User, UserRole
 from core.app import App
 from core.setup_config import parse_commandline, cfg_searchpaths
 from core.status import Status
-from core.app_logging import getLogger
 from core.exceptions import ConfigurationError
 
-LOG = getLogger(__name__)
 WAIT_AVAILABLE_TASK = "wait_for_available"
 WAIT_FAILURE_TASK = "wait_for_failure"
 
@@ -236,4 +238,4 @@ class AppConfiguration:
 
 
 App.set_config_class(AppConfiguration, Config)
-# LOG.debug("module imported")
+logExit(LOG)
