@@ -5,10 +5,8 @@ import re
 import unittest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch, call, DEFAULT
 import logging
-import asyncio
 
 from money_pilot import main
-from core.exceptions import DBRestart
 from database.db import get_db
 from server.ws_server import get_websocket
 
