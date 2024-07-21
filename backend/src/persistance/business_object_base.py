@@ -37,6 +37,7 @@ class BOBase(BOBaseBase):
         self._data = {}
         self._db_data = {}
         self.id = id
+        self.last_updated = None
 
     @classmethod
     def register_persistant_class(cls):
@@ -187,10 +188,10 @@ class BOBase(BOBaseBase):
         assert self.id is not None, "id must not be None for update operation"
         sql = SQL()
         value_class = sql.get_sql_class(Value)
-        sql = sql.update(self.table).where(Eq("id", self.id))
+        sql = sql.update(self.table).where(sql.get_sql_class(Eq)("id", self.id))
         for k, v in self._data.items():
             if k != "id" and v != self.convert_from_db(
-                self._db_data[k], self.attributes_as_dict()[k]
+                self._db_data.get(k), self.attributes_as_dict()[k]
             ):
                 sql.assignment(k, value_class(v))
         try:
