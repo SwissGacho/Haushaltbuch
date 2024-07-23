@@ -3,7 +3,7 @@
 
 from asyncio import Event
 from enum import StrEnum
-from typing import ClassVar, TypeAlias
+from typing import ClassVar, TypeAlias, Callable
 
 from core.app_logging import getLogger, logExit
 
@@ -13,8 +13,11 @@ LOG = getLogger(__name__)
 import core
 
 
-class _classproperty(property):
-    def __get__(self, owner_self, owner_cls):
+class _classproperty:
+    def __init__(self, fget: Callable) -> None:
+        self.fget = fget
+
+    def __get__(self, owner_self, owner_cls=None):
         return self.fget(owner_cls)
 
 

@@ -3,7 +3,7 @@
     Business objects are classes that support persistance in the data base
 """
 
-from typing import Self, TypeAlias, Optional
+from typing import Self, TypeAlias, Optional, Callable
 from datetime import date, datetime, UTC
 
 from core.app_logging import getLogger, logExit
@@ -17,8 +17,11 @@ from database.sqlexecutable import SQL, CreateTable, SQLDataType
 from database.sqlexpression import Eq, Filter, SQLExpression, Value
 
 
-class _classproperty(property):
-    def __get__(self, owner_self, owner_cls):
+class _classproperty:
+    def __init__(self, fget: Callable) -> None:
+        self.fget = fget
+
+    def __get__(self, owner_self, owner_cls=None):
         return self.fget(owner_cls)
 
 
