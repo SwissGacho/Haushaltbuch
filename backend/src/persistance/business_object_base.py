@@ -3,7 +3,7 @@
     Business objects are classes that support persistance in the data base
 """
 
-from typing import Self, TypeAlias
+from typing import Self, TypeAlias, Optional
 from datetime import date, datetime, UTC
 
 from core.app_logging import getLogger, logExit
@@ -13,7 +13,7 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
-from database.sqlexecutable import SQL, CreateTable
+from database.sqlexecutable import SQL, CreateTable, SQLDataType
 from database.sqlexpression import Eq, Filter, SQLExpression, Value
 
 
@@ -22,7 +22,7 @@ class _classproperty(property):
         return self.fget(owner_cls)
 
 
-AttributeDescription: TypeAlias = tuple[str, str, str | None]
+AttributeDescription: TypeAlias = tuple[str, SQLDataType, str, dict[str, str]]
 
 
 class BOBase(BOBaseBase):
@@ -31,8 +31,9 @@ class BOBase(BOBaseBase):
     last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR)
     _table = None
     _attributes: dict[str, list[AttributeDescription]] = {}
-    _business_objects: dict[str, Self] = {}
+    _business_objects: dict[str, type["BOBase"]] = {}
 
+    # pylint: disable=redefined-builtin
     def __init__(self, id=None) -> None:
         self._data = {}
         self._db_data = {}
@@ -46,7 +47,7 @@ class BOBase(BOBaseBase):
         LOG.debug(f"registered class '{cls.__name__}'")
 
     @_classproperty
-    def all_business_objects(self) -> dict[str, Self]:
+    def all_business_objects(self) -> dict[str, type["BOBase"]]:
         "Set of registered Business Objects"
         return self._business_objects
 
@@ -62,22 +63,18 @@ class BOBase(BOBaseBase):
     @classmethod
     def attributes_as_dict(cls) -> dict:
         "dict of BO attribute types with attribute names as keys"
-        super_cols = (
-            {}
-            if cls == BOBase
-            else cls.__base__.attributes_as_dict()  # pylint: disable=no-member
-        )
-        return super_cols | {a[0]: a[1] for a in cls._attributes.get(cls.__name__, [])}
+        cls_cols = {a[0]: a[1] for a in cls._attributes.get(cls.__name__, [])}
+        if isinstance(cls.__base__, BOBase):
+            return cls.__base__.attributes_as_dict() | cls_cols
+        return cls_cols
 
     @classmethod
-    def attribute_descriptions(cls) -> list[tuple[str]]:
+    def attribute_descriptions(cls) -> list[AttributeDescription]:
         "list of attribute descriptions"
-        super_cols = (
-            []
-            if cls == BOBase
-            else cls.__base__.attribute_descriptions()  # pylint: disable=no-member
-        )
-        return super_cols + cls._attributes.get(cls.__name__, [])
+        cls_cols = cls._attributes.get(cls.__name__, [])
+        if isinstance(cls.__base__, BOBase):
+            return cls.__base__.attribute_descriptions() + cls_cols
+        return cls_cols
 
     @classmethod
     async def sql_create_table(cls):
@@ -104,7 +101,7 @@ class BOBase(BOBaseBase):
         return value
 
     @classmethod
-    async def count_rows(cls, conditions: dict = None) -> int:
+    async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
         sql = SQL().select(["count(*) as count"]).from_(cls.table)
         if conditions:

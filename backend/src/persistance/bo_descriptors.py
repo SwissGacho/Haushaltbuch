@@ -33,9 +33,11 @@ class _PersistantAttr:
     ) -> None:
         self._flag = flag
         self._flag_values = flag_values
+        self.my_name = None
 
     @classmethod
     def data_type(cls):
+        "Datatype of attribute"
         raise NotImplementedError
 
     def __set_name__(self, owner, name):
@@ -50,14 +52,22 @@ class _PersistantAttr:
         owner._attributes[owner.__name__].append(cols)
 
     def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
         return obj._data.get(self.my_name)
 
     def __set__(self, obj, value):
-        self.validate(value)
+        if not self.validate(value):
+            raise ValueError(f"'{value}' invalid to set attribute {self.my_name}")
+        # if value is None and BOColumnFlag.BOC_NOT_NULL in self._flag:
+        #     raise ValueError(
+        #         "Value must not be 'None' for 'NOT NULL' attribute {self.my_name}"
+        #     )
         obj._data[self.my_name] = value
 
-    def validate(self, value):
-        pass
+    def validate(self, value) -> bool:
+        "Validate 'value' for assignability."
+        return value is None
 
 
 # pylint: disable=missing-class-docstring
@@ -67,7 +77,7 @@ class BOInt(_PersistantAttr):
         return int
 
     def validate(self, value):
-        return isinstance(value, int)
+        return value is None or isinstance(value, int)
 
 
 class BOStr(_PersistantAttr):
@@ -76,7 +86,7 @@ class BOStr(_PersistantAttr):
         return str
 
     def validate(self, value):
-        return isinstance(value, str)
+        return value is None or isinstance(value, str)
 
 
 class BODatetime(_PersistantAttr):
@@ -84,8 +94,17 @@ class BODatetime(_PersistantAttr):
     def data_type(cls):
         return datetime
 
+    def __set__(self, obj, value):
+        if isinstance(value, str):
+            value = datetime.fromisoformat(value)
+        return super().__set__(obj=obj, value=value)
+
     def validate(self, value):
-        return isinstance(value, datetime)
+        return (
+            value is None
+            or isinstance(value, datetime)
+            or datetime.fromisoformat(value) is not None
+        )
 
 
 class BODate(_PersistantAttr):
@@ -93,8 +112,17 @@ class BODate(_PersistantAttr):
     def data_type(cls):
         return date
 
+    def __set__(self, obj, value):
+        if isinstance(value, str):
+            value = date.fromisoformat(value)
+        return super().__set__(obj=obj, value=value)
+
     def validate(self, value):
-        return isinstance(value, date)
+        return (
+            value is None
+            or isinstance(value, date)
+            or date.fromisoformat(value) is not None
+        )
 
 
 class BODict(_PersistantAttr):
@@ -103,6 +131,8 @@ class BODict(_PersistantAttr):
         return dict
 
     def validate(self, value):
+        if not isinstance(value, dict):
+            return value is None
         try:
             json.dumps(value, separators=(",", ":"))
         except (ValueError, TypeError, RecursionError) as exc:
@@ -116,6 +146,8 @@ class BOList(_PersistantAttr):
         return list
 
     def validate(self, value):
+        if not isinstance(value, list):
+            return value is None
         try:
             json.dumps(value, separators=(",", ":"))
         except (ValueError, TypeError, RecursionError) as exc:
@@ -137,3 +169,6 @@ class BORelation(_PersistantAttr):
     @classmethod
     def data_type(cls):
         return BOBaseBase
+
+    def validate(self, value):
+        return value is None or isinstance(value, BOBaseBase)

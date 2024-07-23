@@ -150,7 +150,7 @@ class Cursor:
         self._rowcount = None
         self._close = close
 
-    async def execute(self, query: str, params=None, close=False):
+    async def execute(self, query: str, params=None, close: bool | int = False):
         """execute an SQL statement and return the Cursor instance (self).
         If 'close'=True close connection after fetching all rows
         If 'close'=1 close connection after fetching one row
