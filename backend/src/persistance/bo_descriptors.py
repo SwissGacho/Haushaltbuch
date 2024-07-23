@@ -29,7 +29,7 @@ class BOBaseBase:
 
 class _PersistantAttr:
     def __init__(
-        self, flag: BOColumnFlag = BOColumnFlag.BOC_NONE, flag_values: dict = {}
+        self, flag: BOColumnFlag = BOColumnFlag.BOC_NONE, **flag_values
     ) -> None:
         self._flag = flag
         self._flag_values = flag_values
@@ -125,15 +125,14 @@ class BOList(_PersistantAttr):
 
 class BORelation(_PersistantAttr):
     def __init__(
-        self, flag: BOColumnFlag = BOColumnFlag.BOC_FK, flag_values: dict = None
+        self, relation: type[BOBaseBase], flag: BOColumnFlag = BOColumnFlag.BOC_FK
     ) -> None:
         flag |= BOColumnFlag.BOC_FK
-        relation = flag_values.get("relation")
         # LOG.debug(f"{relation=}")
         if not issubclass(relation, BOBaseBase):
             raise TypeError("BO relation should be derived from BOBase.")
 
-        super().__init__(flag, flag_values)
+        super().__init__(flag, relation=relation)
 
     @classmethod
     def data_type(cls):

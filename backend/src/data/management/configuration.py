@@ -9,7 +9,7 @@ LOG = getLogger(__name__)
 
 
 class Configuration(BOBase):
-    user_id = BORelation(flag_values={"relation": User})
+    user_id = BORelation(User)
     configuration = BODict()
 
     def __init__(self, id: int = None, cfg: any = None, user_id: int = None) -> None:
