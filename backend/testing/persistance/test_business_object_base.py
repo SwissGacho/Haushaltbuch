@@ -1,7 +1,6 @@
 """Test suite for Business Objects Base"""
 
 import datetime
-from os import name
 import unittest
 from unittest.mock import DEFAULT, Mock, AsyncMock, patch, call
 
@@ -24,7 +23,7 @@ class MockBO1(BOBase):
 
 class MockBO2(BOBase):
     mock_attr1 = BOStr()
-    mock_attr2 = BORelation(flag_values={"relation": MockBO1})
+    mock_attr2 = BORelation(MockBO1)
     mock_attr3 = BOList()
 
     def __init__(
