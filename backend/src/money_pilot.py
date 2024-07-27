@@ -2,27 +2,29 @@
 
 import asyncio
 
+from core.app_logging import getLogger
+
+LOG = getLogger(__name__)
+
 from core.exceptions import DBRestart, DBSchemaError, ConfigurationError
 from core.app import App
 from core.status import Status
-from core.config import Config
-from core.app_logging import getLogger
+from core.configuration.config import Config
+from core.configuration.db_config import DBConfig
 from database.db import get_db
 from server.ws_server import get_websocket
-
-LOG = getLogger(__name__)
 
 
 async def main():
     "connect DB and start servers"
     LOG.debug(f"{App.status=}")
-    async with get_websocket() as ws:
+    async with get_websocket():
         # LOG.debug(f"got websocket {ws=}")
         while True:
-            LOG.debug("Start DB, config")
+            # LOG.debug("Start DB, config")
             App.status_object.status = (
                 Status.STATUS_DB_CFG
-                if App.configuration.get(Config.CONFIG_DB)
+                if DBConfig.db_configuration
                 else Status.STATUS_NO_DB
             )
             try:

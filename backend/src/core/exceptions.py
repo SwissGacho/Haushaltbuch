@@ -19,3 +19,7 @@ class ConnectionClosed(Exception):
 
 class ConfigurationError(Exception):
     "The configuration (as read from DB) is invalid"
+
+
+class DataError(Exception):
+    "DB consistancy error"

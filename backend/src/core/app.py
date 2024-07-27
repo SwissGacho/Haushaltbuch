@@ -9,6 +9,7 @@ from core.base_objects import (
     Status,
     ConfigurationBaseClass,
     Config,
+    ConfigDict,
     DBBaseClass,
 )
 from core.app_logging import getLogger
@@ -52,6 +53,7 @@ class App:
             raise TypeError("Configuration class not initialized.")
         else:
             cls._config = cls._config_class(app_location)
+        cls._config.initialize_configuration()
         LOG.debug("app initialized")
 
     @classmethod
@@ -79,8 +81,7 @@ class App:
             raise ReferenceError("Status and Configuration not initialized")
         return cls._status.status
 
-    # pylint: disable=no-self-argument
-    @_classproperty
+    @classmethod
     def config_object(cls) -> ConfigurationBaseClass:
         """The app's configuration object.
         This should only be used for calling config methods.
@@ -91,11 +92,18 @@ class App:
 
     # pylint: disable=no-self-argument
     @_classproperty
-    def configuration(cls) -> dict:
+    def configuration(cls) -> ConfigDict:
         "Global configuration of the app"
         if not cls._config:
             raise ReferenceError("Status and Configuration not initialized")
         return cls._config.configuration()
+
+    @classmethod
+    def get_config_item(cls, key: Config, default=None):
+        "Extract an item from global configuration"
+        if not cls._config:
+            raise ReferenceError("Status and Configuration not initialized")
+        return cls._config.configuration().get(key, default)
 
     # pylint: disable=no-self-argument
     @_classproperty

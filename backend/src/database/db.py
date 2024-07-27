@@ -4,8 +4,10 @@
 from contextlib import asynccontextmanager
 
 from core.app import App
+from core.configuration.util import get_config_item
 from core.status import Status
-from core.config import Config
+from core.configuration.config import Config
+from core.configuration.db_config import DBConfig
 from core.app_logging import getLogger
 from database.sqlite import SQLiteDB
 from database.mysql import MySQLDB
@@ -23,8 +25,8 @@ async def get_db():
         yield
         return
 
-    db_config = App.configuration.get(Config.CONFIG_DB)
-    db_type = db_config.get(Config.CONFIG_DB_DB)
+    db_config = get_config_item(DBConfig.db_configuration, Config.CONFIG_DB)
+    db_type = get_config_item(DBConfig.db_configuration, Config.CONFIG_DB_DB)
     if not (db_config and db_type):
         LOG.error(f"Invalid DB configuration: {App.configuration}")
         yield
