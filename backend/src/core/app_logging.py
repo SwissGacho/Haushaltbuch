@@ -24,7 +24,9 @@ root_logger.debug("root logger initialized.")
 app_logger.debug("app logger initialized.")
 
 
+# pylint: disable=invalid-name,unused-argument
 def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
+    "Create module specific logger and log potentially module code entry (when module is imported)"
     logger = logging.getLogger(
         APPNAME if name == "__main__" else (APPNAME + "." + name)
     )
@@ -33,6 +35,7 @@ def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
     return logger
 
 
-def logExit(logger):
+def log_exit(logger):
+    "Log end of execution of the modole code"
     if _LOG_MODULE_EXIT:
         logger.debug("Exit module")

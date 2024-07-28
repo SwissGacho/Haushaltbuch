@@ -1,7 +1,7 @@
 """ Check validity of login and actions.
 """
 
-from core.app_logging import getLogger, logExit
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
@@ -25,4 +25,4 @@ async def check_login(login_message: dict) -> User:
     return user
 
 
-logExit(LOG)
+log_exit(LOG)

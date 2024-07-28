@@ -1,27 +1,34 @@
 """ User business object """
 
+from typing import Optional
 from enum import StrEnum
+
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
 
 from persistance.business_object_base import BOBase
 from persistance.bo_descriptors import BOStr
 
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
-
 
 class UserRole(StrEnum):
+    "User Roles/Permissions"
     ROLE_ADMIN = "admin"
     ROLE_USER = "user"
 
 
 class User(BOBase):
+    "Persistant user object"
     name = BOStr()
     password = BOStr()
     role = BOStr()
 
     def __init__(
-        self, id=None, name: str = None, pw: str = None, role: UserRole = None
+        self,
+        id=None,
+        name: Optional[str] = None,
+        pw: Optional[str] = None,
+        role: Optional[UserRole] = None,
     ) -> None:
         super().__init__(id=id)
         self.name = name
@@ -32,4 +39,4 @@ class User(BOBase):
         return f"<User id:{self.id}, name:{self.name}, role:{self.role}>"
 
 
-# LOG.debug(f"{BO_Base._business_objects=}")
+log_exit(LOG)

@@ -6,7 +6,7 @@
 import importlib
 import pathlib
 
-from core.app_logging import getLogger, logExit
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
@@ -30,4 +30,4 @@ def import_business_objects():
 
 
 import_business_objects()
-logExit(LOG)
+log_exit(LOG)

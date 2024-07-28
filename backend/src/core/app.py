@@ -2,8 +2,14 @@
 """
 
 from asyncio import Event
-from typing import Callable, Optional
+from typing import Optional
 
+# pylint: disable=wrong-import-position
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
+from core.util import _classproperty
 from core.base_objects import (
     StatusBaseClass,
     Status,
@@ -12,25 +18,6 @@ from core.base_objects import (
     ConfigDict,
     DBBaseClass,
 )
-from core.app_logging import getLogger
-from asyncio import Event
-from enum import StrEnum
-from typing import ClassVar, TypeAlias, Callable
-
-from core.app_logging import getLogger, logExit
-
-LOG = getLogger(__name__)
-
-# pylint: disable=wrong-import-position
-import core
-
-
-class _classproperty:
-    def __init__(self, fget: Callable) -> None:
-        self.fget = fget
-
-    def __get__(self, owner_self, owner_cls=None):
-        return self.fget(owner_cls)
 
 
 class App:
@@ -140,4 +127,4 @@ class App:
         cls._config_enum_class = cfg_unum
 
 
-logExit(LOG)
+log_exit(LOG)

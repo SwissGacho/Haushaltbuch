@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import websockets
 import socket
 
-from core.app_logging import getLogger, logExit
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
@@ -95,4 +95,4 @@ async def get_websocket():
         ws_server.close()
 
 
-logExit(LOG)
+log_exit(LOG)

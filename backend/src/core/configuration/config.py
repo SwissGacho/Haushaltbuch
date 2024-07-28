@@ -7,11 +7,10 @@
 """
 
 from typing import Optional
-from enum import StrEnum
 
 from core.configuration.cmd_line import parse_commandline
 from core.configuration.db_config import DBConfig
-from core.configuration.util import get_config_item
+from core.util import get_config_item
 from core.configuration.setup_config import SetupConfigValues
 from core.app import App
 from core.status import Status
@@ -21,10 +20,6 @@ from core.base_objects import ConfigurationBaseClass, Config, ConfigDict
 from data.management.configuration import Configuration
 
 LOG = getLogger(__name__)
-
-
-class ConfigIndex(StrEnum):
-    CFGIX_SEARCHPATH = "search_path"
 
 
 class AppConfiguration(ConfigurationBaseClass):
@@ -57,7 +52,7 @@ class AppConfiguration(ConfigurationBaseClass):
             # LOG.debug("AppConfiguration.get_configuration_from_db: DB available")
             self._global_configuration = await Configuration().fetch(newest=True)
             user_mode = get_config_item(
-                self._global_configuration.configuration, Config.CONFIG_APP_USRMODE
+                self._global_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
             )
             if not user_mode in [
                 SetupConfigValues.SINGLE_USER,

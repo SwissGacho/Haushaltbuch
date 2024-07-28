@@ -16,6 +16,7 @@ LOG = getLogger(__name__)
 
 
 class DBConfig(BaseObject):
+    "Handling of the DB configuration"
     _cfg_searchpath: Optional[list[str]] = None
     _db_locations: Optional[list[str]] = None
     db_configuration: Optional[dict] = None
@@ -58,19 +59,20 @@ class DBConfig(BaseObject):
     @classmethod
     def cfg_searchpath(cls) -> list[str]:
         "Searchpath for DB configuration file"
-        if not (cls._cfg_searchpath):
+        if not cls._cfg_searchpath:
             cls._create_cfg_searchpaths()
         return cls._cfg_searchpath or []
 
     @classmethod
     def db_locations(cls) -> list[str]:
         "Suggested locations for DB file"
-        if not (cls._db_locations):
+        if not cls._db_locations:
             cls._create_cfg_searchpaths()
         return cls._db_locations or []
 
     @classmethod
     def set_db_configuration(cls, config: dict):
+        "Change the DBconfiguration"
         cls.db_configuration = config
 
     @classmethod

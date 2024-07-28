@@ -1,4 +1,6 @@
-""" Configuration utilities """
+""" Common utilities """
+
+from typing import Callable
 
 
 def get_config_item(cfg: dict, key: str):
@@ -11,3 +13,13 @@ def get_config_item(cfg: dict, key: str):
             return None
         sub_cfg = sub_cfg.get(key_part, {})
     return sub_cfg
+
+
+class _classproperty:
+    "Property on class level (only getter implemented)"
+
+    def __init__(self, fget: Callable) -> None:
+        self.fget = fget
+
+    def __get__(self, owner_self, owner_cls=None):
+        return self.fget(owner_cls)

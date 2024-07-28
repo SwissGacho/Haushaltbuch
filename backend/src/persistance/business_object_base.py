@@ -6,7 +6,7 @@
 from typing import Self, TypeAlias, Optional, Callable
 from datetime import date, datetime, UTC
 
-from core.app_logging import getLogger, logExit
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
@@ -203,4 +203,4 @@ class BOBase(BOBaseBase):
             await self.fetch()
 
 
-logExit(LOG)
+log_exit(LOG)

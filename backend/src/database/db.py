@@ -4,7 +4,7 @@
 from contextlib import asynccontextmanager
 
 from core.app import App
-from core.configuration.util import get_config_item
+from core.util import get_config_item
 from core.status import Status
 from core.configuration.config import Config
 from core.configuration.db_config import DBConfig

@@ -9,7 +9,7 @@ from data.management.user import User, UserRole
 from data.management.configuration import Configuration
 from database.sqlexpression import ColumnName
 from core.app import App
-from core.configuration.util import get_config_item
+from core.util import get_config_item
 from core.configuration.db_config import DBConfig
 from core.base_objects import Config
 from core.base_objects import BaseObject
@@ -96,7 +96,7 @@ class ConfigSetup(BaseObject):
                 elif len(rows_in_db) == 1:
                     bo = await Configuration(id=rows_in_db[0]).fetch()
                     for key, set_cfg in configuration.items():
-                        db_cfg = bo.configuration.get(key)
+                        db_cfg = bo.configuration_dict.get(key)
                         if set_cfg != db_cfg:
                             LOG.info(
                                 f"Change configuration '{key}': {db_cfg} -> {set_cfg}"

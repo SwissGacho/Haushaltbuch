@@ -1,9 +1,7 @@
 """ Store the current status of the backend and manage status changes
 """
 
-from enum import StrEnum
-
-from core.app_logging import getLogger, logExit
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
@@ -12,6 +10,8 @@ from core.base_objects import StatusBaseClass, Status
 
 
 class AppStatus(StatusBaseClass):
+    "Global status object (instantiated only once)"
+
     def __init__(self) -> None:
         self._status = Status.STATUS_UNCONFIGURED
 
@@ -27,4 +27,4 @@ class AppStatus(StatusBaseClass):
 
 
 App.set_status_class(AppStatus, Status)
-logExit(LOG)
+log_exit(LOG)
