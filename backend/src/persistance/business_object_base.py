@@ -119,7 +119,7 @@ class BOBase(BOBaseBase):
         sql = SQL().select(["id"]).from_(cls.table)
         sql.where(sql.get_sql_class(Filter)(conditions))
         result = await (await sql.execute(close=1)).fetchall()
-        LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
+        # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
 
     async def fetch(self, id=None, newest=None):
@@ -189,13 +189,16 @@ class BOBase(BOBaseBase):
         sql = SQL()
         value_class = sql.get_sql_class(Value)
         sql = sql.update(self.table).where(sql.get_sql_class(Eq)("id", self.id))
+        changes = False
         for k, v in self._data.items():
             if k != "id" and v != self.convert_from_db(
                 self._db_data.get(k), self.attributes_as_dict()[k]
             ):
-                sql.assignment(k, value_class(v))
+                changes = True
+                sql.assignment(k, value_class(k, v))
         try:
-            await sql.execute(close=0, commit=True)
+            if changes:
+                await sql.execute(close=0, commit=True)
         finally:
             await self.fetch()
 

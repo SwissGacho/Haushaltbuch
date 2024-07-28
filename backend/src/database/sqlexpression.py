@@ -299,7 +299,7 @@ class Assignment(SQLExpression):
 
     def sql(self) -> str:
         """Return the SQL expression as a string."""
-        sql = Eq(",".join(self.columns), self.value.sql())
+        sql = "(" + ",".join(self.columns) + ")=" + self.value.sql()
         if self.where is not None:
             sql += self.where.sql()
         return sql

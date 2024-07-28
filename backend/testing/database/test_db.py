@@ -6,7 +6,7 @@ from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
 from contextlib import _AsyncGeneratorContextManager
 from core.status import Status
-from core.config import Config
+from core.configuration.config import Config
 import database.db
 
 
@@ -65,7 +65,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         self.mock_db_filename = "theDBfile.sqlite"
         self.db_config = {
             Config.CONFIG_DB_DB: "SQLite",
-            Config.CONFIG_DB_FILE: self.mock_db_filename,
+            Config.CONFIG_DBFILE: self.mock_db_filename,
         }
         self.MockApp.configuration = {Config.CONFIG_DB: self.db_config}
         with self.patch:
@@ -93,7 +93,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         self.mock_db_filename = "theDBfile.sqlite"
         self.db_config = {
             Config.CONFIG_DB_DB: "SQLite",
-            Config.CONFIG_DB_FILE: self.mock_db_filename,
+            Config.CONFIG_DBFILE: self.mock_db_filename,
         }
         self.MockApp.configuration = {Config.CONFIG_DB: self.db_config}
         self.MockSQLiteDB.side_effect = ModuleNotFoundError(
@@ -127,10 +127,10 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
     @unittest.skip("implementation pending")
     async def test_201_get_db_mysql(self):
         self.mock_db_config = {
-            Config.CONFIG_DB_HOST: "mockHost",
-            Config.CONFIG_DB_DB: "mockDB",
-            Config.CONFIG_DB_USER: "mockUser",
-            Config.CONFIG_DB_PW: "mockPW",
+            Config.CONFIG_DBHOST: "mockHost",
+            # Config.CONFIG_DB_DB: "mockDB",
+            Config.CONFIG_DBUSER: "mockUser",
+            Config.CONFIG_DBPW: "mockPW",
         }
         self.MockApp.configuration = {Config.CONFIG_DB: self.mock_db_config}
         with self.patch:
@@ -158,10 +158,10 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
     @unittest.skip("implementation pending")
     async def test_202_get_db_mysql_missing(self):
         self.mock_db_config = {
-            Config.CONFIG_DB_HOST: "mockHost",
-            Config.CONFIG_DB_DB: "mockDB",
-            Config.CONFIG_DB_USER: "mockUser",
-            Config.CONFIG_DB_PW: "mockPW",
+            Config.CONFIG_DBHOST: "mockHost",
+            # Config.CONFIG_DB_DB: "mockDB",
+            Config.CONFIG_DBUSER: "mockUser",
+            Config.CONFIG_DBPW: "mockPW",
         }
         self.MockApp.configuration = {Config.CONFIG_DB: self.mock_db_config}
         self.MockMySQLDB.side_effect = ModuleNotFoundError("No module named 'aiomysql'")

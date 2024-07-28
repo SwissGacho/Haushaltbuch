@@ -8,22 +8,10 @@ from core.app_logging import getLogger, logExit
 LOG = getLogger(__name__)
 
 from core.app import App
-from core.base_object import BaseObject
+from core.base_objects import StatusBaseClass, Status
 
 
-class Status(StrEnum):
-    STATUS_UNCONFIGURED = "unconfigured"
-    STATUS_ONLINE = "online"
-    STATUS_NO_DB = "noDB"
-    STATUS_DB_CFG = "DBconfigured"
-    STATUS_DB_UNSUPPORTED = "DBunsuppoerted"
-    STATUS_CHECK_DB = "checkingDBschema"
-    STATUS_OLD_DB = "outdatedDBschema"
-    STATUS_SINGLE_USER = "singleUser"
-    STATUS_MULTI_USER = "multiUser"
-
-
-class AppStatus(BaseObject):
+class AppStatus(StatusBaseClass):
     def __init__(self) -> None:
         self._status = Status.STATUS_UNCONFIGURED
 

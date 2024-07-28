@@ -6,7 +6,7 @@ import json
 import re
 
 from core.exceptions import OperationalError
-from core.config import Config
+from core.configuration.config import Config
 from core.app_logging import getLogger
 from database.db_base import DB, Connection, Cursor
 from database.sqlexecutable import SQL, SQLTemplate, SQLScript
@@ -152,7 +152,7 @@ class SQLiteConnection(Connection):
             fields = [column[0] for column in cursor.description]
             return {key: value for key, value in zip(fields, row)}
 
-        db_path = Path(self._cfg[Config.CONFIG_DB_FILE])
+        db_path = Path(self._cfg[Config.CONFIG_DBFILE])
         # LOG.debug(f"Connecting to {db_path=}")
         if not db_path.parent.exists():
             LOG.info(f"Create missing directory '{db_path.parent}' for SQLite DB.")

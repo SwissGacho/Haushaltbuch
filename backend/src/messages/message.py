@@ -4,8 +4,8 @@
 import pathlib
 from enum import StrEnum
 from json import dumps, loads
-from typing import Any
-from core.base_object import BaseObject
+from typing import Any, Optional
+from core.base_objects import BaseObject
 from server.ws_token import WSToken
 from core.app_logging import getLogger
 import messages
@@ -38,7 +38,7 @@ class MessageAttribute(StrEnum):
 
     # Fetch
     WS_ATTR_OBJECT = "object"
-    WS_ATTR_INDDEX = "index"
+    WS_ATTR_INDEX = "index"
 
     # Hello
     WS_ATTR_SEARCH_PATH = "search_path"
@@ -116,7 +116,7 @@ class Message(BaseObject):
                 self.message |= {MessageAttribute.WS_ATTR_STATUS: status}
 
     @classmethod
-    def message_type(cls):
+    def message_type(cls) -> MessageType:
         "type of the message"
         return MessageType.WS_TYPE_NONE
 
@@ -124,6 +124,18 @@ class Message(BaseObject):
     def token(self):
         "connection token of the message"
         return self.message.get(MessageAttribute.WS_ATTR_TOKEN)
+
+    def get_str(self, attr: MessageAttribute) -> Optional[str]:
+        val = self.message.get(attr, "")
+        return val if isinstance(val, str) else None
+
+    def get_int(self, attr: MessageAttribute) -> Optional[int]:
+        val = self.message.get(attr, "")
+        return val if isinstance(val, int) else None
+
+    def get_dict(self, attr: MessageAttribute) -> Optional[dict]:
+        val = self.message.get(attr, "")
+        return val if isinstance(val, dict) else None
 
     def add(self, attrs: dict):
         "Add items to the payload"

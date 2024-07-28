@@ -8,9 +8,10 @@ LOG = getLogger(__name__)
 from database.sqlfactory import SQLFactory
 from database.sqlexecutable import SQL, SQLTemplate
 from database.sqlexpression import SQLColumnDefinition
+from core.base_objects import DBBaseClass
 
 
-class DB:
+class DB(DBBaseClass):
     "application Data Base"
 
     def __init__(self, **cfg) -> None:
