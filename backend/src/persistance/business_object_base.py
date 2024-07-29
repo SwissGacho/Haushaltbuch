@@ -42,8 +42,11 @@ class BOBase(BOBaseBase):
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__} "
-            f"({', '.join([a+': '+str(v)for a,v in self._data.items()])})"
+            f"({', '.join([a+': '+str(v) for a,v in self._data.items()])})"
         )
+
+    def __str__(self) -> str:
+        return str(self.id)
 
     @classmethod
     def register_persistant_class(cls):
@@ -140,10 +143,10 @@ class BOBase(BOBaseBase):
         if id is None and newest is None:
             LOG.debug(f"fetching {self} without id or newest")
             return self
-        # LOG.debug(f"fetching {self} with newest={newest}")
+        LOG.debug(f"fetching {self} with {id=}, {newest=}")
 
         sql = SQL().select([], True).from_(self.table)
-        if self.id is not None:
+        if id is not None:
             sql.where(sql.get_sql_class(Eq)("id", id))
         elif newest:
             sql.where(

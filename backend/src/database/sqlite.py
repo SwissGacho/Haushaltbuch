@@ -162,6 +162,7 @@ class SQLiteConnection(Connection):
         self._connection = await aiosqlite.connect(
             database=db_path, detect_types=sqlite3.PARSE_DECLTYPES
         )
+        await (await self._connection.execute("PRAGMA foreign_keys = ON")).close()
         self._connection.row_factory = row_factory
         return self
 
