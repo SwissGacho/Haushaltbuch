@@ -11,7 +11,7 @@ from core.app import App
 from core.status import Status
 from core.configuration.config import Config
 from core.configuration.db_config import DBConfig
-from database.db import get_db
+from database.db_manager import get_db
 from server.ws_server import get_websocket
 
 

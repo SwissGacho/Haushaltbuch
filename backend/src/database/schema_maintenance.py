@@ -2,7 +2,7 @@
 
 import core
 import database
-import database.db
+import database.db_manager
 import database.db_base
 import persistance
 
