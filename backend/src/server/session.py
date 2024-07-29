@@ -2,6 +2,7 @@
     A session is created by a WS connection without session token.
 """
 
+import imp
 from data.management.user import User
 from server.ws_token import WSToken
 
@@ -9,6 +10,7 @@ from server.ws_token import WSToken
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
+from core.exceptions import TokenExpiredError
 
 
 class Session:
@@ -43,6 +45,10 @@ class Session:
             if connection
             else LOG
         )
+        if ses_token and not WSToken.check_token(ses_token):
+            raise TokenExpiredError("Session expired.")
+        if conn_token and not WSToken.check_token(conn_token):
+            raise TokenExpiredError("Previous connection expired.")
         for ses in cls._all_sessions:
             if (ses.token == ses_token or conn_token in ses._tokens) and (
                 session_user is None or ses.user == session_user
