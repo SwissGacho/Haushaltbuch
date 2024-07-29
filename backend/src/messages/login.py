@@ -39,25 +39,26 @@ class LoginMessage(Message):
             MessageAttribute.WS_ATTR_USER,
             ("<single user>" if single_user_mode else None),
         )
-        token = self.message.get(MessageAttribute.WS_ATTR_TOKEN)
-        if single_user_mode:
-            user = User(name=user_name)
-        else:
-            user = await check_login(self.message)
-            if not user:
-                await connection.send_message(
-                    ByeMessage(reason="Password not matching")
-                )
-                LOG.debug("login failed (password)")
-                return
+        token = self.get_str(MessageAttribute.WS_ATTR_TOKEN)
         try:
-            session = (
-                Session.get_session_from_token(
-                    ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
-                    conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
+            ses_token = self.get_str(MessageAttribute.WS_ATTR_SES_TOKEN)
+            conn_token = self.get_str(MessageAttribute.WS_ATTR_PREV_TOKEN)
+            if ses_token or conn_token:
+                session = Session.get_session_from_token(
+                    ses_token=ses_token, conn_token=conn_token
                 )
-                or Session(user, token, connection)
-            )
+            else:
+                if single_user_mode:
+                    user = User(name=user_name)
+                else:
+                    user = await check_login(self.message)
+                    if not user:
+                        await connection.send_message(
+                            ByeMessage(reason="Password not matching")
+                        )
+                        LOG.debug("login failed (password)")
+                        return
+                session = Session(user, token, connection)
             if not session:
                 raise PermissionError(
                     f"Failed to create session for user '{user_name}'"
