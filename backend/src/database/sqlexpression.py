@@ -1,6 +1,6 @@
 """Classes for building SQL expressions that can be used in SQLStatements."""
 
-from enum import Enum
+from enum import Enum, StrEnum, Flag
 from typing import TypeAlias
 import json
 
@@ -230,7 +230,7 @@ class Value(SQLExpression):
         return self._name
 
     def sql(self) -> str:
-        if isinstance(self._value, str):
+        if isinstance(self._value, (str, StrEnum, Flag)):
             return f"'{self._value}'"
         if isinstance(self._value, dict | list):
             return f"""'{json.dumps(self._value, separators=(",", ":"))}'"""
