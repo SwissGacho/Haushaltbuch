@@ -57,13 +57,11 @@ class LoginMessage(Message):
                     conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
                 )
                 or Session(user, token, connection)
-                or None
             )
             if not session:
                 raise PermissionError(
                     f"Failed to create session for user '{user_name}'"
                 )
-            user = await session.get_user_obj()
             connection.session = session
             LOG = getLogger(  # pylint: disable=invalid-name
                 f"{LoginMessage.__module__}({connection.connection_id})"
