@@ -58,7 +58,6 @@ async def check_db_schema():
 
         try:
             db_schema = await DBSchema().fetch(newest=True)
-            LOG.debug(f"ssssssssssssssssssssssssssssssssss {db_schema=}")
         except core.exceptions.OperationalError:
             db_schema = DBSchema()
         except Exception as exc:  # pylint: disable=broad-exception-caught
