@@ -128,7 +128,7 @@ class ConfigSetup(BaseObject):
                 else:
                     user = User(
                         name=adm_user["name"],
-                        pw=adm_user["password"],
+                        password=adm_user["password"],
                         role=UserRole.ROLE_ADMIN,
                     )
                 # LOG.debug(f"ConfigSetup.setup_configuration(): {user=}")

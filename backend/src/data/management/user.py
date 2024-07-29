@@ -28,16 +28,5 @@ class User(BOBase):
     password = BOStr()
     role = BOStr()
 
-    def __init__(
-        self, id=None, name: str = None, pw: str = None, role: UserRole = None
-    ) -> None:
-        super().__init__(id=id)
-        self.name = name
-        self.password = pw
-        self.role = role
-
-    def __repr__(self) -> str:
-        return f"<User id:{self.id}, name:{self.name}, role:{self.role}>"
-
 
 # LOG.debug(f"{BO_Base._business_objects=}")

@@ -30,10 +30,20 @@ class BOBase(BOBaseBase):
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, Self] = {}
 
-    def __init__(self, id=None) -> None:
+    def __init__(self, id=None, **attributes) -> None:
+        # LOG.debug(f"BOBase({id=},{attributes})")
         self._data = {}
         self._db_data = {}
         self.id = id
+        self.last_updated = None
+        for attribute, value in attributes.items():
+            self._data[attribute] = value
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__} "
+            f"({', '.join([a+': '+str(v)for a,v in self._data.items()])})"
+        )
 
     @classmethod
     def register_persistant_class(cls):
