@@ -1,13 +1,16 @@
 """ Messages to request and send business objects
 """
 
-from typing import Optional
+from types import NoneType
+from typing import TypeAlias, Optional, Union
 from enum import StrEnum
+import pathlib
 
 from server.ws_token import WSToken
 from messages.message import Message, MessageType, MessageAttribute
 from core.app import App
 from core.configuration.config import Config
+from core.base_objects import BaseObject
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -28,6 +31,18 @@ class FetchMessage(Message):
         "handle a fetch message"
 
 
+JSONAble: TypeAlias = Union[
+    str,
+    int,
+    bool,
+    NoneType,
+    dict[str, "JSONAble"],
+    list["JSONAble"],
+    BaseObject,
+    pathlib.Path,
+]
+
+
 class ObjectMessage(Message):
     "Message containing a single requested business object"
 
@@ -39,7 +54,7 @@ class ObjectMessage(Message):
         self,
         object_type: DataObjectTypes,
         index: Optional[int | str],
-        payload: any,
+        payload: JSONAble,
         token: Optional[WSToken] = None,
         status: str = None,
     ) -> None:

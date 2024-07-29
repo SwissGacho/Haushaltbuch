@@ -45,8 +45,6 @@ async def main():
                     await App.db_request_restart.wait()
                     App.db_request_restart.clear()
 
-            except DBRestart:
-                LOG.warning("DB Restart Exception")
             except DBSchemaError as exc:
                 App.status_object.status = Status.STATUS_NO_DB
                 LOG.error(f"DB unusable. ({exc})")
