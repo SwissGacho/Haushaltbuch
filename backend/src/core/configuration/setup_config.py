@@ -103,7 +103,7 @@ class ConfigSetup(BaseObject):
                             )
                     bo.configuration = configuration
                 else:
-                    bo = Configuration(cfg=configuration)
+                    bo = Configuration(configuration=configuration)
                 await bo.store()
             else:
                 LOG.error("Start DB failed with new configuration.")
@@ -128,7 +128,7 @@ class ConfigSetup(BaseObject):
                 else:
                     user = User(
                         name=adm_user["name"],
-                        pw=adm_user["password"],
+                        password=adm_user["password"],
                         role=UserRole.ROLE_ADMIN,
                     )
                 # LOG.debug(f"ConfigSetup.setup_configuration(): {user=}")

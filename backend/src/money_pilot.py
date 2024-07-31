@@ -11,7 +11,7 @@ from core.app import App
 from core.status import Status
 from core.configuration.config import Config
 from core.configuration.db_config import DBConfig
-from database.db import get_db
+from database.db_manager import get_db
 from server.ws_server import get_websocket
 
 
@@ -45,8 +45,6 @@ async def main():
                     await App.db_request_restart.wait()
                     App.db_request_restart.clear()
 
-            except DBRestart:
-                LOG.warning("DB Restart Exception")
             except DBSchemaError as exc:
                 App.status_object.status = Status.STATUS_NO_DB
                 LOG.error(f"DB unusable. ({exc})")

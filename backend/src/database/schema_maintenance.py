@@ -2,7 +2,7 @@
 
 import core
 import database
-import database.db
+import database.db_manager
 import database.db_base
 import persistance
 
@@ -90,4 +90,4 @@ async def check_db_schema():
     if not ok:
         raise DBSchemaError("DB schema not compatible")
     if upgraded:
-        await DBSchema(v_nr=CURRENT_DB_SCHEMA_VERSION).store()
+        await DBSchema(version_nr=CURRENT_DB_SCHEMA_VERSION).store()

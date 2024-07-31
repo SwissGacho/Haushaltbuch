@@ -17,7 +17,6 @@ class BaseObject:
 class Status(StrEnum):
     "Values for global app status"
     STATUS_UNCONFIGURED = "unconfigured"
-    STATUS_ONLINE = "online"
     STATUS_NO_DB = "noDB"
     STATUS_DB_CFG = "DBconfigured"
     STATUS_DB_UNSUPPORTED = "DBunsuppoerted"

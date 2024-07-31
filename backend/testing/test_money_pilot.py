@@ -7,7 +7,7 @@ from unittest.mock import Mock, MagicMock, AsyncMock, patch, call, DEFAULT
 import logging
 
 from money_pilot import main
-from database.db import get_db
+from database.db_manager import get_db
 from server.ws_server import get_websocket
 
 

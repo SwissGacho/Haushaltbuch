@@ -19,7 +19,7 @@ async def check_login(login_message: dict) -> User:
     if matching_count > 1:
         raise ValueError(f"multiple users with name '{username}' found")
     if matching_count < 1:
-        raise PermissionError(f"User '{username} not found.")
+        raise PermissionError(f"User '{username}' not found.")
     user = await User(id=matching_users[0]).fetch()
     LOG.debug(f"check_login() -> {user}")
     return user

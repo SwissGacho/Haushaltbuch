@@ -23,3 +23,7 @@ class ConfigurationError(Exception):
 
 class DataError(Exception):
     "DB consistancy error"
+
+
+class TokenExpiredError(Exception):
+    "Lifetime of token has expired"

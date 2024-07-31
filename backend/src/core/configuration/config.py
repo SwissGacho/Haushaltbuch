@@ -18,6 +18,7 @@ from core.app_logging import getLogger
 from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config, ConfigDict
 from data.management.configuration import Configuration
+from database.sqlexpression import ColumnName
 
 LOG = getLogger(__name__)
 
@@ -50,7 +51,12 @@ class AppConfiguration(ConfigurationBaseClass):
         "Fetch configuration from database"
         async with DBConfig.db_config_lock:
             # LOG.debug("AppConfiguration.get_configuration_from_db: DB available")
-            self._global_configuration = await Configuration().fetch(newest=True)
+            config_ids = await Configuration.get_matching_ids(
+                {ColumnName("user_id"): None}
+            )
+            if len(config_ids) != 1:
+                raise ConfigurationError("Multiple global configurations")
+            self._global_configuration = await Configuration().fetch(id=config_ids[0])
             user_mode = get_config_item(
                 self._global_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
             )

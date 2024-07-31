@@ -137,7 +137,7 @@ class BODict(_PersistantAttr):
             json.dumps(value, separators=(",", ":"))
         except (ValueError, TypeError, RecursionError) as exc:
             raise TypeError(f"{value} is not serializable by JSON: {exc}") from exc
-        return True
+        return isinstance(value, dict)
 
 
 class BOList(_PersistantAttr):
@@ -152,7 +152,7 @@ class BOList(_PersistantAttr):
             json.dumps(value, separators=(",", ":"))
         except (ValueError, TypeError, RecursionError) as exc:
             raise TypeError(f"{value} is not serializable by JSON: {exc}") from exc
-        return True
+        return isinstance(value, list)
 
 
 class BORelation(_PersistantAttr):
