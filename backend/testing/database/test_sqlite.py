@@ -133,6 +133,9 @@ class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
 
     async def test_101_connect(self):
         mock_aioconnection = Mock(name="mock_aioconnection")
+        mock_cursor = Mock(name="cursor")
+        mock_aioconnection.execute = AsyncMock(return_value=mock_cursor)
+        mock_cursor.close = AsyncMock()
         mock_sqlite_connect = AsyncMock(
             name="mock_aioconnect", return_value=mock_aioconnection
         )
@@ -144,6 +147,8 @@ class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
             database=pathlib.Path(self.db_cfg["file"]), detect_types=1
         )
         self.assertEqual(self.con._connection, mock_aioconnection)
+        mock_aioconnection.execute.assert_awaited_once_with("PRAGMA foreign_keys = ON")
+        mock_cursor.close.assert_awaited_once_with()
 
         # test rowfactory
         mock_cursor = Mock()

@@ -79,7 +79,7 @@ class BOBase(BOBaseBase):
     def attributes_as_dict(cls) -> dict:
         "dict of BO attribute types with attribute names as keys"
         cls_cols = {a[0]: a[1] for a in cls._attributes.get(cls.__name__, [])}
-        if isinstance(cls.__base__, BOBase):
+        if issubclass(cls.__base__, BOBase):
             return cls.__base__.attributes_as_dict() | cls_cols
         return cls_cols
 
@@ -87,7 +87,7 @@ class BOBase(BOBaseBase):
     def attribute_descriptions(cls) -> list[AttributeDescription]:
         "list of attribute descriptions"
         cls_cols = cls._attributes.get(cls.__name__, [])
-        if isinstance(cls.__base__, BOBase):
+        if issubclass(cls.__base__, BOBase):
             return cls.__base__.attribute_descriptions() + cls_cols
         return cls_cols
 
