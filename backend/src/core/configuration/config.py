@@ -55,7 +55,7 @@ class AppConfiguration(ConfigurationBaseClass):
                 {ColumnName("user_id"): None}
             )
             if len(config_ids) != 1:
-                raise ConfigurationError("Multiple global configurations")
+                raise ConfigurationError("Multiple or no global configurations")
             self._global_configuration = await Configuration().fetch(id=config_ids[0])
             user_mode = get_config_item(
                 self._global_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
