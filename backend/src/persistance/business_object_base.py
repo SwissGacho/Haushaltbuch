@@ -4,6 +4,7 @@
 """
 
 from typing import Self, TypeAlias
+import copy
 from datetime import date, datetime, UTC
 
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
@@ -110,7 +111,7 @@ class BOBase(BOBaseBase):
             if dt.tzinfo in [None, UTC]:
                 dt = dt.replace(tzinfo=UTC).astimezone(tz=None)
             return dt
-        return value
+        return copy.deepcopy(value)
 
     @classmethod
     async def count_rows(cls, conditions: dict = None) -> int:
@@ -143,7 +144,7 @@ class BOBase(BOBaseBase):
         if id is None and newest is None:
             LOG.debug(f"fetching {self} without id or newest")
             return self
-        LOG.debug(f"fetching {self} with {id=}, {newest=}")
+        # LOG.debug(f"fetching {self} with {id=}, {newest=}")
 
         sql = SQL().select([], True).from_(self.table)
         if id is not None:
@@ -158,8 +159,6 @@ class BOBase(BOBaseBase):
 
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
-                if attr == "u1.last_updated":
-                    LOG.debug(f"fetched u1.last_updated: {self._db_data.get(attr)}")
                 self._data[attr] = self.convert_from_db(self._db_data.get(attr), typ)
         return self
 
