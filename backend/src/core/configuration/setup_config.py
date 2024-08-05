@@ -9,7 +9,7 @@ from data.management.user import User, UserRole
 from data.management.configuration import Configuration
 from database.sqlexpression import ColumnName
 from core.app import App
-from core.util import get_config_item
+from core.util import get_config_item, update_dicts_recursively
 from core.configuration.db_config import DBConfig
 from core.base_objects import Config
 from core.base_objects import BaseObject
@@ -62,12 +62,8 @@ class ConfigSetup(BaseObject):
         return WAIT_AVAILABLE_TASK in [t.get_name() for t in done]
 
     @classmethod
-    async def setup_configuration(cls, setup_cfg: dict):
-        """Setup configuration.
-        -  write DB configuration file
-        -  create configuration business object
-        """
-        # LOG.debug(f"ConfigSetup.setup_configuration({setup_cfg=}")
+    def _write_db_cfg_file(cls, setup_cfg: dict):
+        # LOG.debug(f"ConfigSetup.write_db_cfg_file({setup_cfg=}")
         db_filename = get_config_item(setup_cfg, SetupConfigKeys.DBCFG_CFG_FILE)
         if not isinstance(db_filename, str):
             raise TypeError(
@@ -79,32 +75,63 @@ class ConfigSetup(BaseObject):
         # pylint: disable=unspecified-encoding
         with open(file=db_filename, mode="w") as cfg_file:
             cfg_file.write(json.dumps(db_cfg))
+        return db_filename
+
+    @classmethod
+    async def _create_or_update_global_configuration(cls, configuration: dict):
+        rows_in_db = await Configuration.get_matching_ids({ColumnName("user_id"): None})
+        if len(rows_in_db) > 1:
+            LOG.error(f"Multiple ({len(rows_in_db)}) global configurations in DB")
+            raise ConfigurationError("Multiple global configurations in DB")
+        elif len(rows_in_db) == 1:
+            bo = await Configuration(id=rows_in_db[0]).fetch()
+            update_dicts_recursively(target=bo.configuration, source=configuration)
+        else:
+            bo = Configuration(configuration=configuration)
+        # LOG.debug(
+        #     f"ConfigSetup._create_or_update_global_configuration(): {bo.configuration=}"
+        # )
+        await bo.store()
+
+    @classmethod
+    async def _create_or_update_admin_user(cls, setup_cfg: dict):
+        adm_user = get_config_item(setup_cfg, SetupConfigKeys.ADM_USER)
+        if not isinstance(adm_user, dict):
+            raise TypeError(f"admin user must be dict not {type(adm_user)}")
+        rows_in_db = await User.get_matching_ids({ColumnName("name"): adm_user["name"]})
+        if len(rows_in_db) > 1:
+            LOG.error(f"{len(rows_in_db)} users named {adm_user['name']} in DB")
+            raise DataError("Multiple users in DB")
+        elif len(rows_in_db) == 1:
+            user = await User(id=rows_in_db[0]).fetch()
+            user.password = adm_user["password"]
+            user.role = UserRole.role(user.role) | UserRole.ADMIN
+        else:
+            user = User(
+                name=adm_user["name"],
+                password=adm_user["password"],
+                role=UserRole.ADMIN,
+            )
+        # LOG.debug(f"ConfigSetup._create_or_update_admin_user(): {user=}")
+        await user.store()
+
+    @classmethod
+    async def setup_configuration(cls, setup_cfg: dict):
+        """Setup configuration.
+        -  write DB configuration file
+        -  create configuration business object
+        """
+        # LOG.debug(f"ConfigSetup.setup_configuration({setup_cfg=}")
+        db_filename = cls._write_db_cfg_file(setup_cfg=setup_cfg)
         DBConfig.read_db_config_file([Path(db_filename).parent], Path(db_filename).name)
         configuration = {
             Config.CONFIG_APP: get_config_item(setup_cfg, SetupConfigKeys.CFG_APP)
         }
         async with DBConfig.db_config_lock:
             if await cls._wait_for_db():
-                rows_in_db = await Configuration.get_matching_ids(
-                    {ColumnName("user_id"): None}
+                await cls._create_or_update_global_configuration(
+                    configuration=configuration
                 )
-                if len(rows_in_db) > 1:
-                    LOG.error(
-                        f"Multiple ({len(rows_in_db)}) global configurations in DB"
-                    )
-                    raise ConfigurationError("Multiple global configurations in DB")
-                elif len(rows_in_db) == 1:
-                    bo = await Configuration(id=rows_in_db[0]).fetch()
-                    for key, set_cfg in configuration.items():
-                        db_cfg = bo.configuration_dict.get(key)
-                        if set_cfg != db_cfg:
-                            LOG.info(
-                                f"Change configuration '{key}': {db_cfg} -> {set_cfg}"
-                            )
-                    bo.configuration = configuration
-                else:
-                    bo = Configuration(configuration=configuration)
-                await bo.store()
             else:
                 LOG.error("Start DB failed with new configuration.")
 
@@ -112,24 +139,4 @@ class ConfigSetup(BaseObject):
                 get_config_item(configuration, Config.CONFIG_APP_USRMODE)
                 == SetupConfigValues.MULTI_USER
             ):
-                adm_user = get_config_item(setup_cfg, SetupConfigKeys.ADM_USER)
-                if not isinstance(adm_user, dict):
-                    raise TypeError(f"admin user must be dict not {type(adm_user)}")
-                rows_in_db = await User.get_matching_ids(
-                    {ColumnName("name"): adm_user["name"]}
-                )
-                if len(rows_in_db) > 1:
-                    LOG.error(f"{len(rows_in_db)} users named {adm_user['name']} in DB")
-                    raise DataError("Multiple users in DB")
-                elif len(rows_in_db) == 1:
-                    user = await User(id=rows_in_db[0]).fetch()
-                    user.password = adm_user["password"]
-                    user.role = UserRole.ROLE_ADMIN
-                else:
-                    user = User(
-                        name=adm_user["name"],
-                        password=adm_user["password"],
-                        role=UserRole.ROLE_ADMIN,
-                    )
-                # LOG.debug(f"ConfigSetup.setup_configuration(): {user=}")
-                await user.store()
+                await cls._create_or_update_admin_user(setup_cfg=setup_cfg)
