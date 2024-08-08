@@ -1,7 +1,8 @@
 """Classes for building SQL expressions that can be used in SQLStatements."""
 
-from enum import Enum
-from typing import List
+from enum import Enum, StrEnum, Flag
+from typing import TypeAlias
+import json
 
 from core.app_logging import getLogger
 
@@ -22,7 +23,7 @@ class SQLExpression:
     Can be instantiated directly to create an expression verbatim from a string."""
 
     def __init__(self, expression: str):
-        self._expression = "Null" if expression is None else expression
+        self._expression = "NULL" if expression is None else expression
 
     def sql(self) -> str:
         """Return the SQL expression as a string."""
@@ -35,7 +36,7 @@ class From(SQLExpression):
     def __init__(self, table):
         super().__init__(None)
         self.table = table
-        self.joins: List[(JoinOperator, str, SQLExpression)] = []
+        self.joins: list[(JoinOperator, str, SQLExpression)] = []
 
     def sql(self) -> str:
         """Return the SQL expression as a string."""
@@ -56,11 +57,11 @@ class From(SQLExpression):
         self.joins.append((join_operator, table, join_constraint))
 
 
-class SQLMultiExpressin(SQLExpression):
+class SQLMultiExpression(SQLExpression):
     """Abstract class to combine any number of SQL expressions with an operator.
     Should not be instantiated directly."""
 
-    def __init__(self, arguments: List[SQLExpression]):
+    def __init__(self, arguments: list[SQLExpression]):
         super().__init__(None)
         self.arguments = arguments
 
@@ -73,17 +74,17 @@ class SQLMultiExpressin(SQLExpression):
                 "SQL_multi_expression is an abstract class and should not be instantiated."
             )
         return self.__class__.operator.join(
-            [expression.sql() for expression in self._expression]
+            [expression.sql() for expression in self.arguments]
         )
 
 
-class And(SQLMultiExpressin):
+class And(SQLMultiExpression):
     """Represents a SQL AND expression."""
 
     operator = " AND "
 
 
-class Or(SQLMultiExpressin):
+class Or(SQLMultiExpression):
     """Represents a SQL OR expression."""
 
     operator = " OR "
@@ -95,6 +96,7 @@ class SQLBinaryExpression(SQLExpression):
 
     def __init__(self, left: SQLExpression | str, right: SQLExpression | str):
         super().__init__(None)
+        # LOG.debug(f"SQLBinaryExpression({left=}, {right=})")
         self.left = left if isinstance(left, SQLExpression) else SQLExpression(left)
         self.right = right if isinstance(right, SQLExpression) else SQLExpression(right)
 
@@ -113,6 +115,69 @@ class Eq(SQLBinaryExpression):
     """Represents a SQL = expression."""
 
     operator = " = "
+
+
+class Is(SQLBinaryExpression):
+    """Represents a SQL 'is' expression."""
+
+    operator = " is "
+
+
+class IsNull(Is):
+    "Represents test for NULL"
+
+    def __init__(self, left: SQLExpression | str):
+        super().__init__(left, right=None)
+
+
+class ColumnName(SQLExpression):
+    """Represents a column name"""
+
+    def __init__(self, name: str):
+        super().__init__(None)
+        self._name = name
+
+    def sql(self) -> str:
+        return self._name
+
+
+class SQLString(SQLExpression):
+    """Represents a string value"""
+
+    def __init__(self, value: str):
+        super().__init__(None)
+        self._value = value
+
+    def sql(self) -> str:
+        return f"'{self._value}'"
+
+
+FilterItem: TypeAlias = SQLExpression | str
+
+
+class Filter(And):
+    """Represent a filter condition matching all items.
+    Keys and values of 'filter' are rendered in quotes if they have the class str.
+    SQLExpressions are rendered according to their class.
+    (Use ColumnName() to avoid rendering in quotes)
+    """
+
+    def __init__(self, filters: dict[FilterItem, FilterItem]):
+        super().__init__(
+            [
+                (
+                    Eq(
+                        var if isinstance(var, SQLExpression) else SQLString(var),
+                        val if isinstance(val, SQLExpression) else SQLString(val),
+                    )
+                    if val is not None
+                    else IsNull(
+                        var if isinstance(var, SQLExpression) else SQLString(var)
+                    )
+                )
+                for var, val in filters.items()
+            ]
+        )
 
 
 class SQLTernaryExpression(SQLExpression):
@@ -165,6 +230,10 @@ class Value(SQLExpression):
         return self._name
 
     def sql(self) -> str:
+        if isinstance(self._value, (str, StrEnum, Flag)):
+            return f"'{self._value}'"
+        if isinstance(self._value, dict | list):
+            return f"""'{json.dumps(self._value, separators=(",", ":"))}'"""
         return str(self._value)
 
 
@@ -200,11 +269,14 @@ class Values(SQLExpression):
 
     def row(self, value: Row):
         """Add a row to the end of the list."""
+        # LOG.debug(f"Values.row({value=})")
         self.rows.append(value)
         return self
 
     def names(self) -> str:
         "List of value names"
+        if not self.rows:
+            return ""
         return self.rows[0].names()
 
     def sql(self) -> str:
@@ -227,7 +299,7 @@ class Assignment(SQLExpression):
 
     def sql(self) -> str:
         """Return the SQL expression as a string."""
-        sql = Eq(",".join(self.columns), self.value.sql())
+        sql = "(" + ",".join(self.columns) + ")=" + self.value.sql()
         if self.where is not None:
             sql += self.where.sql()
         return sql
@@ -275,11 +347,13 @@ class SQLColumnDefinition(SQLExpression):
     type_map = {}
     constraint_map = {}
 
-    def __init__(self, name: str, data_type: type, constraint: str = None):
+    def __init__(self, name: str, data_type: type, constraint: str = None, **pars):
+        # LOG.debug(f"SQLColumnDefinition({name=}, {data_type=}, {constraint=}, {pars=})")
         super().__init__(None)
         self.name = name
         if data_type in self.type_map:
             self.data_type = self.__class__.type_map[data_type]
+            # LOG.debug(f" - data_type={self.data_type}")
         else:
             raise ValueError(
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
@@ -287,7 +361,13 @@ class SQLColumnDefinition(SQLExpression):
         if not constraint:
             self.constraint = ""
         elif constraint in self.constraint_map:
-            self.constraint = self.__class__.constraint_map[constraint]
+            self.constraint = self.__class__.constraint_map[constraint].format(
+                **{
+                    k: v.table if hasattr(v, "table") else str(v).lower()
+                    for k, v in pars.items()
+                }
+            )
+            # LOG.debug(f" - constraint={self.constraint}")
         else:
             raise ValueError(
                 f"Unsupported column constraint for a {self.__class__.__name__}: {constraint}"

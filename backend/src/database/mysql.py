@@ -1,9 +1,9 @@
 """ Connection to MySQL DB using aiomysql """
 
-from db.db_base import DB, Connection, Cursor
-from db.sql import SQL
-from db.sqlfactory import SQLFactory
-from core.config import Config
+from database.db_base import DB, Connection, Cursor
+from database.sql import SQL
+from database.sqlfactory import SQLFactory
+from core.configuration.config import Config
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -42,10 +42,10 @@ class MySQLDB(DB):
 class MySQLConnection(Connection):
     async def connect(self):
         self._connection = await aiomysql.connect(
-            host=self._cfg[Config.CONFIG_DB_HOST],
-            db=self._cfg[Config.CONFIG_DB_DB],
-            user=self._cfg[Config.CONFIG_DB_USER],
-            password=self._cfg[Config.CONFIG_DB_PW],
+            host=self._cfg[Config.CONFIG_DBHOST],
+            # db=self._cfg[Config.CONFIG_DB_DB],
+            user=self._cfg[Config.CONFIG_DBUSER],
+            password=self._cfg[Config.CONFIG_DBPW],
         )
         return self
 

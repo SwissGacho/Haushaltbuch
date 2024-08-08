@@ -1,10 +1,10 @@
 """This module defines a SQLExecutable class that is used to create and execute SQL statements."""
 
 from enum import Enum, auto
-from typing import List
+from typing import TypeAlias
 
 from core.app import App
-from db.sqlexpression import (
+from database.sqlexpression import (
     SQLExpression,
     SQLColumnDefinition,
     Value,
@@ -16,7 +16,7 @@ from db.sqlexpression import (
     GroupBy,
     Having,
 )
-from db.sqlfactory import SQLFactory
+from database.sqlfactory import SQLFactory
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -29,8 +29,7 @@ class InvalidSQLStatementException(Exception):
 
 
 class SQLDataType(Enum):
-    """Basic SQL data types compliant with SQLite. DB implementations should override this enum."""
-
+    "Basic SQL data types compliant with SQLite. DB implementations should override this enum."
     TEXT = auto()
     INTEGER = auto()
     REAL = auto()
@@ -41,6 +40,7 @@ class SQLTemplate(Enum):
     "Keys for dialect specific SQL templates used in SQLScript"
     TABLEINFO = auto()
     TABLELIST = auto()
+    TABLESQL = auto()
 
 
 class SQLExecutable(object):
@@ -197,24 +197,25 @@ class CreateTable(SQLStatement):
     def __init__(
         self,
         table: str = "",
-        columns: list[(str, SQLDataType, str)] = None,
+        columns: list[(str, SQLDataType, str, dict)] = None,
         parent: SQLExecutable = None,
     ):
         super().__init__(parent)
-        cols = [] if columns is None else columns
+        cols = columns or []
         self._table = table
-        sql_column_definition = self.sql_factory.get_sql_class(SQLColumnDefinition)
+        sql_column_definition_cls = self.sql_factory.get_sql_class(SQLColumnDefinition)
         self._columns = [
-            sql_column_definition(name, data_type, constraint)
-            for name, data_type, constraint in cols
+            sql_column_definition_cls(name, data_type, constraint, **pars)
+            for name, data_type, constraint, pars in cols
         ]
 
-    def column(self, name: str, data_type: SQLDataType, constraint: str = None):
+    def column(self, name: str, data_type: SQLDataType, constraint: str = None, **pars):
         """Add a column to the table to be created.
         The column will be added to the end of the column list."""
+        # LOG.debug(f"CreateTable.column({name=}, {data_type=}, {constraint=}, {pars=})")
         self._columns.append(
             self.sql_factory.get_sql_class(SQLColumnDefinition)(
-                name, data_type, constraint
+                name, data_type, constraint, **pars
             )
         )
         return self
@@ -225,7 +226,7 @@ class CreateTable(SQLStatement):
             raise InvalidSQLStatementException(
                 "CREATE TABLE statement must have a table name."
             )
-        return f"CREATE TABLE {self._table} ({', '.join([column.sql() for column in self._columns])})"
+        return f"CREATE TABLE IF NOT EXISTS {self._table} ({', '.join([column.sql() for column in self._columns])})"
 
 
 class TableValuedQuery(SQLStatement):
@@ -314,6 +315,10 @@ class Select(TableValuedQuery):
         return self
 
 
+NamedValue: TypeAlias = tuple[str, any] | Value
+NamedValueList: TypeAlias = list[NamedValue]
+
+
 class Insert(SQLStatement):
     """A SQLStatement representing an INSERT statement.
     Multiple rows may be inserted. It is assumed that all rows have the same columns.
@@ -325,9 +330,7 @@ class Insert(SQLStatement):
     def __init__(
         self,
         table: str,
-        rows: (
-            list[list[tuple[str, any] | Value]] | list[tuple[str, any] | Value]
-        ) = None,
+        rows: list[NamedValueList] | NamedValueList = None,
         parent: SQLExecutable = None,
     ):
         super().__init__(parent)
@@ -340,12 +343,12 @@ class Insert(SQLStatement):
     def sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         sql = f"INSERT INTO {self._table} {self._values.names()} {self._values.sql()}"
-        LOG.debug(f"Insert.sql() -> {sql + self._return_str}")
+        # LOG.debug(f"Insert.sql() -> {sql + self._return_str}")
         return sql + self._return_str
 
-    def _single_row(self, cols: list[tuple[str, any] | Value]):
+    def _single_row(self, cols: NamedValueList):
         """Add a single row of values to be inserted"""
-        LOG.debug(f"Insert.single_row({cols=})")
+        # LOG.debug(f"Insert._single_row({cols=})")
         row = self.get_sql_class(Row)(
             [
                 (
@@ -356,16 +359,14 @@ class Insert(SQLStatement):
                 for col in cols
             ]
         )
-        LOG.debug(f"{row.sql()=}")
         self._values.row(row)
-        LOG.debug(f"{self.sql()=}")
+        # LOG.debug(f"{self.sql()=}")
         return self
 
-    def rows(
-        self, rows: list[list[tuple[str, any] | Value]] | list[tuple[str, any] | Value]
-    ):
+    def rows(self, rows: list[NamedValueList] | NamedValueList):
         """Add rows of values to be inserted"""
-        for row in rows if isinstance(rows, list) else [rows]:
+        # LOG.debug(f"Insert.rows({rows=})")
+        for row in rows if not rows or isinstance(rows[0], list) else [rows]:
             self._single_row(row)
         return self
 
@@ -383,7 +384,7 @@ class Update(SQLStatement):
         super().__init__(parent)
         self._table = table
         self._where: Where = None
-        self.assignments: List[Assignment] = []
+        self.assignments: list[Assignment] = []
 
     def assignment(self, columns: list[str] | str, value: Value):
         """Add an assignment to the list of assignments to be made in the update statement.
@@ -411,7 +412,7 @@ class Update(SQLStatement):
 
     def sql(self) -> str:
         """Get a string representation of the current SQL statement."""
-        sql = f"""UPDATE {self._table}
-            SET {', '.join([assignment.sql() for assignment in self.assignments])}"""
-
+        sql = f"UPDATE {self._table} "
+        sql += f"SET {', '.join([assignment.sql() for assignment in self.assignments])}"
+        sql += self._where.sql()
         return sql

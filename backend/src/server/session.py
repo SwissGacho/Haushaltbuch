@@ -2,10 +2,15 @@
     A session is created by a WS connection without session token.
 """
 
+import imp
+from data.management.user import User
 from server.ws_token import WSToken
+
+# from server.ws_connection import WS_Connection
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
+from core.exceptions import TokenExpiredError
 
 
 class Session:
@@ -13,15 +18,18 @@ class Session:
 
     _all_sessions = []
 
-    def __init__(self, user, conn_token, connection) -> None:
+    def __init__(
+        self, user: User, conn_token: WSToken, connection  #: "WS_Connection"
+    ) -> None:
         Session._all_sessions.append(self)
         self._session_nbr = len(Session._all_sessions)
+        self.LOG = getLogger(  # pylint: disable=invalid-name
+            f"{Session.__module__}({self.session_id})"
+        )
         self.connections = [connection]
         self.token = WSToken()
-        self.user = user
+        self.user: User = user
         self._tokens = {conn_token} if conn_token else set()
-        self.LOG = getLogger(f"{Session.__module__}({self.session_id})")
-        self.LOG.debug(f"created session for user {user}")
 
     @property
     def session_id(self):
@@ -37,6 +45,10 @@ class Session:
             if connection
             else LOG
         )
+        if ses_token and not WSToken.check_token(ses_token):
+            raise TokenExpiredError("Session expired.")
+        if conn_token and not WSToken.check_token(conn_token):
+            raise TokenExpiredError("Previous connection expired.")
         for ses in cls._all_sessions:
             if (ses.token == ses_token or conn_token in ses._tokens) and (
                 session_user is None or ses.user == session_user
@@ -57,7 +69,10 @@ class Session:
             self._tokens.add(token)
 
     def __repr__(self) -> str:
-        return f"<Session[#{self._session_nbr}](user={self.user},token={self.token},conn_token={self._tokens})>"
+        return (
+            f"<Session[#{self._session_nbr}](user={self.user},"
+            f"token={self.token},conn_token={self._tokens})>"
+        )
 
 
 # LOG.debug("module imported")

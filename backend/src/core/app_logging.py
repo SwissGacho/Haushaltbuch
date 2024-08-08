@@ -2,8 +2,8 @@
 """
 
 import logging
+from core.const import APPNAME
 
-APPNAME = "moneypilot"
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 app_logger = logging.getLogger(APPNAME)
@@ -19,5 +19,5 @@ root_logger.debug("root logger initialized.")
 app_logger.debug("app logger initialized.")
 
 
-def getLogger(name: str, level=logging.NOTSET) -> None:
+def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
     return logging.getLogger(APPNAME if name == "__main__" else (APPNAME + "." + name))

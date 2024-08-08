@@ -8,7 +8,7 @@ import asyncio
 
 from money_pilot import main
 from core.exceptions import DBRestart
-from db.db import get_db
+from database.db_manager import get_db
 from server.ws_server import get_websocket
 
 

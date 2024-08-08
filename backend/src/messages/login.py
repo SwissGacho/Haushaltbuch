@@ -5,6 +5,11 @@ from server.ws_token import WSToken
 from server.session import Session
 from messages.message import Message, MessageType, MessageAttribute
 from core.app_logging import getLogger
+from core.status import Status
+from core.app import App
+from core.validation import check_login
+from data.management.user import User
+from database.sqlexpression import ColumnName
 
 LOG = getLogger(__name__)
 
@@ -25,21 +30,51 @@ class LoginMessage(Message):
 
     async def handle_message(self, connection):
         "handle login message"
-        user = self.message.get(MessageAttribute.WS_ATTR_USER)
-        token = self.message.get(MessageAttribute.WS_ATTR_TOKEN)
-        session = Session.get_session_from_token(
-            ses_token=self.message.get(MessageAttribute.WS_ATTR_SES_TOKEN),
-            conn_token=self.message.get(MessageAttribute.WS_ATTR_PREV_TOKEN),
-        ) or (Session(user, token, connection) if user else None)
-        if session:
+        LOG = getLogger(  # pylint: disable=invalid-name,redefined-outer-name
+            f"{LoginMessage.__module__})"
+        )
+        # pylint: disable=comparison-with-callable
+        single_user_mode = App.status == Status.STATUS_SINGLE_USER
+        user_name = self.message.get(
+            MessageAttribute.WS_ATTR_USER,
+            ("<single user>" if single_user_mode else None),
+        )
+        token = self.get_str(MessageAttribute.WS_ATTR_TOKEN)
+        try:
+            ses_token = self.get_str(MessageAttribute.WS_ATTR_SES_TOKEN)
+            conn_token = self.get_str(MessageAttribute.WS_ATTR_PREV_TOKEN)
+            if ses_token or conn_token:
+                session = Session.get_session_from_token(
+                    ses_token=ses_token, conn_token=conn_token
+                )
+            else:
+                if single_user_mode:
+                    user = User(name=user_name)
+                else:
+                    user = await check_login(self.message)
+                    if not user:
+                        await connection.send_message(
+                            ByeMessage(reason="Password not matching")
+                        )
+                        LOG.debug("login failed (password)")
+                        return
+                session = Session(user, token, connection)
+            if not session:
+                raise PermissionError(
+                    f"Failed to create session for user '{user_name}'"
+                )
             connection.session = session
-            LOG = getLogger(f"{LoginMessage.__module__}({connection.connection_id})")
+            LOG = getLogger(  # pylint: disable=invalid-name
+                f"{LoginMessage.__module__}({connection.connection_id})"
+            )
             await connection.send_message(
                 WelcomeMessage(token=token, ses_token=session.token)
             )
             LOG.debug("login successful")
-        else:
+        except PermissionError:
             await connection.abort_connection(reason="Access denied")
+        except ValueError as exc:
+            raise RuntimeError("Login Failure.") from exc
 
 
 class WelcomeMessage(Message):

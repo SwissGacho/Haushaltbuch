@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 from secrets import token_hex as token
-from core.base_object import BaseObject
+from core.base_objects import BaseObject
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
