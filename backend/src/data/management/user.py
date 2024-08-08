@@ -1,9 +1,10 @@
 """ User business object """
 
-from typing import Optional
+from typing import Optional, Union
 from enum import Flag, auto
 
 from core.app_logging import getLogger, log_exit
+from persistance.bo_descriptors import BOStr
 
 LOG = getLogger(__name__)
 from typing import Self
@@ -21,9 +22,9 @@ class UserRole(Flag):
         return ",".join([str(r.name).lower() for r in self])
 
     @classmethod
-    def role(cls, value: str) -> Self:
+    def role(cls, value: Union[str, BOStr]) -> Self:
         "UserRole: str(UserRole.role(value))==value"
-        return cls(sum([cls[f.strip().upper()].value for f in value.split(",")]))
+        return cls(sum([cls[f.strip().upper()].value for f in str(value).split(",")]))
 
 
 class User(BOBase):

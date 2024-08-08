@@ -1,8 +1,9 @@
 """ Common utilities """
 
-from typing import Callable
+from typing import Callable, Union
 
 from core.base_objects import ConfigDict
+from persistance.bo_descriptors import BODict
 
 
 def get_config_item(cfg: dict, key: str):
@@ -27,7 +28,9 @@ class _classproperty:
         return self.fget(owner_cls)
 
 
-def update_dicts_recursively(target: ConfigDict, source: ConfigDict):
+def update_dicts_recursively(
+    target: Union[ConfigDict, BODict], source: Union[ConfigDict, BODict]
+):
     "Merge source into target"
     if not (isinstance(target, dict) and isinstance(source, dict)):
         raise TypeError("Configurations must be mappings.")

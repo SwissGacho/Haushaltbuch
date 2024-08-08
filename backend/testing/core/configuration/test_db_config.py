@@ -200,8 +200,7 @@ class TestDBConfig(unittest.TestCase):
             par1 = mock_file_open.call_args.args[0]
             self.assertTrue(isinstance(par1, MockPath))
             if path_len > not_found_count:
-                mock_json_load.assert_called_once()
-                # mock_json_load.assert_called_once_with()
+                mock_json_load.assert_called_once_with(mock_file_open.return_value)
                 self.assertEqual(DBConfig.db_configuration, mock_cfg_from_file)
             else:
                 mock_json_load.assert_not_called()

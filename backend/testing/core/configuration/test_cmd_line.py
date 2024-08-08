@@ -22,44 +22,12 @@ class TestCmdLine(unittest.TestCase):
         with self.assertRaises(ArgumentTypeError):
             core.configuration.cmd_line._parse_dict(mock_arg)
 
-    def test_201_update_dicts_recursively(self):
-        mock_tgt = {
-            "lvl1a": "valt1",
-            "lvl1b": {
-                "lvl2a": "valt2",
-                "lvl2b": {"lvl3": "val3"},
-            },
-            "lvl1c": "oldt1",
-        }
-        mock_src = {"lvl1c": "new1", "lvl1b": {"lvl2c": "valt2c"}}
-        expct = {
-            "lvl1a": "valt1",
-            "lvl1b": {"lvl2a": "valt2", "lvl2b": {"lvl3": "val3"}, "lvl2c": "valt2c"},
-            "lvl1c": "new1",
-        }
-        core.configuration.cmd_line._update_dicts_recursively(
-            target=mock_tgt, source=mock_src
-        )
-        self.assertEqual(mock_tgt, expct)
-
-    def test_202_update_dicts_recursively_no_dict(self):
-        with self.assertRaises(TypeError):
-            core.configuration.cmd_line._update_dicts_recursively(
-                target="val", source={}
-            )
-        with self.assertRaises(TypeError):
-            core.configuration.cmd_line._update_dicts_recursively(
-                target={}, source=None
-            )
-        # no exception:
-        core.configuration.cmd_line._update_dicts_recursively(target={}, source={})
-
     def _300_parse_commandline(self, args=[]):
         with (
             patch("argparse.ArgumentParser") as MockParser,
             patch("core.configuration.cmd_line._parse_dict") as mock_parse_dict,
             patch(
-                "core.configuration.cmd_line._update_dicts_recursively"
+                "core.configuration.cmd_line.update_dicts_recursively"
             ) as mock_update_dicts,
         ):
             mock_parsed = Mock

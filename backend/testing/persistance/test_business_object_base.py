@@ -226,10 +226,16 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
                         .astimezone(),
                     )
                 else:
-                    self.assertIs(
+                    self.assertEqual(
                         result._data[attr], self.FETCH_RESULT[attr], "attribute result"
                     )
-            self.assertEqual(result._db_data, self.FETCH_RESULT, "_db_data")
+                    if isinstance(result._data[attr], (dict, list)):
+                        self.assertIsNot(
+                            result._data[attr],
+                            self.FETCH_RESULT[attr],
+                            "structured attribute result",
+                        )
+            self.assertIs(result._db_data, self.FETCH_RESULT, "_db_data")
 
     async def test_302_fetch_no_param(self):
         REQ_ID = 19
