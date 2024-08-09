@@ -189,6 +189,7 @@ class SQLTernaryExpression(SQLExpression):
             **self.third.get_params(),
         }
 
+    ##### Need to add support to have lists and dictionaries as values that are serialized as json #####
     def get_sql(self):
         return (
             f" ({self.first.sql()} {self.__class__.operator_one} "
@@ -294,15 +295,13 @@ class Assignment(SQLExpression):
 
     def __init__(
         self,
-        columns: list[str] | str,
+        column: str,
         value: Value,
         key_manager: SQLKeyManager = None,
     ):
         super().__init__(key_manager=key_manager)
-        self._columns = [columns] if isinstance(columns, str) else columns
+        self._column = column
         self._value = value
-        self._where: Where = None
-        self._eq = Eq(",".join(self._columns), self._value)
 
     def get_params(self):
         value_dict = self._eq.get_params()
@@ -311,10 +310,7 @@ class Assignment(SQLExpression):
         return value_dict
 
     def get_sql(self):
-        sql = self._eq.get_sql()
-        if self._where is not None:
-            sql += self._where.get_sql()
-        return sql
+        return f"{self._column} = {self._value.get_sql()}"
 
 
 class Where(SQLExpression):

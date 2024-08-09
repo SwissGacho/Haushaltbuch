@@ -462,7 +462,9 @@ class Update(SQLStatement):
 
     def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
-        sql = f"""UPDATE {self._table}
-            SET {', '.join([assignment.get_sql() for assignment in self.assignments])}"""
+        sql = f"""
+            UPDATE {self._table}
+            SET {', '.join([assignment.get_sql() for assignment in self.assignments])}
+            WHERE {self._where.get_sql()}"""
 
         return sql
