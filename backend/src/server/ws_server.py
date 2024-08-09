@@ -36,42 +36,50 @@ class WSProtocol(websockets.WebSocketServerProtocol):
         # user = gacho_cookie.get("user", None)
 
 
-class WS_Handler:
+class WSHandler:
+    "Container for Websocket handler"
     counter = 0
 
     async def handler(self, websocket, path):
         "Handle a ws connection"
-        sock_nbr = WS_Handler.counter
-        WS_Handler.counter += 1
-        self.LOG = getLogger(f"{WS_Handler.__module__}(sock #{sock_nbr})")
-        self.LOG.debug("connection opened")
+        sock_nbr = WSHandler.counter
+        WSHandler.counter += 1
+        local_LOG = getLogger(  # pylint: disable=invalid-name
+            f"{WSHandler.__module__}(sock #{sock_nbr})"
+        )
+        local_LOG.debug("connection opened")
         connection = WS_Connection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
             if await connection.start_connection():
-                self.LOG = getLogger(
-                    f"{WS_Handler.__module__}({connection.connection_id})"
+                local_LOG = getLogger(  # pylint: disable=invalid-name
+                    f"{WSHandler.__module__}({connection.connection_id})"
                 )
-                self.LOG.debug(f"connection started from socket connection #{sock_nbr}")
+                local_LOG.debug(
+                    f"connection started from socket connection #{sock_nbr}"
+                )
                 async for ws_message in websocket:
-                    self.LOG.debug(f"Client posted: {ws_message=}")
+                    local_LOG.debug(f"Client posted: {ws_message=}")
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:
-                        self.LOG.warning(
+                        local_LOG.warning(  # pylint: disable=logging-not-lazy
                             "message handler failed to create Message object"
-                            + f"from json: {ws_message}"
+                            f"from json: {ws_message}"
                         )
                         raise
                     await connection.handle_message(message=message)
         except Exception as exc:
-            self.LOG.error(f"Connection aborted by exception {exc}")
+            local_LOG.error(f"Connection aborted by exception {exc}")
+            raise
         finally:
-            self.LOG.debug("Connection closed.")
+            local_LOG.debug("Connection ended.")
+            connection.connection_closed()
 
 
 @asynccontextmanager
 async def get_websocket():
-    ws_handler = WS_Handler()
+    "Context manager for Websockets"
+    ws_handler = WSHandler()
     hostname = socket.gethostname()
     ws_server = await websockets.serve(
         ws_handler.handler,

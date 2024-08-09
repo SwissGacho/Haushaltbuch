@@ -3,61 +3,101 @@
     Business objects are classes that support persistance in the data base
 """
 
+from typing import Self, TypeAlias
+import copy
 from datetime import date, datetime, UTC
 
-from persistance.bo_descriptors import BOInt, BODatetime
-from core.app import App
+from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
 from database.sqlexecutable import SQL, CreateTable
-from database.sqlexpression import Eq, SQLExpression, Value
+from database.sqlexpression import Eq, Filter, SQLExpression, Value
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
 
-class BOBase:
-    id = BOInt(primary_key=True, auto_inc=True)
-    last_updated = BODatetime(current_dt=True)
-    _table = None
-    _attributes = {}
-    _business_objects = {}
+class _classproperty(property):
+    def __get__(self, owner_self, owner_cls):
+        return self.fget(owner_cls)
 
-    def __init__(self, id=None) -> None:
+
+AttributeDescription: TypeAlias = tuple[str, str, str | None]
+
+
+class BOBase(BOBaseBase):
+    "Business Object baseclass"
+    id = BOInt(BOColumnFlag.BOC_PK_INC)
+    last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR)
+    _table = None
+    _attributes: dict[str, list[AttributeDescription]] = {}
+    _business_objects: dict[str, Self] = {}
+
+    def __init__(self, id=None, **attributes) -> None:
+        # LOG.debug(f"BOBase({id=},{attributes})")
         self._data = {}
         self._db_data = {}
         self.id = id
+        self.last_updated = None
+        for attribute, value in attributes.items():
+            self._data[attribute] = value
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__} "
+            f"({', '.join([a+': '+str(v) for a,v in self._data.items()])})"
+        )
+
+    def __str__(self) -> str:
+        return str(self.id)
 
     @classmethod
     def register_persistant_class(cls):
+        "Register the Business Object."
         BOBase._business_objects |= {cls.__name__: cls}
-        LOG.debug(f"registered class {cls.__name__}: {BOBase._business_objects}")
+        LOG.debug(f"registered class '{cls.__name__}'")
+
+    @_classproperty
+    def all_business_objects(self) -> dict[str, Self]:
+        "Set of registered Business Objects"
+        return self._business_objects
 
     @classmethod
-    @property
-    def all_business_objects(cls):
-        return cls._business_objects
+    def _name(cls) -> str:
+        return cls.__name__.lower()
+
+    @_classproperty
+    def table(self) -> str:
+        "Name of the BO's DB table"
+        return self._table or self._name() + "s"
 
     @classmethod
-    @property
-    def table(cls):
-        return cls._table if cls._table else cls.__name__.lower() + "s"
-
-    @classmethod
-    def attributes_as_dict(cls):
-        super_cols = {} if cls == BOBase else cls.__base__.attributes_as_dict()
+    def attributes_as_dict(cls) -> dict:
+        "dict of BO attribute types with attribute names as keys"
+        super_cols = (
+            {}
+            if cls == BOBase
+            else cls.__base__.attributes_as_dict()  # pylint: disable=no-member
+        )
         return super_cols | {a[0]: a[1] for a in cls._attributes.get(cls.__name__, [])}
 
     @classmethod
-    def attribute_descriptions(cls):
-        super_cols = [] if cls == BOBase else cls.__base__.attribute_descriptions()
+    def attribute_descriptions(cls) -> list[tuple[str]]:
+        "list of attribute descriptions"
+        super_cols = (
+            []
+            if cls == BOBase
+            else cls.__base__.attribute_descriptions()  # pylint: disable=no-member
+        )
         return super_cols + cls._attributes.get(cls.__name__, [])
 
     @classmethod
     async def sql_create_table(cls):
-
+        "Create a DB table for this class"
         attributes = cls.attribute_descriptions()
         sql: CreateTable = SQL().create_table(cls.table)
-        for attr in attributes:
-            sql.column(attr[0], attr[1], attr[2])
+        # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+        for name, data_type, constraint, pars in attributes:
+            # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
+            sql.column(name, data_type, constraint, **pars)
         await sql.execute(close=0)
 
     def convert_from_db(self, value, typ):
@@ -71,7 +111,26 @@ class BOBase:
             if dt.tzinfo in [None, UTC]:
                 dt = dt.replace(tzinfo=UTC).astimezone(tz=None)
             return dt
-        return value
+        return copy.deepcopy(value)
+
+    @classmethod
+    async def count_rows(cls, conditions: dict = None) -> int:
+        """Count the number of existing business objects in the DB table matching the conditions"""
+        sql = SQL().select(["count(*) as count"]).from_(cls.table)
+        if conditions:
+            sql.where(sql.get_sql_class(Filter)(conditions))
+        result = await (await sql.execute(close=1)).fetchone()
+        # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
+        return result["count"]
+
+    @classmethod
+    async def get_matching_ids(cls, conditions: dict) -> list[int]:
+        """Get the ids of business objects matching the conditions"""
+        sql = SQL().select(["id"]).from_(cls.table)
+        sql.where(sql.get_sql_class(Filter)(conditions))
+        result = await (await sql.execute(close=1)).fetchall()
+        # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
+        return [id["id"] for id in result]
 
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
@@ -79,15 +138,16 @@ class BOBase:
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
+        # LOG.debug(f'BOBase.fetch({id=}, {newest=})')
         if id is None:
             id = self.id
         if id is None and newest is None:
             LOG.debug(f"fetching {self} without id or newest")
             return self
-        LOG.debug(f"fetching {self} with newest={newest}")
+        # LOG.debug(f"fetching {self} with {id=}, {newest=}")
 
         sql = SQL().select([], True).from_(self.table)
-        if self.id is not None:
+        if id is not None:
             sql.where(sql.get_sql_class(Eq)("id", id))
         elif newest:
             sql.where(
@@ -99,8 +159,6 @@ class BOBase:
 
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
-                if attr == "u1.last_updated":
-                    LOG.debug(f"fetched u1.last_updated: {self._db_data.get(attr)}")
                 self._data[attr] = self.convert_from_db(self._db_data.get(attr), typ)
         return self
 
@@ -139,13 +197,16 @@ class BOBase:
         sql = SQL()
         value_class = sql.get_sql_class(Value)
         sql = sql.update(self.table).where(Eq("id", self.id))
+        changes = False
         for k, v in self._data.items():
             if k != "id" and v != self.convert_from_db(
                 self._db_data[k], self.attributes_as_dict()[k]
             ):
-                sql.assignment(k, value_class(v))
+                changes = True
+                sql.assignment(k, value_class(k, v))
         try:
-            await sql.execute(close=0, commit=True)
+            if changes:
+                await sql.execute(close=0, commit=True)
         finally:
             await self.fetch()
 

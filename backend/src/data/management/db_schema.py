@@ -10,10 +10,3 @@ LOG = getLogger(__name__)
 class DBSchema(BOBase):
     _table = "schema_versions"
     version_nr = BOInt()
-
-    def __init__(self, id=None, v_nr: int = None) -> None:
-        super().__init__(id=id)
-        self.version_nr = v_nr
-
-    def __repr__(self) -> str:
-        return f"<DBSchema (id:{self.id}, version:{self.version_nr})>"

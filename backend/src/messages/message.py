@@ -1,10 +1,11 @@
 """ Websocket messages exchanged between backend and frontend
 """
 
+import pathlib
 from enum import StrEnum
 from json import dumps, loads
-from typing import Any
-from core.base_object import BaseObject
+from typing import Any, Optional
+from core.base_objects import BaseObject
 from server.ws_token import WSToken
 from core.app_logging import getLogger
 import messages
@@ -20,6 +21,12 @@ class MessageType(StrEnum):
     WS_TYPE_BYE = "Bye"
     WS_TYPE_LOG = "Log"
     WS_TYPE_ECHO = "Echo"
+    WS_TYPE_FETCH = "Fetch"
+    WS_TYPE_OBJECT = "Object"
+    WS_TYPE_STORE = "Store"
+    WS_TYPE_FETCH_SETUP = "FetchSetup"
+    WS_TYPE_OBJECT_SETUP = "ObjectSetup"
+    WS_TYPE_STORE_SETUP = "StoreSetup"
 
 
 class MessageAttribute(StrEnum):
@@ -27,6 +34,14 @@ class MessageAttribute(StrEnum):
     WS_ATTR_TYPE = "type"
     WS_ATTR_TOKEN = "token"
     WS_ATTR_STATUS = "status"
+    WS_ATTR_PAYLOAD = "payload"
+
+    # Fetch
+    WS_ATTR_OBJECT = "object"
+    WS_ATTR_INDEX = "index"
+
+    # Hello
+    WS_ATTR_SEARCH_PATH = "search_path"
 
     # Login
     WS_ATTR_USER = "user"
@@ -42,20 +57,30 @@ class MessageAttribute(StrEnum):
     WS_ATTR_CALLER = "caller"
 
     # Echo
-    WS_ATTR_PAYLOAD = "payload"
     WS_ATTR_COMPONENT = "component"
 
 
 def json_encode(obj: Any) -> Any:
     "jsonize objects"
-    return str(obj) if isinstance(obj, BaseObject) else obj
+    return (
+        str(obj)
+        if isinstance(obj, BaseObject) or isinstance(obj, pathlib.Path)
+        else obj
+    )
 
 
-def serialize(msg_dict: dict) -> dict:
+def _serialize(msg_dict: dict) -> dict:
     "serialize a message dictionary replacing keys by str(key)"
     return {
-        str(k): serialize(v) if isinstance(v, dict) else v for k, v in msg_dict.items()
+        str(k): _serialize(v) if isinstance(v, dict) else v for k, v in msg_dict.items()
     }
+
+
+def _all_subclasses(cls):
+    "return subclasses recursively"
+    return set(cls.__subclasses__()).union(
+        [s for c in cls.__subclasses__() for s in _all_subclasses(c)]
+    )
 
 
 class Message(BaseObject):
@@ -66,7 +91,7 @@ class Message(BaseObject):
         if json_message and isinstance(json_message, str):
             message_type = loads(json_message).get(MessageAttribute.WS_ATTR_TYPE)
             if message_type:
-                for sub in cls.__subclasses__():
+                for sub in _all_subclasses(cls=cls):
                     if sub.message_type() == message_type:
                         return super().__new__(sub)
         return super().__new__(cls)
@@ -91,7 +116,7 @@ class Message(BaseObject):
                 self.message |= {MessageAttribute.WS_ATTR_STATUS: status}
 
     @classmethod
-    def message_type(cls):
+    def message_type(cls) -> MessageType:
         "type of the message"
         return MessageType.WS_TYPE_NONE
 
@@ -100,13 +125,26 @@ class Message(BaseObject):
         "connection token of the message"
         return self.message.get(MessageAttribute.WS_ATTR_TOKEN)
 
+    def get_str(self, attr: MessageAttribute) -> Optional[str]:
+        val = self.message.get(attr, "")
+        return val if isinstance(val, str) else None
+
+    def get_int(self, attr: MessageAttribute) -> Optional[int]:
+        val = self.message.get(attr, "")
+        return val if isinstance(val, int) else None
+
+    def get_dict(self, attr: MessageAttribute) -> Optional[dict]:
+        val = self.message.get(attr, "")
+        return val if isinstance(val, dict) else None
+
     def add(self, attrs: dict):
         "Add items to the payload"
         self.message |= attrs
 
     def serialize(self):
         "Serialize to JSON"
-        return dumps(serialize(self.message), default=json_encode)
+        # LOG.debug(f"Message.serialize: message={self.message}")
+        return dumps(_serialize(self.message), default=json_encode)
 
     async def handle_message(self, connection):
         "Handle unknown message type"

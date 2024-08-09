@@ -33,4 +33,5 @@ for mod in modules:
         for n, c in inspect.getmembers(module)
         if inspect.isclass(c) and c.__module__ == mod
     ]:
-        module_class.register_persistant_class()
+        if hasattr(module_class, "register_persistant_class"):
+            module_class.register_persistant_class()
