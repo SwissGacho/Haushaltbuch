@@ -9,7 +9,6 @@ from database.sqlexpression import (
     SQLMultiExpression,
     And,
     Or,
-    SQLBinaryExpression,
     Eq,
 )
 

@@ -1,10 +1,11 @@
 """Classes for building SQL expressions that can be used in SQLStatements."""
 
-from enum import Enum
-from typing import List
+from enum import Enum, StrEnum, Flag
+from typing import TypeAlias
+import json
 
 from core.app_logging import getLogger
-from .sqlkeymanager import SQLKeyManager
+from core.database.sqlkeymanager import SQLKeyManager
 
 LOG = getLogger(__name__)
 
@@ -53,7 +54,7 @@ class From(SQLExpression):
     def __init__(self, table, key_manager: SQLKeyManager = None):
         super().__init__(key_manager=key_manager)
         self._table = table
-        self._joins: List[tuple[JoinOperator, str, SQLExpression]] = []
+        self._joins: list[tuple[JoinOperator, str, SQLExpression]] = []
 
     def get_params(self) -> dict:
         return {
@@ -84,7 +85,7 @@ class SQLMultiExpression(SQLExpression):
     Should not be instantiated directly."""
 
     def __init__(
-        self, arguments: List[SQLExpression], key_manager: SQLKeyManager = None
+        self, arguments: list[SQLExpression], key_manager: SQLKeyManager = None
     ):
         super().__init__(key_manager=key_manager)
         self._arguments = arguments
@@ -161,6 +162,69 @@ class Eq(SQLBinaryExpression):
     operator = " = "
 
 
+class Is(SQLBinaryExpression):
+    """Represents a SQL 'is' expression."""
+
+    operator = " is "
+
+
+class IsNull(Is):
+    "Represents test for NULL"
+
+    def __init__(self, left: SQLExpression | str):
+        super().__init__(left, right=None)
+
+
+class ColumnName(SQLExpression):
+    """Represents a column name"""
+
+    def __init__(self, name: str):
+        super().__init__(None)
+        self._name = name
+
+    def sql(self) -> str:
+        return self._name
+
+
+class SQLString(SQLExpression):
+    """Represents a string value"""
+
+    def __init__(self, value: str):
+        super().__init__(None)
+        self._value = value
+
+    def sql(self) -> str:
+        return f"'{self._value}'"
+
+
+FilterItem: TypeAlias = SQLExpression | str
+
+
+class Filter(And):
+    """Represent a filter condition matching all items.
+    Keys and values of 'filter' are rendered in quotes if they have the class str.
+    SQLExpressions are rendered according to their class.
+    (Use ColumnName() to avoid rendering in quotes)
+    """
+
+    def __init__(self, filters: dict[FilterItem, FilterItem]):
+        super().__init__(
+            [
+                (
+                    Eq(
+                        var if isinstance(var, SQLExpression) else SQLString(var),
+                        val if isinstance(val, SQLExpression) else SQLString(val),
+                    )
+                    if val is not None
+                    else IsNull(
+                        var if isinstance(var, SQLExpression) else SQLString(var)
+                    )
+                )
+                for var, val in filters.items()
+            ]
+        )
+
+
 class SQLTernaryExpression(SQLExpression):
     """Abstract class to combine exactly three SQL expressions with two operators.
     Should not be instantiated directly."""
@@ -231,7 +295,14 @@ class Value(SQLExpression):
 
     def get_params(self):
         """Get a dictionary of the value to be used in an SQL cursor"""
-        return {self._key: self._value}
+        value_string = ""
+        if isinstance(self._value, (str, StrEnum, Flag)):
+            value_string = f"'{self._value}'"
+        if isinstance(self._value, dict | list):
+            value_string = f"""'{json.dumps(self._value, separators=(",", ":"))}'"""
+        else:
+            value_string = str(self._value)
+        return {self._key: value_string}
 
     def get_sql(self):
         return ":" + self._key
@@ -277,6 +348,8 @@ class Values(SQLExpression):
 
     def names(self) -> str:
         "List of value names"
+        if not self._rows:
+            return ""
         return self._rows[0].names()
 
     def get_params(self):
@@ -295,22 +368,26 @@ class Assignment(SQLExpression):
 
     def __init__(
         self,
-        column: str,
+        columns: list[str] | str,
         value: Value,
         key_manager: SQLKeyManager = None,
     ):
         super().__init__(key_manager=key_manager)
-        self._column = column
+        self._columns = [columns] if isinstance(columns, str) else columns
         self._value = value
+        self._where: Where = None
 
     def get_params(self):
-        value_dict = self._eq.get_params()
+        value_dict = self._value.get_params()
         if self._where is not None:
             value_dict.update(self._where.get_params())
         return value_dict
 
     def get_sql(self):
-        return f"{self._column} = {self._value.get_sql()}"
+        sql = "(" + ",".join(self._columns) + ")=" + self._value.get_sql()
+        if self._where is not None:
+            sql += self._where.get_sql()
+        return sql
 
 
 class Where(SQLExpression):
@@ -364,11 +441,12 @@ class SQLColumnDefinition(SQLExpression):
         data_type: type,
         constraint: str = None,
         key_manager: SQLKeyManager = None,
+        **pars
     ):
         super().__init__(key_manager=key_manager)
-        self.name = name
+        self._name = name
         if data_type in self.type_map:
-            self.data_type = self.__class__.type_map[data_type]
+            self._data_type = self.__class__.type_map[data_type]
         else:
             raise ValueError(
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
@@ -376,11 +454,17 @@ class SQLColumnDefinition(SQLExpression):
         if not constraint:
             self._constraint = ""
         elif constraint in self.constraint_map:
-            self._constraint = self.__class__.constraint_map[constraint]
+            self._constraint = self.__class__.constraint_map[constraint].format(
+                **{
+                    k: v.table if hasattr(v, "table") else str(v).lower()
+                    for k, v in pars.items()
+                }
+            )
+            # LOG.debug(f" - constraint={self.constraint}")
         else:
             raise ValueError(
                 f"Unsupported column constraint for a {self.__class__.__name__}: {constraint}"
             )
 
     def get_sql(self):
-        return f"{self.name} {self.data_type} {self._constraint}"
+        return f"{self._name} {self._data_type} {self._constraint}"
