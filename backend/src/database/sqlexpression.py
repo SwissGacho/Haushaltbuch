@@ -5,7 +5,7 @@ from typing import TypeAlias
 import json
 
 from core.app_logging import getLogger
-from core.database.sqlkeymanager import SQLKeyManager
+from database.sqlkeymanager import SQLKeyManager
 
 LOG = getLogger(__name__)
 

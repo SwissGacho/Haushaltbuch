@@ -1,7 +1,6 @@
 """ Connection to MySQL DB using aiomysql """
 
 from database.db_base import DB, Connection, Cursor
-from database.sql import SQL
 from database.sqlfactory import SQLFactory
 from core.configuration.config import Config
 from core.app_logging import getLogger
@@ -23,7 +22,7 @@ class MySQLDB(DB):
         super().__init__(**cfg)
 
     @property
-    def sqlFactory():
+    def sqlFactory(self):
         return SQLFactory
 
     async def connect(self):

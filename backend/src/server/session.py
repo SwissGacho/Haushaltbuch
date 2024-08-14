@@ -2,7 +2,6 @@
     A session is created by a WS connection without session token.
 """
 
-import imp
 from data.management.user import User
 from server.ws_token import WSToken
 
