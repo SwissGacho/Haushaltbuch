@@ -1,0 +1,39 @@
+name: Frontend Distribution
+
+on:
+  push:
+    branches:
+      # - main  # Branch, auf dem der Workflow ausgelöst wird
+      - 55-create-dist-workflow
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Frontend Repository
+      uses: actions/checkout@v4
+      with:
+        repository: SwissGacho/Haushaltbuch
+        ref: master
+        path: backend
+
+    - name: Checkout Dist Repository
+      uses: actions/checkout@v4
+      with:
+        repository: SwissGacho/Dist
+        ssh-key: ${{secrets.DIST}}
+        ref: main
+        path: dist
+    - name: Copy compiled app to dist repo
+      run: |
+        find dist/moneypilot -maxdepth 1 ! -name frontend -exec rm -rf {} \;
+        cp -r backend/backend/src/* dist/moneypilot
+    - name: Commit
+      working-directory: dist
+      run: |
+        git config --global user.email "backend@github.com"
+        git config --global user.name "Gacho BE"
+        git add .
+        git commit -m 'New backend commit'
+    #     git push
+
+
