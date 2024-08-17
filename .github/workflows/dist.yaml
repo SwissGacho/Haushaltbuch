@@ -4,7 +4,7 @@ on:
   push:
     branches:
       # - main  # Branch, auf dem der Workflow ausgelöst wird
-      - 55-create-dist-workflow
+      - main
 jobs:
   build:
     runs-on: ubuntu-latest
