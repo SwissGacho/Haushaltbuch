@@ -3,8 +3,7 @@ name: Backend Release Distribution
 on:
   push:
     branches:
-      # - main  # Branch, auf dem der Workflow ausgelöst wird
-      - 55-create-dist-workflow
+      - release
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,7 +12,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: SwissGacho/Haushaltbuch
-        ref: main
+        ref: release
         path: backend
 
     - name: Checkout Dist Repository
