@@ -1,4 +1,4 @@
-name: Frontend Distribution
+name: Backend Distribution
 
 on:
   push:
@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Frontend Repository
+    - name: Checkout Backend Repository
       uses: actions/checkout@v4
       with:
         repository: SwissGacho/Haushaltbuch
@@ -23,7 +23,7 @@ jobs:
         ssh-key: ${{secrets.DIST}}
         ref: main
         path: dist
-    - name: Copy compiled app to dist repo
+    - name: Copy backend to dist repo
       run: |
         ls -R dist
         find dist/moneypilot/* -maxdepth 0 ! -name frontend -exec rm -rf {} \;
@@ -35,6 +35,6 @@ jobs:
         git config --global user.name "Gacho BE"
         git add .
         git commit -m 'New backend commit'
-    #     git push
+        git push
 
 
