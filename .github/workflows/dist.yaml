@@ -1,4 +1,4 @@
-name: Backend Distribution
+name: Backend Release Distribution 
 
 on:
   push:
