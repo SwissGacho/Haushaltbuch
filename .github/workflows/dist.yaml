@@ -25,6 +25,7 @@ jobs:
         path: dist
     - name: Copy compiled app to dist repo
       run: |
+        ls -R dist
         find dist/moneypilot -maxdepth 1 ! -name frontend -exec rm -rf {} \;
         cp -r backend/backend/src/* dist/moneypilot
     - name: Commit
