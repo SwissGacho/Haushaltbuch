@@ -1,10 +1,9 @@
-name: Backend Distribution
+name: Backend Release Distribution 
 
 on:
   push:
     branches:
-      # - main  # Branch, auf dem der Workflow ausgelöst wird
-      - 55-create-dist-workflow
+      - release
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,7 +12,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: SwissGacho/Haushaltbuch
-        ref: main
+        ref: release
         path: backend
 
     - name: Checkout Dist Repository
@@ -28,7 +27,7 @@ jobs:
         ls -R dist
         find dist/moneypilot/* -maxdepth 0 ! -name frontend -exec rm -rf {} \;
         cp -r backend/backend/src/* dist/moneypilot
-    - name: Commit
+    - name: Commit to Dist repo
       working-directory: dist
       run: |
         git config --global user.email "backend@github.com"
