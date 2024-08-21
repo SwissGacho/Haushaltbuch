@@ -102,7 +102,7 @@ class SQL(SQLExecutable):
             raise InvalidSQLStatementException("No SQL statement to execute.")
         return self._sql_statement.get_sql()
 
-    def get_params(self) -> dict[str, str]:
+    def get_params(self) -> dict[str, SQLDataType]:
         """Get the parameters for the current SQL statement."""
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
