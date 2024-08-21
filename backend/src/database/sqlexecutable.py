@@ -111,7 +111,7 @@ class SQL(SQLExecutable):
     @property
     def sql_factory(self) -> SQLFactory:
         """Get the SQLFactory of the current database. Usually call get_sql_class instead."""
-        return SQL._get_db().sqlFactory
+        return SQL._get_db().sql_factory
 
     def create_table(
         self, table: str, columns: list[(str, SQLDataType)] = None

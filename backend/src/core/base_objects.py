@@ -75,3 +75,8 @@ class ConfigurationBaseClass(BaseObject):
 
 class DBBaseClass(BaseObject):
     "DB Baseclass"
+
+    @property
+    def sql_factory(self):
+        "DB specific SQL factory"
+        raise NotImplementedError("sqlFactory not defined on base class")
