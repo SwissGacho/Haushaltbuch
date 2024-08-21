@@ -4,7 +4,8 @@ import unittest
 from unittest.mock import Mock, AsyncMock, patch
 import inspect
 
-from server.ws_connection import WS_Connection, ConnectionClosed
+from server.ws_connection import WS_Connection
+from core.exceptions import ConnectionClosed
 from messages.message import MessageType, MessageAttribute
 
 

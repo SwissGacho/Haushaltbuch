@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
-from server.ws_server import WS_Handler
+from server.ws_server import WSHandler
 
 
 # class Test_000_WS_Server(unittest.IsolatedAsyncioTestCase):
