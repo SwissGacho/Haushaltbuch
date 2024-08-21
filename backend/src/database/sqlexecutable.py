@@ -55,7 +55,7 @@ class SQLExecutable(object):
 
     async def execute(
         self,
-        params: dict[str, str] = None,
+        params: dict[str, SQLDataType] = None,
         close=False,
         commit=False,
     ):
