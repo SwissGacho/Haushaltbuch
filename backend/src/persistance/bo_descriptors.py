@@ -103,7 +103,6 @@ class BODatetime(_PersistantAttr):
         return (
             value is None
             or isinstance(value, datetime)
-            or datetime.fromisoformat(value) is not None
         )
 
 
