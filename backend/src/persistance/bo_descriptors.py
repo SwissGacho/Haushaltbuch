@@ -120,7 +120,6 @@ class BODate(_PersistantAttr):
         return (
             value is None
             or isinstance(value, date)
-            or date.fromisoformat(value) is not None
         )
 
 
