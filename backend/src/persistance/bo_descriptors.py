@@ -169,4 +169,4 @@ class BORelation(_PersistantAttr):
         return BOBaseBase
 
     def validate(self, value):
-        return value is None or isinstance(value, BOBaseBase)
+        return value is None or isinstance(value, self.flag_values["relation"])
