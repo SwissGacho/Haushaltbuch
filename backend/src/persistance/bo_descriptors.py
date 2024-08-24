@@ -58,7 +58,9 @@ class _PersistantAttr:
 
     def __set__(self, obj, value):
         if not self.validate(value):
-            raise ValueError(f"'{value}' invalid to set attribute {self.my_name}")
+            raise ValueError(
+                f"'{value}' invalid to set attribute {self.my_name} of type {self.__class__.__name__}"
+            )
         # if value is None and BOColumnFlag.BOC_NOT_NULL in self._flag:
         #     raise ValueError(
         #         "Value must not be 'None' for 'NOT NULL' attribute {self.my_name}"
@@ -100,10 +102,7 @@ class BODatetime(_PersistantAttr):
         return super().__set__(obj=obj, value=value)
 
     def validate(self, value):
-        return (
-            value is None
-            or isinstance(value, datetime)
-        )
+        return value is None or isinstance(value, datetime)
 
 
 class BODate(_PersistantAttr):
@@ -117,10 +116,7 @@ class BODate(_PersistantAttr):
         return super().__set__(obj=obj, value=value)
 
     def validate(self, value):
-        return (
-            value is None
-            or isinstance(value, date)
-        )
+        return value is None or isinstance(value, date)
 
 
 class BODict(_PersistantAttr):
@@ -169,4 +165,7 @@ class BORelation(_PersistantAttr):
         return BOBaseBase
 
     def validate(self, value):
-        return value is None or isinstance(value, self.flag_values["relation"])
+        relation = self._flag_values.get("relation")
+        return (
+            value is None or isinstance(relation, type) and isinstance(value, relation)
+        )

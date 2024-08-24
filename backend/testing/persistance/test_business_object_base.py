@@ -294,8 +294,8 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
         await self._304_insert_self()
 
     async def test_304c_insert_self(self):
-        mock_bo2 = MockBO2()
-        await self._304_insert_self(mock_attr2=mock_bo2)
+        mock_bo1 = MockBO1()
+        await self._304_insert_self(mock_attr2=mock_bo1)
 
     async def _305_update_self(self, exception=False):
         with (
@@ -386,11 +386,11 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
         await self._305_update_self()
 
     async def test_305c_update_self(self):
-        self.mock_bo = MockBO2(id=55, mock_attr2=MockBO2())
+        self.mock_bo = MockBO2(id=55, mock_attr2=MockBO1())
         await self._305_update_self()
 
     async def test_305d_update_self(self):
-        self.mock_bo = MockBO2(id=55, mock_attr2=MockBO2(), mock_attr3=[1, 2, 3])
+        self.mock_bo = MockBO2(id=55, mock_attr2=MockBO1(), mock_attr3=[1, 2, 3])
         await self._305_update_self()
 
     async def test_305e_update_self_exception(self):

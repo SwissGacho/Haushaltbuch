@@ -62,6 +62,14 @@ class Test_100__PersistantAttr(unittest.TestCase):
         self.assertEqual(mock_bo2.mock_attr, "value2")
 
 
+class MockRel(persistance.bo_descriptors.BOBaseBase):
+    pass
+
+
+class MockNotRel(persistance.bo_descriptors.BOBaseBase):
+    pass
+
+
 class MockObj(persistance.bo_descriptors.BOBaseBase):
     _attributes = {}
     _data = {}
@@ -79,21 +87,7 @@ class MockObj(persistance.bo_descriptors.BOBaseBase):
         persistance.bo_descriptors.BOColumnFlag.BOC_DEFAULT, default={"a": 1, "b": 2}
     )
     list_attr = persistance.bo_descriptors.BOList()
-    rel_attr = persistance.bo_descriptors.BORelation(
-        persistance.bo_descriptors.BOBaseBase
-    )
-
-
-class MockDerived_1(MockObj):
-    pass
-
-
-class MockDerived_2(MockObj):
-    pass
-
-
-class MockNotDerived:
-    pass
+    rel_attr = persistance.bo_descriptors.BORelation(MockRel)
 
 
 expected_attributes = {
@@ -123,7 +117,7 @@ expected_attributes = {
             "rel_attr",
             persistance.bo_descriptors.BOBaseBase,
             persistance.bo_descriptors.BOColumnFlag.BOC_FK,
-            {"relation": persistance.bo_descriptors.BOBaseBase},
+            {"relation": MockRel},
         ),
     ]
 }
@@ -143,7 +137,7 @@ class Test_200_BOAttributes(unittest.TestCase):
         self.mock_obj.d_attr = "2020-02-20"
         self.mock_obj.list_attr = [1, 2, 3]
         self.mock_obj.dict_attr = {"dict": 99}
-        other_obj = MockDerived_1()
+        other_obj = MockRel()
         self.mock_obj.rel_attr = other_obj
 
         self.assertEqual(self.mock_obj.int_attr, 11)
@@ -157,7 +151,6 @@ class Test_200_BOAttributes(unittest.TestCase):
         self.assertEqual(self.mock_obj.list_attr, [1, 2, 3])
         self.assertEqual(self.mock_obj.dict_attr, {"dict": 99})
         self.assertEqual(self.mock_obj.rel_attr, other_obj)
-        self.assertNotEqual(self.mock_obj.rel_attr, MockDerived_2())
 
     def test_203_validate_fails(self):
         with self.assertRaises(ValueError, msg="BOInt"):
@@ -173,7 +166,7 @@ class Test_200_BOAttributes(unittest.TestCase):
         with self.assertRaises(ValueError, msg="BODict"):
             self.mock_obj.dict_attr = []
         with self.assertRaises(ValueError, msg="BORelation"):
-            self.mock_obj.rel_attr = MockNotDerived()
+            self.mock_obj.rel_attr = MockNotRel()
 
     @unittest.skip("allow set 'NOT NULL' to None")
     def test_204_NOT_NULL(self):
