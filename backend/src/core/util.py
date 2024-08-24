@@ -1,6 +1,19 @@
-""" Configuration utilities """
+""" Common utilities """
+
+from typing import Callable, Union
 
 from core.base_objects import ConfigDict
+from persistance.bo_descriptors import BODict
+
+
+class _classproperty:
+    "Property on class level (only getter implemented)"
+
+    def __init__(self, fget: Callable) -> None:
+        self.fget = fget
+
+    def __get__(self, owner_self, owner_cls=None):
+        return self.fget(owner_cls)
 
 
 def get_config_item(cfg: dict, key: str):
@@ -15,7 +28,9 @@ def get_config_item(cfg: dict, key: str):
     return sub_cfg
 
 
-def update_dicts_recursively(target: ConfigDict, source: ConfigDict):
+def update_dicts_recursively(
+    target: Union[ConfigDict, BODict], source: Union[ConfigDict, BODict]
+):
     "Merge source into target"
     if not (isinstance(target, dict) and isinstance(source, dict)):
         raise TypeError("Configurations must be mappings.")

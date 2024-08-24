@@ -1,4 +1,4 @@
-""" Applications base object"""
+""" Applications base classes and common objects. """
 
 from typing import TypeAlias, Union
 from enum import StrEnum
@@ -15,6 +15,7 @@ class BaseObject:
 
 
 class Status(StrEnum):
+    "Values for global app status"
     STATUS_UNCONFIGURED = "unconfigured"
     STATUS_NO_DB = "noDB"
     STATUS_DB_CFG = "DBconfigured"

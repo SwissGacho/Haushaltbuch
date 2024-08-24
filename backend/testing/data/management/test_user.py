@@ -8,9 +8,8 @@ import data.management.user
 
 class TestUser(unittest.IsolatedAsyncioTestCase):
     def test_001_user(self):
-        user = data.app.user.User("Mock")
+        user = data.management.user.User(name="Mock")
         self.assertIsNone(user.id)
         user.id = 1
         self.assertEqual(user.id, 1)
         self.assertEqual(user.name, "Mock")
-        print(f">>{user.sql_create_table()=}")

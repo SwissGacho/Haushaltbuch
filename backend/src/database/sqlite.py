@@ -20,6 +20,7 @@ try:
     import sqlite3
 except ModuleNotFoundError as err:
     AIOSQLITE_IMPORT_ERROR = err
+    sqlite3 = None
 else:
     AIOSQLITE_IMPORT_ERROR = None
 
@@ -75,35 +76,36 @@ def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
 
-sqlite3.register_adapter(dict, _adapt_dict)
-sqlite3.register_adapter(list, _adapt_list)
-sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
+if sqlite3:
+    sqlite3.register_adapter(dict, _adapt_dict)
+    sqlite3.register_adapter(list, _adapt_list)
+    sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
 
 
 class SQLiteScript(SQLScript):
     sql_templates = {
-        # SQL statement returning a result set with info on DB table 'table' with the following columns:
-        # column_name:    name of table column
-        # column_type:    data type of column
-        # pk:             primary key constraint: 0=none; 1=PK,no auto inc; 2=PK,auto inc
-        # dflt_value:     default value
-        SQLTemplate.TABLEINFO: """ SELECT
-                                    column_name
-                                    ,column_type
-                                    ,CONCAT(
-                                        CASE WHEN pk=0 THEN ''
-                                            WHEN autoinc=0 THEN 'PRIMARY KEY'
-                                            ELSE 'PRIMARY KEY AUTOINCREMENT'
-                                            END
-                                        ,CASE WHEN LENGTH(dflt_value) IS NULL THEN ''
-                                            ELSE CONCAT('DEFAULT ',dflt_value)
-                                            END
-                                    ) AS "constraint"
-                                FROM (SELECT name AS column_name, type AS column_type, pk, dflt_value
-                                        FROM pragma_table_info('{table}')) c
-                                        FULL OUTER JOIN (SELECT INSTR(sql,'PRIMARY KEY AUTOINCREMENT')>0 AS autoinc
-                                                        FROM sqlite_master WHERE type='table' AND name = '{table}') s
-                            """,
+        # # # # SQL statement returning a result set with info on DB table 'table' with the following columns:
+        # # # # column_name:    name of table column
+        # # # # column_type:    data type of column
+        # # # # pk:             primary key constraint: 0=none; 1=PK,no auto inc; 2=PK,auto inc
+        # # # # dflt_value:     default value
+        # # # SQLTemplate.TABLEINFO: """ SELECT
+        # # #                             column_name
+        # # #                             ,column_type
+        # # #                             ,CONCAT(
+        # # #                                 CASE WHEN pk=0 THEN ''
+        # # #                                     WHEN autoinc=0 THEN 'PRIMARY KEY'
+        # # #                                     ELSE 'PRIMARY KEY AUTOINCREMENT'
+        # # #                                     END
+        # # #                                 ,CASE WHEN LENGTH(dflt_value) IS NULL THEN ''
+        # # #                                     ELSE CONCAT('DEFAULT ',dflt_value)
+        # # #                                     END
+        # # #                             ) AS "constraint"
+        # # #                         FROM (SELECT name AS column_name, type AS column_type, pk, dflt_value
+        # # #                                 FROM pragma_table_info('{table}')) c
+        # # #                                 FULL OUTER JOIN (SELECT INSTR(sql,'PRIMARY KEY AUTOINCREMENT')>0 AS autoinc
+        # # #                                                 FROM sqlite_master WHERE type='table' AND name = '{table}') s
+        # # #                     """,
         # SQL statement returning list of tables
         SQLTemplate.TABLELIST: """ SELECT name as table_name FROM sqlite_master
                                     WHERE type = 'table' and substr(name,1,7) <> 'sqlite_'

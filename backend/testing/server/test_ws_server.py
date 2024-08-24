@@ -3,16 +3,16 @@
 import unittest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
-from server.ws_server import WS_Handler
+from server.ws_server import WSHandler
 
 
 # class Test_000_WS_Server(unittest.IsolatedAsyncioTestCase):
 #     async def test_001_get_websocket(self):
 
 
-class Test_200_WS_Handler(unittest.IsolatedAsyncioTestCase):
+class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
     async def _200_handle_messages(self, start_conn=True, messages=[]):
-        handler = WS_Handler()
+        handler = WSHandler()
         mock_connection = Mock()
         mock_connection.start_connection = AsyncMock(return_value=start_conn)
         mock_connection.handle_message = AsyncMock()
