@@ -205,10 +205,31 @@ class SQLScript(SQLStatement):
             if isinstance(script_or_template, str)
             else self.__class__.sql_templates.get(script_or_template).format(**kwargs)
         )
+        if isinstance(self._script, SQLTemplate):
+            self._register_and_replace_named_parameters(self._script, kwargs)
 
     def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         return self._script
+
+    def get_params(self) -> dict[str, str]:
+        if isinstance(self._script, SQLTemplate):
+            return self._script.get_params()
+        return {}
+
+    def _register_and_replace_named_parameters(
+        self, query: str, params: dict[str, SQLDataType]
+    ):
+        for key, value in params.items():
+            if not key in query:
+                raise ValueError(f"Parameter '{key}' not found in query '{query}'.")
+            final_key = self._create_param(key, value)
+            query = query.replace(f":{key}", f":{final_key}")
+
+    def _create_param(self, proposed_key: str, value):
+        final_key = self.register_key(proposed_key)
+        self._params[final_key] = value
+        return final_key
 
 
 class CreateTable(SQLStatement):
