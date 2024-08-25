@@ -203,19 +203,13 @@ class SQLScript(SQLStatement):
         self._script = (
             script_or_template
             if isinstance(script_or_template, str)
-            else self.__class__.sql_templates.get(script_or_template).format(**kwargs)
+            else self.__class__.sql_templates.get(script_or_template)
         )
-        if isinstance(self._script, SQLTemplate):
-            self._register_and_replace_named_parameters(self._script, kwargs)
+        self._register_and_replace_named_parameters(self._script, kwargs)
 
     def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         return self._script
-
-    def get_params(self) -> dict[str, str]:
-        if isinstance(self._script, SQLTemplate):
-            return self._script.get_params()
-        return {}
 
     def _register_and_replace_named_parameters(
         self, query: str, params: dict[str, SQLDataType]
