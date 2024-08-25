@@ -56,7 +56,7 @@ class SQLExecutable(object):
     async def execute(
         self,
         params: dict[str, SQLDataType] = None,
-        close=False,
+        close: bool | int = False,
         commit=False,
     ):
         """Execute the current SQL statement on the database."""

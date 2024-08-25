@@ -23,14 +23,14 @@ def setUpModule():
     )
     # print("====================== patch sys.modules['aiomysql']")
     sys.modules["aiomysql"] = types.ModuleType("aiomysql")
-    if sys.modules.get("db.mysql"):
-        importlib.reload(sys.modules.get("db.mysql"))
+    if sys.modules.get("database.mysql"):
+        importlib.reload(sys.modules.get("database.mysql"))
     else:
-        import db.mysql
+        import database.mysql
 
 
-import db.db_base
-import db.sql
+import database.db_base
+import database.sql
 
 
 @unittest.skip("MySQL module is not maintained currently")
@@ -51,17 +51,17 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
     def test_002_MySQLDB_no_lib(self):
         save_aiomysql = sys.modules["aiomysql"]
         sys.modules["aiomysql"] = None
-        importlib.reload(sys.modules.get("db.mysql"))
+        importlib.reload(sys.modules.get("database.mysql"))
         with self.assertRaises(ModuleNotFoundError):
             database.mysql.MySQLDB(**self.db_cfg)
         sys.modules["aiomysql"] = save_aiomysql
-        importlib.reload(sys.modules.get("db.mysql"))
+        importlib.reload(sys.modules.get("database.mysql"))
 
     async def test_101_connect(self):
         mock_con_obj = AsyncMock()
         mock_con_obj.connect = AsyncMock(return_value=mock_con_obj)
         Mock_Connection = Mock(return_value=mock_con_obj)
-        with (patch("db.mysql.MySQLConnection", Mock_Connection),):
+        with (patch("database.mysql.MySQLConnection", Mock_Connection),):
             reply = await self.db.connect()
             self.assertEqual(reply, mock_con_obj)
             Mock_Connection.assert_called_once_with(db_obj=self.db, **self.db_cfg)
@@ -75,12 +75,13 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
     def test_202_sql_any_other(self):
         params = {"par1": ["el1", "el2"], "par2": "val"}
         mock_super = Mock(return_value="mock_sql")
-        with patch("db.db_base.DB.sql", mock_super):
+        with patch("database.db_base.DB.sql", mock_super):
             reply = self.db.sql("ANY", **params)
             self.assertEqual(reply, mock_super.return_value)
             mock_super.assert_called_once_with(sql="ANY", **params)
 
 
+@unittest.skip("MySQL module is not maintained currently")
 class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_db = Mock()
@@ -110,7 +111,7 @@ class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
         MockCursor = Mock(return_value=mock_cur)
         self.con._connection = AsyncMock()
         self.con._connection.cursor.return_value = "mock_cur"
-        with (patch("db.mysql.MySQLCursor", MockCursor),):
+        with (patch("database.mysql.MySQLCursor", MockCursor),):
             reply = await self.con.execute(sql)
             self.assertEqual(reply, mock_cur)
             MockCursor.assert_called_once_with(
@@ -126,6 +127,7 @@ async def spec_async_context_manager():
     yield
 
 
+@unittest.skip("MySQL module is not maintained currently")
 class TestMySQLCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_con = Mock()

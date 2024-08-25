@@ -22,7 +22,7 @@ def setUpModule() -> None:
         if mod in sys.modules:
             del sys.modules[mod]
 
-    remove("db.sqlite")
+    remove("database.sqlite")
     remove("aiosqlite")
     remove("sqlite3")
 
@@ -31,13 +31,13 @@ class SQLiteImport(unittest.TestCase):
 
     def test_101_successful_import(self):
         with patch.dict("sys.modules", {"aiosqlite": types.ModuleType("aiosqlite")}):
-            import db.sqlite
+            import database.sqlite
 
             self.assertIsNone(database.sqlite.AIOSQLITE_IMPORT_ERROR)
 
     def test_101_failed_aiosqlite_import(self):
         with patch.dict("sys.modules", {"aiosqlite": None}):
-            import db.sqlite
+            import database.sqlite
 
             self.assertIsInstance(
                 database.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError
@@ -45,7 +45,7 @@ class SQLiteImport(unittest.TestCase):
 
     def test_101_failed_sqlite3_import(self):
         with patch.dict("sys.modules", {"sqlite3": None}):
-            import db.sqlite
+            import database.sqlite
 
             self.assertIsInstance(
                 database.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError
