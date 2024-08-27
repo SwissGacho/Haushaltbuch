@@ -27,11 +27,17 @@ def normalize_sql(sql):
     return sql.replace("  ", " ").strip()
 
 
-@patch("db.sqlexpression.SQLKeyManager", MockKeyManager)
+@patch("database.sqlkeymanager.SQLKeyManager", MockKeyManager)
 class TestSQLExpression(unittest.TestCase):
 
     def setUp(self):
         self.SQLKeyManager = MockKeyManager()
+
+    def testSQLExpressionInstantiation(self):
+        sql_expression_instance = SQLExpression()
+        self.assertIsNotNone(
+            sql_expression_instance, "SQLExpression instance should not be None"
+        )
 
     def testInitDefaults(self):
         sql = SQLExpression()
@@ -145,7 +151,7 @@ class TestOR(unittest.TestCase):
         self.assertEqual(sql.get_params(), {})
 
 
-@patch("db.sqlexpression.SQLKeyManager", MockKeyManager)
+@patch("database.sqlkeymanager.SQLKeyManager", MockKeyManager)
 class TestValue(unittest.TestCase):
 
     def setUp(self):
