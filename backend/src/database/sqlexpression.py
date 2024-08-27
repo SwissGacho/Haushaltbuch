@@ -67,7 +67,7 @@ class From(SQLExpression):
     def get_sql(self) -> str:
         sql = f" FROM {self._table} "
         if len(self._joins) > 0:
-            sql += " ".join([f"{join[0].value} {join[1]} {"ON "+join[2].get_sql() if join[2] is not None else ""}" for join in self._joins])
+            sql += " ".join([f"{join[0].value} {join[1]} {'ON '+join[2].get_sql() if join[2] is not None else ''}" for join in self._joins])
         return sql
 
     def join(
