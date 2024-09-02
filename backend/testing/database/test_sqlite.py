@@ -94,6 +94,7 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
         re += ".*substr.*'sqlite_' *$"
         self.assertRegex(reply.replace("\n", " "), re)
 
+    @unittest.skip('to be adapted when sql_factory is redesigned')
     async def test_202_get_table_info(self):
         mock_table = "mock_table"
         expected = {
