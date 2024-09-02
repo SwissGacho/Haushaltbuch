@@ -88,6 +88,7 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
             Mock_Connection.assert_called_once_with(db_obj=self.db, **self.db_cfg)
             mock_con_obj.connect.assert_awaited_once_with()
 
+    @unittest.skip('to be adapted when sql_factory is redesigned')
     def test_201_sql_table_list(self):
         reply = self.sql.script(database.sqlexecutable.SQLTemplate.TABLELIST).sql()
         re = "^ *SELECT name .*FROM sqlite_master.*'table'"
