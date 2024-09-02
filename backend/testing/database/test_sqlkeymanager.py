@@ -30,7 +30,7 @@ class TestSQLKeyManager(unittest.TestCase):
         self.assertEqual(self.SQLKeyManager._keys, {"1"})
 
     def test_register_key_duplicate(self):
-        self.SQLKeyManager._keys = {"param"}
+        self.assertEqual(self.SQLKeyManager.register_key("param"), "param")
         key = self.SQLKeyManager.register_key("param")
         self.assertEqual(key, "param1")
         self.assertEqual(self.SQLKeyManager._keys, {"param", "param1"})

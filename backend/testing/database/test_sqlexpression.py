@@ -25,7 +25,7 @@ class MockKeyManagerWithModifications(MockKeyManager):
 
 
 def normalize_sql(sql):
-    return sql.replace("  ", " ").strip()
+    return re.sub("  +", " ").strip()
 
 
 @patch("database.sqlkeymanager.SQLKeyManager", MockKeyManager)
