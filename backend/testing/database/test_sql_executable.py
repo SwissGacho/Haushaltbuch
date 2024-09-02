@@ -2,7 +2,57 @@ import unittest
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
-from database.sqlexecutable import SQLScript
+from database.sqlexecutable import SQL, SQLScript, CreateTable
+
+from core.exceptions import InvalidSQLStatementException
+from persistance.bo_descriptors import BOColumnFlag
+
+MOCKCONSTRAINTMAP = {
+    BOColumnFlag.BOC_NONE: "",
+    BOColumnFlag.BOC_NOT_NULL: "NOT NULL",
+    BOColumnFlag.BOC_DEFAULT: "DEFAULT",
+}
+
+
+class MockColumnDefinition:
+
+    def __init__(
+        self, name: str, data_type: type, constraint: str = None, key_manager=None
+    ):
+        self.name = name
+        self.constraint = constraint
+        self.data_type = self.type_map[data_type]
+
+    type_map = {
+        int: "INTEGER",
+        float: "REAL",
+        str: "TEXT",
+    }
+
+    def get_sql(self):
+        return (
+            f"{self.name} {self.data_type} {MOCKCONSTRAINTMAP.get(self.constraint, '')}"
+        )
+
+
+class MockSQLFactory:
+
+    @classmethod
+    def get_sql_class(self, sql_cls: type):
+        if sql_cls.__name__ == "SQLColumnDefinition":
+            return MockColumnDefinition
+        return sql_cls
+
+
+class MockDB(AsyncMock):
+    execute = AsyncMock(return_value="Mock execute")
+    close = AsyncMock(return_value="Mock close")
+
+    sql_factory = MockSQLFactory
+
+
+class MockApp:
+    db = MockDB()
 
 
 class TestSQLScript(unittest.TestCase):
@@ -83,3 +133,58 @@ class TestSQLScript(unittest.TestCase):
         sql = SQLScript("Dummy")
         with self.assertRaises(ValueError):
             sql._register_and_replace_named_parameters("SELECT * FROM table", {"id": 1})
+
+
+class TestCreateTable(unittest.TestCase):
+
+    def setUp(self) -> None:
+        mock_parent = SQL()
+        mock_parent.execute = AsyncMock(return_value="Mock execute")
+        mock_parent.close = AsyncMock(return_value="Mock close")
+        SQL._get_db = Mock(return_value=MockApp.db)
+        self.mockParent = mock_parent
+
+    def test_create_table_parent(self):
+        create_table = CreateTable(
+            "users",
+            [
+                ("name", str, "", {}),
+                ("age", int, "", {}),
+            ],
+            self.mockParent,
+        )
+        self.assertEqual(create_table._parent, self.mockParent)
+
+    def test_create_table_with_columns(self):
+        create_table = CreateTable(
+            "users",
+            [("name", str, "", {}), ("age", int, "", {})],
+            self.mockParent,
+        )
+        expected_sql = "CREATE TABLE IF NOT EXISTS users (name TEXT , age INTEGER )"
+        self.assertEqual(create_table.get_sql(), expected_sql)
+        self.assertEqual(create_table.get_params(), {})
+
+    def test_create_table_without_columns(self):
+        create_table = CreateTable("users", [], self.mockParent)
+        with self.assertRaises(InvalidSQLStatementException):
+            create_table.get_sql()
+
+    def test_create_table_with_column_constraint(self):
+        create_table = CreateTable(
+            "users",
+            [
+                ("name", str, BOColumnFlag.BOC_NOT_NULL, {}),
+                ("age", int, BOColumnFlag.BOC_DEFAULT, {}),
+            ],
+            self.mockParent,
+        )
+        expected_sql = (
+            "CREATE TABLE IF NOT EXISTS users (name TEXT NOT NULL, age INTEGER DEFAULT)"
+        )
+        self.assertEqual(create_table.get_sql(), expected_sql)
+        self.assertEqual(create_table.get_params(), {})
+
+    def test_params_always_empty(self):
+        create_table = CreateTable("users", [], self.mockParent)
+        self.assertEqual(create_table.get_params(), {})

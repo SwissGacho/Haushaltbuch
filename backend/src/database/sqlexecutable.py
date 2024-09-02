@@ -21,21 +21,11 @@ from database.sqlexpression import (
 from database.sqlfactory import SQLFactory
 from database.sqlkeymanager import SQLKeyManager
 
+from persistance.bo_descriptors import BOColumnFlag
+
+from core.exceptions import InvalidSQLStatementException
+
 LOG = getLogger(__name__)
-
-
-class InvalidSQLStatementException(Exception):
-    """
-    Exception raised when an invalid SQL statement is encountered.
-    """
-
-
-class SQLDataType(Enum):
-    "Basic SQL data types compliant with SQLite. DB implementations should override this enum."
-    TEXT = auto()
-    INTEGER = auto()
-    REAL = auto()
-    BLOB = auto()
 
 
 class SQLTemplate(Enum):
@@ -55,7 +45,7 @@ class SQLExecutable(object):
 
     async def execute(
         self,
-        params: dict[str, SQLDataType] = None,
+        params: dict[str, type] = None,
         close: bool | int = False,
         commit=False,
     ):
@@ -91,6 +81,12 @@ class SQL(SQLExecutable):
         self._rslt = None
         self._sql_statement: "SQLStatement" = None
 
+    def __repr__(self):
+        return f"SQL({self._sql_statement})"
+
+    def __str__(self):
+        return f"SQL({self._sql_statement})"
+
     @classmethod
     def _get_db(cls) -> DBBaseClass:
         """Get the current database connection."""
@@ -102,7 +98,7 @@ class SQL(SQLExecutable):
             raise InvalidSQLStatementException("No SQL statement to execute.")
         return self._sql_statement.get_sql()
 
-    def get_params(self) -> dict[str, SQLDataType]:
+    def get_params(self) -> dict[str, str]:
         """Get the parameters for the current SQL statement."""
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
@@ -114,7 +110,7 @@ class SQL(SQLExecutable):
         return SQL._get_db().sql_factory
 
     def create_table(
-        self, table: str, columns: list[(str, SQLDataType)] = None
+        self, table: str, columns: list[(str, type)] = None
     ) -> "CreateTable":
         """Sets the SQL statement to create a table and returns a create_table object"""
         # LOG.debug(f"SQL.create_table({table=}, {columns=})")
@@ -205,20 +201,21 @@ class SQLScript(SQLStatement):
             if isinstance(script_or_template, str)
             else self.__class__.sql_templates.get(script_or_template)
         )
-        self._register_and_replace_named_parameters(self._script, kwargs)
+        self._script = self._register_and_replace_named_parameters(self._script, kwargs)
 
     def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
         return self._script
 
     def _register_and_replace_named_parameters(
-        self, query: str, params: dict[str, SQLDataType]
+        self, query: str, params: dict[str, str]
     ):
         for key, value in params.items():
             if not key in query:
                 raise ValueError(f"Parameter '{key}' not found in query '{query}'.")
             final_key = self._create_param(key, value)
             query = query.replace(f":{key}", f":{final_key}")
+        return query
 
     def _create_param(self, proposed_key: str, value):
         final_key = self.register_key(proposed_key)
@@ -233,19 +230,17 @@ class CreateTable(SQLStatement):
     def __init__(
         self,
         table: str = "",
-        columns: list[(str, SQLDataType, str, dict)] = None,
+        columns: list[(str, type, BOColumnFlag, dict)] = None,
         parent: SQLExecutable = None,
     ):
         super().__init__(parent)
-        cols = columns or []
         self._table = table
-        sql_column_definition_cls = self.sql_factory.get_sql_class(SQLColumnDefinition)
-        self._columns: list[SQLColumnDefinition] = [
-            sql_column_definition_cls(name, data_type, constraint, **pars)
-            for name, data_type, constraint, pars in cols
-        ]
+        self._columns: list[SQLColumnDefinition] = []
+        for column_description in columns:
+            name, data_type, constraint, pars = column_description
+            self.column(name, data_type, constraint, **pars)
 
-    def column(self, name: str, data_type: SQLDataType, constraint: str = None, **pars):
+    def column(self, name: str, data_type: type, constraint: str = None, **pars):
         """Add a column to the table to be created.
         The column will be added to the end of the column list."""
         self._columns.append(
@@ -256,10 +251,7 @@ class CreateTable(SQLStatement):
         return self
 
     def get_params(self):
-        value_dict = {}
-        for column in self._columns:
-            value_dict.update(column.get_params())
-        return value_dict
+        return {}
 
     def get_sql(self) -> str:
         """Get a string representation of the current SQL statement."""
@@ -267,7 +259,11 @@ class CreateTable(SQLStatement):
             raise InvalidSQLStatementException(
                 "CREATE TABLE statement must have a table name."
             )
-        return f"CREATE TABLE IF NOT EXISTS {self._table} ({', '.join([column.sql() for column in self._columns])})"
+        if len(self._columns) == 0:
+            raise InvalidSQLStatementException(
+                "CREATE TABLE statement must have at least one column."
+            )
+        return f"CREATE TABLE IF NOT EXISTS {self._table} ({', '.join([column.get_sql() for column in self._columns])})"
 
 
 class TableValuedQuery(SQLStatement):

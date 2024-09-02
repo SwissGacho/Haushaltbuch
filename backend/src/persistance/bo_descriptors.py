@@ -15,16 +15,26 @@ class BOColumnFlag(Flag):
     BOC_NOT_NULL = auto()
     BOC_PK = auto()
     BOC_INC = auto()
-    BOC_PK_INC = BOC_PK | BOC_INC
+    BOC_PK_INC = auto()
     BOC_FK = auto()
     BOC_UNIQUE = auto()
     BOC_DEFAULT = auto()
     BOC_CURRENT_TS = auto()
-    BOC_DEFAULT_CURR = BOC_DEFAULT | BOC_CURRENT_TS
+    BOC_DEFAULT_CURR = auto()
 
 
 class BOBaseBase:
     "Base for BOBase to circumvent circular import"
+
+    @classmethod
+    def add_attribute(
+        cls,
+        attribute_name: str,
+        data_type: type,
+        constraint_flag: BOColumnFlag,
+        **flag_values,
+    ):
+        pass
 
 
 class _PersistantAttr:
@@ -46,10 +56,13 @@ class _PersistantAttr:
         #     f"PersistantAttr.__set_name__({owner=}, {name=})"
         #     f" {self.__class__.data_type()=} {self._flag=} {self._flag_values=}"
         # )
-        cols = (name, self.__class__.data_type(), self._flag, self._flag_values)
-        if not owner._attributes.get(owner.__name__):
-            owner._attributes[owner.__name__] = []
-        owner._attributes[owner.__name__].append(cols)
+        # assert issubclass(owner, BOBaseBase)
+        owner.add_attribute(
+            name,
+            self.__class__.data_type(),
+            self._flag or BOColumnFlag.BOC_NONE,
+            **(self._flag_values or {}),
+        )
 
     def __get__(self, obj, objtype=None):
         if obj is None:

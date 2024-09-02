@@ -59,8 +59,8 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         BOColumnFlag.BOC_FK: "REFERENCES {relation}",
         BOColumnFlag.BOC_DEFAULT: "DEFAULT",
         BOColumnFlag.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
-        BOColumnFlag.BOC_INC: "not available ! @%?°",
-        BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
+        # BOColumnFlag.BOC_INC: "not available ! @%?°",
+        # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
 
 

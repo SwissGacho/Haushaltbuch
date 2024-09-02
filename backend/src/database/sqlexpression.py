@@ -6,6 +6,7 @@ import json
 
 from core.app_logging import getLogger
 from database.sqlkeymanager import SQLKeyManager
+from persistance.bo_descriptors import BOColumnFlag
 
 LOG = getLogger(__name__)
 
@@ -58,16 +59,21 @@ class From(SQLExpression):
 
     def get_params(self) -> dict:
         return {
-            k: v 
-            for join in self._joins 
+            k: v
+            for join in self._joins
             if join[2] is not None
             for k, v in join[2].get_params().items()
         }
-    
+
     def get_sql(self) -> str:
         sql = f" FROM {self._table} "
         if len(self._joins) > 0:
-            sql += " ".join([f"{join[0].value} {join[1]} {'ON '+join[2].get_sql() if join[2] is not None else ''}" for join in self._joins])
+            sql += " ".join(
+                [
+                    f"{join[0].value} {join[1]} {'ON '+join[2].get_sql() if join[2] is not None else ''}"
+                    for join in self._joins
+                ]
+            )
         return sql
 
     def join(
@@ -433,15 +439,15 @@ class SQLColumnDefinition(SQLExpression):
     """Represents the definition of a column in an SQL table."""
 
     type_map = {}
-    constraint_map = {}
+    constraint_map: dict[BOColumnFlag, str] = {}
 
     def __init__(
         self,
         name: str,
         data_type: type,
-        constraint: str = None,
+        constraint: BOColumnFlag = None,
         key_manager: SQLKeyManager = None,
-        **pars
+        **pars,
     ):
         super().__init__(key_manager=key_manager)
         self._name = name
@@ -451,20 +457,21 @@ class SQLColumnDefinition(SQLExpression):
             raise ValueError(
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
             )
-        if not constraint:
-            self._constraint = ""
-        elif constraint in self.constraint_map:
-            self._constraint = self.__class__.constraint_map[constraint].format(
-                **{
-                    k: v.table if hasattr(v, "table") else str(v).lower()
-                    for k, v in pars.items()
-                }
-            )
-            # LOG.debug(f" - constraint={self.constraint}")
-        else:
-            raise ValueError(
-                f"Unsupported column constraint for a {self.__class__.__name__}: {constraint}"
+        self._constraints: list[str] = []
+        constraint_map = self.__class__.constraint_map
+        for flag in constraint or BOColumnFlag.BOC_NONE:
+            if flag not in constraint_map:
+                raise ValueError(
+                    f"Unsupported column constraint for a {self.__class__.__name__}: {flag}"
+                )
+            self._constraints.append(
+                self.__class__.constraint_map[flag].format(
+                    **{
+                        k: v.table if hasattr(v, "table") else str(v).lower()
+                        for k, v in pars.items()
+                    }
+                )
             )
 
     def get_sql(self):
-        return f"{self._name} {self._data_type} {self._constraint}"
+        return f"{self._name} {self._data_type} {" ".join(self._constraints)}"

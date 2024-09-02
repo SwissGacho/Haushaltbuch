@@ -14,7 +14,6 @@ from database.sqlexecutable import (
     CreateTable,
     Insert,
     InvalidSQLStatementException,
-    SQLDataType,
     SQLStatement,
     SQLColumnDefinition,
     TableValuedQuery,
@@ -54,7 +53,6 @@ class MockApp:
     db = MockDB()
 
 
-@unittest.skip("in progress")
 class AsyncTestSQLExecutable(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:

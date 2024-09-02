@@ -10,6 +10,7 @@ from database.sqlexpression import (
     And,
     Or,
     Eq,
+    SQLColumnDefinition,
 )
 
 from database.sqlexpression import Value, Row
@@ -191,3 +192,7 @@ class TestRow(unittest.TestCase):
         self.assertEqual(sql.get_sql(), "(:key, :key2)")
         self.assertEqual(sql.get_params(), {"key": "value", "key2": "value2"})
         self.assertEqual(sql.names(), "(name, name2)")
+
+
+class TestSQLColumnDefinition(unittest.TestCase):
+    pass
