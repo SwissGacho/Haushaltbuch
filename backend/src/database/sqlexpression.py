@@ -256,8 +256,8 @@ class SQLTernaryExpression(SQLExpression):
     ##### Need to add support to have lists and dictionaries as values that are serialized as json #####
     def get_sql(self):
         return (
-            f" ({self.first.sql()} {self.__class__.operator_one} "
-            f"{self.second.sql()} {self.__class__.operator_two} {self.third.sql()}) "
+            f" ({self.first.get_sql()} {self.__class__.operator_one} "
+            f"{self.second.get_sql()} {self.__class__.operator_two} {self.third.get_sql()}) "
         )
 
     def sql(self):
