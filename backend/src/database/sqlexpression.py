@@ -380,7 +380,7 @@ class Assignment(SQLExpression):
     def get_params(self):
         value_dict = self._value.get_params()
         if self._where is not None:
-            value_dict.update(self._where.get_params())
+            value_dict |= self._where.get_params()
         return value_dict
 
     def get_sql(self):
