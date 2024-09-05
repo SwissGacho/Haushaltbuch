@@ -44,7 +44,7 @@ class SQLExpression:
         """Return the parametrized SQL string of the expression."""
         return self._expression
 
-    def get_sql(self):
+    def sql(self):
         """Return the SQL expression as a string combined with its parameters."""
         return (self.get_sql(), self.get_params())
 
@@ -256,14 +256,6 @@ class SQLTernaryExpression(SQLExpression):
             f" ({self.first.get_sql()} {self.__class__.operator_one} "
             f"{self.second.get_sql()} {self.__class__.operator_two} {self.third.get_sql()}) "
         )
-
-    def get_sql(self):
-        """Return the SQL expression as a string."""
-        if self.__class__.operator_one is None or self.__class__.operator_two is None:
-            raise NotImplementedError(
-                "SQL_binary_expression is an abstract class and should not be instantiated."
-            )
-        return super().get_sql()
 
 
 class SQLBetween(SQLTernaryExpression):

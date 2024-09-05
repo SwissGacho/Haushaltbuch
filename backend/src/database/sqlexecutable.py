@@ -236,7 +236,7 @@ class CreateTable(SQLStatement):
         super().__init__(parent)
         self._table = table
         self._columns: list[SQLColumnDefinition] = []
-        for column_description in columns:
+        for column_description in columns or []:
             name, data_type, constraint, pars = column_description
             self.column(name, data_type, constraint, **pars)
 
