@@ -178,7 +178,7 @@ class SQLStatement(SQLExecutable, SQLKeyManager):
             "SQL_statement is an abstract class and should not be instantiated."
         )
 
-    def sql(self) -> tuple[str, dict[str, str]]:
+    def get_sql(self) -> tuple[str, dict[str, str]]:
         """Get a string representation of the current SQL statement.
         Must be implemented by subclasses."""
         return self.get_sql(), self.get_params()
@@ -318,13 +318,13 @@ class Select(TableValuedQuery):
         sql = f"SELECT {'DISTINCT ' if self._distinct else ''}{', '.join(self._column_list)}"
         if self._column_list is None or len(self._column_list) == 0:
             sql += "*"
-        sql += self._from_statement.sql()
+        sql += self._from_statement.get_sql()
         if self._where is not None:
-            sql += self._where.sql()
+            sql += self._where.get_sql()
         if self._group_by is not None:
-            sql += self._group_by.sql()
+            sql += self._group_by.get_sql()
         if self._having is not None:
-            sql += self._having.sql()
+            sql += self._having.get_sql()
         return sql
 
     def distinct(self):
@@ -461,7 +461,7 @@ class Update(SQLStatement):
 
     def returning(self, column: str):
         """Set the column to be returned after the update statement is executed."""
-        self.sql += f" RETURNING {column}"
+        self.get_sql += f" RETURNING {column}"
         return self
 
     def get_params(self):

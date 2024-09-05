@@ -220,7 +220,7 @@ class TestSQLStatement(unittest.TestCase):
     def test201_exception(self):
         """Test the exception method"""
         with self.assertRaises(NotImplementedError):
-            SQLStatement().sql()
+            SQLStatement().get_sql()
 
 
 class TestSQLColumnDefinition(unittest.TestCase):
@@ -272,7 +272,7 @@ class TestTableValuedQuery(unittest.TestCase):
     def test501_parent(self):
         """Test the exception method"""
         with self.assertRaises(NotImplementedError):
-            TableValuedQuery(Mock()).sql()
+            TableValuedQuery(Mock()).get_sql()
 
     def test502_setParent(self):
         """Test setting the parent"""
@@ -327,7 +327,7 @@ class TestSelect(unittest.TestCase):
 
         test = Select(parent=self.mock_parent)
         with self.assertRaises(InvalidSQLStatementException):
-            test.sql()
+            test.get_sql()
 
     def test707_test_distinct_method(self):
         """Test the distinct method"""

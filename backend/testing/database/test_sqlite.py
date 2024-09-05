@@ -88,14 +88,14 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
             Mock_Connection.assert_called_once_with(db_obj=self.db, **self.db_cfg)
             mock_con_obj.connect.assert_awaited_once_with()
 
-    @unittest.skip('to be adapted when sql_factory is redesigned')
+    @unittest.skip("to be adapted when sql_factory is redesigned")
     def test_201_sql_table_list(self):
-        reply = self.sql.script(database.sqlexecutable.SQLTemplate.TABLELIST).sql()
+        reply = self.sql.script(database.sqlexecutable.SQLTemplate.TABLELIST).get_sql()
         re = "^ *SELECT name .*FROM sqlite_master.*'table'"
         re += ".*substr.*'sqlite_' *$"
         self.assertRegex(reply.replace("\n", " "), re)
 
-    @unittest.skip('to be adapted when sql_factory is redesigned')
+    @unittest.skip("to be adapted when sql_factory is redesigned")
     async def test_202_get_table_info(self):
         mock_table = "mock_table"
         expected = {
