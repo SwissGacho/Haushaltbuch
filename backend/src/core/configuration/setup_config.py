@@ -9,7 +9,7 @@ from data.management.user import User, UserRole
 from data.management.configuration import Configuration
 from database.sqlexpression import ColumnName
 from core.app import App
-from core.configuration.util import get_config_item, update_dicts_recursively
+from core.util import get_config_item, update_dicts_recursively
 from core.configuration.db_config import DBConfig
 from core.base_objects import Config
 from core.base_objects import BaseObject

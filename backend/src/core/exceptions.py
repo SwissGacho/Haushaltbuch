@@ -27,3 +27,9 @@ class DataError(Exception):
 
 class TokenExpiredError(Exception):
     "Lifetime of token has expired"
+
+
+class InvalidSQLStatementException(Exception):
+    """
+    Exception raised when an invalid SQL statement is encountered.
+    """

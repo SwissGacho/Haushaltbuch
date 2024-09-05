@@ -5,3 +5,5 @@ APPDESC = f"""'{APPNAME}' helps you keeping control over the money you have avai
             Record your expenses and compare to your planned budget.
         """
 DBCFG_FILE_NAME = "configuration.json"
+
+WEBSOCKET_PORT = 8765
