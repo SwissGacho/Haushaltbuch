@@ -49,6 +49,9 @@ class SQLExpression:
         return (self.get_sql(), self.get_params())
 
 
+SQLClause: TypeAlias = SQLExpression | str
+
+
 class From(SQLExpression):
     """Class for the FROM clause of an SQL statement."""
 
@@ -137,8 +140,8 @@ class SQLBinaryExpression(SQLExpression):
 
     def __init__(
         self,
-        left: SQLExpression | str,
-        right: SQLExpression | str,
+        left: SQLClause,
+        right: SQLClause,
         key_manager: SQLKeyManager = None,
     ):
         super().__init__(key_manager=key_manager)
@@ -177,7 +180,7 @@ class Is(SQLBinaryExpression):
 class IsNull(Is):
     "Represents test for NULL"
 
-    def __init__(self, left: SQLExpression | str):
+    def __init__(self, left: SQLClause):
         super().__init__(left, right=None)
 
 
@@ -203,9 +206,6 @@ class SQLString(SQLExpression):
         return f"'{self._value}'"
 
 
-FilterItem: TypeAlias = SQLExpression | str
-
-
 class Filter(And):
     """Represent a filter condition matching all items.
     Keys and values of 'filter' are rendered in quotes if they have the class str.
@@ -213,7 +213,7 @@ class Filter(And):
     (Use ColumnName() to avoid rendering in quotes)
     """
 
-    def __init__(self, filters: dict[FilterItem, FilterItem]):
+    def __init__(self, filters: dict[SQLClause, SQLClause]):
         super().__init__(
             [
                 (
@@ -237,9 +237,9 @@ class SQLTernaryExpression(SQLExpression):
 
     def __init__(
         self,
-        first: SQLExpression | str,
-        second: SQLExpression | str,
-        third: SQLExpression | str,
+        first: SQLClause,
+        second: SQLClause,
+        third: SQLClause,
         key_manager: SQLKeyManager = None,
     ):
         super().__init__(key_manager=key_manager)
@@ -259,7 +259,6 @@ class SQLTernaryExpression(SQLExpression):
             **self.third.get_params(),
         }
 
-    ##### Need to add support to have lists and dictionaries as values that are serialized as json #####
     def get_sql(self):
         return (
             f" ({self.first.get_sql()} {self.__class__.operator_one} "
