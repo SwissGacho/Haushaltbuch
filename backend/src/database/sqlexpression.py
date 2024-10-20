@@ -458,4 +458,4 @@ class SQLColumnDefinition(SQLExpression):
             )
 
     def get_sql(self):
-        return f"{self._name} {self._data_type} {" ".join(self._constraints)}"
+        return f"{self._name} {self._data_type} {' '.join(self._constraints)}"
