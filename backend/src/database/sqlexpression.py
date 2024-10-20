@@ -5,6 +5,8 @@ from typing import TypeAlias
 import json
 
 from core.app_logging import getLogger
+from database.sqlkeymanager import SQLKeyManager
+from persistance.bo_descriptors import BOColumnFlag
 
 LOG = getLogger(__name__)
 
@@ -22,28 +24,58 @@ class SQLExpression:
     """Base class for an SQL expression.
     Can be instantiated directly to create an expression verbatim from a string."""
 
-    def __init__(self, expression: str):
-        self._expression = "NULL" if expression is None else expression
+    def __init__(self, expression: str = None, key_manager: SQLKeyManager = None):
+        self._key_manager = key_manager
+        self._expression = "Null" if expression is None else expression
+        self._params: dict[str, str] = {}
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
+    def create_param(self, key: str, value):
+        if self._key_manager is None:
+            raise ValueError("No key manager provided to create a parameter.")
+        key = self._key_manager.register_key(key)
+        self._params[key] = value
+        return key
+
+    def get_params(self):
+        """Return a dictionary holding the parameters for the expression."""
+        return self._params
+
+    def get_sql(self):
+        """Return the parametrized SQL string of the expression."""
         return self._expression
+
+    def sql(self):
+        """Return the SQL expression as a string combined with its parameters."""
+        return (self.get_sql(), self.get_params())
+
+
+SQLClause: TypeAlias = SQLExpression | str
 
 
 class From(SQLExpression):
     """Class for the FROM clause of an SQL statement."""
 
-    def __init__(self, table):
-        super().__init__(None)
-        self.table = table
-        self.joins: list[(JoinOperator, str, SQLExpression)] = []
+    def __init__(self, table, key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
+        self._table = table
+        self._joins: list[tuple[JoinOperator, str, SQLExpression]] = []
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
-        sql = f" FROM {self.table}"
-        if len(self.joins) > 0:
+    def get_params(self) -> dict:
+        return {
+            k: v
+            for join in self._joins
+            if join[2] is not None
+            for k, v in join[2].get_params().items()
+        }
+
+    def get_sql(self) -> str:
+        sql = f" FROM {self._table} "
+        if len(self._joins) > 0:
             sql += " ".join(
-                [f"{join[0]} {join[1]} ON {join[2].sql()}" for join in self.joins]
+                [
+                    f"{join[0].value} {join[1]} {'ON '+join[2].get_sql() if join[2] is not None else ''}"
+                    for join in self._joins
+                ]
             )
         return sql
 
@@ -52,29 +84,42 @@ class From(SQLExpression):
         table=None,
         join_constraint: "SQLExpression" = None,
         join_operator: JoinOperator = JoinOperator.FULL,
-    ):
+    ) -> "From":
         """Add a join to another table to the FROM clause."""
-        self.joins.append((join_operator, table, join_constraint))
+        self._joins.append((join_operator, table, join_constraint))
+        return self
 
 
 class SQLMultiExpression(SQLExpression):
     """Abstract class to combine any number of SQL expressions with an operator.
     Should not be instantiated directly."""
 
-    def __init__(self, arguments: list[SQLExpression]):
-        super().__init__(None)
-        self.arguments = arguments
+    def __init__(
+        self, arguments: list[SQLExpression], key_manager: SQLKeyManager = None
+    ):
+        super().__init__(key_manager=key_manager)
+        self._arguments = arguments
 
     operator: str = None
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
+    def get_params(self):
+        if self.__class__.operator is None:
+            raise NotImplementedError(
+                "SQL_multi_expression is an abstract class and should not be instantiated."
+            )
+        return {
+            k: v
+            for expression in self._arguments
+            for k, v in expression.get_params().items()
+        }
+
+    def get_sql(self):
         if self.__class__.operator is None:
             raise NotImplementedError(
                 "SQL_multi_expression is an abstract class and should not be instantiated."
             )
         return self.__class__.operator.join(
-            [expression.sql() for expression in self.arguments]
+            [expression.get_sql() for expression in self._arguments]
         )
 
 
@@ -94,21 +139,23 @@ class SQLBinaryExpression(SQLExpression):
     """Abstract class to combine exactly two SQL expressions with an operator.
     Should not be instantiated directly."""
 
-    def __init__(self, left: SQLExpression | str, right: SQLExpression | str):
-        super().__init__(None)
-        # LOG.debug(f"SQLBinaryExpression({left=}, {right=})")
+    def __init__(
+        self,
+        left: SQLClause,
+        right: SQLClause,
+        key_manager: SQLKeyManager = None,
+    ):
+        super().__init__(key_manager=key_manager)
         self.left = left if isinstance(left, SQLExpression) else SQLExpression(left)
         self.right = right if isinstance(right, SQLExpression) else SQLExpression(right)
 
     operator = None
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
-        if self.__class__.operator is None:
-            raise NotImplementedError(
-                "SQL_binary_expression is an abstract class and should not be instantiated."
-            )
-        return f" ({self.left.sql()} {self.__class__.operator} {self.right.sql()}) "
+    def get_params(self):
+        return {**self.left.get_params(), **self.right.get_params()}
+
+    def get_sql(self):
+        return f" ({self.left.get_sql()} {self.__class__.operator} {self.right.get_sql()}) "
 
 
 class Eq(SQLBinaryExpression):
@@ -126,7 +173,7 @@ class Is(SQLBinaryExpression):
 class IsNull(Is):
     "Represents test for NULL"
 
-    def __init__(self, left: SQLExpression | str):
+    def __init__(self, left: SQLClause):
         super().__init__(left, right=None)
 
 
@@ -137,7 +184,7 @@ class ColumnName(SQLExpression):
         super().__init__(None)
         self._name = name
 
-    def sql(self) -> str:
+    def get_sql(self) -> str:
         return self._name
 
 
@@ -148,11 +195,8 @@ class SQLString(SQLExpression):
         super().__init__(None)
         self._value = value
 
-    def sql(self) -> str:
+    def get_sql(self) -> str:
         return f"'{self._value}'"
-
-
-FilterItem: TypeAlias = SQLExpression | str
 
 
 class Filter(And):
@@ -162,7 +206,7 @@ class Filter(And):
     (Use ColumnName() to avoid rendering in quotes)
     """
 
-    def __init__(self, filters: dict[FilterItem, FilterItem]):
+    def __init__(self, filters: dict[SQLClause, SQLClause]):
         super().__init__(
             [
                 (
@@ -186,11 +230,12 @@ class SQLTernaryExpression(SQLExpression):
 
     def __init__(
         self,
-        first: SQLExpression | str,
-        second: SQLExpression | str,
-        third: SQLExpression | str,
+        first: SQLClause,
+        second: SQLClause,
+        third: SQLClause,
+        key_manager: SQLKeyManager = None,
     ):
-        super().__init__(None)
+        super().__init__(key_manager=key_manager)
         self.first = first if isinstance(first, SQLExpression) else SQLExpression(first)
         self.second = (
             second if isinstance(second, SQLExpression) else SQLExpression(second)
@@ -200,13 +245,18 @@ class SQLTernaryExpression(SQLExpression):
     operator_one = None
     operator_two = None
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
-        if self.__class__.operator_one is None or self.__class__.operator_two is None:
-            raise NotImplementedError(
-                "SQL_binary_expression is an abstract class and should not be instantiated."
-            )
-        return f" ({self.first.sql()} {self.__class__.operator_one} {self.second.sql()} {self.__class__.operator_two} {self.third.sql()}) "
+    def get_params(self):
+        return {
+            **self.first.get_params(),
+            **self.second.get_params(),
+            **self.third.get_params(),
+        }
+
+    def get_sql(self):
+        return (
+            f" ({self.first.get_sql()} {self.__class__.operator_one} "
+            f"{self.second.get_sql()} {self.__class__.operator_two} {self.third.get_sql()}) "
+        )
 
 
 class SQLBetween(SQLTernaryExpression):
@@ -219,9 +269,13 @@ class SQLBetween(SQLTernaryExpression):
 class Value(SQLExpression):
     """Represents a value in an SQL statement."""
 
-    def __init__(self, name: str, value: any):
+    def __init__(
+        self, name: str, value: any, key_manager: SQLKeyManager, key: str = ""
+    ):
         # LOG.debug(f"Value({name=}, {value=})")
-        super().__init__(None)
+        super().__init__(key_manager=key_manager)
+        key = self.create_param(key, value)
+        self._key = key
         self._name = name
         self._value = value
 
@@ -229,59 +283,74 @@ class Value(SQLExpression):
         "Name of the value"
         return self._name
 
-    def sql(self) -> str:
+    def get_params(self):
+        """Get a dictionary of the value to be used in an SQL cursor"""
+        value_string = ""
         if isinstance(self._value, (str, StrEnum, Flag)):
-            return f"'{self._value}'"
+            value_string = f"'{self._value}'"
         if isinstance(self._value, dict | list):
-            return f"""'{json.dumps(self._value, separators=(",", ":"))}'"""
-        return str(self._value)
+            value_string = f"""'{json.dumps(self._value, separators=(",", ":"))}'"""
+        else:
+            value_string = str(self._value)
+        return {self._key: value_string}
+
+    def get_sql(self):
+        return ":" + self._key
 
 
 class Row(SQLExpression):
     """Represents a list of values defining a row in an SQL statement such as an INSERT."""
 
-    def __init__(self, values: list[Value] = None):
+    def __init__(self, values: list[Value] = None, key_manager: SQLKeyManager = None):
         # LOG.debug(f"Row({values=})")
-        super().__init__(None)
-        self.values = [] if values is None else values
+        super().__init__(key_manager=key_manager)
+        self._values = [] if values is None else values
 
     def value(self, value: Value):
         """Add a value to the end of the row."""
-        self.values.append(value)
+        self._values.append(value)
         return self
 
     def names(self) -> str:
         "List of value names"
-        return f"({', '.join([v.name() for v in self.values])})"
+        return f"({', '.join([v.name() for v in self._values])})"
 
-    def sql(self) -> str:
+    def get_params(self):
+        return {k: v for value in self._values for k, v in value.get_params().items()}
+
+    def get_sql(self):
         """Return the SQL expression as a string."""
-        return f"({', '.join([v.sql() for v in self.values])})"
+        return f"({', '.join([v.get_sql() for v in self._values])})"
 
 
 class Values(SQLExpression):
     """Represents a list of rows in an SQL statement such as an INSERT."""
 
-    def __init__(self, rows: list[Row]):
+    def __init__(self, rows: list[Row], key_manager: SQLKeyManager = None):
         # LOG.debug(f"Values({rows=})")
-        super().__init__(None)
-        self.rows = rows
+        super().__init__(key_manager=key_manager)
+        self._rows = rows
 
     def row(self, value: Row):
         """Add a row to the end of the list."""
-        # LOG.debug(f"Values.row({value=})")
-        self.rows.append(value)
+        self._rows.append(value)
         return self
 
     def names(self) -> str:
         "List of value names"
-        if not self.rows:
+        if not self._rows:
             return ""
-        return self.rows[0].names()
+        return self._rows[0].names()
 
-    def sql(self) -> str:
+    def get_params(self):
+        value_dict: dict[str, str] = {}
+        for row in self._rows:
+            value_dict.update(row.get_params())
+        return value_dict
+
+    def get_sql(self):
         """Return the SQL expression as a string."""
-        return f"VALUES {', '.join([row.sql() for row in self.rows])}"
+        return f"VALUES {', '.join([row.get_sql() for row in self._rows])}"
 
 
 class Assignment(SQLExpression):
@@ -291,88 +360,102 @@ class Assignment(SQLExpression):
         self,
         columns: list[str] | str,
         value: Value,
+        key_manager: SQLKeyManager = None,
     ):
-        super().__init__(None)
-        self.columns = [columns] if isinstance(columns, str) else columns
-        self.value = value
-        self.where: Where = None
+        super().__init__(key_manager=key_manager)
+        self._columns = [columns] if isinstance(columns, str) else columns
+        self._value = value
+        self._where: Where = None
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
-        sql = "(" + ",".join(self.columns) + ")=" + self.value.sql()
-        if self.where is not None:
-            sql += self.where.sql()
+    def get_params(self):
+        value_dict = self._value.get_params()
+        if self._where is not None:
+            value_dict |= self._where.get_params()
+        return value_dict
+
+    def get_sql(self):
+        sql = "(" + ",".join(self._columns) + ")=" + self._value.get_sql()
+        if self._where is not None:
+            sql += self._where.get_sql()
         return sql
 
 
 class Where(SQLExpression):
     """Represents a WHERE clause in an SQL statement."""
 
-    def __init__(self, condition: SQLExpression):
-        super().__init__(None)
-        self.condition = condition
+    def __init__(self, condition: SQLExpression, key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
+        self._condition = condition
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
-        return f" WHERE {self.condition.sql()}"
+    def get_params(self):
+        return self._condition.get_params()
+
+    def get_sql(self):
+        return f" WHERE {self._condition.get_sql()}"
 
 
 class GroupBy(SQLExpression):
     """Represents a GROUP BY clause in an SQL statement."""
 
-    def __init__(self, column_list: list[str]):
-        super().__init__(None)
+    def __init__(self, column_list: list[str], key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
         self.column_list = column_list
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
+    def get_sql(self):
         return f"GROUP BY {', '.join(self.column_list)}"
 
 
 class Having(SQLExpression):
     """Represents a HAVING clause in an SQL statement."""
 
-    def __init__(self, condition: SQLExpression):
-        super().__init__(None)
-        self.condition = condition
+    def __init__(self, condition: SQLExpression, key_manager: SQLKeyManager = None):
+        super().__init__(key_manager=key_manager)
+        self._condition = condition
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
-        return f" HAVING {self.condition.sql()}"
+    def get_params(self):
+        return self._condition.get_params()
+
+    def get_sql(self):
+        return f" HAVING {self._condition.get_sql()}"
 
 
 class SQLColumnDefinition(SQLExpression):
     """Represents the definition of a column in an SQL table."""
 
     type_map = {}
-    constraint_map = {}
+    constraint_map: dict[BOColumnFlag, str] = {}
 
-    def __init__(self, name: str, data_type: type, constraint: str = None, **pars):
-        # LOG.debug(f"SQLColumnDefinition({name=}, {data_type=}, {constraint=}, {pars=})")
-        super().__init__(None)
-        self.name = name
+    def __init__(
+        self,
+        name: str,
+        data_type: type,
+        constraint: BOColumnFlag = None,
+        key_manager: SQLKeyManager = None,
+        **pars,
+    ):
+        super().__init__(key_manager=key_manager)
+        self._name = name
         if data_type in self.type_map:
-            self.data_type = self.__class__.type_map[data_type]
-            # LOG.debug(f" - data_type={self.data_type}")
+            self._data_type = self.__class__.type_map[data_type]
         else:
             raise ValueError(
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
             )
-        if not constraint:
-            self.constraint = ""
-        elif constraint in self.constraint_map:
-            self.constraint = self.__class__.constraint_map[constraint].format(
-                **{
-                    k: v.table if hasattr(v, "table") else str(v).lower()
-                    for k, v in pars.items()
-                }
-            )
-            # LOG.debug(f" - constraint={self.constraint}")
-        else:
-            raise ValueError(
-                f"Unsupported column constraint for a {self.__class__.__name__}: {constraint}"
+        self._constraints: list[str] = []
+        constraint_map = self.__class__.constraint_map
+        for flag in constraint or BOColumnFlag.BOC_NONE:
+            if flag not in constraint_map:
+                raise ValueError(
+                    f"Unsupported column constraint for a {self.__class__.__name__}: {flag}"
+                )
+            self._constraints.append(
+                self.__class__.constraint_map[flag].format(
+                    **{
+                        k: v.table if hasattr(v, "table") else str(v).lower()
+                        for k, v in pars.items()
+                    }
+                )
             )
 
-    def sql(self) -> str:
-        """Return the SQL expression as a string."""
-        return f"{self.name} {self.data_type} {self.constraint}"
+    def get_sql(self):
+        return f"{self._name} {self._data_type} {" ".join(self._constraints)}"

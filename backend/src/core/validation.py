@@ -1,12 +1,13 @@
 """ Check validity of login and actions.
 """
 
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
 from data.management.user import User
 from messages.message import MessageAttribute
 from database.sqlexpression import ColumnName
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
 
 
 async def check_login(login_message: dict) -> User:
@@ -22,3 +23,6 @@ async def check_login(login_message: dict) -> User:
     user = await User(id=matching_users[0]).fetch()
     LOG.debug(f"check_login() -> {user}")
     return user
+
+
+log_exit(LOG)

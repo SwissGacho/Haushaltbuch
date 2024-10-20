@@ -1,13 +1,12 @@
 """ Base class for DB connections """
 
-# from persistance.business_object_base import BO_Base
-from database.sqlfactory import SQLFactory
-from database.sqlexecutable import SQL, SQLTemplate
-from database.sqlexpression import SQLColumnDefinition
-from core.base_objects import DBBaseClass
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
+
+from core.base_objects import DBBaseClass
+from database.sqlexecutable import SQL, SQLTemplate
+from database.sqlexpression import SQLColumnDefinition
 
 
 class DB(DBBaseClass):
@@ -18,7 +17,7 @@ class DB(DBBaseClass):
         self._connections = set()
 
     @property
-    def sqlFactory(self):
+    def sql_factory(self):
         "DB specific SQL factory"
         raise NotImplementedError("sqlFactory not defined on base class")
 
@@ -150,7 +149,7 @@ class Cursor:
         self._rowcount = None
         self._close = close
 
-    async def execute(self, query: str, params=None, close=False):
+    async def execute(self, query: str, params=None, close: bool | int = False):
         """execute an SQL statement and return the Cursor instance (self).
         If 'close'=True close connection after fetching all rows
         If 'close'=1 close connection after fetching one row
@@ -197,4 +196,4 @@ class Cursor:
             self._cursor = None
 
 
-LOG.debug(f"module {__name__} initialized")
+log_exit(LOG)

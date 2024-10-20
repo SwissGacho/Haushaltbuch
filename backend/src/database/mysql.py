@@ -1,8 +1,8 @@
 """ Connection to MySQL DB using aiomysql """
 
 from database.db_base import DB, Connection, Cursor
-from database.sql import SQL
 from database.sqlfactory import SQLFactory
+from database.sqlexecutable import SQL
 from core.configuration.config import Config
 from core.app_logging import getLogger
 
@@ -23,20 +23,20 @@ class MySQLDB(DB):
         super().__init__(**cfg)
 
     @property
-    def sqlFactory():
+    def sql_factory(self):
         return SQLFactory
 
     async def connect(self):
         "Open a connection"
         return await MySQLConnection(db_obj=self, **self._cfg).connect()
 
-    def sql(self, query: SQL, **kwargs) -> str:
-        if query == SQL.TABLE_LIST:
-            return f""" SELECT table_name FROM information_schema.tables 
-                        WHERE table_schema = '{self._cfg['db']}'
-                    """
-        else:
-            return super().sql(query=query, **kwargs)
+    # def sql(self, query: SQL, **kwargs) -> str:
+    #    if query == SQL.TABLE_LIST:
+    #        return f""" SELECT table_name FROM information_schema.tables
+    #                    WHERE table_schema = '{self._cfg['db']}'
+    #                """
+    #    else:
+    #        return super().sql(query=query, **kwargs)*/
 
 
 class MySQLConnection(Connection):

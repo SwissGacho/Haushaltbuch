@@ -6,7 +6,7 @@ from pathlib import Path
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
-from core.configuration.util import update_dicts_recursively
+from core.util import update_dicts_recursively
 from core.const import APPDESC, APPNAME, DBCFG_FILE_NAME
 from core.base_objects import ConfigDict
 
