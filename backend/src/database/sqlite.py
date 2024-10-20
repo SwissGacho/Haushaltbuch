@@ -17,19 +17,12 @@ from persistance.bo_descriptors import BOColumnFlag, BOBaseBase
 LOG = getLogger(__name__)
 try:
     import aiosqlite
-except ModuleNotFoundError as err:
-    AIOSQLITE_IMPORT_ERROR = err
-else:
-    AIOSQLITE_IMPORT_ERROR = None
-
-try:
     import sqlite3
 except ModuleNotFoundError as err:
     AIOSQLITE_IMPORT_ERROR = err
     sqlite3 = None
 else:
     AIOSQLITE_IMPORT_ERROR = None
-
 
 
 class SQLiteSQLFactory(SQLFactory):
