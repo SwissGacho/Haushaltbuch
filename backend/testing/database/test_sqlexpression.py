@@ -1,4 +1,5 @@
 import unittest
+import re
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
@@ -17,6 +18,10 @@ from database.sqlexpression import Value, Row
 
 
 class MockKeyManager:
+
+    def __init__(self):
+        self.register_key.reset_mock()
+
     register_key = Mock(side_effect=lambda x: x)
 
 
@@ -25,7 +30,7 @@ class MockKeyManagerWithModifications(MockKeyManager):
 
 
 def normalize_sql(sql):
-    return re.sub("  +", " ").strip()
+    return re.sub("  +", " ", sql).strip()
 
 
 @patch("database.sqlkeymanager.SQLKeyManager", MockKeyManager)
@@ -72,15 +77,14 @@ class TestFrom(unittest.TestCase):
 
     def test_join(self):
         sql = From("table")
-        sql.join("table2", None)
+        join = sql.join("table2", None)
+        self.assertIs(sql, join)
         self.assertEqual(sql.get_sql(), " FROM table FULL OUTER JOIN table2 ")
         self.assertEqual(sql.get_params(), {})
         self.assertEqual(sql._joins, [(JoinOperator.FULL, "table2", None)])
 
     def test_join_with_condition(self):
-        sql = From("table")
-        condition = Eq("table.id", "table2.id")
-        sql.join("table2", condition)
+        sql = From("table").join("table2", condition := Eq("table.id", "table2.id"))
         self.assertEqual(
             sql.get_sql().replace("  ", " ").strip(),
             "FROM table FULL OUTER JOIN table2 ON (table.id = table2.id)",
@@ -166,7 +170,6 @@ class TestValue(unittest.TestCase):
         self.assertEqual(sql._name, "name")
         self.assertEqual(sql.get_sql(), ":key")
         self.assertEqual(sql.get_params(), {"key": "value"})
-        sql = Value("name", "value", self.SQLKeyManager, "key")
 
     def test_value_with_key_manager_modifications(self):
         manager = MockKeyManagerWithModifications()
@@ -188,6 +191,13 @@ class TestRow(unittest.TestCase):
 
     def test_row(self):
         sql = Row(self.valueList)
+        self.assertEqual(sql._values, self.valueList)
+        self.assertEqual(sql.get_sql(), "(:key, :key2)")
+        self.assertEqual(sql.get_params(), {"key": "value", "key2": "value2"})
+        self.assertEqual(sql.names(), "(name, name2)")
+
+    def test_row_value(self):
+        sql = Row().value(self.valueList[0]).value(self.valueList[1])
         self.assertEqual(sql._values, self.valueList)
         self.assertEqual(sql.get_sql(), "(:key, :key2)")
         self.assertEqual(sql.get_params(), {"key": "value", "key2": "value2"})

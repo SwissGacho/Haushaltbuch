@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
-from database.sqlexecutable import SQL, SQLScript, CreateTable
+from database.sqlexecutable import SQL, SQLScript, CreateTable, SQLTemplate
 
 from core.exceptions import InvalidSQLStatementException
 from persistance.bo_descriptors import BOColumnFlag
@@ -50,6 +50,12 @@ class MockDB(AsyncMock):
 
     sql_factory = MockSQLFactory
 
+MOCKTABLEINFO = "Tableinfo"
+class SQLScriptWithMockTemplate(SQLScript):
+    sql_templates = {
+        SQLTemplate.TABLEINFO: MOCKTABLEINFO
+    }
+
 
 class MockApp:
     db = MockDB()
@@ -57,11 +63,15 @@ class MockApp:
 
 class TestSQLScript(unittest.TestCase):
 
-    def test_init_with_enum(self):
-        sql = SQLScript("SELECT * FROM table")
+    def test_init_with_template(self):
+        sql = SQLScriptWithMockTemplate(SQLTemplate.TABLEINFO)
         self.assertIsInstance(sql._script, str)
-        self.assertEqual(sql.get_sql(), "SELECT * FROM table")
+        self.assertEqual(sql.get_sql(), MOCKTABLEINFO)
         self.assertEqual(sql.get_params(), {})
+    
+    def test_init_with_not_implemented_template(self):
+        with self.assertRaises(KeyError):
+            sql = SQLScriptWithMockTemplate(None)
 
     def test_init_with_str(self):
         sql = SQLScript("SELECT * FROM table")
@@ -71,11 +81,7 @@ class TestSQLScript(unittest.TestCase):
 
     def test_init_with_str_and_params(self):
         sql = SQLScript("SELECT * FROM table WHERE id = :id", id=1)
-        print(sql.get_sql())
-        print(sql.get_params())
         self.assertIsInstance(sql._script, str)
-        self.assertEqual(sql._script, "SELECT * FROM table WHERE id = :id")
-        self.assertEqual(sql._params, {"id": 1})
         self.assertEqual(sql.get_sql(), "SELECT * FROM table WHERE id = :id")
         self.assertEqual(sql.get_params(), {"id": 1})
 
@@ -131,8 +137,8 @@ class TestSQLScript(unittest.TestCase):
 
     def test_register_and_replace_named_parameters_without_key_in_query(self):
         sql = SQLScript("Dummy")
-        with self.assertRaises(ValueError):
-            sql._register_and_replace_named_parameters("SELECT * FROM table", {"id": 1})
+        sql._register_and_replace_named_parameters("SELECT * FROM table", {"id": 1})
+        self.assertEqual(sql.get_sql(), "Dummy")
 
 
 class TestCreateTable(unittest.TestCase):

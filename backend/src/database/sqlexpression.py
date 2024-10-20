@@ -84,9 +84,10 @@ class From(SQLExpression):
         table=None,
         join_constraint: "SQLExpression" = None,
         join_operator: JoinOperator = JoinOperator.FULL,
-    ):
+    ) -> "From":
         """Add a join to another table to the FROM clause."""
         self._joins.append((join_operator, table, join_constraint))
+        return self
 
 
 class SQLMultiExpression(SQLExpression):

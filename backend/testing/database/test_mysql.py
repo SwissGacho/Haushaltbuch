@@ -30,7 +30,6 @@ def setUpModule():
 
 
 import database.db_base
-import database.sql
 
 
 @unittest.skip("MySQL module is not maintained currently")

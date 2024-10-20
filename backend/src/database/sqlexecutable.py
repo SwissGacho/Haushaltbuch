@@ -1,6 +1,7 @@
 """This module defines a SQLExecutable class that is used to create and execute SQL statements."""
 
 from enum import Enum, auto
+import re
 from typing import TypeAlias
 
 from core.app import App
@@ -199,8 +200,9 @@ class SQLScript(SQLStatement):
         self._script = (
             script_or_template
             if isinstance(script_or_template, str)
-            else self.__class__.sql_templates.get(script_or_template)
+            else self.__class__.sql_templates[script_or_template]
         )
+        print(f"{self._script=}")
         self._script = self._register_and_replace_named_parameters(self._script, kwargs)
 
     def get_sql(self) -> str:
@@ -212,9 +214,9 @@ class SQLScript(SQLStatement):
     ):
         for key, value in params.items():
             if not key in query:
-                raise ValueError(f"Parameter '{key}' not found in query '{query}'.")
+                continue
             final_key = self._create_param(key, value)
-            query = query.replace(f":{key}", f":{final_key}")
+            query = re.sub(fr":{key}\b", f":{final_key}", query)
         return query
 
     def _create_param(self, proposed_key: str, value):
