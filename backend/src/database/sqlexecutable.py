@@ -42,7 +42,15 @@ class SQLExecutable(object):
     def __init__(self, parent: "SQLExecutable" = None):
         self._parent = parent
         self._parameters = {}
-        self._children: list[SQLExecutable] = []
+
+    def __new__(cls, *args, **kwargs):
+        future_parent = kwargs.get("_parent", None)
+        if not isinstance(future_parent, SQLExecutable):
+            raise TypeError(f"Expected 'SQLExecutable' as parent, got {type(future_parent).__name__}")
+        actual_class = future_parent.sql_factory.get_sql_class(cls)
+        if not issubclass(actual_class, SQLExecutable):
+            raise TypeError(f"Factory returned an invalid class: {actual_class}")
+        return super().__new__(actual_class)
 
     async def execute(
         self,
@@ -76,6 +84,9 @@ class SQL(SQLExecutable):
             ("age",  SQL_data_type.INTEGER)
         ],
     ).execute()"""
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls, *args, **kwargs)
 
     def __init__(self):
         super().__init__(None)
@@ -115,26 +126,26 @@ class SQL(SQLExecutable):
     ) -> "CreateTable":
         """Sets the SQL statement to create a table and returns a create_table object"""
         # LOG.debug(f"SQL.create_table({table=}, {columns=})")
-        create_table = self.get_sql_class(CreateTable)(table, columns, self)
+        create_table = CreateTable(table, columns, self)
         # create_table = Create_Table(table, columns, self)
         self._sql_statement = create_table
         return create_table
 
     def select(self, column_list: list[str] = None, distinct: bool = False) -> "Select":
         """Sets the SQL statement to a select statement and returns a select object"""
-        select = self.get_sql_class(Select)(column_list, distinct, self)
+        select = Select(column_list, distinct, self)
         self._sql_statement = select
         return select
 
     def insert(self, table: str, columns: list[str] = None) -> "Insert":
         """Sets the SQL statement to a insert statement and returns an insert object"""
-        insert = self.get_sql_class(Insert)(table, columns, parent=self)
+        insert = Insert(table, columns, parent=self)
         self._sql_statement = insert
         return insert
 
     def update(self, table: str) -> "Update":
         """Sets the SQL statement to a update statement and returns an update object"""
-        update = self.get_sql_class(Update)(table, parent=self)
+        update = Update(table, parent=self)
         self._sql_statement = update
         return update
 
@@ -146,7 +157,7 @@ class SQL(SQLExecutable):
             raise ValueError(
                 f"'parent={kwargs['parent']}' must not be a template argument"
             )
-        self._sql_statement = self.get_sql_class(SQLScript)(
+        self._sql_statement = SQLScript(
             script_or_template, parent=self, **kwargs
         )
         return self._sql_statement
