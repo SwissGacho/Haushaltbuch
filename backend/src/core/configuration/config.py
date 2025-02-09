@@ -7,11 +7,10 @@
 """
 
 from typing import Optional
-from enum import StrEnum
 
 from core.configuration.cmd_line import parse_commandline
 from core.configuration.db_config import DBConfig
-from core.configuration.util import get_config_item
+from core.util import get_config_item
 from core.configuration.setup_config import SetupConfigValues
 from core.app import App
 from core.status import Status
@@ -22,10 +21,6 @@ from data.management.configuration import Configuration
 from database.sqlexpression import ColumnName
 
 LOG = getLogger(__name__)
-
-
-class ConfigIndex(StrEnum):
-    CFGIX_SEARCHPATH = "search_path"
 
 
 class AppConfiguration(ConfigurationBaseClass):
@@ -60,10 +55,10 @@ class AppConfiguration(ConfigurationBaseClass):
                 {ColumnName("user_id"): None}
             )
             if len(config_ids) != 1:
-                raise ConfigurationError("Multiple global configurations")
+                raise ConfigurationError("Multiple or no global configurations")
             self._global_configuration = await Configuration().fetch(id=config_ids[0])
             user_mode = get_config_item(
-                self._global_configuration.configuration, Config.CONFIG_APP_USRMODE
+                self._global_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
             )
             if not user_mode in [
                 SetupConfigValues.SINGLE_USER,
