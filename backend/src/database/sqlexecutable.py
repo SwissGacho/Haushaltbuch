@@ -2,7 +2,7 @@
 
 from enum import Enum, auto
 import re
-from typing import TypeAlias
+from typing import TypeAlias, Optional, Type
 
 from core.app import App
 from core.app_logging import getLogger
@@ -39,18 +39,26 @@ class SQLTemplate(Enum):
 class SQLExecutable(object):
     """Base class for SQL operations. Should not be instantiated directly."""
 
-    def __init__(self, parent: "SQLExecutable" = None):
+    def __init__(self, parent: Optional["SQLExecutable"] = None):
         self._parent = parent
         self._parameters = {}
 
     def __new__(cls, *args, **kwargs):
-        future_parent = kwargs.get("_parent", None)
-        if not isinstance(future_parent, SQLExecutable):
+        # Should we really get "_parent" rather than "parent"?
+        LOG.debug(f"SQLExecutable.__new__({cls=}, {args=}, {kwargs=})")
+        future_parent = kwargs.get("parent", None)
+        LOG.debug(f"{future_parent=}")
+        if future_parent is not None and not (isinstance(future_parent, SQLExecutable)):
+            LOG.debug(f"{type(future_parent)=}")
             raise TypeError(f"Expected 'SQLExecutable' as parent, got {type(future_parent).__name__}")
-        actual_class = future_parent.sql_factory.get_sql_class(cls)
+        
+        actual_class = future_parent._get_db().sql_factory.get_sql_class(cls) 
+
+        LOG.debug(f"{actual_class=}")
         if not issubclass(actual_class, SQLExecutable):
             raise TypeError(f"Factory returned an invalid class: {actual_class}")
-        return super().__new__(actual_class)
+        LOG.debug(f"{super().__new__(actual_class)=}")
+        return super().__new__(actual_class) # type: ignore
 
     async def execute(
         self,
@@ -69,6 +77,10 @@ class SQLExecutable(object):
         """Get the speficied SQL class definition as defined by the db's SQLFactory."""
         return self.sql_factory.get_sql_class(sql_cls)
 
+    @classmethod
+    def _get_db(cls) -> DBBaseClass:
+        raise NotImplementedError("Must be implemented by subclass.")
+
     @property
     def sql_factory(self) -> SQLFactory:
         """Get the SQLFactory of the current database. Usually call get_sql_class instead."""
@@ -86,7 +98,10 @@ class SQL(SQLExecutable):
     ).execute()"""
 
     def __new__(cls, *args, **kwargs):
-        return super().__new__(cls, *args, **kwargs)
+        LOG.debug("SQL.__new__")
+        factory = cls._get_db().sql_factory
+        actual_class = factory.get_sql_class(cls)
+        return object().__new__(actual_class, *args, **kwargs)
 
     def __init__(self):
         super().__init__(None)
@@ -126,14 +141,14 @@ class SQL(SQLExecutable):
     ) -> "CreateTable":
         """Sets the SQL statement to create a table and returns a create_table object"""
         # LOG.debug(f"SQL.create_table({table=}, {columns=})")
-        create_table = CreateTable(table, columns, self)
+        create_table = CreateTable(table, columns, parent=self)
         # create_table = Create_Table(table, columns, self)
         self._sql_statement = create_table
         return create_table
 
     def select(self, column_list: list[str] = None, distinct: bool = False) -> "Select":
         """Sets the SQL statement to a select statement and returns a select object"""
-        select = Select(column_list, distinct, self)
+        select = Select(column_list, distinct, parent=self)
         self._sql_statement = select
         return select
 
