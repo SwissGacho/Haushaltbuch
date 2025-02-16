@@ -177,12 +177,13 @@ class SQL(SQLExecutable):
         )
         return self._sql_statement
 
-    async def execute(self, params=None, close=False, commit=False):
+    async def execute(self, close=False, commit=False):
         """Execute the current SQL statement on the database.
         Must create the statement before calling this method"""
+        
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
-        return await SQL._get_db().execute(self.get_sql(), params, close, commit)
+        return await SQL._get_db().execute(self.get_sql(), self.get_params(), close, commit)
 
     async def close(self):
         await SQL._get_db().close()
@@ -198,12 +199,6 @@ class SQLStatement(SQLExecutable, SQLKeyManager):
     def get_params(self) -> dict[str, str]:
         """Get the parameters for the current SQL statement."""
         return self._params
-
-    def get_sql(self) -> str:
-        """Get the SQL statement."""
-        raise NotImplementedError(
-            "SQL_statement is an abstract class and should not be instantiated."
-        )
 
     def get_sql(self) -> tuple[str, dict[str, str]]:
         """Get a string representation of the current SQL statement.
