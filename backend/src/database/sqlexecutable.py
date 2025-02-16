@@ -62,12 +62,11 @@ class SQLExecutable(object):
 
     async def execute(
         self,
-        params: dict[str, type] = None,
         close: bool | int = False,
         commit=False,
     ):
         """Execute the current SQL statement on the database."""
-        return await self._parent.execute(params=params, close=close, commit=commit)
+        return await self._parent.execute(close=close, commit=commit)
 
     async def close(self):
         """Close the database connection."""
@@ -183,6 +182,7 @@ class SQL(SQLExecutable):
         
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
+        LOG.debug(f"{self.get_sql()=}, {self.get_params()=}, {close=}, {commit=}")
         return await SQL._get_db().execute(self.get_sql(), self.get_params(), close, commit)
 
     async def close(self):
@@ -425,20 +425,20 @@ class Insert(SQLStatement):
 
     def _single_row(self, cols: list[tuple[str, any] | Value]):
         """Add a single row of values to be inserted"""
-        # LOG.debug(f"Insert._single_row({cols=})")
+        LOG.debug(f"Insert._single_row({cols=})")
         row = self.get_sql_class(Row)(
             [
                 (
                     col
                     if isinstance(col, Value)
-                    else self.get_sql_class(Value)(name=col[0], value=col[1])
+                    else self.get_sql_class(Value)(name=col[0], value=col[1], key_manager=self)
                 )
                 for col in cols
             ]
         )
-        # LOG.debug(f"{row.get_sql()=}")
+        LOG.debug(f"{row.get_sql()=}")
         self._values.row(row)
-        # LOG.debug(f"{self.get_sql()=}")
+        LOG.debug(f"{self.get_sql()=}")
         return self
 
     def rows(self, rows: list[NamedValueList] | NamedValueList):
