@@ -17,7 +17,7 @@ class DB(DBBaseClass):
         self._connections = set()
 
     @property
-    def sqlFactory(self):
+    def sql_factory(self):
         "DB specific SQL factory"
         raise NotImplementedError("sqlFactory not defined on base class")
 
@@ -40,7 +40,7 @@ class DB(DBBaseClass):
             .sql_factory.get_sql_class(SQLColumnDefinition)(
                 name, data_type, constraint, **pars
             )
-            .sql()
+            .get_sql()
         )
         if col is None:
             LOG.error(

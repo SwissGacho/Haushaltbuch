@@ -59,8 +59,8 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         BOColumnFlag.BOC_FK: "REFERENCES {relation}",
         BOColumnFlag.BOC_DEFAULT: "DEFAULT",
         BOColumnFlag.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
-        BOColumnFlag.BOC_INC: "not available ! @%?°",
-        BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
+        # BOColumnFlag.BOC_INC: "not available ! @%?°",
+        # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
 
 
@@ -111,7 +111,7 @@ class SQLiteScript(SQLScript):
                                     WHERE type = 'table' and substr(name,1,7) <> 'sqlite_'
                                 """,
         SQLTemplate.TABLESQL: """SELECT sql FROM sqlite_master
-                                WHERE type='table' AND name = '{table}'
+                                WHERE type='table' AND name = :table
                             """,
     }
 
@@ -153,7 +153,7 @@ class SQLiteConnection(Connection):
             return {key: value for key, value in zip(fields, row)}
 
         db_path = Path(self._cfg[Config.CONFIG_DBFILE])
-        # LOG.debug(f"Connecting to {db_path=}")
+        LOG.debug(f"Connecting to {db_path=}")
         if not db_path.parent.exists():
             LOG.info(f"Create missing directory '{db_path.parent}' for SQLite DB.")
             db_path.parent.mkdir(parents=True)

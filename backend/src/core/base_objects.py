@@ -76,3 +76,18 @@ class ConfigurationBaseClass(BaseObject):
 
 class DBBaseClass(BaseObject):
     "DB Baseclass"
+
+    @property
+    def sql_factory(self):
+        "DB specific SQL factory"
+        raise NotImplementedError("sqlFactory not defined on base class")
+
+    async def connect(self):
+        "Open a connection and return the Connection instance"
+
+    async def execute(self, query: str, params=None, close=False, commit=False):
+        """Open a connection, execute a query and return the Cursor instance.
+        If 'close'=True close connection after fetching all rows"""
+
+    async def close(self):
+        "close all activities"

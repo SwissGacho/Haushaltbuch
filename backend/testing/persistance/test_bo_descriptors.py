@@ -23,6 +23,10 @@ class MockBO:
         self._data = {}
         self.mock_attr = attr
 
+    @classmethod
+    def add_attribute(cls, attribute_name, data_type, constraint_flag, **flag_values):
+        pass
+
 
 class Test_100__PersistantAttr(unittest.TestCase):
     def test_101_initialization(self):

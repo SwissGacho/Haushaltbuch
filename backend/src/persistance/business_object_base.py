@@ -14,7 +14,7 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
-from database.sqlexecutable import SQL, CreateTable, SQLDataType
+from database.sqlexecutable import SQL, CreateTable
 from database.sqlexpression import Eq, Filter, SQLExpression, Value
 
 
@@ -26,7 +26,7 @@ class _classproperty:
         return self.fget(owner_cls)
 
 
-AttributeDescription: TypeAlias = tuple[str, SQLDataType, str, dict[str, str]]
+AttributeDescription: TypeAlias = tuple[str, type, str, dict[str, str]]
 
 
 class BOBase(BOBaseBase):
@@ -55,6 +55,20 @@ class BOBase(BOBaseBase):
 
     def __str__(self) -> str:
         return str(self.id)
+
+    @classmethod
+    def add_attribute(
+        cls,
+        attribute_name: str,
+        data_type: type,
+        constraint_flag: BOColumnFlag,
+        **flag_values,
+    ):
+        if not cls._attributes.get(cls.__name__):
+            cls._attributes[cls.__name__] = []
+        cls._attributes[cls.__name__].append(
+            (attribute_name, data_type, constraint_flag, flag_values)
+        )
 
     @classmethod
     def register_persistant_class(cls):
