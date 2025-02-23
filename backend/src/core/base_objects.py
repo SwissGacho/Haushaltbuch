@@ -38,7 +38,8 @@ class StatusBaseClass(BaseObject):
 class Config(StrEnum):
     "Configuration keys"
     CONFIG_APP = "app"
-    CONFIG_APP_USRMODE = "/".join([CONFIG_APP, "userMode"])
+    CONFIG_USR_MODE = "userMode"
+    CONFIG_APP_USRMODE = "/".join([CONFIG_APP, CONFIG_USR_MODE])
     CONFIG_DBCFG_FILE = "dbcfg_file"
     CONFIG_DB = "db_cfg"
     CONFIG_DB_DB = "/".join([CONFIG_DB, "db"])

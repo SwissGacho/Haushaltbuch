@@ -54,9 +54,16 @@ class AppConfiguration(ConfigurationBaseClass):
             config_ids = await Configuration.get_matching_ids(
                 {ColumnName("user_id"): None}
             )
-            if len(config_ids) != 1:
+            LOG.debug(f"AppConfiguration.get_configuration_from_db: {config_ids=}")
+            if len(config_ids) == 0:
+                self._global_configuration = Configuration(configuration = {Config.CONFIG_APP: {Config.CONFIG_USR_MODE: SetupConfigValues.SINGLE_USER}})
+                await self._global_configuration.store()
+            elif len(config_ids) == 1:
+                self._global_configuration = await Configuration().fetch(id=config_ids[0])
+            else:
                 raise ConfigurationError("Multiple or no global configurations")
-            self._global_configuration = await Configuration().fetch(id=config_ids[0])
+            LOG.debug(f"AppConfiguration.get_configuration_from_db: {self._global_configuration=}")
+
             user_mode = get_config_item(
                 self._global_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
             )

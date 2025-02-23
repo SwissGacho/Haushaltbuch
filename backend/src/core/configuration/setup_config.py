@@ -78,7 +78,8 @@ class ConfigSetup(BaseObject):
         return db_filename
 
     @classmethod
-    async def _create_or_update_global_configuration(cls, configuration: dict):
+    async def _create_or_update_global_configuration(cls, configuration: dict) -> None:
+        #Load the global configuration that does not belong to a user
         rows_in_db = await Configuration.get_matching_ids({ColumnName("user_id"): None})
         if len(rows_in_db) > 1:
             LOG.error(f"Multiple ({len(rows_in_db)}) global configurations in DB")
