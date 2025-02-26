@@ -285,14 +285,7 @@ class Value(SQLExpression):
 
     def get_params(self):
         """Get a dictionary of the value to be used in an SQL cursor"""
-        value_string = ""
-        if isinstance(self._value, (str, StrEnum, Flag)):
-            value_string = f"'{self._value}'"
-        if isinstance(self._value, dict | list):
-            value_string = f"""'{json.dumps(self._value, separators=(",", ":"))}'"""
-        else:
-            value_string = str(self._value)
-        return {self._key: value_string}
+        return {self._key: self._value}
 
     def get_sql(self):
         return ":" + self._key
