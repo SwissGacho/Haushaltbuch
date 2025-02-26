@@ -37,7 +37,12 @@ class AppConfiguration(ConfigurationBaseClass):
         return self._cmdline_configuration or {}
 
     def initialize_configuration(self):
-        "Parse commandline for configuration overrides"
+        """Initialize App configuration
+        - parse commandline for configuration overrides
+        - either:
+            - set DB configuration from commandline
+            - read DB configuration from config file
+        """
         LOG.debug("AppConfiguration.initialize_configuration()")
         self._cmdline_configuration = parse_commandline(Config.CONFIG_DBCFG_FILE)
         if Config.CONFIG_DB in self._cmdline_configuration:
@@ -56,18 +61,28 @@ class AppConfiguration(ConfigurationBaseClass):
             )
             LOG.debug(f"AppConfiguration.get_configuration_from_db: {config_ids=}")
             if len(config_ids) == 0:
-                self._global_configuration = Configuration(configuration = {Config.CONFIG_APP: {Config.CONFIG_USR_MODE: SetupConfigValues.SINGLE_USER}})
+                self._global_configuration = Configuration(
+                    configuration={
+                        Config.CONFIG_APP: {
+                            Config.CONFIG_USR_MODE: SetupConfigValues.SINGLE_USER
+                        }
+                    }
+                )
                 await self._global_configuration.store()
             elif len(config_ids) == 1:
-                self._global_configuration = await Configuration().fetch(id=config_ids[0])
+                self._global_configuration = await Configuration().fetch(
+                    id=config_ids[0]
+                )
             else:
-                raise ConfigurationError("Multiple or no global configurations")
-            LOG.debug(f"AppConfiguration.get_configuration_from_db: {self._global_configuration=}")
+                raise ConfigurationError("Multiple global configurations in DB.")
+            LOG.debug(
+                f"AppConfiguration.get_configuration_from_db: {self._global_configuration=}"
+            )
 
             user_mode = get_config_item(
                 self._global_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
             )
-            if not user_mode in [
+            if user_mode not in [
                 SetupConfigValues.SINGLE_USER,
                 SetupConfigValues.MULTI_USER,
             ]:

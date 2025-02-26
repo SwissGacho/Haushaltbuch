@@ -78,8 +78,15 @@ class ConfigSetup(BaseObject):
         return db_filename
 
     @classmethod
-    async def _create_or_update_global_configuration(cls, configuration: dict) -> None:
-        #Load the global configuration that does not belong to a user
+    async def _create_or_update_global_configuration(
+        cls, app_configuration: dict
+    ) -> None:
+        """Setup the global configuration that does not belong to a user."""
+        # Default user mode to single user
+        configuration: dict = {
+            Config.CONFIG_APP: {Config.CONFIG_USR_MODE: SetupConfigValues.SINGLE_USER}
+        }
+        update_dicts_recursively(target=configuration, source=app_configuration)
         rows_in_db = await Configuration.get_matching_ids({ColumnName("user_id"): None})
         if len(rows_in_db) > 1:
             LOG.error(f"Multiple ({len(rows_in_db)}) global configurations in DB")
@@ -118,26 +125,27 @@ class ConfigSetup(BaseObject):
 
     @classmethod
     async def setup_configuration(cls, setup_cfg: dict):
-        """Setup configuration.
+        """Setup configuration from setup dialogue.
         -  write DB configuration file
-        -  create configuration business object
+        -  create configuration business object in DB using app setup configuration
+        -  create admin user in DB using app setup configuration
         """
         # LOG.debug(f"ConfigSetup.setup_configuration({setup_cfg=}")
         db_filename = cls._write_db_cfg_file(setup_cfg=setup_cfg)
         DBConfig.read_db_config_file([Path(db_filename).parent], Path(db_filename).name)
-        configuration = {
+        app_configuration = {
             Config.CONFIG_APP: get_config_item(setup_cfg, SetupConfigKeys.CFG_APP)
         }
         async with DBConfig.db_config_lock:
             if await cls._wait_for_db():
                 await cls._create_or_update_global_configuration(
-                    configuration=configuration
+                    app_configuration=app_configuration
                 )
             else:
                 LOG.error("Start DB failed with new configuration.")
 
             if (
-                get_config_item(configuration, Config.CONFIG_APP_USRMODE)
+                get_config_item(app_configuration, Config.CONFIG_APP_USRMODE)
                 == SetupConfigValues.MULTI_USER
             ):
                 await cls._create_or_update_admin_user(setup_cfg=setup_cfg)
