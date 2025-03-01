@@ -40,7 +40,7 @@ class DB(DBBaseClass):
             .sql_factory.get_sql_class(SQLColumnDefinition)(
                 name, data_type, constraint, **pars
             )
-            .sql()
+            .get_sql()
         )
         if col is None:
             LOG.error(

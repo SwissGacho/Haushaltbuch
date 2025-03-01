@@ -2,7 +2,7 @@
 
 from enum import Enum, auto
 import re
-from typing import TypeAlias
+from typing import TypeAlias, Optional, Type
 
 from core.app import App
 from core.app_logging import getLogger
@@ -39,19 +39,34 @@ class SQLTemplate(Enum):
 class SQLExecutable(object):
     """Base class for SQL operations. Should not be instantiated directly."""
 
-    def __init__(self, parent: "SQLExecutable" = None):
+    def __init__(self, parent: Optional["SQLExecutable"] = None):
         self._parent = parent
         self._parameters = {}
-        self._children: list[SQLExecutable] = []
+
+    def __new__(cls, *args, **kwargs):
+        # Should we really get "_parent" rather than "parent"?
+        LOG.debug(f"SQLExecutable.__new__({cls=}, {args=}, {kwargs=})")
+        future_parent = kwargs.get("parent", None)
+        LOG.debug(f"{future_parent=}")
+        if future_parent is not None and not (isinstance(future_parent, SQLExecutable)):
+            LOG.debug(f"{type(future_parent)=}")
+            raise TypeError(f"Expected 'SQLExecutable' as parent, got {type(future_parent).__name__}")
+        
+        actual_class = future_parent._get_db().sql_factory.get_sql_class(cls) 
+
+        LOG.debug(f"{actual_class=}")
+        if not issubclass(actual_class, SQLExecutable):
+            raise TypeError(f"Factory returned an invalid class: {actual_class}")
+        LOG.debug(f"{super().__new__(actual_class)=}")
+        return super().__new__(actual_class) # type: ignore
 
     async def execute(
         self,
-        params: dict[str, type] = None,
         close: bool | int = False,
         commit=False,
     ):
         """Execute the current SQL statement on the database."""
-        return await self._parent.execute(params=params, close=close, commit=commit)
+        return await self._parent.execute(close=close, commit=commit)
 
     async def close(self):
         """Close the database connection."""
@@ -60,6 +75,10 @@ class SQLExecutable(object):
     def get_sql_class(self, sql_cls: type) -> type:
         """Get the speficied SQL class definition as defined by the db's SQLFactory."""
         return self.sql_factory.get_sql_class(sql_cls)
+
+    @classmethod
+    def _get_db(cls) -> DBBaseClass:
+        raise NotImplementedError("Must be implemented by subclass.")
 
     @property
     def sql_factory(self) -> SQLFactory:
@@ -76,6 +95,12 @@ class SQL(SQLExecutable):
             ("age",  SQL_data_type.INTEGER)
         ],
     ).execute()"""
+
+    def __new__(cls, *args, **kwargs):
+        LOG.debug("SQL.__new__")
+        factory = cls._get_db().sql_factory
+        actual_class = factory.get_sql_class(cls)
+        return object().__new__(actual_class, *args, **kwargs)
 
     def __init__(self):
         super().__init__(None)
@@ -115,26 +140,26 @@ class SQL(SQLExecutable):
     ) -> "CreateTable":
         """Sets the SQL statement to create a table and returns a create_table object"""
         # LOG.debug(f"SQL.create_table({table=}, {columns=})")
-        create_table = self.get_sql_class(CreateTable)(table, columns, self)
+        create_table = CreateTable(table, columns, parent=self)
         # create_table = Create_Table(table, columns, self)
         self._sql_statement = create_table
         return create_table
 
     def select(self, column_list: list[str] = None, distinct: bool = False) -> "Select":
         """Sets the SQL statement to a select statement and returns a select object"""
-        select = self.get_sql_class(Select)(column_list, distinct, self)
+        select = Select(column_list, distinct, parent=self)
         self._sql_statement = select
         return select
 
     def insert(self, table: str, columns: list[str] = None) -> "Insert":
         """Sets the SQL statement to a insert statement and returns an insert object"""
-        insert = self.get_sql_class(Insert)(table, columns, parent=self)
+        insert = Insert(table, columns, parent=self)
         self._sql_statement = insert
         return insert
 
     def update(self, table: str) -> "Update":
         """Sets the SQL statement to a update statement and returns an update object"""
-        update = self.get_sql_class(Update)(table, parent=self)
+        update = Update(table, parent=self)
         self._sql_statement = update
         return update
 
@@ -146,17 +171,19 @@ class SQL(SQLExecutable):
             raise ValueError(
                 f"'parent={kwargs['parent']}' must not be a template argument"
             )
-        self._sql_statement = self.get_sql_class(SQLScript)(
+        self._sql_statement = SQLScript(
             script_or_template, parent=self, **kwargs
         )
         return self._sql_statement
 
-    async def execute(self, params=None, close=False, commit=False):
+    async def execute(self, close=False, commit=False):
         """Execute the current SQL statement on the database.
         Must create the statement before calling this method"""
+        
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
-        return await SQL._get_db().execute(self.get_sql(), params, close, commit)
+        LOG.debug(f"{self.get_sql()=}, {self.get_params()=}, {close=}, {commit=}")
+        return await SQL._get_db().execute(self.get_sql(), self.get_params(), close, commit)
 
     async def close(self):
         await SQL._get_db().close()
@@ -172,12 +199,6 @@ class SQLStatement(SQLExecutable, SQLKeyManager):
     def get_params(self) -> dict[str, str]:
         """Get the parameters for the current SQL statement."""
         return self._params
-
-    def get_sql(self) -> str:
-        """Get the SQL statement."""
-        raise NotImplementedError(
-            "SQL_statement is an abstract class and should not be instantiated."
-        )
 
     def get_sql(self) -> tuple[str, dict[str, str]]:
         """Get a string representation of the current SQL statement.
@@ -404,20 +425,20 @@ class Insert(SQLStatement):
 
     def _single_row(self, cols: list[tuple[str, any] | Value]):
         """Add a single row of values to be inserted"""
-        # LOG.debug(f"Insert._single_row({cols=})")
+        LOG.debug(f"Insert._single_row({cols=})")
         row = self.get_sql_class(Row)(
             [
                 (
                     col
                     if isinstance(col, Value)
-                    else self.get_sql_class(Value)(name=col[0], value=col[1])
+                    else self.get_sql_class(Value)(name=col[0], value=col[1], key_manager=self)
                 )
                 for col in cols
             ]
         )
-        # LOG.debug(f"{row.get_sql()=}")
+        LOG.debug(f"{row.get_sql()=}")
         self._values.row(row)
-        # LOG.debug(f"{self.get_sql()=}")
+        LOG.debug(f"{self.get_sql()=}")
         return self
 
     def rows(self, rows: list[NamedValueList] | NamedValueList):

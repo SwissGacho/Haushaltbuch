@@ -70,7 +70,8 @@ async def get_db():
         await check_db_schema()
         LOG.debug("DB ready")
         yield db
-    except TypeError:
+    except TypeError as exc:
+        LOG.error(f"DB connection failed: {exc}")
         App.status = Status.STATUS_NO_DB
         yield
         return

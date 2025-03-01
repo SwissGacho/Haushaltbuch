@@ -84,34 +84,11 @@ if sqlite3:
 
 class SQLiteScript(SQLScript):
     sql_templates = {
-        # # # # SQL statement returning a result set with info on DB table 'table' with the following columns:
-        # # # # column_name:    name of table column
-        # # # # column_type:    data type of column
-        # # # # pk:             primary key constraint: 0=none; 1=PK,no auto inc; 2=PK,auto inc
-        # # # # dflt_value:     default value
-        # # # SQLTemplate.TABLEINFO: """ SELECT
-        # # #                             column_name
-        # # #                             ,column_type
-        # # #                             ,CONCAT(
-        # # #                                 CASE WHEN pk=0 THEN ''
-        # # #                                     WHEN autoinc=0 THEN 'PRIMARY KEY'
-        # # #                                     ELSE 'PRIMARY KEY AUTOINCREMENT'
-        # # #                                     END
-        # # #                                 ,CASE WHEN LENGTH(dflt_value) IS NULL THEN ''
-        # # #                                     ELSE CONCAT('DEFAULT ',dflt_value)
-        # # #                                     END
-        # # #                             ) AS "constraint"
-        # # #                         FROM (SELECT name AS column_name, type AS column_type, pk, dflt_value
-        # # #                                 FROM pragma_table_info('{table}')) c
-        # # #                                 FULL OUTER JOIN (SELECT INSTR(sql,'PRIMARY KEY AUTOINCREMENT')>0 AS autoinc
-        # # #                                                 FROM sqlite_master WHERE type='table' AND name = '{table}') s
-        # # #                     """,
-        # SQL statement returning list of tables
         SQLTemplate.TABLELIST: """ SELECT name as table_name FROM sqlite_master
                                     WHERE type = 'table' and substr(name,1,7) <> 'sqlite_'
                                 """,
         SQLTemplate.TABLESQL: """SELECT sql FROM sqlite_master
-                                WHERE type='table' AND name = '{table}'
+                                WHERE type='table' AND name = :table
                             """,
     }
 
@@ -153,7 +130,7 @@ class SQLiteConnection(Connection):
             return {key: value for key, value in zip(fields, row)}
 
         db_path = Path(self._cfg[Config.CONFIG_DBFILE])
-        # LOG.debug(f"Connecting to {db_path=}")
+        LOG.debug(f"Connecting to {db_path=}")
         if not db_path.parent.exists():
             LOG.info(f"Create missing directory '{db_path.parent}' for SQLite DB.")
             db_path.parent.mkdir(parents=True)
