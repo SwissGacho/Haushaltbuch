@@ -8,11 +8,18 @@ LOG = getLogger(__name__)
 from data.management.user import User
 from messages.message import MessageAttribute
 from database.sqlexpression import ColumnName
+from core.app import App
+from core.status import Status
+from core.const import SINGLE_USER_NAME
 
 
 async def check_login(login_message: dict) -> User:
     "Check login permission for for user and return User object"
-    username = login_message.get(MessageAttribute.WS_ATTR_USER)
+    username = (
+        login_message.get(MessageAttribute.WS_ATTR_USER)
+        if App.status == Status.STATUS_MULTI_USER
+        else "<single_user>"
+    )
     LOG.debug(f"check_login() for {username}")
     matching_users = await User.get_matching_ids({ColumnName("name"): username})
     matching_count = len(matching_users)

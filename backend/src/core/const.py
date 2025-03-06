@@ -7,3 +7,5 @@ APPDESC = f"""'{APPNAME}' helps you keeping control over the money you have avai
 DBCFG_FILE_NAME = "configuration.json"
 
 WEBSOCKET_PORT = 8765
+
+SINGLE_USER_NAME = "<single_user>"
