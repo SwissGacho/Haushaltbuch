@@ -1,6 +1,8 @@
 """ Connection to SQLit DB using aiosqlite """
 
 import datetime
+import types
+from enum import Flag
 from pathlib import Path
 import json
 import re
@@ -72,14 +74,39 @@ def _adapt_list(value: list) -> str:
     return json.dumps(value, separators=(",", ":"))
 
 
+def _adapt_flag(value: Flag) -> str:
+    LOG.debug(f"SQLite._adapt_flag({value=})")
+    return str(value)
+
+
 def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
 
+def _convert_flag(value: bytes) -> Flag:
+    LOG.debug(f"SQLite._convert_flag({value=})")
+    return Flag(value)
+
+
 if sqlite3:
+
     sqlite3.register_adapter(dict, _adapt_dict)
     sqlite3.register_adapter(list, _adapt_list)
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
+    for flag_type in list(Flag.__subclasses__()):
+        LOG.debug(f"Registering adapter and converter for {flag_type=}")
+        sqlite3.register_adapter(flag_type, _adapt_flag)
+        sqlite3.register_converter(flag_type.__name__, _convert_flag)
+
+    flag_original_init_subclass = Flag.__init_subclass__
+
+    def flag_init_selfregistering_subclass(cls, *args, **kwargs):
+        flag_original_init_subclass(cls)
+        LOG.debug(f"Self-Registering adapter and converter for {cls=}")
+        sqlite3.register_adapter(cls, _adapt_flag)
+        sqlite3.register_converter(cls.__name__, _convert_flag)
+
+    Flag.__init_subclass__ = types.MethodType(flag_init_selfregistering_subclass, Flag)
 
 
 class SQLiteScript(SQLScript):
