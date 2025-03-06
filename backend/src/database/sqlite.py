@@ -100,13 +100,13 @@ if sqlite3:
 
     flag_original_init_subclass = Flag.__init_subclass__
 
-    def flag_init_selfregistering_subclass(cls, *args, **kwargs):
-        flag_original_init_subclass(cls)
+    def flag_init_selfregistering_subclass(cls):
+        flag_original_init_subclass()
         LOG.debug(f"Self-Registering adapter and converter for {cls=}")
         sqlite3.register_adapter(cls, _adapt_flag)
         sqlite3.register_converter(cls.__name__, _convert_flag)
 
-    Flag.__init_subclass__ = types.MethodType(flag_init_selfregistering_subclass, Flag)
+    Flag.__init_subclass__ = classmethod(flag_init_selfregistering_subclass)
 
 
 class SQLiteScript(SQLScript):
