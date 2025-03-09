@@ -18,7 +18,7 @@ async def check_login(login_message: dict) -> User:
     username = (
         login_message.get(MessageAttribute.WS_ATTR_USER)
         if App.status == Status.STATUS_MULTI_USER
-        else "<single_user>"
+        else SINGLE_USER_NAME
     )
     LOG.debug(f"check_login() for {username}")
     matching_users = await User.get_matching_ids({ColumnName("name"): username})
