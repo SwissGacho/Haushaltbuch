@@ -74,9 +74,9 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
         self.mockCur = AsyncMock(name="mockCursor")
         with patch("core.app.App.db", self.db):
             self.sql = database.sqlexecutable.SQL()
-            self.MockSQL = Mock(return_value=self.sql)
-            self.sql._get_db = Mock(return_value=self.db)
-            self.sql.execute = AsyncMock(return_value=self.mockCur)
+        self.MockSQL = Mock(return_value=self.sql)
+        self.sql._get_db = Mock(return_value=self.db)
+        self.sql.execute = AsyncMock(return_value=self.mockCur)
         return super().setUp()
 
     async def test_101_connect(self):
