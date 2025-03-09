@@ -8,6 +8,8 @@ from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
+from persistance.business_attribute_base import BaseFlag
+
 
 class BOColumnFlag(Flag):
     "Column flag of a BO attribute"
@@ -69,7 +71,7 @@ class _PersistantAttr:
             return self
         return obj._data.get(self.my_name)
 
-    def __set__(self, obj, value):
+    def __set__(self, obj, value) -> None:
         if not self.validate(value):
             raise ValueError(
                 f"'{value}' invalid to set attribute {self.my_name} of type {self.__class__.__name__}"
@@ -182,3 +184,34 @@ class BORelation(_PersistantAttr):
         return (
             value is None or isinstance(relation, type) and isinstance(value, relation)
         )
+
+
+class BOFlag(_PersistantAttr):
+
+    def __init__(
+        self, flag_type: type[Flag], flag: BOColumnFlag = BOColumnFlag.BOC_NONE
+    ) -> None:
+        # LOG.debug(f"{relation=}")
+        if not issubclass(flag_type, Flag):
+            raise TypeError("BO relation should be derived from BOBase.")
+
+        super().__init__(flag, flag_type=flag_type)
+
+    @classmethod
+    def data_type(cls):
+        return BaseFlag
+
+    def validate(self, value):
+        return value is None or isinstance(value, Flag)
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        base_value = super().__get__(obj, objtype)
+        if isinstance(base_value, str):
+            return self._flag_values["flag_type"].flags(base_value)
+        if not isinstance(base_value, self._flag_values["flag_type"]):
+            raise ValueError(
+                f"Attribute {self.my_name} of {obj.__class__.__name__} is not of type {self._flag_values['flag_type']}"
+            )
+        return base_value
