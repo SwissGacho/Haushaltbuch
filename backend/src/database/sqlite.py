@@ -97,8 +97,6 @@ if sqlite3:
     for flag_type in list(BaseFlag.__subclasses__()):
         LOG.debug(f"Registering adapter and converter for {flag_type=}")
         sqlite3.register_adapter(flag_type, _adapt_flag)
-        # sqlite3.register_converter(flag_type.__name__, _convert_flag)
-        # SQLiteColumnDefinition.type_map[flag_type.__name__] = SQLITE_BASEFLAG_TYPE
 
     # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses
     flag_original_init_subclass = BaseFlag.__init_subclass__
@@ -107,8 +105,6 @@ if sqlite3:
         flag_original_init_subclass()
         LOG.debug(f"Self-Registering adapter and converter for {cls=}")
         sqlite3.register_adapter(cls, _adapt_flag)
-        # sqlite3.register_converter(cls.__name__, _convert_flag)
-        # SQLiteColumnDefinition.type_map[cls.__name__] = SQLITE_BASEFLAG_TYPE
 
     BaseFlag.__init_subclass__ = classmethod(flag_init_selfregistering_subclass)
 
