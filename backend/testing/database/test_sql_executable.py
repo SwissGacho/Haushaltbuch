@@ -50,17 +50,19 @@ class MockDB(AsyncMock):
 
     sql_factory = MockSQLFactory
 
+
 MOCKTABLEINFO = "Tableinfo"
+
+
 class SQLScriptWithMockTemplate(SQLScript):
-    sql_templates = {
-        SQLTemplate.TABLEINFO: MOCKTABLEINFO
-    }
+    sql_templates = {SQLTemplate.TABLEINFO: MOCKTABLEINFO}
 
 
 class MockApp:
     db = MockDB()
 
 
+@unittest.skip("moved to test_sql_statement.py")
 class TestSQLScript(unittest.TestCase):
 
     def test_init_with_template(self):
@@ -68,7 +70,7 @@ class TestSQLScript(unittest.TestCase):
         self.assertIsInstance(sql._script, str)
         self.assertEqual(sql.get_sql(), MOCKTABLEINFO)
         self.assertEqual(sql.get_params(), {})
-    
+
     def test_init_with_not_implemented_template(self):
         with self.assertRaises(KeyError):
             sql = SQLScriptWithMockTemplate(None)
@@ -141,6 +143,7 @@ class TestSQLScript(unittest.TestCase):
         self.assertEqual(sql.get_sql(), "Dummy")
 
 
+@unittest.skip("moved to test_sql_statement.py")
 class TestCreateTable(unittest.TestCase):
 
     def setUp(self) -> None:
