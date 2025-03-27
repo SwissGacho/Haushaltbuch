@@ -270,10 +270,10 @@ class Value(SQLExpression):
     """Represents a value in an SQL statement."""
 
     def __init__(
-        self, name: str, value: any, key_manager: SQLKeyManager, key: str = ""
+        self, name: str, value: any, key_manager: SQLKeyManager = None, key: str = ""
     ):
         # LOG.debug(f"Value({name=}, {value=})")
-        super().__init__(key_manager=key_manager)
+        super().__init__(key_manager=key_manager or SQLKeyManager())
         key = self.create_param(key, value)
         self._key = key
         self._name = name

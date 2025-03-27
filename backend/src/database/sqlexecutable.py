@@ -31,6 +31,7 @@ LOG = getLogger(__name__)
 
 class SQLTemplate(Enum):
     "Keys for dialect specific SQL templates used in SQLScript"
+
     TABLEINFO = auto()
     TABLELIST = auto()
     TABLESQL = auto()
@@ -48,17 +49,19 @@ class SQLExecutable(object):
         LOG.debug(f"SQLExecutable.__new__({cls=}, {args=}, {kwargs=})")
         future_parent = kwargs.get("parent", None)
         LOG.debug(f"{future_parent=}")
-        if future_parent is not None and not (isinstance(future_parent, SQLExecutable)):
+        if future_parent is None or not (isinstance(future_parent, SQLExecutable)):
             LOG.debug(f"{type(future_parent)=}")
-            raise TypeError(f"Expected 'SQLExecutable' as parent, got {type(future_parent).__name__}")
-        
-        actual_class = future_parent._get_db().sql_factory.get_sql_class(cls) 
+            raise TypeError(
+                f"Expected 'SQLExecutable' as parent, got {type(future_parent).__name__}"
+            )
+
+        actual_class = future_parent._get_db().sql_factory.get_sql_class(cls)
 
         LOG.debug(f"{actual_class=}")
         if not issubclass(actual_class, SQLExecutable):
             raise TypeError(f"Factory returned an invalid class: {actual_class}")
         LOG.debug(f"{super().__new__(actual_class)=}")
-        return super().__new__(actual_class) # type: ignore
+        return super().__new__(actual_class)  # type: ignore
 
     async def execute(
         self,
@@ -171,19 +174,19 @@ class SQL(SQLExecutable):
             raise ValueError(
                 f"'parent={kwargs['parent']}' must not be a template argument"
             )
-        self._sql_statement = SQLScript(
-            script_or_template, parent=self, **kwargs
-        )
+        self._sql_statement = SQLScript(script_or_template, parent=self, **kwargs)
         return self._sql_statement
 
     async def execute(self, close=False, commit=False):
         """Execute the current SQL statement on the database.
         Must create the statement before calling this method"""
-        
+
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
         LOG.debug(f"{self.get_sql()=}, {self.get_params()=}, {close=}, {commit=}")
-        return await SQL._get_db().execute(self.get_sql(), self.get_params(), close, commit)
+        return await SQL._get_db().execute(
+            self.get_sql(), self.get_params(), close, commit
+        )
 
     async def close(self):
         await SQL._get_db().close()
@@ -191,6 +194,13 @@ class SQL(SQLExecutable):
 
 class SQLStatement(SQLExecutable, SQLKeyManager):
     """Base class for SQL statements. Should not be instantiated directly."""
+
+    def __new__(cls, *args, **kwargs):
+        if cls == SQLStatement:
+            raise NotImplementedError(
+                "SQLStatement is an abstract class and should not be instantiated"
+            )
+        return super().__new__(cls, *args, **kwargs)
 
     def __init__(self, parent: SQLExecutable = None):
         super().__init__(parent)
@@ -223,7 +233,6 @@ class SQLScript(SQLStatement):
             if isinstance(script_or_template, str)
             else self.__class__.sql_templates[script_or_template]
         )
-        print(f"{self._script=}")
         self._script = self._register_and_replace_named_parameters(self._script, kwargs)
 
     def get_sql(self) -> str:
@@ -237,7 +246,7 @@ class SQLScript(SQLStatement):
             if not key in query:
                 continue
             final_key = self._create_param(key, value)
-            query = re.sub(fr":{key}\b", f":{final_key}", query)
+            query = re.sub(rf":{key}\b", f":{final_key}", query)
         return query
 
     def _create_param(self, proposed_key: str, value):
@@ -431,7 +440,9 @@ class Insert(SQLStatement):
                 (
                     col
                     if isinstance(col, Value)
-                    else self.get_sql_class(Value)(name=col[0], value=col[1], key_manager=self)
+                    else self.get_sql_class(Value)(
+                        name=col[0], value=col[1], key_manager=self
+                    )
                 )
                 for col in cols
             ]
