@@ -1,5 +1,4 @@
 class SQLKeyManager:
-    _last_key = 0
 
     def __init__(self):
         super().__init__()
@@ -7,8 +6,8 @@ class SQLKeyManager:
 
     def _generate_key(self):
         """Generate a new unique id for a parameter"""
-        SQLKeyManager._last_key += 1
-        return str(SQLKeyManager._last_key)
+        self._last_key += 1
+        return str(self._last_key)
 
     def register_key(self, key="param"):
         """Register a new key for a parameter,
@@ -21,5 +20,5 @@ class SQLKeyManager:
         return key
 
     def _initialize_registry(self):
-        # self._last_key = 0
+        self._last_key = 0
         self._keys: set[str] = set()
