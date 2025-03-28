@@ -202,7 +202,7 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
             MockUserRole.role = Mock(return_value=MockRole.R2)
             MockUserRole.ADMIN = MockRole.ADMIN
 
-            await ConfigSetup._create_or_update_admin_user(mock_cfg)
+            await ConfigSetup._create_or_update_initial_user(mock_cfg)
 
         mock_get_cfg.assert_called_once_with(mock_cfg, SetupConfigKeys.ADM_USER)
         MockUser.get_matching_ids.assert_awaited_once_with(
@@ -240,7 +240,7 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         ):
             mock_get_cfg.return_value = 99
             MockUser.get_matching_ids = AsyncMock(return_value=[])
-            await ConfigSetup._create_or_update_admin_user(mock_cfg)
+            await ConfigSetup._create_or_update_initial_user(mock_cfg)
         mock_get_cfg.assert_called_once_with(mock_cfg, SetupConfigKeys.ADM_USER)
         MockUser.get_matching_ids.assert_not_awaited()
 
@@ -258,7 +258,7 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
             MockUser.get_matching_ids = AsyncMock(return_value=[22, 33])
             MockColumnName.return_value = mock_col
 
-            await ConfigSetup._create_or_update_admin_user(mock_cfg)
+            await ConfigSetup._create_or_update_initial_user(mock_cfg)
 
         mock_get_cfg.assert_called_once_with(mock_cfg, SetupConfigKeys.ADM_USER)
         MockUser.get_matching_ids.assert_awaited_once_with(
@@ -278,7 +278,7 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         ConfigSetup._write_db_cfg_file = Mock(return_value=mock_filename)
         ConfigSetup._wait_for_db = AsyncMock(return_value=db_available)
         ConfigSetup._create_or_update_global_configuration = AsyncMock()
-        ConfigSetup._create_or_update_admin_user = AsyncMock()
+        ConfigSetup._create_or_update_initial_user = AsyncMock()
         with (
             patch("core.configuration.setup_config.get_config_item") as mock_get_cfg,
             patch("core.configuration.setup_config.DBConfig") as MockDBCfg,
@@ -313,11 +313,11 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         else:
             ConfigSetup._create_or_update_global_configuration.assert_not_called()
         if multi:
-            ConfigSetup._create_or_update_admin_user.assert_awaited_once_with(
+            ConfigSetup._create_or_update_initial_user.assert_awaited_once_with(
                 setup_cfg=mock_cfg
             )
         else:
-            ConfigSetup._create_or_update_admin_user.assert_not_awaited()
+            ConfigSetup._create_or_update_initial_user.assert_not_awaited()
 
     async def test_501_setup_configuration_multi(self):
         await self._500_setup_configuration(multi=True)

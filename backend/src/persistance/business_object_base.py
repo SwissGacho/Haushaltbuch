@@ -111,9 +111,9 @@ class BOBase(BOBaseBase):
         "Create a DB table for this class"
         attributes = cls.attribute_descriptions()
         sql: CreateTable = SQL().create_table(cls.table)
-        # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+        LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
         for name, data_type, constraint, pars in attributes:
-            # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
+            LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
             sql.column(name, data_type, constraint, **pars)
         await sql.execute(close=0)
 

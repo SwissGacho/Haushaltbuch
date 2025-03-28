@@ -11,6 +11,8 @@ from database.sqlexpression import ColumnName
 from core.app import App
 from core.util import get_config_item, update_dicts_recursively
 from core.configuration.db_config import DBConfig
+from core.status import Status
+from core.const import SINGLE_USER_NAME
 from core.base_objects import Config
 from core.base_objects import BaseObject
 from core.exceptions import ConfigurationError, DataError
@@ -102,22 +104,28 @@ class ConfigSetup(BaseObject):
         await bo.store()
 
     @classmethod
-    async def _create_or_update_admin_user(cls, setup_cfg: dict):
-        adm_user = get_config_item(setup_cfg, SetupConfigKeys.ADM_USER)
-        if not isinstance(adm_user, dict):
-            raise TypeError(f"admin user must be dict not {type(adm_user)}")
-        rows_in_db = await User.get_matching_ids({ColumnName("name"): adm_user["name"]})
+    async def _create_or_update_initial_user(cls, setup_cfg: dict):
+        initial_user = (
+            get_config_item(setup_cfg, SetupConfigKeys.ADM_USER)
+            if App.status == Status.STATUS_MULTI_USER
+            else {"name": SINGLE_USER_NAME, "password": None}
+        )
+        if not isinstance(initial_user, dict):
+            raise TypeError(f"admin user must be dict not {type(initial_user)}")
+        rows_in_db = await User.get_matching_ids(
+            {ColumnName("name"): initial_user["name"]}
+        )
         if len(rows_in_db) > 1:
-            LOG.error(f"{len(rows_in_db)} users named {adm_user['name']} in DB")
+            LOG.error(f"{len(rows_in_db)} users named {initial_user['name']} in DB")
             raise DataError("Multiple users in DB")
         elif len(rows_in_db) == 1:
-            user = await User(id=rows_in_db[0]).fetch()
-            user.password = adm_user["password"]
-            user.role = UserRole.role(user.role) | UserRole.ADMIN
+            user: User = await User(id=rows_in_db[0]).fetch()
+            user.password = initial_user["password"]
+            user.role |= UserRole.ADMIN
         else:
             user = User(
-                name=adm_user["name"],
-                password=adm_user["password"],
+                name=initial_user["name"],
+                password=initial_user["password"],
                 role=UserRole.ADMIN,
             )
         # LOG.debug(f"ConfigSetup._create_or_update_admin_user(): {user=}")
@@ -144,8 +152,4 @@ class ConfigSetup(BaseObject):
             else:
                 LOG.error("Start DB failed with new configuration.")
 
-            if (
-                get_config_item(app_configuration, Config.CONFIG_APP_USRMODE)
-                == SetupConfigValues.MULTI_USER
-            ):
-                await cls._create_or_update_admin_user(setup_cfg=setup_cfg)
+            await cls._create_or_update_initial_user(setup_cfg=setup_cfg)

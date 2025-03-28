@@ -7,6 +7,7 @@ from messages.message import Message, MessageType, MessageAttribute
 from core.app_logging import getLogger
 from core.status import Status
 from core.app import App
+from core.const import SINGLE_USER_NAME
 from core.validation import check_login
 from data.management.user import User
 from database.sqlexpression import ColumnName
@@ -33,12 +34,6 @@ class LoginMessage(Message):
         LOG = getLogger(  # pylint: disable=invalid-name,redefined-outer-name
             f"{LoginMessage.__module__})"
         )
-        # pylint: disable=comparison-with-callable
-        single_user_mode = App.status == Status.STATUS_SINGLE_USER
-        user_name = self.message.get(
-            MessageAttribute.WS_ATTR_USER,
-            ("<single user>" if single_user_mode else None),
-        )
         token = self.get_str(MessageAttribute.WS_ATTR_TOKEN)
         try:
             ses_token = self.get_str(MessageAttribute.WS_ATTR_SES_TOKEN)
@@ -48,20 +43,11 @@ class LoginMessage(Message):
                     ses_token=ses_token, conn_token=conn_token
                 )
             else:
-                if single_user_mode:
-                    user = User(name=user_name)
-                else:
-                    user = await check_login(self.message)
-                    if not user:
-                        await connection.send_message(
-                            ByeMessage(reason="Password not matching")
-                        )
-                        LOG.debug("login failed (password)")
-                        return
+                user = await check_login(self.message)
                 session = Session(user, token, connection)
             if not session:
                 raise PermissionError(
-                    f"Failed to create session for user '{user_name}'"
+                    f"Failed to create session for login with message {self.message}"
                 )
             connection.session = session
             LOG = getLogger(  # pylint: disable=invalid-name
