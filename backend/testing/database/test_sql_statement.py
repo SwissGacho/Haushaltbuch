@@ -14,7 +14,7 @@ from database.sqlstatement import (
     Insert,
     Update,
 )
-from database.sqlclause import SQLColumnDefinition
+from database.sql_clause import SQLColumnDefinition
 from database.sqlexpression import Eq, And, ColumnName, SQLString, Value
 from persistance.bo_descriptors import BOBaseBase, BOColumnFlag
 from persistance.business_attribute_base import BaseFlag

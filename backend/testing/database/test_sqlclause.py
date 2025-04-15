@@ -3,7 +3,7 @@ import re
 from unittest.mock import Mock, AsyncMock, create_autospec
 from unittest.mock import patch
 
-from database.sqlclause import (
+from database.sql_clause import (
     JoinOperator,
     SQLColumnDefinition,
     From,

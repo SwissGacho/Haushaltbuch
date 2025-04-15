@@ -8,7 +8,7 @@ from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call,
 import database.db_base
 from database.sqlexecutable import SQLExecutable
 from database.sqlstatement import SQL
-from database.sqlclause import SQLColumnDefinition
+from database.sql_clause import SQLColumnDefinition
 from persistance.bo_descriptors import BOColumnFlag
 
 

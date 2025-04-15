@@ -7,7 +7,7 @@ LOG = getLogger(__name__)
 
 from core.base_objects import DBBaseClass
 from database.sqlstatement import SQL, SQLTemplate
-from database.sqlclause import SQLColumnDefinition
+from database.sql_clause import SQLColumnDefinition
 
 
 class DB(DBBaseClass):

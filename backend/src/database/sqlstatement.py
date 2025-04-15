@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import Any, TypeAlias
 
 from database.sqlexecutable import SQLExecutable, SQLManagedExecutable
-from database.sqlclause import (
+from database.sql_clause import (
     Assignment,
     From,
     GroupBy,
