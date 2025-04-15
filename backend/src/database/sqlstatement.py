@@ -18,7 +18,7 @@ from database.sql_expression import (
     SQLExpression,
     Value,
 )
-from database.sqlfactory import SQLFactory
+from database.sql_factory import SQLFactory
 from database.sqlkeymanager import SQL_Dict
 
 from persistance.bo_descriptors import BOColumnFlag

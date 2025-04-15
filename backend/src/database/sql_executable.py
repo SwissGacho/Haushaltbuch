@@ -4,7 +4,7 @@ from typing import Optional
 
 from core.app import App
 from core.base_objects import DBBaseClass
-from database.sqlfactory import SQLFactory
+from database.sql_factory import SQLFactory
 from database.sqlkeymanager import SQLKeyManager, SQL_Dict
 from core.app_logging import getLogger
 

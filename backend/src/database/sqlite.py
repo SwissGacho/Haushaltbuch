@@ -13,7 +13,7 @@ from core.app_logging import getLogger
 from database.db_base import DB, Connection, Cursor
 from database.sqlstatement import SQL, SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
-from database.sqlfactory import SQLFactory
+from database.sql_factory import SQLFactory
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase
 from persistance.business_attribute_base import BaseFlag
 
