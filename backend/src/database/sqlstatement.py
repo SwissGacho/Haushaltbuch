@@ -13,7 +13,7 @@ from database.sql_clause import (
     Values,
     Where,
 )
-from database.sqlexpression import (
+from database.sql_expression import (
     Row,
     SQLExpression,
     Value,

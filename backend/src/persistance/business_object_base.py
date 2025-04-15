@@ -15,7 +15,7 @@ LOG = getLogger(__name__)
 
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
 from database.sqlstatement import SQL, CreateTable
-from database.sqlexpression import Eq, Filter, SQLExpression, Value
+from database.sql_expression import Eq, Filter, SQLExpression, Value
 
 
 class _classproperty:

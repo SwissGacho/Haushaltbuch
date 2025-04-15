@@ -14,7 +14,7 @@ from database.sql_clause import (
     Assignment,
 )
 from database.sqlstatement import SQL
-from database.sqlexpression import ColumnName, Row, SQLExpression, Value, Eq
+from database.sql_expression import ColumnName, Row, SQLExpression, Value, Eq
 from persistance.bo_descriptors import BOColumnFlag
 
 

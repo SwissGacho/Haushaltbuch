@@ -1,4 +1,4 @@
-""" Helper functions for the configuration of the setup procedure """
+"""Helper functions for the configuration of the setup procedure"""
 
 from enum import StrEnum
 from pathlib import Path
@@ -7,7 +7,7 @@ import asyncio
 
 from data.management.user import User, UserRole
 from data.management.configuration import Configuration
-from database.sqlexpression import ColumnName
+from database.sql_expression import ColumnName
 from core.app import App
 from core.util import get_config_item, update_dicts_recursively
 from core.configuration.db_config import DBConfig
@@ -26,6 +26,7 @@ WAIT_FAILURE_TASK = "wait_for_failure"
 
 class SetupConfigKeys(StrEnum):
     "Keys used by configuration setup"
+
     CONFIG = "configuration"
     CFG_APP = "configuration/app"
     DBCFG_CFG_FILE = "dbcfg_file"
@@ -37,6 +38,7 @@ class SetupConfigKeys(StrEnum):
 
 class SetupConfigValues(StrEnum):
     "Values used by configuration setup"
+
     SINGLE_USER = "single"
     MULTI_USER = "multi"
 

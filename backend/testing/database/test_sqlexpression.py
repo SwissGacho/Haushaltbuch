@@ -5,7 +5,7 @@ import re
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
-from database.sqlexpression import (
+from database.sql_expression import (
     ColumnName,
     Row,
     SQLExpression,

@@ -1,5 +1,4 @@
-""" Login related messages
-"""
+"""Login related messages"""
 
 from server.ws_token import WSToken
 from server.session import Session
@@ -10,7 +9,7 @@ from core.app import App
 from core.const import SINGLE_USER_NAME
 from core.validation import check_login
 from data.management.user import User
-from database.sqlexpression import ColumnName
+from database.sql_expression import ColumnName
 
 LOG = getLogger(__name__)
 
