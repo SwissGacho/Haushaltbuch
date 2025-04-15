@@ -100,7 +100,7 @@ def clean_sql(sql: str | SQL_Dict) -> str | SQL_Dict:
 class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
-        self.patcher = patch("database.sqlexecutable.App", MockApp)
+        self.patcher = patch("database.sql_executable.App", MockApp)
         self.patcher.start()
         MockApp.db.execute.reset_mock()
         MockApp.db.close.reset_mock()
@@ -154,7 +154,7 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
 class Test_300_SQL(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.patcher = patch("database.sqlexecutable.App", MockApp)
+        self.patcher = patch("database.sql_executable.App", MockApp)
         self.patcher.start()
         self.sql = SQL()
 
@@ -250,7 +250,7 @@ class Test_400_SQLStatement(unittest.TestCase):
 
 class Test_600_SQLScript(unittest.TestCase):
     def setUp(self) -> None:
-        self.patcher = patch("database.sqlexecutable.App", MockApp)
+        self.patcher = patch("database.sql_executable.App", MockApp)
         self.patcher.start()
         self.mockParent = Mock(spec=SQL)
         self.mockParent.sql_factory = MockSQLFactory
@@ -294,7 +294,7 @@ class Test_600_SQLScript(unittest.TestCase):
 class Test_700_CreateTable(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.patcher = patch("database.sqlexecutable.App", MockApp)
+        self.patcher = patch("database.sql_executable.App", MockApp)
         self.patcher.start()
 
         self.mockParent = Mock(spec=SQL)
@@ -401,7 +401,7 @@ class Test_900_Select(unittest.TestCase):
     """Test the SQLExecutable.Select class"""
 
     def setUp(self) -> None:
-        self.patcher = patch("database.sqlexecutable.App", MockApp)
+        self.patcher = patch("database.sql_executable.App", MockApp)
         self.patcher.start()
         self.mockParent = Mock(spec=SQL)
         self.mockParent.sql_factory = MockSQLFactory
@@ -508,7 +508,7 @@ class Test_A00_Insert(unittest.TestCase):
     """Test the SQLExecutable.Insert class"""
 
     def setUp(self) -> None:
-        self.patcher = patch("database.sqlexecutable.App", MockApp)
+        self.patcher = patch("database.sql_executable.App", MockApp)
         self.patcher.start()
         self.mockParent = Mock(spec=SQL)
         self.mockParent.sql_factory = MockSQLFactory
@@ -627,7 +627,7 @@ class Test_B00_Update(unittest.TestCase):
     """Test the SQLExecutable.Update class"""
 
     def setUp(self) -> None:
-        self.patcher = patch("database.sqlexecutable.App", MockApp)
+        self.patcher = patch("database.sql_executable.App", MockApp)
         self.patcher.start()
         self.mockParent = Mock(spec=SQL)
         self.mockParent.sql_factory = MockSQLFactory

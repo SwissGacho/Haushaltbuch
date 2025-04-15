@@ -1,8 +1,6 @@
 """Connection to SQLit DB using aiosqlite"""
 
 import datetime
-import types
-from enum import Flag
 from pathlib import Path
 import json
 import re

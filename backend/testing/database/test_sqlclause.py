@@ -132,7 +132,7 @@ class Test_300_Where(unittest.TestCase):
 
     def test_302_mock_get_query_call(self):
         with patch(
-            "database.sqlexpression.SQLExpression.get_query",
+            "database.sql_expression.SQLExpression.get_query",
             return_value="mock_condition",
         ) as mock_get_query:
             sql = Where(SQLExpression("mock_condition"), parent=self.mock_parent)
@@ -169,7 +169,7 @@ class Test_500_Having(unittest.TestCase):
 
     def test_502_mock_get_query_call(self):
         with patch(
-            "database.sqlexpression.SQLExpression.get_query",
+            "database.sql_expression.SQLExpression.get_query",
             return_value="mock_condition",
         ) as mock_get_query:
             sql = Having(SQLExpression("mock_condition"), parent=self.mock_parent)
@@ -205,9 +205,9 @@ class Test_600_Assignment(unittest.TestCase):
 
     def test_604_mock_get_query_calls(self):
         with patch(
-            "database.sqlexpression.Value.get_query", return_value="mock_val"
+            "database.sql_expression.Value.get_query", return_value="mock_val"
         ) as mock_value_get_query, patch(
-            "database.sqlexpression.ColumnName.get_query", return_value="mock_col"
+            "database.sql_expression.ColumnName.get_query", return_value="mock_col"
         ) as mock_col_get_query:
             sql = Assignment(
                 ColumnName("column1"), Value("value1"), parent=self.mock_parent

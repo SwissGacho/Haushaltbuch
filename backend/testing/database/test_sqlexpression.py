@@ -33,7 +33,7 @@ def normalize_sql(sql):
     return re.sub("  +", " ", sql).strip()
 
 
-@patch("database.sqlkeymanager.SQLKeyManager", MockKeyManager)
+@patch("database.sql_key_manager.SQLKeyManager", MockKeyManager)
 class Test_100_SQLExpression(unittest.TestCase):
 
     def setUp(self):
@@ -159,7 +159,7 @@ class Test_500_TernaryExpression(unittest.TestCase):
         )
 
 
-@patch("database.sqlkeymanager.SQLKeyManager", MockKeyManager)
+@patch("database.sql_key_manager.SQLKeyManager", MockKeyManager)
 class Test_600_Value(unittest.TestCase):
 
     def setUp(self):
