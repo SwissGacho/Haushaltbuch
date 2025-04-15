@@ -19,7 +19,7 @@ from database.sql_expression import (
     Value,
 )
 from database.sql_factory import SQLFactory
-from database.sqlkeymanager import SQL_Dict
+from database.sql_key_manager import SQL_Dict
 
 from persistance.bo_descriptors import BOColumnFlag
 

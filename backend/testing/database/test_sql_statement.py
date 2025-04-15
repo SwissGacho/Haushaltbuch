@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
-from database.sqlkeymanager import SQL_Dict
+from database.sql_key_manager import SQL_Dict
 from database.sqlstatement import (
     SQL,
     SQLStatement,
