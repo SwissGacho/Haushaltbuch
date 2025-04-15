@@ -1,8 +1,8 @@
-""" Connection to MySQL DB using aiomysql """
+"""Connection to MySQL DB using aiomysql"""
 
 from database.db_base import DB, Connection, Cursor
 from database.sqlfactory import SQLFactory
-from database.sqlexecutable import SQL
+from database.sqlstatement import SQL
 from core.configuration.config import Config
 from core.app_logging import getLogger
 
