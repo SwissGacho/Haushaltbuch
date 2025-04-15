@@ -89,12 +89,10 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         FETCH_RESULT = [{"id": i} for i in RESULT]
         mock_cursor = Mock(name="mock_cursor")
         mock_cursor.fetchall = AsyncMock(return_value=FETCH_RESULT)
-        MockDBFilter = Mock(name="MockDBFilter")
         mock_sql = Mock(name="mock_sql")
         mock_sql.execute = AsyncMock(return_value=mock_cursor)
         mock_sql.select = Mock(return_value=mock_sql)
         mock_sql.from_ = Mock(return_value=mock_sql)
-        mock_sql.get_sql_class = Mock(return_value=MockDBFilter)
         mock_sql.where = Mock(return_value=mock_sql)
 
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
@@ -108,9 +106,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             MockSQL.assert_called_once_with()
             mock_sql.select.assert_called_once_with(["id"])
             mock_sql.from_.assert_called_once_with(MOCK_TAB2)
-            mock_sql.get_sql_class.assert_called_once_with(MockFilter)
-            MockDBFilter.assert_called_once_with(mock_conditions)
-            mock_sql.where.assert_called_once_with(MockDBFilter())
+            mock_sql.where.assert_called_once_with(MockFilter())
             mock_sql.execute.assert_awaited_once_with(close=1)
             mock_cursor.fetchall.assert_awaited_once_with()
             self.assertEqual(result, RESULT)
@@ -178,10 +174,6 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_sql.execute = AsyncMock(return_value=self.mock_cursor)
         self.mock_sql.select = Mock(return_value=self.mock_sql)
         self.mock_sql.from_ = Mock(return_value=self.mock_sql)
-        self.Mock_DB_SQLExpr = Mock(
-            name="Mock_DB_SQLExpr", return_value="Mock_DB_SQLExpr"
-        )
-        self.mock_sql.get_sql_class = Mock(return_value=self.Mock_DB_SQLExpr)
         self.mock_sql.where = Mock(return_value=self.mock_sql)
         self.mock_sql.insert = Mock(return_value=self.mock_sql)
         self.mock_sql.update = Mock(return_value=self.mock_sql)
@@ -211,9 +203,7 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.MockSQL.assert_called_once_with()
             self.mock_sql.select.assert_called_once_with([], True)
             self.mock_sql.from_.assert_called_once_with(MOCK_TAB2)
-            self.mock_sql.get_sql_class.assert_called_once_with(MockExp)
-            self.Mock_DB_SQLExpr.assert_called_once_with(*exp_params)
-            self.mock_sql.where.assert_called_once_with("Mock_DB_SQLExpr")
+            self.mock_sql.where.assert_called_once_with(MockExp())
             self.mock_sql.execute.assert_awaited_once_with(close=1)
             self.mock_cursor.fetchone.assert_awaited_once_with()
             self.assertIs(result, self.mock_bo)
@@ -325,13 +315,13 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 for a in self.mock_bo._data
                 if a != "id" and self.mock_bo._data[a] != self.mock_bo._db_data.get(a)
             ]
-            Mock_DB_Val = Mock(
-                name="Mock_DB_Val",
-                side_effect=[v[1] for v in new_vals],
-            )
+            # Mock_DB_Val = Mock(
+            #     name="Mock_DB_Val",
+            #     side_effect=[v[1] for v in new_vals],
+            # )
             self.mock_bo.fetch = AsyncMock(name="fetch")
-            Mock_DB_Eq = Mock(name="Mock_DB_Eq", return_value="mock eq")
-            self.mock_sql.get_sql_class = Mock(side_effect=[Mock_DB_Val, Mock_DB_Eq])
+            # Mock_DB_Eq = Mock(name="Mock_DB_Eq", return_value="mock eq")
+            # self.mock_sql.get_sql_class = Mock(side_effect=[Mock_DB_Val, Mock_DB_Eq])
             id = self.mock_bo.id
 
             if exception:
@@ -342,17 +332,9 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 await self.mock_bo._update_self()
 
             self.MockSQL.assert_called_once_with()
-            self.assertEqual(
-                self.mock_sql.get_sql_class.call_count, 2, "DB classfactory calls"
-            )
-            self.assertEqual(
-                self.mock_sql.get_sql_class.call_args_list,
-                [call(MockValue), call(MockEq)],
-                "DB classfactory calls",
-            )
             self.mock_sql.update.assert_called_once_with(MOCK_TAB2)
-            Mock_DB_Eq.assert_called_once_with("id", id)
-            self.mock_sql.where.assert_called_once_with("mock eq")
+            MockEq.assert_called_once_with("id", id)
+            self.mock_sql.where.assert_called_once_with(MockEq())
             self.assertEqual(
                 self.mock_bo.attributes_as_dict.call_count,
                 len(convert_args),
@@ -370,9 +352,12 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(self.mock_bo.convert_from_db.call_args_list, convert_args)
             self.assertEqual(self.mock_sql.assignment.call_count, len(new_vals))
+            self.assertEqual(MockValue.call_count, len(new_vals))
+            for v in new_vals:
+                MockValue.assert_any_call(v[0], v[1])
             self.assertEqual(
                 self.mock_sql.assignment.call_args_list,
-                [call(v[0], v[1]) for v in new_vals],
+                [call(v[0], MockValue()) for v in new_vals],
             )
             self.mock_sql.execute.assert_awaited_once_with(close=0, commit=True)
             self.mock_bo.fetch.assert_awaited_once()

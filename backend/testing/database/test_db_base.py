@@ -1,10 +1,33 @@
-""" Test suite for DB connection base classes """
+"""Test suite for DB connection base classes"""
 
 import logging
 import unittest
-from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call
+from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call, ANY
+
 
 import database.db_base
+from database.sqlexecutable import SQLExecutable
+from database.sqlstatement import SQL
+from database.sqlclause import SQLColumnDefinition
+from persistance.bo_descriptors import BOColumnFlag
+
+
+class MockFactory:
+    def get_sql_class(self, cls):
+        print(f"mock_factory {cls=}")
+        return cls
+
+
+class MockDB:
+    sql_factory = MockFactory()
+
+
+class MockSQL(SQLExecutable):
+    def __new__(cls, *args, **kwargs):
+        return object.__new__(cls)
+
+    def _get_db(self):
+        return MockDB()
 
 
 class TestDB(unittest.IsolatedAsyncioTestCase):
@@ -18,9 +41,10 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.db._connections, set())
 
     def _200_check_column(self, col_correct):
+
         mock_name = "mock_col"
         mock_type = "mock_typ"
-        mock_constr = "mock_cnstr"
+        mock_constr = "mock_constr"
         mock_kwa = {"M": "m"}
         mock_col_def = f"{mock_name} {mock_type} {mock_constr} {mock_kwa}"
         if col_correct:
@@ -30,12 +54,12 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
         else:
             mock_col = f"wrong def of col {mock_name}"
         mockColDef = Mock()
-        mockColDef.sql = Mock(return_value=mock_col_def)
+        mockColDef.get_query = Mock(return_value=mock_col_def)
         MockColDef = Mock(return_value=mockColDef)
-        mock_sql = Mock()
-        mock_sql.sql_factory.get_sql_class = Mock(return_value=MockColDef)
-        mock_SQL = Mock(name="MockSQL", return_value=mock_sql)
-        with (patch("database.db_base.SQL", mock_SQL),):
+        with (
+            patch("database.db_base.SQL", MockSQL),
+            patch("database.db_base.SQLColumnDefinition", MockColDef),
+        ):
             result = self.db.check_column(
                 tab="mock_tab",
                 col=mock_col,
@@ -45,23 +69,20 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
                 **mock_kwa,
             )
         MockColDef.assert_called_once_with(
-            mock_name, mock_type, mock_constr, **mock_kwa
+            mock_name, mock_type, mock_constr, parent=ANY, **mock_kwa
         )
-        mockColDef.sql.assert_called_once_with()
+        mockColDef.get_query.assert_called_once_with()
         return result
 
-    @unittest.skip("Need to adapt test to new SQLExecutable")
     def test_201_check_column(self):
         with self.assertNoLogs():
             self.assertTrue(self._200_check_column(True))
 
-    @unittest.skip("Need to adapt test to new SQLExecutable")
     def test_202_check_column_no_tabcol(self):
         with self.assertLogs(None, logging.ERROR) as err_msg:
             self.assertFalse(self._200_check_column(None))
             self.assertTrue(err_msg.output[0].find("is undefined") >= 0)
 
-    @unittest.skip("Need to adapt test to new SQLExecutable")
     def test_203_check_column_wrong_tabcol(self):
         with self.assertLogs(None, logging.ERROR) as err_msg:
             self.assertFalse(self._200_check_column(False))

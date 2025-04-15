@@ -1,32 +1,32 @@
+from ast import Eq
+from os import name
 import unittest
 import re
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
 from database.sqlexpression import (
+    ColumnName,
+    Row,
     SQLExpression,
-    From,
-    JoinOperator,
+    Not,
     SQLMultiExpression,
     And,
     Or,
     Eq,
-    SQLColumnDefinition,
+    Is,
+    IsNull,
+    SQLBetween,
+    Value,
 )
-
-from database.sqlexpression import Value, Row
 
 
 class MockKeyManager:
 
     def __init__(self):
-        self.register_key.reset_mock()
+        self.merge_params.reset_mock()
 
-    register_key = Mock(side_effect=lambda x: x)
-
-
-class MockKeyManagerWithModifications(MockKeyManager):
-    register_key = Mock(side_effect=lambda x: x + "1")
+    merge_params = Mock(return_value="mockmanaged")
 
 
 def normalize_sql(sql):
@@ -34,175 +34,198 @@ def normalize_sql(sql):
 
 
 @patch("database.sqlkeymanager.SQLKeyManager", MockKeyManager)
-class TestSQLExpression(unittest.TestCase):
+class Test_100_SQLExpression(unittest.TestCase):
 
     def setUp(self):
         self.SQLKeyManager = MockKeyManager()
 
-    def testSQLExpressionInstantiation(self):
+    def test_101_SQLExpressionInstantiation(self):
         sql_expression_instance = SQLExpression()
         self.assertIsNotNone(
             sql_expression_instance, "SQLExpression instance should not be None"
         )
 
-    def testInitDefaults(self):
-        sql = SQLExpression()
-        self.assertEqual(sql._key_manager, None)
-        self.assertEqual(sql._expression, "Null")
-        self.assertEqual(sql._params, {})
-        self.assertEqual(sql.get_sql(), "Null")
-        self.assertEqual(sql.get_params(), {})
-
-    def testcreate_param(self):
-        sql = SQLExpression(key_manager=self.SQLKeyManager)
-        key = sql.create_param("key", "value")
-        self.SQLKeyManager.register_key.assert_called_once_with("key")
-        self.assertEqual(key, "key")
-        self.assertEqual(sql._params["key"], "value")
-        self.assertEqual(sql.get_params(), {"key": "value"})
-
-    def testsimpleexpression(self):
+    def test_102_simpleexpression(self):
         sql = SQLExpression(expression="SELECT * FROM table")
-        self.assertEqual(sql.get_sql(), "SELECT * FROM table")
+        self.assertEqual(sql.get_query(self.SQLKeyManager), "SELECT * FROM table")
 
-
-class TestFrom(unittest.TestCase):
-
-    def test_init(self):
-        sql = From("table")
-        self.assertEqual(sql._table, "table")
-        self.assertEqual(sql.get_sql(), " FROM table ")
-        self.assertEqual(sql.get_params(), {})
-        self.assertEqual(sql._joins, [])
-
-    def test_join(self):
-        sql = From("table")
-        join = sql.join("table2", None)
-        self.assertIs(sql, join)
-        self.assertEqual(sql.get_sql(), " FROM table FULL OUTER JOIN table2 ")
-        self.assertEqual(sql.get_params(), {})
-        self.assertEqual(sql._joins, [(JoinOperator.FULL, "table2", None)])
-
-    def test_join_with_condition(self):
-        sql = From("table").join("table2", condition := Eq("table.id", "table2.id"))
-        self.assertEqual(
-            sql.get_sql().replace("  ", " ").strip(),
-            "FROM table FULL OUTER JOIN table2 ON (table.id = table2.id)",
-        )
-        self.assertEqual(sql.get_params(), {})
-        self.assertEqual(sql._joins, [(JoinOperator.FULL, "table2", condition)])
-
-    def test_join_with_left_join(self):
-        sql = From("table")
-        condition = Eq("table.id", "table2.id")
-        sql.join("table2", condition, JoinOperator.LEFT)
-        self.assertEqual(
-            sql.get_sql().replace("  ", " ").strip(),
-            "FROM table LEFT JOIN table2 ON (table.id = table2.id)",
-        )
-        self.assertEqual(sql.get_params(), {})
-        self.assertEqual(sql._joins, [(JoinOperator.LEFT, "table2", condition)])
-
-    def test_join_with_multiple_joins(self):
-        sql = From("table")
-        condition = Eq("table.id", "table2.id")
-        sql.join("table2", condition, JoinOperator.LEFT)
-        sql.join("table3", None)
-        self.assertEqual(
-            sql.get_sql().replace("  ", " ").strip(),
-            "FROM table LEFT JOIN table2 ON (table.id = table2.id) FULL OUTER JOIN table3",
-        )
-        self.assertEqual(sql.get_params(), {})
-        self.assertEqual(
-            sql._joins,
-            [
-                (JoinOperator.LEFT, "table2", condition),
-                (JoinOperator.FULL, "table3", None),
-            ],
+    def test_103_expression_with_int(self):
+        sql = SQLExpression(expression=99)
+        query = sql.get_query(self.SQLKeyManager)
+        self.assertEqual(query, "mockmanaged")
+        self.SQLKeyManager.merge_params.assert_called_once_with(
+            query=":param", params={"param": 99}
         )
 
 
-class TestSQLMultiExpression(unittest.TestCase):
+class Test_200_SQLMultiExpression(unittest.TestCase):
 
     def setUp(self):
         self.expressions = [SQLExpression(), SQLExpression(), SQLExpression()]
+        self.SQLKeyManager = MockKeyManager()
 
-    def test_init(self):
+    def test_201_init(self):
         sql = SQLMultiExpression(self.expressions)
         self.assertEqual(sql._arguments, self.expressions)
 
-    def test_not_implemented(self):
+    def test_202_not_implemented(self):
         sql = SQLMultiExpression(self.expressions)
-        self.assertRaises(NotImplementedError, sql.get_sql)
-        self.assertRaises(NotImplementedError, sql.get_params)
+        self.assertRaises(NotImplementedError, sql.get_query, self.SQLKeyManager)
 
 
-class TestAND(unittest.TestCase):
+class Test_300_SQLExpression(unittest.TestCase):
+    def setUp(self):
+        self.SQLKeyManager = MockKeyManager()
 
-    def test_and(self):
-        sql = And([SQLExpression(), SQLExpression()])
-        self.assertEqual(normalize_sql(sql.get_sql()), "Null AND Null")
-        self.assertEqual(sql.get_params(), {})
-        sql = And([SQLExpression(), SQLExpression(), SQLExpression("1 = 1")])
-        self.assertEqual(normalize_sql(sql.get_sql()), "Null AND Null AND 1 = 1")
-        self.assertEqual(sql.get_params(), {})
+    def test_301_and(self):
+        sql = And([SQLExpression(1), SQLExpression(), "quack"])
+        self.assertEqual(
+            normalize_sql(sql.get_query(self.SQLKeyManager)),
+            "(mockmanaged AND Null AND quack)",
+        )
+        self.SQLKeyManager.merge_params.assert_called_once_with(
+            query=":param", params={"param": 1}
+        )
+
+    def test_302_or(self):
+        sql = Or([SQLExpression(99), SQLExpression()])
+        self.assertEqual(
+            normalize_sql(sql.get_query(self.SQLKeyManager)), "(mockmanaged OR Null)"
+        )
+        self.SQLKeyManager.merge_params.assert_called_once_with(
+            query=":param", params={"param": 99}
+        )
+
+    def test_303_or_and(self):
+        sql = Or([SQLExpression(99), SQLExpression(), And([SQLExpression(1), "quack"])])
+        self.assertEqual(
+            normalize_sql(sql.get_query(self.SQLKeyManager)),
+            "(mockmanaged OR Null OR (mockmanaged AND quack))",
+        )
+        self.assertEqual(self.SQLKeyManager.merge_params.call_count, 2)
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":param", params={"param": 99}
+        )
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":param", params={"param": 1}
+        )
+
+    def test_304_complex_expr(self):
+        sql = And(
+            [
+                SQLExpression(1),
+                "complex",
+                Not(Eq(ColumnName("A"), "b")),
+                Or([SQLExpression(77), IsNull(ColumnName("D"))]),
+            ]
+        )
+        query = sql.get_query(self.SQLKeyManager)
+        self.assertEqual(
+            normalize_sql(query),
+            "(mockmanaged AND complex AND (NOT (A = b)) AND (mockmanaged OR (D IS NULL)))",
+        )
+        print(
+            f"{query=} {self.SQLKeyManager.merge_params.call_count=}, {self.SQLKeyManager.merge_params.call_args_list=}"
+        )
+        self.assertEqual(self.SQLKeyManager.merge_params.call_count, 2)
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":param", params={"param": 1}
+        )
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":param", params={"param": 77}
+        )
 
 
-class TestOR(unittest.TestCase):
+class Test_400_Filter(unittest.TestCase):
+    pass
 
-    def test_or(self):
-        sql = Or([SQLExpression(), SQLExpression()])
-        self.assertEqual(normalize_sql(sql.get_sql()), "Null OR Null")
-        self.assertEqual(sql.get_params(), {})
+
+class Test_500_TernaryExpression(unittest.TestCase):
+    def setUp(self):
+        self.SQLKeyManager = MockKeyManager()
+
+    def test_501_between(self):
+        result = SQLBetween("age", 18, 25)
+        self.assertEqual(
+            result.get_query(km=self.SQLKeyManager),
+            "( age BETWEEN mockmanaged AND mockmanaged )",
+        )
+        self.assertEqual(self.SQLKeyManager.merge_params.call_count, 2)
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":param", params={"param": 18}
+        )
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":param", params={"param": 25}
+        )
 
 
 @patch("database.sqlkeymanager.SQLKeyManager", MockKeyManager)
-class TestValue(unittest.TestCase):
+class Test_600_Value(unittest.TestCase):
 
     def setUp(self):
         self.SQLKeyManager = MockKeyManager()
 
-    def test_value(self):
-        sql = Value("name", "value", self.SQLKeyManager, "key")
-        self.SQLKeyManager.register_key.assert_called_once_with("key")
-        self.assertEqual(sql._key, "key")
-        self.assertEqual(sql._value, "value")
-        self.assertEqual(sql._name, "name")
-        self.assertEqual(sql.get_sql(), ":key")
-        self.assertEqual(sql.get_params(), {"key": "value"})
+    def _test_600(self, n, v, *args, **kwargs):
+        sql = Value(*args, **kwargs)
+        self.assertEqual(sql.get_query(km=self.SQLKeyManager), "mockmanaged")
+        self.SQLKeyManager.merge_params.assert_called_once_with(
+            query=f":{n}", params={f"{n}": f"{v}"}
+        )
+        self.assertEqual(sql.get_name(), n)
 
-    def test_value_with_key_manager_modifications(self):
-        manager = MockKeyManagerWithModifications()
-        sql = Value("name", "value", manager, "key")
-        manager.register_key.assert_called_once_with("key")
-        self.assertEqual(sql._key, "key1")
-        self.assertEqual(sql.get_sql(), ":key1")
-        self.assertEqual(sql.get_params(), {"key1": "value"})
+    def test_601_2_args(self):
+        self._test_600("mick", "mack", "mick", "mack")
+
+    def test_602_single_arg(self):
+        self._test_600("param", "mick", "mick")
+
+    def test_603_no_args(self):
+        self.assertRaises(ValueError, Value)
+
+    def test_604_named_args(self):
+        self._test_600("mick", "mack", name="mick", value="mack")
+
+    def test_605_no_name(self):
+        self._test_600("param", "mack", value="mack")
+
+    def test_606_no_value(self):
+        self.assertRaises(ValueError, Value, name="mick")
+
+    def test_607_mixed_args(self):
+        self._test_600("mick", "mack", "mack", name="mick")
 
 
-class TestRow(unittest.TestCase):
+class Test_700_Row(unittest.TestCase):
 
     def setUp(self):
         self.SQLKeyManager = MockKeyManager()
-        self.valueList = [
-            Value("name", "value", self.SQLKeyManager, "key"),
-            Value("name2", "value2", self.SQLKeyManager, "key2"),
-        ]
+        self.valueList = [Value("mick", "value"), Value("mack", "value2")]
 
-    def test_row(self):
+    def test_701_row(self):
         sql = Row(self.valueList)
-        self.assertEqual(sql._values, self.valueList)
-        self.assertEqual(sql.get_sql(), "(:key, :key2)")
-        self.assertEqual(sql.get_params(), {"key": "value", "key2": "value2"})
-        self.assertEqual(sql.names(), "(name, name2)")
+        self.assertEqual(
+            sql.get_query(km=self.SQLKeyManager), "(mockmanaged, mockmanaged)"
+        )
+        self.assertEqual(self.SQLKeyManager.merge_params.call_count, 2)
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":mick", params={"mick": "value"}
+        )
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":mack", params={"mack": "value2"}
+        )
+        self.assertEqual(sql.get_names(), "(mick, mack)")
 
-    def test_row_value(self):
+    def test_702_row_value(self):
         sql = Row().value(self.valueList[0]).value(self.valueList[1])
         self.assertEqual(sql._values, self.valueList)
-        self.assertEqual(sql.get_sql(), "(:key, :key2)")
-        self.assertEqual(sql.get_params(), {"key": "value", "key2": "value2"})
-        self.assertEqual(sql.names(), "(name, name2)")
-
-
-class TestSQLColumnDefinition(unittest.TestCase):
-    pass
+        self.assertEqual(
+            sql.get_query(km=self.SQLKeyManager), "(mockmanaged, mockmanaged)"
+        )
+        self.assertEqual(self.SQLKeyManager.merge_params.call_count, 2)
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":mick", params={"mick": "value"}
+        )
+        self.SQLKeyManager.merge_params.assert_any_call(
+            query=":mack", params={"mack": "value2"}
+        )
+        self.assertEqual(sql.get_names(), "(mick, mack)")
