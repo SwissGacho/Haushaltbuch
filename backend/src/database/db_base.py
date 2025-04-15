@@ -1,7 +1,7 @@
 """Base class for DB connections"""
 
 from core.app_logging import getLogger, log_exit
-from .sqlexecutable import SQLExecutable
+from .sql_executable import SQLExecutable
 
 LOG = getLogger(__name__)
 

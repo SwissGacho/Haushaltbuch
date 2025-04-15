@@ -4,7 +4,7 @@ from enum import Enum
 
 from matplotlib.pylab import cond
 
-from database.sqlexecutable import SQLExecutable, SQLManagedExecutable
+from database.sql_executable import SQLExecutable, SQLManagedExecutable
 from database.sqlexpression import ColumnName, Row, SQLExpression, Value
 from persistance.bo_descriptors import BOColumnFlag
 
