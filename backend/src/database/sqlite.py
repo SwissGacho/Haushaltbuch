@@ -1,6 +1,8 @@
 """ Connection to SQLit DB using aiosqlite """
 
 import datetime
+import types
+from enum import Flag
 from pathlib import Path
 import json
 import re
@@ -13,6 +15,7 @@ from database.sqlexecutable import SQL, SQLTemplate, SQLScript
 from database.sqlexpression import SQLColumnDefinition
 from database.sqlfactory import SQLFactory
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase
+from persistance.business_attribute_base import BaseFlag
 
 LOG = getLogger(__name__)
 try:
@@ -37,6 +40,7 @@ class SQLiteSQLFactory(SQLFactory):
 
 
 SQLITE_JSON_TYPE = "JSON"
+SQLITE_BASEFLAG_TYPE = "FLAG"
 
 
 class SQLiteColumnDefinition(SQLColumnDefinition):
@@ -49,6 +53,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         dict: SQLITE_JSON_TYPE,
         list: SQLITE_JSON_TYPE,
         BOBaseBase: "INTEGER",
+        BaseFlag: SQLITE_BASEFLAG_TYPE,
     }
     constraint_map = {
         BOColumnFlag.BOC_NONE: "",
@@ -72,14 +77,36 @@ def _adapt_list(value: list) -> str:
     return json.dumps(value, separators=(",", ":"))
 
 
+def _adapt_flag(value: BaseFlag) -> str:
+    LOG.debug(f"SQLite._adapt_flag({value=})")
+    return str(value)
+
+
 def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
 
 if sqlite3:
+
     sqlite3.register_adapter(dict, _adapt_dict)
     sqlite3.register_adapter(list, _adapt_list)
+    sqlite3.register_adapter(BaseFlag, _adapt_flag)
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
+
+    # Register adapter and converter for all existing Flag subclasses
+    for flag_type in list(BaseFlag.__subclasses__()):
+        LOG.debug(f"Registering adapter and converter for {flag_type=}")
+        sqlite3.register_adapter(flag_type, _adapt_flag)
+
+    # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses
+    flag_original_init_subclass = BaseFlag.__init_subclass__
+
+    def flag_init_selfregistering_subclass(cls):
+        flag_original_init_subclass()
+        LOG.debug(f"Self-Registering adapter and converter for {cls=}")
+        sqlite3.register_adapter(cls, _adapt_flag)
+
+    BaseFlag.__init_subclass__ = classmethod(flag_init_selfregistering_subclass)
 
 
 class SQLiteScript(SQLScript):
