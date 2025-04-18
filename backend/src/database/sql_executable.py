@@ -67,7 +67,7 @@ class SQLManagedExecutable(SQLExecutable, SQLKeyManager):
     """Base class for SQL operations that are managed by a parent object.
     Should not be instantiated directly."""
 
-    def get_query(self):
+    def get_query(self) -> str:
         """Get the SQL statement as a string."""
         raise NotImplementedError("Subclasses must implement this method.")
 
