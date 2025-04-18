@@ -113,7 +113,7 @@ class ConfigSetup(BaseObject):
             else {"name": SINGLE_USER_NAME, "password": None}
         )
         if not isinstance(initial_user, dict):
-            raise TypeError(f"admin user must be dict not {type(initial_user)}")
+            raise TypeError(f"initial user must be dict not {type(initial_user)}")
         rows_in_db = await User.get_matching_ids(
             {ColumnName("name"): initial_user["name"]}
         )
