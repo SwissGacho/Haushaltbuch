@@ -34,7 +34,11 @@ def normalize_sql(sql):
 
 class SQLColumnDefinitionMock(SQLColumnDefinition):
     type_map = {int: "MOCKINTEGER", str: "MOCKSTRING"}
-    constraint_map = {BOColumnFlag.BOC_NOT_NULL: "MOCKCONSTRAINT"}
+    constraint_map = {
+        BOColumnFlag.BOC_NOT_NULL: "MOCKNOTNULL",
+        BOColumnFlag.BOC_UNIQUE: "MOCKUNIQUE",
+        BOColumnFlag.BOC_DEFAULT: "MOCKDEFAULT ({default})",
+    }
 
 
 class Test_100_SQLColumnDefinition(unittest.TestCase):
@@ -56,12 +60,39 @@ class Test_100_SQLColumnDefinition(unittest.TestCase):
         self.assertEqual(normalize_sql(sql.get_query()), "mock_column MOCKINTEGER")
         self.assertEqual(sql.params, {})
 
-    def test_103_init_derived_with_constraints(self):
+    def test_103_init_derived_with_constraint(self):
         sql = SQLColumnDefinitionMock(
             "mock_column", int, BOColumnFlag.BOC_NOT_NULL, parent=self.mock_parent
         )
         self.assertEqual(
-            normalize_sql(sql.get_query()), "mock_column MOCKINTEGER MOCKCONSTRAINT"
+            normalize_sql(sql.get_query()), "mock_column MOCKINTEGER MOCKNOTNULL"
+        )
+        self.assertEqual(sql.params, {})
+
+    def test_104_init_derived_with_multiple_constraints(self):
+        sql = SQLColumnDefinitionMock(
+            "mock_column",
+            int,
+            BOColumnFlag.BOC_UNIQUE | BOColumnFlag.BOC_NOT_NULL,
+            parent=self.mock_parent,
+        )
+        self.assertEqual(
+            normalize_sql(sql.get_query()),
+            "mock_column MOCKINTEGER MOCKNOTNULL MOCKUNIQUE",
+        )
+        self.assertEqual(sql.params, {})
+
+    def test_105_init_derived_with_multiple_constraints_and_arg(self):
+        sql = SQLColumnDefinitionMock(
+            "mock_column",
+            int,
+            BOColumnFlag.BOC_DEFAULT | BOColumnFlag.BOC_NOT_NULL,
+            parent=self.mock_parent,
+            default="mock_default",
+        )
+        self.assertEqual(
+            normalize_sql(sql.get_query()),
+            "mock_column MOCKINTEGER MOCKNOTNULL MOCKDEFAULT (mock_default)",
         )
         self.assertEqual(sql.params, {})
 

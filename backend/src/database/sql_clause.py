@@ -1,5 +1,6 @@
 """Clauses used in SQL statements."""
 
+from calendar import c
 from enum import Enum
 
 from database.sql_executable import SQLExecutable, SQLManagedExecutable
@@ -30,9 +31,9 @@ class SQLColumnDefinition(SQLManagedExecutable):
         self,
         name: str,
         data_type: type,
-        constraint: BOColumnFlag = None,
+        constraints: BOColumnFlag = None,
         parent: SQLExecutable = None,
-        **pars,
+        **args,
     ):
         super().__init__(parent)
         self._name = name
@@ -41,24 +42,25 @@ class SQLColumnDefinition(SQLManagedExecutable):
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
             )
         self._data_type = self.__class__.type_map[data_type]
-        self._constraints: list[str] = []
+        self._constraint = constraints
+        self._arguments = args
         constraint_map = self.__class__.constraint_map
-        for flag in constraint or BOColumnFlag.BOC_NONE:
+        for flag in constraints or BOColumnFlag.BOC_NONE:
             if flag not in constraint_map:
                 raise ValueError(
                     f"Unsupported column constraint for a {self.__class__.__name__}: {flag}"
                 )
-            self._constraints.append(
-                self.__class__.constraint_map[flag].format(
-                    **{
-                        k: v.table if hasattr(v, "table") else str(v).lower()
-                        for k, v in pars.items()
-                    }
-                )
-            )
 
     def get_query(self):
-        return f"{self._name} {self._data_type} {' '.join(self._constraints)}"
+        return f"""{self._name} {self._data_type} {' '.join([
+                self.__class__.constraint_map[flag].format(
+                    **{
+                        k: v.table if hasattr(v, 'table') else str(v).lower()
+                        for k, v in self._arguments.items()
+                    }
+                )
+                for flag in self._constraint or BOColumnFlag.BOC_NONE
+            ])}"""
 
 
 class From(SQLManagedExecutable):
@@ -85,7 +87,7 @@ class From(SQLManagedExecutable):
 
     def join(
         self,
-        table: str =None,
+        table: str = None,
         join_constraint: "SQLExpression" = None,
         join_operator: JoinOperator = JoinOperator.FULL,
     ) -> "From":

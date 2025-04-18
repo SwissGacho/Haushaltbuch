@@ -295,7 +295,8 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         mock_get_cfg.assert_called_once_with(mock_cfg, SetupConfigKeys.ADM_USER)
         MockUser.get_matching_ids.assert_not_awaited()
         self.assertEqual(
-            str(mock_type_error.exception), "admin user must be dict not <class 'int'>"
+            str(mock_type_error.exception),
+            "initial user must be dict not <class 'int'>",
         )
 
     async def test_405_create_or_update_initial_user_more_ids(self):
