@@ -134,7 +134,7 @@ class Having(SQLManagedExecutable):
 
 
 class Values(SQLManagedExecutable):
-    """Represents a the VALUES clause in an SQL statement such as an INSERT.
+    """Represents the VALUES clause in an SQL statement such as an INSERT.
     It may contain multiple rows of Value objects. The values in the first row also define the
     names of the columns. Each row must have the same number of values.
     """
