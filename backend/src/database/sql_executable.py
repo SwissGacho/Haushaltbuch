@@ -48,10 +48,6 @@ class SQLExecutable(object):
         """Close the database connection."""
         return await self._parent.close()
 
-    def get_sql_class(self, sql_cls: type) -> type:
-        """Get the speficied SQL class definition as defined by the db's SQLFactory."""
-        return self.sql_factory.get_sql_class(sql_cls)
-
     @classmethod
     def _get_db(cls) -> DBBaseClass:
         """Get the current database connection."""
