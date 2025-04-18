@@ -85,7 +85,7 @@ class From(SQLManagedExecutable):
 
     def join(
         self,
-        table=None,
+        table: str =None,
         join_constraint: "SQLExpression" = None,
         join_operator: JoinOperator = JoinOperator.FULL,
     ) -> "From":
