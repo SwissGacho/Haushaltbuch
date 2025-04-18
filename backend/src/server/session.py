@@ -1,7 +1,8 @@
-""" Manager for user sessions.
-    A session is created by a WS connection without session token.
+"""Manager for user sessions.
+A session is created by a WS connection without session token.
 """
 
+from typing import Self
 from data.management.user import User
 from server.ws_token import WSToken
 
@@ -15,7 +16,7 @@ from core.exceptions import TokenExpiredError
 class Session:
     "a user session with limited lifetime"
 
-    _all_sessions = []
+    _all_sessions: list[Self] = []
 
     def __init__(
         self, user: User, conn_token: WSToken, connection  #: "WS_Connection"
@@ -36,7 +37,11 @@ class Session:
 
     @classmethod
     def get_session_from_token(
-        cls, ses_token: str, conn_token: str, session_user=None, connection=None
+        cls,
+        ses_token: str,
+        conn_token: str,
+        session_user: User | None = None,
+        connection=None,
     ):
         "find session by session or any connection token"
         local_LOG = (

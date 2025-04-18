@@ -1,6 +1,6 @@
-""" Base module for Business Object logic
+"""Base module for Business Object logic
 
-    Business objects are classes that support persistance in the data base
+Business objects are classes that support persistance in the data base
 """
 
 from typing import Self, TypeAlias, Optional, Callable
@@ -31,6 +31,7 @@ AttributeDescription: TypeAlias = tuple[str, type, str, dict[str, str]]
 
 class BOBase(BOBaseBase):
     "Business Object baseclass"
+
     id = BOInt(BOColumnFlag.BOC_PK_INC)
     last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR)
     _table = None
@@ -141,10 +142,11 @@ class BOBase(BOBaseBase):
         return result["count"]
 
     @classmethod
-    async def get_matching_ids(cls, conditions: dict) -> list[int]:
+    async def get_matching_ids(cls, conditions: dict = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
         sql = SQL().select(["id"]).from_(cls.table)
-        sql.where(sql.get_sql_class(Filter)(conditions))
+        if conditions:
+            sql.where(sql.get_sql_class(Filter)(conditions))
         result = await (await sql.execute(close=1)).fetchall()
         # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
