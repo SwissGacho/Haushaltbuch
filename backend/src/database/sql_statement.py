@@ -189,7 +189,9 @@ class CreateTable(SQLStatement):
             name, data_type, constraint, pars = column_description
             self.column(name, data_type, constraint, **pars)
 
-    def column(self, name: str, data_type: type, constraint: str = None, **pars):
+    def column(
+        self, name: str, data_type: type, constraint: BOColumnFlag | None = None, **pars
+    ):
         """Add a column to the table to be created.
         The column will be added to the end of the column list."""
         self._columns.append(

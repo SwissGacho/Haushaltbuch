@@ -31,8 +31,8 @@ class SQLColumnDefinition(SQLManagedExecutable):
         self,
         name: str,
         data_type: type,
-        constraints: BOColumnFlag = None,
-        parent: SQLExecutable = None,
+        constraints: BOColumnFlag | None = None,
+        parent: SQLExecutable | None = None,
         **args,
     ):
         super().__init__(parent)

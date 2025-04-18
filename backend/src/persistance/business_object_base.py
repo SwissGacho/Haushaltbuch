@@ -3,7 +3,7 @@
 Business objects are classes that support persistance in the data base
 """
 
-from typing import Self, TypeAlias, Optional, Callable
+from typing import TypeAlias, Optional, Callable
 import copy
 from datetime import date, datetime, UTC
 
@@ -14,8 +14,6 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
-from database.sql_statement import SQL, CreateTable
-from database.sql_expression import Eq, Filter, SQLExpression, Value
 
 
 class _classproperty:
@@ -26,7 +24,7 @@ class _classproperty:
         return self.fget(owner_cls)
 
 
-AttributeDescription: TypeAlias = tuple[str, type, str, dict[str, str]]
+AttributeDescription: TypeAlias = tuple[str, type, BOColumnFlag, dict[str, str]]
 
 
 class BOBase(BOBaseBase):
@@ -67,6 +65,11 @@ class BOBase(BOBaseBase):
     ):
         if not cls._attributes.get(cls.__name__):
             cls._attributes[cls.__name__] = []
+        if any(a[0] == attribute_name for a in cls._attributes[cls.__name__]):
+            LOG.warning(
+                f"BOBase.add_attribute({cls.__name__}, {attribute_name}) already registered"
+            )
+            return
         cls._attributes[cls.__name__].append(
             (attribute_name, data_type, constraint_flag, flag_values)
         )
@@ -95,6 +98,7 @@ class BOBase(BOBaseBase):
     def attributes_as_dict(cls) -> dict:
         "dict of BO attribute types with attribute names as keys"
         cls_cols = {a[0]: a[1] for a in cls._attributes.get(cls.__name__, [])}
+        assert cls.__base__ is not None, "BOBase.__base__ is None"
         if issubclass(cls.__base__, BOBase):
             return cls.__base__.attributes_as_dict() | cls_cols
         return cls_cols
@@ -103,6 +107,7 @@ class BOBase(BOBaseBase):
     def attribute_descriptions(cls) -> list[AttributeDescription]:
         "list of attribute descriptions"
         cls_cols = cls._attributes.get(cls.__name__, [])
+        assert cls.__base__ is not None, "BOBase.__base__ is None"
         if issubclass(cls.__base__, BOBase):
             return cls.__base__.attribute_descriptions() + cls_cols
         return cls_cols
@@ -110,13 +115,7 @@ class BOBase(BOBaseBase):
     @classmethod
     async def sql_create_table(cls):
         "Create a DB table for this class"
-        attributes = cls.attribute_descriptions()
-        sql: CreateTable = SQL().create_table(cls.table)
-        LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
-        for name, data_type, constraint, pars in attributes:
-            LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
-            sql.column(name, data_type, constraint, **pars)
-        await sql.execute(close=0)
+        raise NotImplementedError("sql_create_table not implemented")
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
@@ -134,23 +133,12 @@ class BOBase(BOBaseBase):
     @classmethod
     async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
-        sql = SQL().select(["count(*) as count"]).from_(cls.table)
-        if conditions:
-            sql.where(Filter(conditions))
-        result = await (await sql.execute(close=1)).fetchone()
-        # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
-        return result["count"]
+        raise NotImplementedError("count_rows not implemented")
 
     @classmethod
-    async def get_matching_ids(cls, conditions: dict = None) -> list[int]:
+    async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
-        sql = SQL().select(["id"]).from_(cls.table)
-        if conditions:
-            sql.where(Filter(conditions))
-        sql.where(sql.get_sql_class(Filter)(conditions))
-        result = await (await sql.execute(close=1)).fetchall()
-        # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
-        return [id["id"] for id in result]
+        raise NotImplementedError("get_matching_ids not implemented")
 
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
@@ -158,73 +146,14 @@ class BOBase(BOBaseBase):
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
-        # LOG.debug(f'BOBase.fetch({id=}, {newest=})')
-        if id is None:
-            id = self.id
-        if id is None and newest is None:
-            LOG.debug(f"fetching {self} without id or newest")
-            return self
-        # LOG.debug(f"fetching {self} with {id=}, {newest=}")
-
-        sql = SQL().select([], True).from_(self.table)
-        if id is not None:
-            sql.where(Eq("id", id))
-        elif newest:
-            sql.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-        self._db_data = await (await sql.execute(close=1)).fetchone()
-
-        if self._db_data:
-            for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
-                self._data[attr] = self.convert_from_db(self._db_data.get(attr), typ)
-        return self
+        raise NotImplementedError("fetch not implemented")
 
     async def store(self):
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
-        if self.id is None:
-            await self._insert_self()
-        else:
-            await self._update_self()
-
-    async def _insert_self(self):
-        assert self.id is None, "id must be None for insert operation"
-
-        self.id = (
-            await (
-                await (
-                    SQL()
-                    .insert(self.table)
-                    .rows(
-                        [
-                            (k, v)
-                            for k, v in self._data.items()
-                            if k != "id" and v is not None
-                        ]
-                    )
-                    .returning("id")
-                ).execute(close=1, commit=True)
-            ).fetchone()
-        ).get("id")
-
-    async def _update_self(self):
-        assert self.id is not None, "id must not be None for update operation"
-        sql = SQL()
-        value_class = Value
-        sql = sql.update(self.table).where(Eq("id", self.id))
-        changes = False
-        for k, v in self._data.items():
-            if k != "id" and v != self.convert_from_db(
-                self._db_data.get(k), self.attributes_as_dict()[k]
-            ):
-                changes = True
-                sql.assignment(k, value_class(k, v))
-        try:
-            if changes:
-                await sql.execute(close=0, commit=True)
-        finally:
-            await self.fetch()
+        raise NotImplementedError("store not implemented")
 
 
 log_exit(LOG)
