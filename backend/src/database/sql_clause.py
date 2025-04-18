@@ -64,7 +64,7 @@ class SQLColumnDefinition(SQLManagedExecutable):
 class From(SQLManagedExecutable):
     """Class for the FROM clause of an SQL statement."""
 
-    def __init__(self, table, parent: SQLExecutable = None):
+    def __init__(self, table: str, parent: SQLExecutable = None):
         super().__init__(parent)
         self._table = table
         self._joins: list[tuple[JoinOperator, str, SQLExpression]] = []
