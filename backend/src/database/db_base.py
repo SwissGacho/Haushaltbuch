@@ -1,12 +1,13 @@
-""" Base class for DB connections """
+"""Base class for DB connections"""
 
 from core.app_logging import getLogger, log_exit
+from .sql_executable import SQLExecutable
 
 LOG = getLogger(__name__)
 
 from core.base_objects import DBBaseClass
-from database.sqlexecutable import SQL, SQLTemplate
-from database.sqlexpression import SQLColumnDefinition
+from database.sql_statement import SQL, SQLTemplate
+from database.sql_clause import SQLColumnDefinition
 
 
 class DB(DBBaseClass):
@@ -35,13 +36,9 @@ class DB(DBBaseClass):
         # LOG.debug(
         #     f"DB.check_column({col=}, {name=}, {data_type=}, {constraint=}, {pars=})"
         # )
-        attr_sql = (
-            SQL()
-            .sql_factory.get_sql_class(SQLColumnDefinition)(
-                name, data_type, constraint, **pars
-            )
-            .get_sql()
-        )
+        attr_sql = SQLColumnDefinition(
+            name, data_type, constraint, parent=SQL(), **pars
+        ).get_query()
         if col is None:
             LOG.error(
                 f"column '{name}' in DB table '{tab}' is undefined in the DB instead of '{attr_sql}'"

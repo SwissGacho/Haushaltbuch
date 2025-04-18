@@ -14,8 +14,8 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
-from database.sqlexecutable import SQL, CreateTable
-from database.sqlexpression import Eq, Filter, SQLExpression, Value
+from database.sql_statement import SQL, CreateTable
+from database.sql_expression import Eq, Filter, SQLExpression, Value
 
 
 class _classproperty:
@@ -136,7 +136,7 @@ class BOBase(BOBaseBase):
         """Count the number of existing business objects in the DB table matching the conditions"""
         sql = SQL().select(["count(*) as count"]).from_(cls.table)
         if conditions:
-            sql.where(sql.get_sql_class(Filter)(conditions))
+            sql.where(Filter(conditions))
         result = await (await sql.execute(close=1)).fetchone()
         # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
         return result["count"]
@@ -146,7 +146,8 @@ class BOBase(BOBaseBase):
         """Get the ids of business objects matching the conditions"""
         sql = SQL().select(["id"]).from_(cls.table)
         if conditions:
-            sql.where(sql.get_sql_class(Filter)(conditions))
+            sql.where(Filter(conditions))
+        sql.where(sql.get_sql_class(Filter)(conditions))
         result = await (await sql.execute(close=1)).fetchall()
         # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
@@ -167,13 +168,9 @@ class BOBase(BOBaseBase):
 
         sql = SQL().select([], True).from_(self.table)
         if id is not None:
-            sql.where(sql.get_sql_class(Eq)("id", id))
+            sql.where(Eq("id", id))
         elif newest:
-            sql.where(
-                sql.get_sql_class(SQLExpression)(
-                    f"id = (SELECT MAX(id) FROM {self.table})"
-                )
-            )
+            sql.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
         self._db_data = await (await sql.execute(close=1)).fetchone()
 
         if self._db_data:
@@ -214,8 +211,8 @@ class BOBase(BOBaseBase):
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
         sql = SQL()
-        value_class = sql.get_sql_class(Value)
-        sql = sql.update(self.table).where(sql.get_sql_class(Eq)("id", self.id))
+        value_class = Value
+        sql = sql.update(self.table).where(Eq("id", self.id))
         changes = False
         for k, v in self._data.items():
             if k != "id" and v != self.convert_from_db(

@@ -1,4 +1,4 @@
-""" Data descriptors used in business objects """
+"""Data descriptors used in business objects"""
 
 import json
 from enum import Flag, auto
@@ -13,6 +13,7 @@ from persistance.business_attribute_base import BaseFlag
 
 class BOColumnFlag(Flag):
     "Column flag of a BO attribute"
+
     BOC_NONE = 0
     BOC_NOT_NULL = auto()
     BOC_PK = auto()
@@ -76,14 +77,14 @@ class _PersistantAttr:
             raise ValueError(
                 f"'{value}' invalid to set attribute {self.my_name} of type {self.__class__.__name__}"
             )
-        # if value is None and BOColumnFlag.BOC_NOT_NULL in self._flag:
-        #     raise ValueError(
-        #         "Value must not be 'None' for 'NOT NULL' attribute {self.my_name}"
-        #     )
         obj._data[self.my_name] = value
 
     def validate(self, value) -> bool:
         "Validate 'value' for assignability."
+        if value is None and BOColumnFlag.BOC_NOT_NULL in self._flag:
+            raise ValueError(
+                f"Value must not be 'None' for 'NOT NULL' attribute {self.my_name}"
+            )
         return value is None
 
 
@@ -94,7 +95,7 @@ class BOInt(_PersistantAttr):
         return int
 
     def validate(self, value):
-        return value is None or isinstance(value, int)
+        return super().validate(value) or isinstance(value, int)
 
 
 class BOStr(_PersistantAttr):
@@ -103,7 +104,7 @@ class BOStr(_PersistantAttr):
         return str
 
     def validate(self, value):
-        return value is None or isinstance(value, str)
+        return super().validate(value) or isinstance(value, str)
 
 
 class BODatetime(_PersistantAttr):
@@ -117,7 +118,7 @@ class BODatetime(_PersistantAttr):
         return super().__set__(obj=obj, value=value)
 
     def validate(self, value):
-        return value is None or isinstance(value, datetime)
+        return super().validate(value) or isinstance(value, datetime)
 
 
 class BODate(_PersistantAttr):
@@ -131,7 +132,7 @@ class BODate(_PersistantAttr):
         return super().__set__(obj=obj, value=value)
 
     def validate(self, value):
-        return value is None or isinstance(value, date)
+        return super().validate(value) or isinstance(value, date)
 
 
 class BODict(_PersistantAttr):
@@ -141,7 +142,7 @@ class BODict(_PersistantAttr):
 
     def validate(self, value):
         if not isinstance(value, dict):
-            return value is None
+            return super().validate(value)
         try:
             json.dumps(value, separators=(",", ":"))
         except (ValueError, TypeError, RecursionError) as exc:
@@ -156,7 +157,7 @@ class BOList(_PersistantAttr):
 
     def validate(self, value):
         if not isinstance(value, list):
-            return value is None
+            return super().validate(value)
         try:
             json.dumps(value, separators=(",", ":"))
         except (ValueError, TypeError, RecursionError) as exc:
@@ -182,7 +183,9 @@ class BORelation(_PersistantAttr):
     def validate(self, value):
         relation = self._flag_values.get("relation")
         return (
-            value is None or isinstance(relation, type) and isinstance(value, relation)
+            super().validate(value)
+            or isinstance(relation, type)
+            and isinstance(value, relation)
         )
 
 
@@ -192,8 +195,8 @@ class BOFlag(_PersistantAttr):
         self, flag_type: type[Flag], flag: BOColumnFlag = BOColumnFlag.BOC_NONE
     ) -> None:
         # LOG.debug(f"{relation=}")
-        if not issubclass(flag_type, Flag):
-            raise TypeError("BO relation should be derived from BOBase.")
+        if not issubclass(flag_type, BaseFlag):
+            raise TypeError("BO Flag should be derived from BaseFlag.")
 
         super().__init__(flag, flag_type=flag_type)
 
@@ -202,7 +205,7 @@ class BOFlag(_PersistantAttr):
         return BaseFlag
 
     def validate(self, value):
-        return value is None or isinstance(value, Flag)
+        return super().validate(value) or isinstance(value, Flag)
 
     def __get__(self, obj, objtype=None):
         if obj is None:
