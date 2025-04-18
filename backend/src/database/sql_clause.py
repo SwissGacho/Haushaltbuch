@@ -1,4 +1,4 @@
-"""Cluases used in SQL statements."""
+"""Clauses used in SQL statements."""
 
 from enum import Enum
 
