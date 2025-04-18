@@ -1,6 +1,8 @@
-""" Test suite for business object attributes descriptors."""
+"""Test suite for business object attributes descriptors."""
 
 import datetime
+from enum import auto
+from re import M
 import unittest
 
 import persistance.bo_descriptors
@@ -17,7 +19,7 @@ class MockAttr(persistance.bo_descriptors._PersistantAttr):
 
 class MockBO:
     mock_attr = MockAttr()
-    _attributes = {}
+    _add_attributes_args = None
 
     def __init__(self, attr) -> None:
         self._data = {}
@@ -25,7 +27,12 @@ class MockBO:
 
     @classmethod
     def add_attribute(cls, attribute_name, data_type, constraint_flag, **flag_values):
-        pass
+        cls._add_attributes_args = (
+            attribute_name,
+            data_type,
+            constraint_flag,
+            flag_values,
+        )
 
 
 class Test_100__PersistantAttr(unittest.TestCase):
@@ -41,18 +48,15 @@ class Test_100__PersistantAttr(unittest.TestCase):
 
     def test_103_set_name(self):
         self.assertEqual(MockBO.mock_attr.my_name, "mock_attr")
+        print(f"{MockBO._add_attributes_args=}")
         self.assertEqual(
-            MockBO._attributes,
-            {
-                "MockBO": [
-                    (
-                        "mock_attr",
-                        str,
-                        persistance.bo_descriptors.BOColumnFlag.BOC_NONE,
-                        {},
-                    )
-                ]
-            },
+            MockBO._add_attributes_args,
+            (
+                "mock_attr",
+                str,
+                persistance.bo_descriptors.BOColumnFlag.BOC_NONE,
+                {},
+            ),
         )
 
     def test_104_get_without_instance(self):
@@ -74,8 +78,13 @@ class MockNotRel(persistance.bo_descriptors.BOBaseBase):
     pass
 
 
+class MockFlag(persistance.bo_descriptors.BaseFlag):
+    FLAG_1 = auto()
+    FLAG_2 = auto()
+
+
 class MockObj(persistance.bo_descriptors.BOBaseBase):
-    _attributes = {}
+    _attributes = {"MockObj": []}
     _data = {}
     int_attr = persistance.bo_descriptors.BOInt(
         persistance.bo_descriptors.BOColumnFlag.BOC_PK_INC
@@ -92,6 +101,13 @@ class MockObj(persistance.bo_descriptors.BOBaseBase):
     )
     list_attr = persistance.bo_descriptors.BOList()
     rel_attr = persistance.bo_descriptors.BORelation(MockRel)
+    flag_attr = persistance.bo_descriptors.BOFlag(flag_type=MockFlag)
+
+    @classmethod
+    def add_attribute(cls, attribute_name, data_type, constraint_flag, **flag_values):
+        cls._attributes["MockObj"].append(
+            (attribute_name, data_type, constraint_flag, flag_values)
+        )
 
 
 expected_attributes = {
@@ -123,6 +139,12 @@ expected_attributes = {
             persistance.bo_descriptors.BOColumnFlag.BOC_FK,
             {"relation": MockRel},
         ),
+        (
+            "flag_attr",
+            persistance.bo_descriptors.BaseFlag,
+            persistance.bo_descriptors.BOColumnFlag.BOC_NONE,
+            {"flag_type": MockFlag},
+        ),
     ]
 }
 
@@ -132,6 +154,7 @@ class Test_200_BOAttributes(unittest.TestCase):
         self.mock_obj = MockObj()
 
     def test_201_attributes(self):
+        self.maxDiff = None
         self.assertEqual(self.mock_obj._attributes, expected_attributes)
 
     def test_202_validate_set_get(self):
@@ -143,6 +166,7 @@ class Test_200_BOAttributes(unittest.TestCase):
         self.mock_obj.dict_attr = {"dict": 99}
         other_obj = MockRel()
         self.mock_obj.rel_attr = other_obj
+        self.mock_obj.flag_attr = MockFlag(1)
 
         self.assertEqual(self.mock_obj.int_attr, 11)
         self.assertEqual(self.mock_obj.str_attr, "str")
@@ -155,6 +179,7 @@ class Test_200_BOAttributes(unittest.TestCase):
         self.assertEqual(self.mock_obj.list_attr, [1, 2, 3])
         self.assertEqual(self.mock_obj.dict_attr, {"dict": 99})
         self.assertEqual(self.mock_obj.rel_attr, other_obj)
+        self.assertEqual(self.mock_obj.flag_attr, MockFlag.FLAG_1)
 
     def test_203_validate_fails(self):
         with self.assertRaises(ValueError, msg="BOInt"):
@@ -171,9 +196,27 @@ class Test_200_BOAttributes(unittest.TestCase):
             self.mock_obj.dict_attr = []
         with self.assertRaises(ValueError, msg="BORelation"):
             self.mock_obj.rel_attr = MockNotRel()
+        with self.assertRaises(ValueError, msg="BOFlag"):
+            self.mock_obj.flag_attr = 1
 
-    @unittest.skip("allow set 'NOT NULL' to None")
+    # @unittest.skip("allow set 'NOT NULL' to None")
     def test_204_NOT_NULL(self):
         self.mock_obj.int_attr = None
         with self.assertRaises(ValueError, msg="set 'NOT NULL' attribute to None"):
             self.mock_obj.str_attr = None
+
+    def test_205_Flag(self):
+        self.mock_obj.flag_attr = MockFlag(3)
+        self.assertEqual(self.mock_obj.flag_attr, MockFlag.FLAG_1 | MockFlag.FLAG_2)
+        self.assertEqual(str(self.mock_obj.flag_attr), "flag_1,flag_2")
+
+        self.mock_obj._data["flag_attr"] = "flag_1"
+        self.assertIsInstance(self.mock_obj._data["flag_attr"], str)
+        self.assertIsInstance(self.mock_obj.flag_attr, MockFlag)
+        self.assertEqual(self.mock_obj.flag_attr, MockFlag.FLAG_1)
+
+        self.mock_obj.flag_attr |= MockFlag.FLAG_2
+        self.assertEqual(self.mock_obj.flag_attr, MockFlag.FLAG_1 | MockFlag.FLAG_2)
+        self.assertIsInstance(self.mock_obj._data["flag_attr"], MockFlag)
+        self.assertIsInstance(self.mock_obj.flag_attr, MockFlag)
+        self.assertEqual(self.mock_obj.flag_attr, MockFlag(0b11))

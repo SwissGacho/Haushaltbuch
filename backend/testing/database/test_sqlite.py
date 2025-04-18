@@ -1,4 +1,4 @@
-""" Test suite for SQLite attachement """
+"""Test suite for SQLite attachement"""
 
 import sys, types
 import importlib
@@ -42,7 +42,7 @@ def setUpModule() -> None:
 
 
 import database.db_base
-import database.sqlexecutable
+import database.sql_statement
 
 
 class TestSQLiteDB__init__(unittest.TestCase):
@@ -73,7 +73,7 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
         self.db = database.sqlite.SQLiteDB(**self.db_cfg)
         self.mockCur = AsyncMock(name="mockCursor")
         with patch("core.app.App.db", self.db):
-            self.sql = database.sqlexecutable.SQL()
+            self.sql = database.sql_statement.SQL()
         self.MockSQL = Mock(return_value=self.sql)
         self.sql._get_db = Mock(return_value=self.db)
         self.sql.execute = AsyncMock(return_value=self.mockCur)
@@ -89,14 +89,13 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
             Mock_Connection.assert_called_once_with(db_obj=self.db, **self.db_cfg)
             mock_con_obj.connect.assert_awaited_once_with()
 
-    @unittest.skip("to be adapted when sql_factory is redesigned")
     def test_201_sql_table_list(self):
-        reply = self.sql.script(database.sqlexecutable.SQLTemplate.TABLELIST).get_sql()
+        reply = self.sql.script(database.sql_statement.SQLTemplate.TABLELIST).get_sql()
         re = "^ *SELECT name .*FROM sqlite_master.*'table'"
         re += ".*substr.*'sqlite_' *$"
-        self.assertRegex(reply.replace("\n", " "), re)
+        self.assertRegex(reply["query"].replace("\n", " "), re)
+        self.assertEqual(reply["params"], {})
 
-    @unittest.skip("to be adapted when sql_factory is redesigned")
     async def test_202_get_table_info(self):
         mock_table = "mock_table"
         expected = {
@@ -111,16 +110,15 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
         )
         with patch("database.sqlite.SQL", self.MockSQL):
             reply = await self.db._get_table_info(mock_table)
-            self.sql.execute.assert_awaited_once_with(
-                close=1, params=None, commit=False
-            )
+            self.sql.execute.assert_awaited_once_with(close=1, commit=False)
             self.mockCur.fetchone.assert_awaited_once_with()
             self.assertDictEqual(reply, expected)
-            sql_issued = self.sql.sql()
-            print(f"{sql_issued=}")
+            sql_issued = self.sql.get_sql()
+            print(f"{sql_issued['query']=}")
         re = "^ *SELECT *sql *FROM *sqlite_master *WHERE *type *= *'table'"
-        re += f" *AND *name *= *'{mock_table}' *$"
-        self.assertRegex(sql_issued.replace("\n", " "), re)
+        re += f" *AND *name *= *:table *$"
+        self.assertRegex(sql_issued["query"].replace("\n", " "), re)
+        self.assertEqual(sql_issued["params"], {"table": mock_table})
 
 
 class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):

@@ -1,9 +1,9 @@
-""" Manage the configuration of the app
-    - initially configuration is read from a file
-    # - when DB is connected the initial configuration is merged 
-    #     with the DB persisted configuration
-    # - configuration is made persistent in the DB
-    # - user configurable attributes can be maintained by the frontend
+"""Manage the configuration of the app
+- initially configuration is read from a file
+# - when DB is connected the initial configuration is merged
+#     with the DB persisted configuration
+# - configuration is made persistent in the DB
+# - user configurable attributes can be maintained by the frontend
 """
 
 from typing import Optional
@@ -18,7 +18,7 @@ from core.app_logging import getLogger
 from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config, ConfigDict
 from data.management.configuration import Configuration
-from database.sqlexpression import ColumnName
+from database.sql_expression import ColumnName
 
 LOG = getLogger(__name__)
 

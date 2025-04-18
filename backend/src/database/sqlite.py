@@ -1,8 +1,6 @@
-""" Connection to SQLit DB using aiosqlite """
+"""Connection to SQLit DB using aiosqlite"""
 
 import datetime
-import types
-from enum import Flag
 from pathlib import Path
 import json
 import re
@@ -11,9 +9,9 @@ from core.exceptions import OperationalError
 from core.configuration.config import Config
 from core.app_logging import getLogger
 from database.db_base import DB, Connection, Cursor
-from database.sqlexecutable import SQL, SQLTemplate, SQLScript
-from database.sqlexpression import SQLColumnDefinition
-from database.sqlfactory import SQLFactory
+from database.sql_statement import SQL, SQLTemplate, SQLScript
+from database.sql_clause import SQLColumnDefinition
+from database.sql_factory import SQLFactory
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase
 from persistance.business_attribute_base import BaseFlag
 

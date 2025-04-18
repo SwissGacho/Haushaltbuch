@@ -1,4 +1,4 @@
-""" Manage DB schema versins and check compatibility """
+"""Manage DB schema versins and check compatibility"""
 
 import core
 import database
@@ -10,7 +10,7 @@ import persistance
 from data.management.db_schema import DBSchema
 from core.app_logging import getLogger
 from core.exceptions import DBSchemaError
-from database.sqlexecutable import SQL, SQLTemplate
+from database.sql_statement import SQL, SQLTemplate
 import persistance.business_object_base
 
 LOG = getLogger(__name__)

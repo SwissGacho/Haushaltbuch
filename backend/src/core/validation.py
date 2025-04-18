@@ -1,5 +1,4 @@
-""" Check validity of login and actions.
-"""
+"""Check validity of login and actions."""
 
 from core.app_logging import getLogger, log_exit
 
@@ -7,7 +6,7 @@ LOG = getLogger(__name__)
 
 from data.management.user import User
 from messages.message import MessageAttribute
-from database.sqlexpression import ColumnName
+from database.sql_expression import ColumnName
 from core.app import App
 from data.management.user import UserRole
 from core.status import Status
