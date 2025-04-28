@@ -107,6 +107,7 @@ class ConfigSetup(BaseObject):
 
     @classmethod
     async def _create_or_update_initial_user(cls, setup_cfg: dict):
+        # LOG.debug(f"ConfigSetup._create_or_update_initial_user({setup_cfg=}")
         initial_user = (
             get_config_item(setup_cfg, SetupConfigKeys.ADM_USER)
             if App.status == Status.STATUS_MULTI_USER

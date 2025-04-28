@@ -54,7 +54,6 @@ class SQL(SQLExecutable):
     ).execute()"""
 
     def __new__(cls, *args, **kwargs):
-        LOG.debug("SQL.__new__")
         factory = cls._get_db().sql_factory
         actual_class = factory.get_sql_class(cls)
         return object().__new__(actual_class, *args, **kwargs)

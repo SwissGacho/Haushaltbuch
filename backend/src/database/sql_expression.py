@@ -244,7 +244,7 @@ class Value(SQLExpression):
             raise ValueError("Value must be provided")
         if not isinstance(name, str):
             raise ValueError("Name must be a string")
-        LOG.debug(f"Value({name=}, {value=})")
+        # LOG.debug(f"Value({name=}, {value=})")
         super().__init__()
         self._name: str = name
         # if not isinstance(value, (str, int, float)):

@@ -19,21 +19,17 @@ class SQLExecutable(object):
         self._parent = parent
 
     def __new__(cls, *args, **kwargs):
-        LOG.debug(f"SQLExecutable.__new__({cls=}, {args=}, {kwargs=})")
+        # LOG.debug(f"SQLExecutable.__new__({cls=}, {args=}, {kwargs=})")
         future_parent = kwargs.get("parent", None)
-        LOG.debug(f"     {future_parent=}")
         if future_parent is None or not (isinstance(future_parent, SQLExecutable)):
-            LOG.debug(f"{type(future_parent)=}")
             raise TypeError(
                 f"Expected 'SQLExecutable' as parent, got {type(future_parent).__name__}"
             )
         actual_class = future_parent._get_db().sql_factory.get_sql_class(cls)
 
-        LOG.debug(f"     {actual_class=}")
         if not issubclass(actual_class, SQLExecutable):
             raise TypeError(f"Factory returned an invalid class: {actual_class}")
         actual_object = super().__new__(actual_class)  # type: ignore
-        LOG.debug(f"     {actual_object=}")
         return actual_object
 
     async def execute(
