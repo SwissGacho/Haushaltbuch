@@ -1,15 +1,18 @@
-""" Test suite for general configuration features. """
+"""Test suite for general configuration features."""
 
 import platform
 
+from re import M
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
+from core.const import SINGLE_USER_NAME
 from core.base_objects import Config
 from core.configuration.setup_config import SetupConfigValues
 from core.exceptions import ConfigurationError
 from core.status import Status
 import core.configuration.config
+from data.management.user import UserRole
 
 
 class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
@@ -65,16 +68,19 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             mock_dbcfg.set_db_configuration.assert_not_called()
             mock_dbcfg.read_db_config_file.assert_called_once_with()
 
-    async def _400_get_configuration_from_db(self, u_mode, stat, mock_ids=[1]):
+    async def _400_get_configuration_from_db(
+        self, u_mode, stat, mock_cfg_ids=[1], no_sngl_usr=False
+    ):
         with (
             patch("core.configuration.config.Configuration") as MockConfiguration,
             patch("core.configuration.config.ColumnName") as MockColNam,
             patch("core.configuration.config.get_config_item") as mock_get_config_item,
+            patch("core.configuration.config.User") as MockUser,
             patch("core.configuration.config.App") as MockApp,
         ):
 
             mock_col = "mock-nam"
-            MockConfiguration.get_matching_ids = AsyncMock(return_value=mock_ids)
+            MockConfiguration.get_matching_ids = AsyncMock(return_value=mock_cfg_ids)
             MockColNam.return_value = mock_col
             mock_configuration = Mock(name="global_configuration")
             mock_configuration.fetch = AsyncMock(
@@ -82,20 +88,46 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             )
             MockConfiguration.return_value = mock_configuration
             mock_get_config_item.return_value = u_mode
+            MockUser.get_matching_ids = AsyncMock(
+                return_value=[] if no_sngl_usr else [1]
+            )
+            MockUser.return_value = Mock(name="mockuser")
+            MockUser.return_value.store = AsyncMock()
 
             result = await self.config_obj.get_configuration_from_db()
 
             self.assertIsNone(result)
-            MockColNam.assert_called_once_with("user_id")
+            self.assertEqual(
+                MockColNam.call_count,
+                2 if u_mode == SetupConfigValues.SINGLE_USER else 1,
+            )
+            MockColNam.assert_any_call("user_id")
             MockConfiguration.get_matching_ids.assert_awaited_once_with(
                 {mock_col: None}
             )
-            mock_configuration.fetch.assert_awaited_once_with(id=mock_ids[0])
+            mock_configuration.fetch.assert_awaited_once_with(id=mock_cfg_ids[0])
             self.assertEqual(self.config_obj._global_configuration, mock_configuration)
             mock_get_config_item.assert_called_once_with(
                 mock_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
             )
             self.assertEqual(MockApp.status_object.status, stat)
+            if u_mode == SetupConfigValues.SINGLE_USER:
+                MockColNam.assert_any_call("name")
+                MockUser.get_matching_ids.assert_awaited_once_with(
+                    {MockColNam.return_value: SINGLE_USER_NAME}
+                )
+                if no_sngl_usr:
+                    MockUser.assert_called_once_with(
+                        name=SINGLE_USER_NAME, role=UserRole.ADMIN
+                    )
+                    MockUser.return_value.store.assert_awaited_once()
+                else:
+                    MockUser.assert_not_called()
+                    MockUser.return_value.store.assert_not_awaited()
+            else:
+                MockUser.get_matching_ids.assert_not_awaited()
+                MockUser.assert_not_called()
+                MockUser.return_value.store.assert_not_awaited()
 
     async def test_401a_get_configuration_from_db_multi(self):
         await self._400_get_configuration_from_db(
@@ -107,9 +139,14 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             SetupConfigValues.SINGLE_USER, Status.STATUS_SINGLE_USER
         )
 
+    async def test_401c_get_configuration_from_db_no_single(self):
+        await self._400_get_configuration_from_db(
+            SetupConfigValues.SINGLE_USER, Status.STATUS_SINGLE_USER, no_sngl_usr=True
+        )
+
     async def test_402_get_configuration_from_db_cfg_exc(self):
         with self.assertRaises(ConfigurationError):
-            await self._400_get_configuration_from_db(None, None, mock_ids=[1, 2])
+            await self._400_get_configuration_from_db(None, None, mock_cfg_ids=[1, 2])
 
     async def test_403_get_configuration_from_db_no_mode(self):
         with self.assertRaises(ConfigurationError):
