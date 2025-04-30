@@ -2,7 +2,6 @@
 
 import platform
 
-from re import M
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -69,7 +68,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             mock_dbcfg.read_db_config_file.assert_called_once_with()
 
     async def _400_get_configuration_from_db(
-        self, u_mode, stat, mock_cfg_ids=[1], no_sngl_usr=False
+        self, u_mode, stat, mock_ids=[1], no_sngl_usr=False
     ):
         with (
             patch("core.configuration.config.Configuration") as MockConfiguration,
@@ -80,7 +79,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
         ):
 
             mock_col = "mock-nam"
-            MockConfiguration.get_matching_ids = AsyncMock(return_value=mock_cfg_ids)
+            MockConfiguration.get_matching_ids = AsyncMock(return_value=mock_ids)
             MockColNam.return_value = mock_col
             mock_configuration = Mock(name="global_configuration")
             mock_configuration.fetch = AsyncMock(
@@ -105,7 +104,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             MockConfiguration.get_matching_ids.assert_awaited_once_with(
                 {mock_col: None}
             )
-            mock_configuration.fetch.assert_awaited_once_with(id=mock_cfg_ids[0])
+            mock_configuration.fetch.assert_awaited_once_with(id=mock_ids[0])
             self.assertEqual(self.config_obj._global_configuration, mock_configuration)
             mock_get_config_item.assert_called_once_with(
                 mock_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
@@ -146,7 +145,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
 
     async def test_402_get_configuration_from_db_cfg_exc(self):
         with self.assertRaises(ConfigurationError):
-            await self._400_get_configuration_from_db(None, None, mock_cfg_ids=[1, 2])
+            await self._400_get_configuration_from_db(None, None, mock_ids=[1, 2])
 
     async def test_403_get_configuration_from_db_no_mode(self):
         with self.assertRaises(ConfigurationError):

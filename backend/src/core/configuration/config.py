@@ -6,7 +6,6 @@
 # - user configurable attributes can be maintained by the frontend
 """
 
-from os import name
 from typing import Optional
 
 from core.configuration.cmd_line import parse_commandline
