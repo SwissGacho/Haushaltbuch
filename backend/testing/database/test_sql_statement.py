@@ -323,7 +323,19 @@ class Test_700_CreateTable(unittest.TestCase):
     def tearDown(self):
         self.patcher.stop()
 
-    def test_703_create_table_with_columns(self):
+    def test_701_create_table_as_select(self):
+        """Test creating a table using AS SELECT"""
+        create_table = CreateTable(table="test", parent=self.mockParent)
+        create_table.as_select(column_list=["mick", "mack"]).from_("mocks")
+        self.assertEqual(
+            clean_sql(create_table.get_sql()),
+            {
+                "query": "CREATE TABLE IF NOT EXISTS test AS SELECT mick, mack FROM mocks",
+                "params": {},
+            },
+        )
+
+    def test_702_create_table_with_columns(self):
         """Test creating a table with multiple columns"""
         create_table = CreateTable(
             table="test", columns=self.col_desc[:2], parent=self.mockParent
@@ -351,12 +363,31 @@ class Test_700_CreateTable(unittest.TestCase):
             },
         )
 
+    def test_703_create_temp_table(self):
+        """Test creating a table with multiple columns"""
+        create_table = CreateTable(
+            table="test",
+            columns=self.col_desc[:2],
+            temporary=True,
+            parent=self.mockParent,
+        )
+        self.assertEqual(
+            clean_sql(create_table.get_sql()),
+            {
+                "query": "CREATE TEMPORARY TABLE IF NOT EXISTS test ("
+                + ", ".join(self.expected_sql[:2])
+                + ")",
+                "params": {},
+            },
+        )
+
     def test_704_create_table_without_columns(self):
         create_table = CreateTable("test", [], parent=self.mockParent)
         with self.assertRaises(InvalidSQLStatementException) as exc:
             create_table.get_sql()
         self.assertEqual(
-            str(exc.exception), "CREATE TABLE statement must have at least one column."
+            str(exc.exception),
+            "CREATE TABLE statement must have at least one column or 'AS SELECT' clause.",
         )
 
     def test_705_create_table_with_column_constraint(self):
