@@ -2,6 +2,7 @@
 
 from calendar import c
 from enum import Enum
+from typing import Self
 
 from database.sql_executable import SQLExecutable, SQLManagedExecutable
 from database.sql_expression import ColumnName, Row, SQLExpression, Value
@@ -31,8 +32,8 @@ class SQLColumnDefinition(SQLManagedExecutable):
         self,
         name: str,
         data_type: type,
-        constraints: BOColumnFlag = None,
-        parent: SQLExecutable = None,
+        constraints: BOColumnFlag | None = None,
+        parent: SQLExecutable | None = None,
         **args,
     ):
         super().__init__(parent)
@@ -90,7 +91,7 @@ class From(SQLManagedExecutable):
         table: str = None,
         join_constraint: "SQLExpression" = None,
         join_operator: JoinOperator = JoinOperator.FULL,
-    ) -> "From":
+    ) -> Self:
         """Add a join to another table to the FROM clause."""
         self._joins.append((join_operator, table, join_constraint))
         return self
@@ -146,7 +147,7 @@ class Values(SQLManagedExecutable):
         super().__init__(parent)
         self._rows = rows
 
-    def row(self, row: Row):
+    def row(self, row: Row) -> Self:
         """Add a row to the end of the list."""
         self._rows.append(row)
         return self
