@@ -10,7 +10,8 @@ import persistance
 from data.management.db_schema import DBSchema
 from core.app_logging import getLogger
 from core.exceptions import DBSchemaError
-from database.sql_statement import SQL, SQLTemplate
+from database.sql import SQL
+from database.sql_statement import SQLTemplate
 import persistance.business_object_base
 
 LOG = getLogger(__name__)

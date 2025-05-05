@@ -2,9 +2,9 @@ import unittest
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
+from database.sql import SQL
 from database.sql_key_manager import SQL_Dict
 from database.sql_statement import (
-    SQL,
     SQLStatement,
     SQLScript,
     SQLTemplate,
@@ -119,13 +119,17 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
         """Test direct execute method when an SQL statement is set"""
         self.sql.script("MOCK SQL")
         await self.sql.execute()
-        MockApp.db.execute.assert_awaited_once_with("MOCK SQL", {}, False, False)
+        MockApp.db.execute.assert_awaited_once_with(
+            "MOCK SQL", {}, False, False, connection=None
+        )
 
     async def test_203_execute_indirect(self):
         """Test indirect execute method when an SQL statement is set"""
         self.sql.script("MOCK SQL")
         await self.sql._sql_statement.execute()
-        MockApp.db.execute.assert_awaited_once_with("MOCK SQL", {}, False, False)
+        MockApp.db.execute.assert_awaited_once_with(
+            "MOCK SQL", {}, False, False, connection=None
+        )
 
     async def test_204_execute_with_params(self):
         """Test indirect execute method when an SQL statement is set"""
@@ -136,6 +140,7 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
             {"param1": "test1", "param2": "test2"},
             False,
             False,
+            connection=None,
         )
 
     async def test_205_close(self):
@@ -323,7 +328,19 @@ class Test_700_CreateTable(unittest.TestCase):
     def tearDown(self):
         self.patcher.stop()
 
-    def test_703_create_table_with_columns(self):
+    def test_701_create_table_as_select(self):
+        """Test creating a table using AS SELECT"""
+        create_table = CreateTable(table="test", parent=self.mockParent)
+        create_table.as_select(column_list=["mick", "mack"]).from_("mocks")
+        self.assertEqual(
+            clean_sql(create_table.get_sql()),
+            {
+                "query": "CREATE TABLE IF NOT EXISTS test AS SELECT mick, mack FROM mocks",
+                "params": {},
+            },
+        )
+
+    def test_702_create_table_with_columns(self):
         """Test creating a table with multiple columns"""
         create_table = CreateTable(
             table="test", columns=self.col_desc[:2], parent=self.mockParent
@@ -351,12 +368,31 @@ class Test_700_CreateTable(unittest.TestCase):
             },
         )
 
+    def test_703_create_temp_table(self):
+        """Test creating a table with multiple columns"""
+        create_table = CreateTable(
+            table="test",
+            columns=self.col_desc[:2],
+            temporary=True,
+            parent=self.mockParent,
+        )
+        self.assertEqual(
+            clean_sql(create_table.get_sql()),
+            {
+                "query": "CREATE TEMPORARY TABLE IF NOT EXISTS test ("
+                + ", ".join(self.expected_sql[:2])
+                + ")",
+                "params": {},
+            },
+        )
+
     def test_704_create_table_without_columns(self):
         create_table = CreateTable("test", [], parent=self.mockParent)
         with self.assertRaises(InvalidSQLStatementException) as exc:
             create_table.get_sql()
         self.assertEqual(
-            str(exc.exception), "CREATE TABLE statement must have at least one column."
+            str(exc.exception),
+            "CREATE TABLE statement must have at least one column or 'AS SELECT' clause.",
         )
 
     def test_705_create_table_with_column_constraint(self):
