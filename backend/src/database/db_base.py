@@ -5,8 +5,9 @@ from .sql_executable import SQLExecutable
 
 LOG = getLogger(__name__)
 
-from core.base_objects import DBBaseClass
-from database.sql_statement import SQL, SQLTemplate
+from core.base_objects import DBBaseClass, ConnectionBaseClass
+from database.sql import SQL
+from database.sql_statement import SQLTemplate
 from database.sql_clause import SQLColumnDefinition
 
 
@@ -80,11 +81,13 @@ class DB(DBBaseClass):
         "Open a connection and return the Connection instance"
         raise ConnectionError("Called from DB base class.")
 
-    async def execute(self, query: str, params=None, close=False, commit=False):
+    async def execute(
+        self, query: str, params=None, close=False, commit=False, connection=None
+    ):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
-        # LOG.debug(f"execute: {query=}, {params=}, {close=}, {commit=}")
-        return await (await self.connect()).execute(
+        # LOG.debug(f"DB.execute: {query=}, {params=}, {close=}, {commit=} {connection=}")
+        return await (connection or await self.connect()).execute(
             query=query, params=params, close=close, commit=commit
         )
 
@@ -94,7 +97,7 @@ class DB(DBBaseClass):
             await con.close()
 
 
-class Connection:
+class Connection(ConnectionBaseClass):
     "Connection to the DB"
 
     def __init__(self, db_obj: DB, commit=False, **cfg) -> None:
@@ -113,7 +116,7 @@ class Connection:
         if self._connection:
             if self._commit:
                 await self.commit()
-            # LOG.debug("close connection")
+            # LOG.debug("Connection.close: close connection")
             await self._connection.close()
             self._db._connections.remove(self)
             self._connection = None
@@ -187,7 +190,7 @@ class Cursor:
 
     async def close(self):
         "close the cursor"
-        # LOG.debug("close cursor")
+        # LOG.debug("Cursor.close: close cursor")
         if self._cursor:
             await self._cursor.close()
             self._cursor = None
