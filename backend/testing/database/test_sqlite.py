@@ -244,10 +244,12 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
         self.cur._rowcount = 0
         if params is DEFAULT and close is DEFAULT:
             reply = await self.cur.execute(query)
+            params = {}
         elif params is not DEFAULT and close is DEFAULT:
             reply = await self.cur.execute(query, params=params)
         elif params is DEFAULT and close is not DEFAULT:
             reply = await self.cur.execute(query, close=close)
+            params = {}
         elif params is not DEFAULT and close is not DEFAULT:
             reply = await self.cur.execute(query, params=params, close=close)
         if close == 0:
@@ -256,17 +258,17 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(reply, self.cur)
         self.assertEqual(self.cur._last_query, query)
         self.assertEqual(self.cur._rowcount, 99)
-        self.mock_aiocursor.execute.assert_awaited_once_with(query, ANY)
+        self.mock_aiocursor.execute.assert_awaited_once_with(
+            sql=query, parameters=params
+        )
         return self.mock_aiocursor.execute
 
     async def test_101_execute(self):
         result = await self._101_execute()
-        result.assert_awaited_once_with(ANY, {})
+        result.assert_awaited_once_with(sql="ANY_SQL", parameters={})
         result = await self._101_execute(sentinel.PARAMS)
-        result.assert_awaited_once_with(ANY, sentinel.PARAMS)
+        result.assert_awaited_once_with(sql="ANY_SQL", parameters=sentinel.PARAMS)
         result = await self._101_execute(close=0)
-
-        result.assert_awaited_once_with(ANY, {})
 
     async def test_201_rowcount_get_11(self):
         self.cur._rowcount = 11
@@ -293,7 +295,7 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
         reply = await self.cur.rowcount
         self.assertEqual(reply, 22)
         self.mock_con._connection.execute.assert_called_once_with(
-            query=f"SELECT COUNT(*) AS rowcount FROM ({_last_sql})", params={}
+            sql=f"SELECT COUNT(*) AS rowcount FROM ({_last_sql})", parameters={}
         )
         mock_sqlite_con_execute.__aenter__.assert_awaited_once_with()
         mock_sqlite_con_execute.__aexit__.assert_awaited_once_with(None, None, None)

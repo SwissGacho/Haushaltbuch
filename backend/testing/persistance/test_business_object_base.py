@@ -73,16 +73,20 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
     async def test_106_sql_create_table(self):
         mock_sql = Mock(name="mock_sql")
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
+        mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
+        mock_sql.__aexit__ = AsyncMock(return_value=None)
         mock_sql.create_table = Mock(return_value=mock_sql)
         mock_sql.column = Mock()
         mock_sql.execute = AsyncMock()
         with patch("persistance.business_object_base.SQL", new=MockSQL):
             await MockBO2.sql_create_table()
-            MockSQL.assert_called_once_with()
-            mock_sql.create_table.assert_called_once_with(MOCK_TAB2)
-            exp_arglist = [(call(a[0], a[1], a[2], **a[3])) for a in mock_attr_desc]
-            self.assertEqual(mock_sql.column.call_args_list, exp_arglist)
-            mock_sql.execute.assert_awaited_once_with(close=0)
+        MockSQL.assert_called_once_with()
+        mock_sql.__aenter__.assert_awaited_once_with()
+        mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
+        mock_sql.create_table.assert_called_once_with(MOCK_TAB2)
+        exp_arglist = [(call(a[0], a[1], a[2], **a[3])) for a in mock_attr_desc]
+        self.assertEqual(mock_sql.column.call_args_list, exp_arglist)
+        mock_sql.execute.assert_awaited_once_with(close=0)
 
     async def test_107_count_rows(self):
         RESULT = [1, 99]
@@ -96,6 +100,9 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         mock_sql.where = Mock(return_value=mock_sql)
 
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
+        mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
+        mock_sql.__aexit__ = AsyncMock(return_value=None)
+
         with (
             patch("persistance.business_object_base.SQL", new=MockSQL),
             patch("persistance.business_object_base.Filter") as MockFilter,
@@ -103,13 +110,15 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             mock_conditions = "{mock conditions}"
 
             result = await MockBO2.get_matching_ids(mock_conditions)
-            MockSQL.assert_called_once_with()
-            mock_sql.select.assert_called_once_with(["id"])
-            mock_sql.from_.assert_called_once_with(MOCK_TAB2)
-            mock_sql.where.assert_called_once_with(MockFilter())
-            mock_sql.execute.assert_awaited_once_with(close=1)
-            mock_cursor.fetchall.assert_awaited_once_with()
-            self.assertEqual(result, RESULT)
+        MockSQL.assert_called_once_with()
+        mock_sql.__aenter__.assert_awaited_once_with()
+        mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
+        mock_sql.select.assert_called_once_with(["id"])
+        mock_sql.from_.assert_called_once_with(MOCK_TAB2)
+        mock_sql.where.assert_called_once_with(MockFilter())
+        mock_sql.execute.assert_awaited_once_with(close=1)
+        mock_cursor.fetchall.assert_awaited_once_with()
+        self.assertEqual(result, RESULT)
 
 
 class Test_200_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
@@ -162,6 +171,8 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_bo = MockBO2()
         self.mock_sql = Mock(name="mock_sql")
+        self.mock_sql.__aenter__ = AsyncMock(return_value=self.mock_sql)
+        self.mock_sql.__aexit__ = AsyncMock(return_value=None)
         self.mock_cursor = Mock(name="mock_cursor")
         self.FETCH_RESULT = {
             "id": 33,
@@ -201,6 +212,8 @@ class Test_300_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 result = await self.mock_bo.fetch(newest=newest)
 
             self.MockSQL.assert_called_once_with()
+            self.mock_sql.__aenter__.assert_awaited_once_with()
+            self.mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
             self.mock_sql.select.assert_called_once_with([], True)
             self.mock_sql.from_.assert_called_once_with(MOCK_TAB2)
             self.mock_sql.where.assert_called_once_with(MockExp())

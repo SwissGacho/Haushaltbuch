@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
@@ -129,12 +130,14 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
 
     async def test_203_execute_with_connection(self):
         """Test execute method using an existing connection"""
-        sql = SQL(connection="Mock connect existing")
+        mock_connection = Mock()
+        mock_connection.connected = Mock(return_value=True)
+        sql = SQL(connection=mock_connection)
         sql.script("MOCK SQL")
         await sql._sql_statement.execute()
         MockApp.db.connect.assert_not_awaited()
         MockApp.db.execute.assert_awaited_once_with(
-            "MOCK SQL", {}, False, False, connection="Mock connect existing"
+            "MOCK SQL", {}, False, False, connection=mock_connection
         )
 
     async def test_204_execute_with_params(self):
