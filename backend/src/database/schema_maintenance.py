@@ -47,27 +47,28 @@ async def check_db_schema():
     if this_database.__class__ == database.db_base.DB:
         raise TypeError("cannot check abstract DB")
     LOG.debug("checking DB Schema")
-    cur = await SQL().script(SQLTemplate.TABLELIST).execute()
-    table_count = await cur.rowcount
-    # if table_count < 1:
-    #     raise DBSchemaError("No tables in DB")
-    LOG.debug(f"Found {table_count} tables in DB:")
-    if table_count > 0:
-        LOG.debug(
-            f"    tables: {', '.join([t['table_name'] for t in await cur.fetchall()])}"
-        )
-
-        try:
-            db_schema = await DBSchema().fetch(newest=True)
-        except core.exceptions.OperationalError:
-            db_schema = DBSchema()
-        except Exception as exc:  # pylint: disable=broad-exception-caught
-            LOG.error(
-                f"An error occurred fetching DB schema version in check_db_schema(): {exc}"
+    async with SQL() as sql:
+        cur = await sql.script(SQLTemplate.TABLELIST).execute()
+        table_count = await cur.rowcount
+        # if table_count < 1:
+        #     raise DBSchemaError("No tables in DB")
+        LOG.debug(f"Found {table_count} tables in DB:")
+        if table_count > 0:
+            LOG.debug(
+                f"    tables: {', '.join([t['table_name'] for t in await cur.fetchall()])}"
             )
+
+            try:
+                db_schema = await DBSchema().fetch(newest=True)
+            except core.exceptions.OperationalError:
+                db_schema = DBSchema()
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                LOG.error(
+                    f"An error occurred fetching DB schema version in check_db_schema(): {exc}"
+                )
+                db_schema = DBSchema()
+        else:
             db_schema = DBSchema()
-    else:
-        db_schema = DBSchema()
     all_business_objects = (
         persistance.business_object_base.BOBase.all_business_objects.values()
     )

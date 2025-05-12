@@ -112,12 +112,13 @@ class BOBase(BOBaseBase):
     async def sql_create_table(cls):
         "Create a DB table for this class"
         attributes = cls.attribute_descriptions()
-        sql: CreateTable = SQL().create_table(cls.table)
-        LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
-        for name, data_type, constraint, pars in attributes:
-            LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
-            sql.column(name, data_type, constraint, **pars)
-        await sql.execute(close=0)
+        async with SQL() as sql:
+            create_table: CreateTable = sql.create_table(cls.table)
+            LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+            for name, data_type, constraint, pars in attributes:
+                LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
+                create_table.column(name, data_type, constraint, **pars)
+            await create_table.execute(close=0)
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
@@ -135,19 +136,21 @@ class BOBase(BOBaseBase):
     @classmethod
     async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
-        sql = SQL().select(["count(*) as count"]).from_(cls.table)
-        if conditions:
-            sql.where(Filter(conditions))
-        result = await (await sql.execute(close=1)).fetchone()
+        async with SQL() as sql:
+            select = sql.select(["count(*) as count"]).from_(cls.table)
+            if conditions:
+                select.where(Filter(conditions))
+            result = await (await select.execute(close=1)).fetchone()
         # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
         return result["count"]
 
     @classmethod
     async def get_matching_ids(cls, conditions: dict) -> list[int]:
         """Get the ids of business objects matching the conditions"""
-        sql = SQL().select(["id"]).from_(cls.table)
-        sql.where(Filter(conditions))
-        result = await (await sql.execute(close=1)).fetchall()
+        async with SQL() as sql:
+            select = sql.select(["id"]).from_(cls.table)
+            select.where(Filter(conditions))
+            result = await (await select.execute(close=1)).fetchall()
         # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
 
@@ -165,12 +168,13 @@ class BOBase(BOBaseBase):
             return self
         # LOG.debug(f"fetching {self} with {id=}, {newest=}")
 
-        sql = SQL().select([], True).from_(self.table)
-        if id is not None:
-            sql.where(Eq("id", id))
-        elif newest:
-            sql.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-        self._db_data = await (await sql.execute(close=1)).fetchone()
+        async with SQL() as sql:
+            select = sql.select([], True).from_(self.table)
+            if id is not None:
+                select.where(Eq("id", id))
+            elif newest:
+                select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
+            self._db_data = await (await select.execute(close=1)).fetchone()
 
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
@@ -190,40 +194,40 @@ class BOBase(BOBaseBase):
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
 
-        self.id = (
-            await (
+        async with SQL() as sql:
+            self.id = (
                 await (
-                    SQL()
-                    .insert(self.table)
-                    .rows(
-                        [
-                            (k, v)
-                            for k, v in self._data.items()
-                            if k != "id" and v is not None
-                        ]
-                    )
-                    .returning("id")
-                ).execute(close=1, commit=True)
-            ).fetchone()
-        ).get("id")
+                    await (
+                        sql.insert(self.table)
+                        .rows(
+                            [
+                                (k, v)
+                                for k, v in self._data.items()
+                                if k != "id" and v is not None
+                            ]
+                        )
+                        .returning("id")
+                    ).execute(close=1, commit=True)
+                ).fetchone()
+            ).get("id")
 
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
-        sql = SQL()
-        value_class = Value
-        sql = sql.update(self.table).where(Eq("id", self.id))
-        changes = False
-        for k, v in self._data.items():
-            if k != "id" and v != self.convert_from_db(
-                self._db_data.get(k), self.attributes_as_dict()[k]
-            ):
-                changes = True
-                sql.assignment(k, value_class(k, v))
-        try:
-            if changes:
-                await sql.execute(close=0, commit=True)
-        finally:
-            await self.fetch()
+        async with SQL() as sql:
+            value_class = Value
+            update = sql.update(self.table).where(Eq("id", self.id))
+            changes = False
+            for k, v in self._data.items():
+                if k != "id" and v != self.convert_from_db(
+                    self._db_data.get(k), self.attributes_as_dict()[k]
+                ):
+                    changes = True
+                    update.assignment(k, value_class(k, v))
+            try:
+                if changes:
+                    await update.execute(close=0, commit=True)
+            finally:
+                await self.fetch()
 
 
 log_exit(LOG)

@@ -102,6 +102,7 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.patcher = patch("database.sql_executable.App", MockApp)
         self.patcher.start()
+        MockApp.db.connect = AsyncMock(return_value="Mock connect")
         MockApp.db.execute.reset_mock()
         MockApp.db.close.reset_mock()
         self.sql = SQL()
@@ -114,33 +115,39 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(InvalidSQLStatementException) as exc:
             await self.sql.execute()
         self.assertEqual(str(exc.exception), "No SQL statement to execute.")
+        MockApp.db.connect.assert_not_awaited()
+        MockApp.db.execute.assert_not_awaited()
 
     async def test_202_execute(self):
-        """Test direct execute method when an SQL statement is set"""
+        """Test execute method when an SQL statement is set"""
         self.sql.script("MOCK SQL")
         await self.sql.execute()
+        MockApp.db.connect.assert_awaited_once_with()
         MockApp.db.execute.assert_awaited_once_with(
-            "MOCK SQL", {}, False, False, connection=None
+            "MOCK SQL", {}, False, False, connection="Mock connect"
         )
 
-    async def test_203_execute_indirect(self):
-        """Test indirect execute method when an SQL statement is set"""
-        self.sql.script("MOCK SQL")
-        await self.sql._sql_statement.execute()
+    async def test_203_execute_with_connection(self):
+        """Test execute method using an existing connection"""
+        sql = SQL(connection="Mock connect existing")
+        sql.script("MOCK SQL")
+        await sql._sql_statement.execute()
+        MockApp.db.connect.assert_not_awaited()
         MockApp.db.execute.assert_awaited_once_with(
-            "MOCK SQL", {}, False, False, connection=None
+            "MOCK SQL", {}, False, False, connection="Mock connect existing"
         )
 
     async def test_204_execute_with_params(self):
         """Test indirect execute method when an SQL statement is set"""
         self.sql.script("MOCK SQL :param1 :param2", param1="test1", param2="test2")
         await self.sql._sql_statement.execute()
+        MockApp.db.connect.assert_awaited_once_with()
         MockApp.db.execute.assert_awaited_once_with(
             "MOCK SQL :param1 :param2",
             {"param1": "test1", "param2": "test2"},
             False,
             False,
-            connection=None,
+            connection="Mock connect",
         )
 
     async def test_205_close(self):
