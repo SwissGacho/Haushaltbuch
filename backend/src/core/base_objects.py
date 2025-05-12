@@ -85,14 +85,21 @@ class DBBaseClass(BaseObject):
         "DB specific SQL factory"
         raise NotImplementedError("sqlFactory not defined on base class")
 
-    async def connect(self):
+    async def connect(self) -> "ConnectionBaseClass":
         "Open a connection and return the Connection instance"
+        raise ConnectionError("Called from DB base class.")
 
     async def execute(
-        self, query: str, params=None, close=False, commit=False, connection=None
+        self,
+        query: str,
+        params=None,
+        close=False,
+        commit=False,
+        connection: "ConnectionBaseClass" = None,
     ):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
+        raise NotImplementedError("execute not implemented in base class.")
 
     async def close(self):
         "close all activities"

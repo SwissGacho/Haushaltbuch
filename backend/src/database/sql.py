@@ -4,7 +4,7 @@ This module provides functionality to create, execute, and manage SQL statements
 from multiprocessing import connection
 from core.exceptions import InvalidSQLStatementException
 
-from core.base_objects import ConnectionBaseClass
+from core.base_objects import ConnectionBaseClass, DBBaseClass
 from database.sql_executable import SQLExecutable
 from database.sql_factory import SQLFactory
 from database.sql_key_manager import SQL_Dict
@@ -45,13 +45,25 @@ class SQL(SQLExecutable):
     ) -> None:
         super().__init__(None)
         self._connection = connection
+        self._my_connection = connection
         self._sql_statement: SQLStatement | None = None
 
+    async def __aenter__(self) -> "SQL":
+        """Enter the runtime context related to this object."""
+        if self._my_connection is None:
+            self._my_connection = await SQLExecutable._get_db().connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        """Exit the runtime context related to this object."""
+        await self.close()
+        return False
+
     def __repr__(self):
-        return f"SQL({self._sql_statement})"
+        return f"SQL({repr(self._sql_statement)})"
 
     def __str__(self):
-        return f"SQL({self._sql_statement})"
+        return f"SQL({str(self._sql_statement)})"
 
     def get_sql(self) -> SQL_Dict:
         """Get a string representation of the current SQL statement."""
@@ -111,11 +123,20 @@ class SQL(SQLExecutable):
 
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
-        # LOG.debug(f"SQL.execute({close=}, {commit=}): {self.get_sql()=}")
+        # LOG.debug(
+        #     f"SQL.execute({close=}, {commit=}): {self.get_sql()=}; {self._my_connection=}"
+        # )
         sql = self.get_sql()
-        return await SQL._get_db().execute(
-            sql["query"], sql["params"], close, commit, connection=self._connection
+        db: DBBaseClass = SQLExecutable._get_db()
+        if self._my_connection is None or not self._my_connection.connected:
+            self._my_connection = await db.connect()
+        return await db.execute(
+            sql["query"], sql["params"], close, commit, connection=self._my_connection
         )
 
     async def close(self):
-        await SQL._get_db().close()
+        if self._my_connection is not None and self._connection is None:
+            await self._my_connection.close()
+            self._my_connection = None
+        else:
+            await SQL._get_db().close()
