@@ -14,7 +14,7 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
-from database.sql import SQL
+from database.sql import SQL, SQLTransaction
 from database.sql_statement import CreateTable
 from database.sql_expression import Eq, Filter, SQLExpression, Value
 
@@ -112,13 +112,15 @@ class BOBase(BOBaseBase):
     async def sql_create_table(cls):
         "Create a DB table for this class"
         attributes = cls.attribute_descriptions()
-        async with SQL() as sql:
-            create_table: CreateTable = sql.create_table(cls.table)
-            LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+        async with SQLTransaction() as txaction:
+            # create_table: CreateTable = txaction.sql().create_table(cls.table)
+            s = txaction.sql()
+            create_table: CreateTable = s.create_table(cls.table)
+            # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
             for name, data_type, constraint, pars in attributes:
-                LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
+                # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
                 create_table.column(name, data_type, constraint, **pars)
-            await create_table.execute(close=0)
+            await create_table.execute()
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
@@ -140,7 +142,7 @@ class BOBase(BOBaseBase):
             select = sql.select(["count(*) as count"]).from_(cls.table)
             if conditions:
                 select.where(Filter(conditions))
-            result = await (await select.execute(close=1)).fetchone()
+            result = await (await select.execute()).fetchone()
         # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
         return result["count"]
 
@@ -150,7 +152,7 @@ class BOBase(BOBaseBase):
         async with SQL() as sql:
             select = sql.select(["id"]).from_(cls.table)
             select.where(Filter(conditions))
-            result = await (await select.execute(close=1)).fetchall()
+            result = await (await select.execute()).fetchall()
         # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
 
@@ -174,7 +176,7 @@ class BOBase(BOBaseBase):
                 select.where(Eq("id", id))
             elif newest:
                 select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-            self._db_data = await (await select.execute(close=1)).fetchone()
+            self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
@@ -194,11 +196,12 @@ class BOBase(BOBaseBase):
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
 
-        async with SQL() as sql:
+        async with SQLTransaction() as txaction:
             self.id = (
                 await (
                     await (
-                        sql.insert(self.table)
+                        txaction.sql()
+                        .insert(self.table)
                         .rows(
                             [
                                 (k, v)
@@ -207,15 +210,15 @@ class BOBase(BOBaseBase):
                             ]
                         )
                         .returning("id")
-                    ).execute(close=1, commit=True)
+                    ).execute()
                 ).fetchone()
             ).get("id")
 
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
-        async with SQL() as sql:
+        async with SQLTransaction() as txaction:
             value_class = Value
-            update = sql.update(self.table).where(Eq("id", self.id))
+            update = txaction.sql().update(self.table).where(Eq("id", self.id))
             changes = False
             for k, v in self._data.items():
                 if k != "id" and v != self.convert_from_db(
@@ -225,7 +228,7 @@ class BOBase(BOBaseBase):
                     update.assignment(k, value_class(k, v))
             try:
                 if changes:
-                    await update.execute(close=0, commit=True)
+                    await update.execute()
             finally:
                 await self.fetch()
 

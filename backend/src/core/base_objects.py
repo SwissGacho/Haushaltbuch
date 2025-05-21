@@ -93,8 +93,6 @@ class DBBaseClass(BaseObject):
         self,
         query: str,
         params=None,
-        close=False,
-        commit=False,
         connection: "ConnectionBaseClass" = None,
     ):
         """Open a connection, execute a query and return the Cursor instance.

@@ -32,14 +32,10 @@ class SQLExecutable(object):
         actual_object = super().__new__(actual_class)  # type: ignore
         return actual_object
 
-    async def execute(
-        self,
-        close: bool | int = False,
-        commit=False,
-    ):
+    async def execute(self):
         """Execute the current SQL statement on the database."""
-        # LOG.debug(f"SQLExecutable.execute({close=},{commit=})")
-        return await self._parent.execute(close=close, commit=commit)
+        # LOG.debug(f"SQLExecutable.execute()")
+        return await self._parent.execute()
 
     async def close(self):
         """Close the database connection."""

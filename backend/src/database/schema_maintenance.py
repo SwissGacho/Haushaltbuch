@@ -32,7 +32,7 @@ async def upgrade_db_schema(
     objects: list[persistance.business_object_base.BOBase],
 ):
     "Apply changes to the DB schema"
-    LOG.debug(f"upgrade from {from_version} to {to_version}")
+    LOG.info(f"Upgrade DB schema from version {from_version} to {to_version}")
     if from_version is None:
         await _create_all_tables(objects)
         return

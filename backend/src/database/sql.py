@@ -1,7 +1,7 @@
 """SQL statement builder for the database.
 This module provides functionality to create, execute, and manage SQL statements."""
 
-from multiprocessing import connection
+from typing import Self
 from core.exceptions import InvalidSQLStatementException
 
 from core.base_objects import ConnectionBaseClass, DBBaseClass
@@ -24,7 +24,67 @@ from core.app_logging import getLogger
 LOG = getLogger(__name__)
 
 
-class SQL(SQLExecutable):
+class _SQLBase(SQLExecutable):
+    """Base class for SQL operations that need a DB connection.
+    A connection can be provided on instantiation.
+    .connect will create a new connection if not provided.
+    .close will close the connection if it was created by this class.
+    Context manager support is provided creating a connection when necessary.
+
+    Should not be instantiated directly."""
+
+    def __new__(cls, *args, **kwargs):
+        factory = cls._get_db().sql_factory
+        actual_class = factory.get_sql_class(cls)
+        return object().__new__(actual_class)
+
+    def __init__(self, connection: ConnectionBaseClass | None = None) -> None:
+        super().__init__(None)
+        self._connection = connection
+        self._my_connection = connection
+
+    async def __aenter__(self) -> Self:
+        """Enter the runtime context related to this object."""
+        # LOG.debug(f"Entering {self.__class__.__name__} context")
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        """Exit the runtime context related to this object."""
+        # LOG.debug(f"Exiting {self.__class__.__name__} context")
+        await self.close()
+        return False
+
+    async def connect(self) -> ConnectionBaseClass:
+        """Create a new connection to the database."""
+        if self._my_connection is None:
+            self._my_connection = await SQLExecutable._get_db().connect()
+        return self._my_connection
+
+    @property
+    def connection(self) -> ConnectionBaseClass:
+        """Get the currently used connection to the database."""
+        return self._my_connection
+
+    async def close(self):
+        if self._my_connection is not None and self._connection is None:
+            await self._my_connection.close()
+            self._my_connection = None
+
+    async def commit(self):
+        "commit current transaction"
+        # LOG.debug("commit connection")
+        if self._my_connection is not None:
+            await self._my_connection.commit()
+
+    async def rollback(self):
+        "rollback current transaction"
+        # LOG.debug("rollback connection")
+        if self._my_connection is not None:
+            await self._my_connection.rollback()
+
+
+class SQL(_SQLBase):
     """Usage:
     sql = SQL_statement().create_table(
         "users",
@@ -34,30 +94,13 @@ class SQL(SQLExecutable):
         ],
     ).execute()"""
 
-    def __new__(cls, *args, **kwargs):
-        factory = cls._get_db().sql_factory
-        actual_class = factory.get_sql_class(cls)
-        return object().__new__(actual_class)
-
     def __init__(
         self,
         connection: ConnectionBaseClass | None = None,
     ) -> None:
-        super().__init__(None)
-        self._connection = connection
-        self._my_connection = connection
+        # LOG.debug(f"SQL.__init__({connection=})")
+        super().__init__(connection=connection)
         self._sql_statement: SQLStatement | None = None
-
-    async def __aenter__(self) -> "SQL":
-        """Enter the runtime context related to this object."""
-        if self._my_connection is None:
-            self._my_connection = await SQLExecutable._get_db().connect()
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        """Exit the runtime context related to this object."""
-        await self.close()
-        return False
 
     def __repr__(self):
         return f"SQL({repr(self._sql_statement)})"
@@ -117,26 +160,51 @@ class SQL(SQLExecutable):
         self._sql_statement = SQLScript(script_or_template, parent=self, **kwargs)
         return self._sql_statement
 
-    async def execute(self, close=False, commit=False):
+    async def execute(self):
         """Execute the current SQL statement on the database.
         Must create the statement before calling this method"""
 
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
         # LOG.debug(
-        #     f"SQL.execute({close=}, {commit=}): {self.get_sql()=}; {self._my_connection=}"
+        #     f"SQL.execute(): {self.get_sql()=}; {self._my_connection=}"
         # )
         sql = self.get_sql()
-        db: DBBaseClass = SQLExecutable._get_db()
-        if self._my_connection is None or not self._my_connection.connected:
-            self._my_connection = await db.connect()
-        return await db.execute(
-            sql["query"], sql["params"], close, commit, connection=self._my_connection
+        return await SQLExecutable._get_db().execute(
+            query=sql["query"], params=sql["params"], connection=await self.connect()
         )
 
-    async def close(self):
-        if self._my_connection is not None and self._connection is None:
-            await self._my_connection.close()
-            self._my_connection = None
+
+class SQLTransaction(_SQLBase):
+    """SQL transaction context manager."""
+
+    def __init__(self, connection: ConnectionBaseClass | None = None) -> None:
+        super().__init__(connection)
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        # LOG.debug("Exiting SQL transaction context")
+        if exc_type is None:
+            await self.commit()
         else:
-            await SQL._get_db().close()
+            await self.rollback()
+        await self.close()
+        return False
+
+    def sql(self) -> SQL:
+        "Create a new SQL statement object"
+        return SQL(connection=self.connection)
+
+
+class SQLConnection(_SQLBase):
+    """SQL connection context manager."""
+
+    def __init__(self) -> None:
+        super().__init__(None)
+
+    def sql(self) -> SQL:
+        "Create a new SQL statement object"
+        return SQL(connection=self.connection)
+
+    def transaction(self) -> SQLTransaction:
+        "Create a new SQL transaction object"
+        return SQLTransaction(connection=self.connection)
