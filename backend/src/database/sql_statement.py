@@ -115,7 +115,7 @@ class Select(TableValuedQuery):
         column_list: list[str] = None,
         distinct: bool = False,
     ):
-        self._column_list = [] if column_list is None else column_list
+        self._column_list = column_list or []
         self._distinct = distinct
         self._from_statement: From | None = None
         self._where: Where = None
@@ -400,6 +400,50 @@ class CreateTableAsSelect(CreateTable, Select):
                     self._table,
                     "AS",
                     self.get_query(),
+                ]
+            ),
+            "params": self.params,
+        }
+
+
+class CreateView(Select):
+    """A SQLStatement representing a CREATE VIEW statement.
+    Default implementation complies with SQLite syntax."""
+
+    def __init__(
+        self,
+        view: str = "",
+        view_columns: list[str] = None,
+        *args,
+        temporary: bool = False,
+        parent: SQLExecutable = None,
+        **kwargs,
+    ):
+        # LOG.debug(f"CreateTable({table=}, {columns=}, {temporary=})")
+        self._view = view
+        self._columns: list[str] = view_columns or []
+        self._temporary = temporary
+        super().__init__(parent=parent, *args, **kwargs)
+
+    def get_sql(self) -> SQL_Dict:
+        """Get a string representation of the current SQL statement."""
+        if self._view is None or len(self._view) == 0:
+            raise InvalidSQLStatementException(
+                "CREATE VIEW statement must have a view name."
+            )
+        return {
+            "query": " ".join(
+                [
+                    "CREATE",
+                    "TEMPORARY VIEW" if self._temporary else "VIEW",
+                    "IF NOT EXISTS",
+                    self._view,
+                    (
+                        ("( " + ", ".join(self._columns) + " ) AS")
+                        if self._columns
+                        else "AS"
+                    ),
+                    super().get_query(),
                 ]
             ),
             "params": self.params,
