@@ -460,7 +460,6 @@ class CreateTable(SQLStatement):
                     "CREATE",
                     "TEMPORARY" if self._temporary else "",
                     "TABLE",
-                    "IF NOT EXISTS",
                     self._table,
                     f"({', '.join([column.get_query() for column in self._columns])})",
                 ]
