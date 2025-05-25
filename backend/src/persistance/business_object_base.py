@@ -14,7 +14,8 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
-from database.sql_statement import SQL, CreateTable
+from database.sql import SQL
+from database.sql_statement import CreateTable
 from database.sql_expression import Eq, Filter, SQLExpression, Value
 
 

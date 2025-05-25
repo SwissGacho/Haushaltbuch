@@ -9,7 +9,8 @@ from core.exceptions import OperationalError
 from core.configuration.config import Config
 from core.app_logging import getLogger
 from database.db_base import DB, Connection, Cursor
-from database.sql_statement import SQL, SQLTemplate, SQLScript
+from database.sql import SQL
+from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
 from database.sql_factory import SQLFactory
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase
@@ -93,7 +94,7 @@ if sqlite3:
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):
-        LOG.debug(f"Registering adapter and converter for {flag_type=}")
+        # LOG.debug(f"Registering adapter and converter for {flag_type=}")
         sqlite3.register_adapter(flag_type, _adapt_flag)
 
     # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses
@@ -155,7 +156,6 @@ class SQLiteConnection(Connection):
             return {key: value for key, value in zip(fields, row)}
 
         db_path = Path(self._cfg[Config.CONFIG_DBFILE])
-        LOG.debug(f"Connecting to {db_path=}")
         if not db_path.parent.exists():
             LOG.info(f"Create missing directory '{db_path.parent}' for SQLite DB.")
             db_path.parent.mkdir(parents=True)
@@ -163,6 +163,7 @@ class SQLiteConnection(Connection):
             raise FileExistsError(
                 f"Path containing SQLite DB exists and is not a directory: {db_path.parent}"
             )
+        # LOG.debug(f"Connecting to SQLite DB: {db_path}")
         self._connection = await aiosqlite.connect(
             database=db_path, detect_types=sqlite3.PARSE_DECLTYPES
         )
@@ -191,6 +192,7 @@ class SQLiteCursor(Cursor):
         except sqlite3.OperationalError as err:
             raise OperationalError(err)
         if close is 0:
+            LOG.debug("SQLiteCursor.execute: Close connection immediately")
             await self._connection.close()
             return None
         return self
