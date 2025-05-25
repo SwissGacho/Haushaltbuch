@@ -14,9 +14,9 @@ LOG = getLogger(__name__)
 class SQLExecutable(object):
     """Base class for SQL operations. Should not be instantiated directly."""
 
-    def __init__(self, parent: Self | None = None):
+    def __init__(self, parent: "SQLExecutable | None" = None):
         super().__init__()
-        self._parent: Self | None = parent
+        self._parent: "SQLExecutable | None" = parent
 
     def __new__(cls, *args, **kwargs):
         # LOG.debug(f"SQLExecutable.__new__({cls=}, {args=}, {kwargs=})")

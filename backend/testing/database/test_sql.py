@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock, patch, sentinel
 from database.sql import SQL, SQLTransaction, SQLConnection
 from database.sql_key_manager import SQL_Dict
 from database.sql_expression import And, ColumnName, Eq, SQLString, Value
-from database.sql_statement import CreateTable, Insert, SQLStatement, Select
+from database.sql_statement import CreateTable, CreateView, Insert, SQLStatement, Select
 from database.sql_clause import SQLColumnDefinition
 from core.base_objects import ConnectionBaseClass
 from core.exceptions import InvalidSQLStatementException
@@ -212,6 +212,10 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
             "users", [("name", str, None, {}), ("age", int, None, {})]
         )
         self.checkPrimaryStatement(create_table, CreateTable)
+
+    def test_221_create_view(self):
+        create_view = self.sql.create_view("user_view")
+        self.checkPrimaryStatement(create_view, CreateView)
 
     def test_230_select(self):
         """Test the select method"""

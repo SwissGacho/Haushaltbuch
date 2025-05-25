@@ -62,7 +62,7 @@ class SQLScript(SQLStatement):
     def __init__(
         self,
         script_or_template: str | SQLTemplate,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
         **kwargs,
     ):
         super().__init__(parent)
@@ -84,7 +84,7 @@ class TableValuedQuery(SQLStatement):
     """SQLStatement representing a statement that has a table as its result set.
     Should not be instantiated directly."""
 
-    def __init__(self, parent: SQLExecutable):
+    def __init__(self, parent: SQLExecutable | None = None):
         super().__init__(parent)
 
     def get_sql(self) -> SQL_Dict:
@@ -103,24 +103,24 @@ class Select(TableValuedQuery):
 
     def __init__(
         self,
-        column_list: list[str] = None,
+        column_list: list[str] | None = None,
         distinct: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         super().__init__(parent)
-        self._init_attrs(column_list, distinct)
+        self._init_attrs(column_list or [], distinct)
 
     def _init_attrs(
         self,
-        column_list: list[str] = None,
+        column_list: list[str] | None = None,
         distinct: bool = False,
     ):
         self._column_list = column_list or []
         self._distinct = distinct
         self._from_statement: From | None = None
-        self._where: Where = None
-        self._group_by: GroupBy = None
-        self._having: Having = None
+        self._where: Where | None = None
+        self._group_by: GroupBy | None = None
+        self._having: Having | None = None
 
     def get_query(self) -> str:
         """Get a string representation of the current SQL statement."""
@@ -166,7 +166,7 @@ class Select(TableValuedQuery):
     def join(
         self,
         table: str,
-        join_constraint: SQLExpression = None,
+        join_constraint: SQLExpression | None = None,
         join_operator: JoinOperator = JoinOperator.FULL,
     ):
         """Sets the join clause for the select statement."""
@@ -310,7 +310,7 @@ class CreateTable(SQLStatement):
         table: str = "",
         columns: list[tuple[str, type, BOColumnFlag | None, dict]] = None,
         temporary: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         # LOG.debug(f"CreateTable({table=}, {columns=}, {temporary=})")
         super().__init__(parent)
@@ -383,9 +383,9 @@ class CreateTableAsSelect(CreateTable, Select):
     def __init__(
         self,
         table: str = "",
-        columns: list[tuple[str, type, BOColumnFlag | None, dict]] = None,
+        columns: list[tuple[str, type, BOColumnFlag | None, dict]] | None = None,
         temporary: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         super().__init__(table, columns, temporary, parent)
 
@@ -413,10 +413,10 @@ class CreateView(Select):
     def __init__(
         self,
         view: str = "",
-        view_columns: list[str] = None,
+        view_columns: list[str] | None = None,
         *args,
         temporary: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
         **kwargs,
     ):
         # LOG.debug(f"CreateTable({table=}, {columns=}, {temporary=})")

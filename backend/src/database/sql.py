@@ -11,6 +11,7 @@ from database.sql_key_manager import SQL_Dict
 from database.sql_statement import (
     NamedValueListList,
     CreateTable,
+    CreateView,
     Insert,
     SQLScript,
     SQLStatement,
@@ -130,6 +131,26 @@ class SQL(_SQLBase):
         create_table = CreateTable(table, columns, temporary=temporary, parent=self)
         self._sql_statement = create_table
         return create_table
+
+    def create_view(
+        self,
+        view_name: str,
+        view_columns: list[str] | None = None,
+        column_list: list[str] | None = None,
+        distinct: bool = False,
+    ) -> "CreateView":
+        """Sets the SQL statement to a create view statement and returns a create_view object
+        view_columns: list of columns of the view
+        column_list: list of columns to be selected by the view (see .select())"""
+        create_view = CreateView(
+            view_name,
+            view_columns,
+            column_list=column_list,
+            distinct=distinct,
+            parent=self,
+        )
+        self._sql_statement = create_view
+        return create_view
 
     def select(self, column_list: list[str] = None, distinct: bool = False) -> "Select":
         """Sets the SQL statement to a select statement and returns a select object"""
