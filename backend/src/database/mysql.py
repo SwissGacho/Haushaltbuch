@@ -2,7 +2,7 @@
 
 from database.db_base import DB, Connection, Cursor
 from database.sql_factory import SQLFactory
-from database.sql_statement import SQL
+from database.sql import SQL
 from core.configuration.config import Config
 from core.app_logging import getLogger
 

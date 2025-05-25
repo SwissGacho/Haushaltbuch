@@ -1,10 +1,11 @@
 import unittest
+from unittest import mock
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
+from database.sql import SQL
 from database.sql_key_manager import SQL_Dict
 from database.sql_statement import (
-    SQL,
     SQLStatement,
     SQLScript,
     SQLTemplate,
@@ -15,7 +16,7 @@ from database.sql_statement import (
     Update,
 )
 from database.sql_clause import SQLColumnDefinition
-from database.sql_expression import Eq, And, ColumnName, SQLString, Value
+from database.sql_expression import Eq, And, ColumnName, Value
 from persistance.bo_descriptors import BOBaseBase, BOColumnFlag
 from persistance.business_attribute_base import BaseFlag
 from core.exceptions import InvalidSQLStatementException
@@ -95,149 +96,6 @@ def clean_sql(sql: str | SQL_Dict) -> str | SQL_Dict:
     if isinstance(sql, str):
         return " ".join(sql.strip().split())
     return {"query": " ".join(sql["query"].strip().split()), "params": sql["params"]}
-
-
-class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
-
-    def setUp(self) -> None:
-        self.patcher = patch("database.sql_executable.App", MockApp)
-        self.patcher.start()
-        MockApp.db.execute.reset_mock()
-        MockApp.db.close.reset_mock()
-        self.sql = SQL()
-
-    def tearDown(self):
-        self.patcher.stop()
-
-    async def test_201_execute_default(self):
-        """Test exception when no SQL statement is set"""
-        with self.assertRaises(InvalidSQLStatementException) as exc:
-            await self.sql.execute()
-        self.assertEqual(str(exc.exception), "No SQL statement to execute.")
-
-    async def test_202_execute(self):
-        """Test direct execute method when an SQL statement is set"""
-        self.sql.script("MOCK SQL")
-        await self.sql.execute()
-        MockApp.db.execute.assert_awaited_once_with("MOCK SQL", {}, False, False)
-
-    async def test_203_execute_indirect(self):
-        """Test indirect execute method when an SQL statement is set"""
-        self.sql.script("MOCK SQL")
-        await self.sql._sql_statement.execute()
-        MockApp.db.execute.assert_awaited_once_with("MOCK SQL", {}, False, False)
-
-    async def test_204_execute_with_params(self):
-        """Test indirect execute method when an SQL statement is set"""
-        self.sql.script("MOCK SQL :param1 :param2", param1="test1", param2="test2")
-        await self.sql._sql_statement.execute()
-        MockApp.db.execute.assert_awaited_once_with(
-            "MOCK SQL :param1 :param2",
-            {"param1": "test1", "param2": "test2"},
-            False,
-            False,
-        )
-
-    async def test_205_close(self):
-        """Test direct execute method when an SQL statement is set"""
-        self.sql.script("MOCK SQL")
-        await self.sql.close()
-        MockApp.db.close.assert_awaited_once_with()
-
-    async def test_206_close_indirect(self):
-        """Test indirect execute method when an SQL statement is set"""
-        self.sql.script("MOCK SQL")
-        await self.sql._sql_statement.close()
-        MockApp.db.close.assert_awaited_once_with()
-
-
-class Test_300_SQL(unittest.TestCase):
-
-    def setUp(self) -> None:
-        self.patcher = patch("database.sql_executable.App", MockApp)
-        self.patcher.start()
-        self.sql = SQL()
-
-    def tearDown(self):
-        self.patcher.stop()
-
-    def checkPrimaryStatement(self, statement: SQLStatement, type):
-        self.assertIsInstance(statement, type)
-        self.assertEqual(self.sql._sql_statement, statement)
-        self.assertEqual(statement._parent, self.sql)
-
-    def test_301_get_db(self):
-        db = SQL._get_db()
-        self.assertEqual(db, MockApp.db)
-
-    def test_302_sql(self):
-        """Test the get_sql method"""
-        with self.assertRaises(InvalidSQLStatementException) as exc:
-            self.sql.get_sql()
-        self.assertEqual(str(exc.exception), "No SQL statement to execute.")
-
-    def test_310_create_table(self):
-        create_table = self.sql.create_table(
-            "users", [("name", str, None, {}), ("age", int, None, {})]
-        )
-        self.checkPrimaryStatement(create_table, CreateTable)
-
-    def test_320_select(self):
-        """Test the select method"""
-        select = self.sql.select(["name", "age"], distinct=True)
-        self.checkPrimaryStatement(select, Select)
-        self.assertTrue(self.sql._sql_statement._distinct)
-
-    def test_321_sql_select_without_from(self):
-        """Test get_sql method when a select statement is set, but before a from clause is set"""
-        self.sql.select(["name", "age"], distinct=True)
-        with self.assertRaises(InvalidSQLStatementException) as exc:
-            self.sql.get_sql()
-        self.assertEqual(
-            str(exc.exception), "SELECT statement must have a FROM clause."
-        )
-
-    def test_322_sql_select_from(self):
-        """Test get_sql method when a select statement is set"""
-        self.sql.select(["name", "age"], distinct=True).from_("users")
-        self.assertEqual(
-            clean_sql(self.sql.get_sql()),
-            {"query": "SELECT DISTINCT name, age FROM users", "params": {}},
-        )
-
-    def test_323_sql_select_where(self):
-        """Test get_sql method when a select statement with where clause is set"""
-        self.sql.select([], distinct=False).from_("users").where(
-            Eq(ColumnName("id"), SQLString("test"))
-        )
-        self.assertEqual(
-            clean_sql(self.sql.get_sql()),
-            {"query": "SELECT * FROM users WHERE (id = 'test')", "params": {}},
-        )
-
-    def test_324_sql_select_with_params(self):
-        """Test get_sql method when a select statement with where clause is set"""
-        self.sql.select([], distinct=False).from_("users").where(
-            And(
-                [
-                    Eq(ColumnName("id1"), Value("mock_val1", "test1")),
-                    Eq(ColumnName("id2"), Value("mock_val2", "test2")),
-                ]
-            )
-        )
-        print(self.sql.get_sql())
-        self.assertEqual(
-            clean_sql(self.sql.get_sql()),
-            {
-                "query": "SELECT * FROM users WHERE ((id1 = :mock_val1) AND (id2 = :mock_val2))",
-                "params": {"mock_val1": "test1", "mock_val2": "test2"},
-            },
-        )
-
-    def test_330_insert(self):
-        """Test the insert method"""
-        insert = self.sql.insert("users", [("name", "TheName"), ("age", 42)])
-        self.checkPrimaryStatement(insert, Insert)
 
 
 class Test_400_SQLStatement(unittest.TestCase):
@@ -323,7 +181,19 @@ class Test_700_CreateTable(unittest.TestCase):
     def tearDown(self):
         self.patcher.stop()
 
-    def test_703_create_table_with_columns(self):
+    def test_701_create_table_as_select(self):
+        """Test creating a table using AS SELECT"""
+        create_table = CreateTable(table="test", parent=self.mockParent)
+        create_table.as_select(column_list=["mick", "mack"]).from_("mocks")
+        self.assertEqual(
+            clean_sql(create_table.get_sql()),
+            {
+                "query": "CREATE TABLE IF NOT EXISTS test AS SELECT mick, mack FROM mocks",
+                "params": {},
+            },
+        )
+
+    def test_702_create_table_with_columns(self):
         """Test creating a table with multiple columns"""
         create_table = CreateTable(
             table="test", columns=self.col_desc[:2], parent=self.mockParent
@@ -351,12 +221,31 @@ class Test_700_CreateTable(unittest.TestCase):
             },
         )
 
+    def test_703_create_temp_table(self):
+        """Test creating a table with multiple columns"""
+        create_table = CreateTable(
+            table="test",
+            columns=self.col_desc[:2],
+            temporary=True,
+            parent=self.mockParent,
+        )
+        self.assertEqual(
+            clean_sql(create_table.get_sql()),
+            {
+                "query": "CREATE TEMPORARY TABLE IF NOT EXISTS test ("
+                + ", ".join(self.expected_sql[:2])
+                + ")",
+                "params": {},
+            },
+        )
+
     def test_704_create_table_without_columns(self):
         create_table = CreateTable("test", [], parent=self.mockParent)
         with self.assertRaises(InvalidSQLStatementException) as exc:
             create_table.get_sql()
         self.assertEqual(
-            str(exc.exception), "CREATE TABLE statement must have at least one column."
+            str(exc.exception),
+            "CREATE TABLE statement must have at least one column or 'AS SELECT' clause.",
         )
 
     def test_705_create_table_with_column_constraint(self):

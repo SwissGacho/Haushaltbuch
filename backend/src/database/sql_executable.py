@@ -1,6 +1,6 @@
 """This module defines a SQLExecutable class that is used to create and execute SQL statements."""
 
-from typing import Optional
+from typing import Optional, Self
 
 from core.app import App
 from core.base_objects import DBBaseClass
@@ -14,9 +14,9 @@ LOG = getLogger(__name__)
 class SQLExecutable(object):
     """Base class for SQL operations. Should not be instantiated directly."""
 
-    def __init__(self, parent: Optional["SQLExecutable"] = None):
+    def __init__(self, parent: Self | None = None):
         super().__init__()
-        self._parent = parent
+        self._parent: Self | None = parent
 
     def __new__(cls, *args, **kwargs):
         # LOG.debug(f"SQLExecutable.__new__({cls=}, {args=}, {kwargs=})")
@@ -32,13 +32,10 @@ class SQLExecutable(object):
         actual_object = super().__new__(actual_class)  # type: ignore
         return actual_object
 
-    async def execute(
-        self,
-        close: bool | int = False,
-        commit=False,
-    ):
+    async def execute(self):
         """Execute the current SQL statement on the database."""
-        return await self._parent.execute(close=close, commit=commit)
+        # LOG.debug(f"SQLExecutable.execute()")
+        return await self._parent.execute()
 
     async def close(self):
         """Close the database connection."""

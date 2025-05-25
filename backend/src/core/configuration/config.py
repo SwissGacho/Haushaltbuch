@@ -45,7 +45,7 @@ class AppConfiguration(ConfigurationBaseClass):
             - set DB configuration from commandline
             - read DB configuration from config file
         """
-        LOG.debug("AppConfiguration.initialize_configuration()")
+        # LOG.debug("AppConfiguration.initialize_configuration()")
         self._cmdline_configuration = parse_commandline(Config.CONFIG_DBCFG_FILE)
         if Config.CONFIG_DB in self._cmdline_configuration:
             DBConfig.set_db_configuration(
@@ -61,7 +61,7 @@ class AppConfiguration(ConfigurationBaseClass):
             config_ids = await Configuration.get_matching_ids(
                 {ColumnName("user_id"): None}
             )
-            LOG.debug(f"AppConfiguration.get_configuration_from_db: {config_ids=}")
+            # LOG.debug(f"AppConfiguration.get_configuration_from_db: {config_ids=}")
             if len(config_ids) == 0:
                 LOG.info(
                     f"Creating global configuration {str(Config.CONFIG_USR_MODE)}={SetupConfigValues.SINGLE_USER}"
@@ -80,9 +80,9 @@ class AppConfiguration(ConfigurationBaseClass):
                 )
             else:
                 raise ConfigurationError("Multiple global configurations in DB.")
-            LOG.debug(
-                f"AppConfiguration.get_configuration_from_db: {self._global_configuration=}"
-            )
+            # LOG.debug(
+            #     f"AppConfiguration.get_configuration_from_db: {self._global_configuration=}"
+            # )
 
             user_mode = get_config_item(
                 self._global_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
