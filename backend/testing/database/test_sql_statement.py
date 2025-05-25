@@ -330,7 +330,7 @@ class Test_700_CreateTable(unittest.TestCase):
         self.assertEqual(
             clean_sql(create_table.get_sql()),
             {
-                "query": "CREATE TABLE IF NOT EXISTS test AS SELECT mick, mack FROM mocks",
+                "query": "CREATE TABLE test AS SELECT mick, mack FROM mocks",
                 "params": {},
             },
         )
