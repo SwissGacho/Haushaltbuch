@@ -343,9 +343,7 @@ class Test_700_CreateTable(unittest.TestCase):
         self.assertEqual(
             clean_sql(create_table.get_sql()),
             {
-                "query": "CREATE TABLE IF NOT EXISTS test ("
-                + ", ".join(self.expected_sql[:2])
-                + ")",
+                "query": "CREATE TABLE test (" + ", ".join(self.expected_sql[:2]) + ")",
                 "params": {},
             },
         )
@@ -356,9 +354,7 @@ class Test_700_CreateTable(unittest.TestCase):
         self.assertEqual(
             clean_sql(create_table.get_sql()),
             {
-                "query": "CREATE TABLE IF NOT EXISTS test ("
-                + ", ".join(self.expected_sql[:3])
-                + ")",
+                "query": "CREATE TABLE test (" + ", ".join(self.expected_sql[:3]) + ")",
                 "params": {},
             },
         )
@@ -399,7 +395,9 @@ class Test_700_CreateTable(unittest.TestCase):
             ],
             parent=self.mockParent,
         )
-        expected_sql = "CREATE TABLE IF NOT EXISTS test (name DB_TEXT Not Null, age DB_INTEGER Default)"
+        expected_sql = (
+            "CREATE TABLE test (name DB_TEXT Not Null, age DB_INTEGER Default)"
+        )
         self.assertEqual(
             clean_sql(create_table.get_sql()), {"query": expected_sql, "params": {}}
         )
