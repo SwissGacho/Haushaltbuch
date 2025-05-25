@@ -323,7 +323,19 @@ class Test_700_CreateTable(unittest.TestCase):
     def tearDown(self):
         self.patcher.stop()
 
-    def test_703_create_table_with_columns(self):
+    def test_701_create_table_as_select(self):
+        """Test creating a table using AS SELECT"""
+        create_table = CreateTable(table="test", parent=self.mockParent)
+        create_table.as_select(column_list=["mick", "mack"]).from_("mocks")
+        self.assertEqual(
+            clean_sql(create_table.get_sql()),
+            {
+                "query": "CREATE TABLE test AS SELECT mick, mack FROM mocks",
+                "params": {},
+            },
+        )
+
+    def test_702_create_table_with_columns(self):
         """Test creating a table with multiple columns"""
         create_table = CreateTable(
             table="test", columns=self.col_desc[:2], parent=self.mockParent
@@ -331,9 +343,7 @@ class Test_700_CreateTable(unittest.TestCase):
         self.assertEqual(
             clean_sql(create_table.get_sql()),
             {
-                "query": "CREATE TABLE IF NOT EXISTS test ("
-                + ", ".join(self.expected_sql[:2])
-                + ")",
+                "query": "CREATE TABLE test (" + ", ".join(self.expected_sql[:2]) + ")",
                 "params": {},
             },
         )
@@ -344,8 +354,24 @@ class Test_700_CreateTable(unittest.TestCase):
         self.assertEqual(
             clean_sql(create_table.get_sql()),
             {
-                "query": "CREATE TABLE IF NOT EXISTS test ("
-                + ", ".join(self.expected_sql[:3])
+                "query": "CREATE TABLE test (" + ", ".join(self.expected_sql[:3]) + ")",
+                "params": {},
+            },
+        )
+
+    def test_703_create_temp_table(self):
+        """Test creating a table with multiple columns"""
+        create_table = CreateTable(
+            table="test",
+            columns=self.col_desc[:2],
+            temporary=True,
+            parent=self.mockParent,
+        )
+        self.assertEqual(
+            clean_sql(create_table.get_sql()),
+            {
+                "query": "CREATE TEMPORARY TABLE test ("
+                + ", ".join(self.expected_sql[:2])
                 + ")",
                 "params": {},
             },
@@ -356,7 +382,8 @@ class Test_700_CreateTable(unittest.TestCase):
         with self.assertRaises(InvalidSQLStatementException) as exc:
             create_table.get_sql()
         self.assertEqual(
-            str(exc.exception), "CREATE TABLE statement must have at least one column."
+            str(exc.exception),
+            "CREATE TABLE statement must have at least one column or 'AS SELECT' clause.",
         )
 
     def test_705_create_table_with_column_constraint(self):
@@ -368,7 +395,9 @@ class Test_700_CreateTable(unittest.TestCase):
             ],
             parent=self.mockParent,
         )
-        expected_sql = "CREATE TABLE IF NOT EXISTS test (name DB_TEXT Not Null, age DB_INTEGER Default)"
+        expected_sql = (
+            "CREATE TABLE test (name DB_TEXT Not Null, age DB_INTEGER Default)"
+        )
         self.assertEqual(
             clean_sql(create_table.get_sql()), {"query": expected_sql, "params": {}}
         )
