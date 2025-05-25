@@ -374,7 +374,7 @@ class Test_700_CreateTable(unittest.TestCase):
         self.assertEqual(
             clean_sql(create_table.get_sql()),
             {
-                "query": "CREATE TEMPORARY TABLE IF NOT EXISTS test ("
+                "query": "CREATE TEMPORARY TABLE test ("
                 + ", ".join(self.expected_sql[:2])
                 + ")",
                 "params": {},
