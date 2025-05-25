@@ -489,7 +489,6 @@ class CreateTableAsSelect(CreateTable, Select):
                     "CREATE",
                     "TEMPORARY" if self._temporary else "",
                     "TABLE",
-                    "IF NOT EXISTS",
                     self._table,
                     "AS",
                     self.get_query(),
