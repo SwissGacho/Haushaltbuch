@@ -1,9 +1,49 @@
-""" Common utilities """
+"""Common utilities"""
 
+import sys
 from typing import Callable, Union
+import importlib.metadata
+from packaging.version import Version
+
 
 from core.base_objects import ConfigDict
 from persistance.bo_descriptors import BODict
+
+
+class EnvironmentError(Exception):
+    """Custom exception for environment requirement errors."""
+
+    pass
+
+
+def check_environment():
+    """Check if the environment meets the requirements for running the application."""
+
+    def check_lib_version(lib: str, required: Version, raise_error: bool = True):
+        """Check if the installed library version meets the required version."""
+        try:
+            installed_version = Version(importlib.metadata.version(lib))
+        except importlib.metadata.PackageNotFoundError:
+            raise EnvironmentError(f"The '{lib}' package is not installed.")
+
+        if installed_version < required:
+            if raise_error:
+                raise EnvironmentError(
+                    f"'{lib}' version {required} or higher required, "
+                    f"but found: {installed_version}"
+                )
+            return installed_version, False
+        return installed_version, True
+
+    # Python-Version
+    required_python_version = (3, 12)
+    if sys.version_info < required_python_version:
+        raise EnvironmentError(
+            f"Python {required_python_version[0]}.{required_python_version[1]} or higher required, "
+            f"but found: {sys.version_info.major}.{sys.version_info.minor}"
+        )
+
+    check_lib_version("websockets", Version("15.0.1"))
 
 
 class _classproperty:
