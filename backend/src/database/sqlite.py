@@ -117,6 +117,9 @@ class SQLiteScript(SQLScript):
         SQLTemplate.TABLESQL: """SELECT sql FROM sqlite_master
                                 WHERE type='table' AND name = :table
                             """,
+        SQLTemplate.VIEWLIST: """ SELECT name as view_name FROM sqlite_master
+                                    WHERE type = 'view' and substr(name,1,7) <> 'sqlite_'
+                                """,
     }
 
 

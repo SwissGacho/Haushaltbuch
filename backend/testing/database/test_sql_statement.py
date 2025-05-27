@@ -606,7 +606,7 @@ class Test_C000_CreateView(unittest.TestCase):
         self.assertEqual(
             clean_sql(create_view.get_sql()),
             {
-                "query": "CREATE VIEW IF NOT EXISTS user_view AS SELECT * FROM users",
+                "query": "CREATE VIEW user_view AS SELECT * FROM users",
                 "params": {},
             },
         )
@@ -619,7 +619,7 @@ class Test_C000_CreateView(unittest.TestCase):
         self.assertEqual(
             clean_sql(create_view.get_sql()),
             {
-                "query": "CREATE TEMPORARY VIEW IF NOT EXISTS user_view AS SELECT * FROM users",
+                "query": "CREATE TEMPORARY VIEW user_view AS SELECT * FROM users",
                 "params": {},
             },
         )
@@ -632,7 +632,7 @@ class Test_C000_CreateView(unittest.TestCase):
         self.assertEqual(
             clean_sql(create_view.get_sql()),
             {
-                "query": "CREATE VIEW IF NOT EXISTS user_view ( u_num, u_name ) AS SELECT id, name FROM users",
+                "query": "CREATE VIEW user_view ( u_num, u_name ) AS SELECT id, name FROM users",
                 "params": {},
             },
         )
@@ -655,7 +655,7 @@ class Test_C000_CreateView(unittest.TestCase):
             {
                 "query": " ".join(
                     [
-                        "CREATE VIEW IF NOT EXISTS user_view AS",
+                        "CREATE VIEW user_view AS",
                         "SELECT * FROM users",
                         "WHERE ((id1 = :mock_val) AND (id2 = :mock_val1))",
                         "HAVING (age = :mock_val2)",

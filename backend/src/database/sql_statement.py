@@ -36,6 +36,7 @@ class SQLTemplate(Enum):
     TABLEINFO = auto()
     TABLELIST = auto()
     TABLESQL = auto()
+    VIEWLIST = auto()
 
 
 NamedValue: TypeAlias = tuple[str, Any] | Value
@@ -434,7 +435,6 @@ class CreateView(Select):
                 [
                     "CREATE",
                     "TEMPORARY VIEW" if self._temporary else "VIEW",
-                    "IF NOT EXISTS",
                     self._view,
                     (
                         ("( " + ", ".join(self._columns) + " ) AS")

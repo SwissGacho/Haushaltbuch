@@ -138,6 +138,7 @@ class SQL(_SQLBase):
         view_columns: list[str] | None = None,
         column_list: list[str] | None = None,
         distinct: bool = False,
+        temporary: bool = False,
     ) -> "CreateView":
         """Sets the SQL statement to a create view statement and returns a create_view object
         view_columns: list of columns of the view
@@ -147,6 +148,7 @@ class SQL(_SQLBase):
             view_columns,
             column_list=column_list,
             distinct=distinct,
+            temporary=temporary,
             parent=self,
         )
         self._sql_statement = create_view
