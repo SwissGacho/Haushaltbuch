@@ -213,13 +213,10 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
         self.mock_aiocursor.execute.assert_awaited_once_with(
             sql=query, parameters=params
         )
-        return self.mock_aiocursor.execute
 
     async def test_101_execute(self):
-        result = await self._101_execute()
-        result.assert_awaited_once_with(sql="ANY_SQL", parameters={})
-        result = await self._101_execute(sentinel.PARAMS)
-        result.assert_awaited_once_with(sql="ANY_SQL", parameters=sentinel.PARAMS)
+        await self._101_execute()
+        await self._101_execute(sentinel.PARAMS)
 
     async def test_201_rowcount_get_11(self):
         self.cur._rowcount = 11

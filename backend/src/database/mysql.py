@@ -170,3 +170,4 @@ class MySQLCursor(Cursor):
         # LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
 
         self._rowcount = await self._cursor.execute(conv_sql, args=args)
+        return self
