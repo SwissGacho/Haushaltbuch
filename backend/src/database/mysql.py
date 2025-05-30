@@ -1,9 +1,17 @@
 """Connection to MySQL DB using aiomysql"""
 
+from typing import Self
+import datetime
+
+from core.configuration.config import Config
 from database.db_base import DB, Connection, Cursor
 from database.sql_factory import SQLFactory
 from database.sql import SQL
-from core.configuration.config import Config
+from database.sql_statement import SQLTemplate, SQLScript
+from database.sql_clause import SQLColumnDefinition
+from persistance.bo_descriptors import BOColumnFlag, BOBaseBase
+from persistance.business_attribute_base import BaseFlag
+
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -16,47 +24,149 @@ else:
     AIOMYSQL_IMPORT_ERROR = None
 
 
+class MySQLFactory(SQLFactory):
+
+    @classmethod
+    def get_sql_class(cls, sql_cls: type):
+        # LOG.debug(f"MySQLFactory.get_sql_class({sql_cls=})")
+        for mysql_class in [MySQLColumnDefinition, MySQLScript]:
+            if sql_cls.__name__ in [b.__name__ for b in mysql_class.__bases__]:
+                return mysql_class
+        return super().get_sql_class(sql_cls)
+
+
+MYSQL_JSON_TYPE = "JSON"
+MYSQL_BASEFLAG_TYPE = "BIT(64)"
+
+
+class MySQLColumnDefinition(SQLColumnDefinition):
+
+    type_map = {
+        int: "INT",
+        float: "DOUBLE",
+        str: "VARCHAR(100)",
+        datetime.datetime: "DATETIME",
+        dict: MYSQL_JSON_TYPE,
+        list: MYSQL_JSON_TYPE,
+        BOBaseBase: "INT",
+        BaseFlag: MYSQL_BASEFLAG_TYPE,
+    }
+    constraint_map = {
+        BOColumnFlag.BOC_NONE: "",
+        BOColumnFlag.BOC_NOT_NULL: "NOT NULL",
+        BOColumnFlag.BOC_UNIQUE: "UNIQUE",
+        BOColumnFlag.BOC_PK: "PRIMARY KEY",
+        BOColumnFlag.BOC_PK_INC: "AUTO_INCREMENT PRIMARY KEY",
+        BOColumnFlag.BOC_FK: "REFERENCES {relation} (id)",
+        BOColumnFlag.BOC_DEFAULT: "DEFAULT",
+        BOColumnFlag.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        # BOColumnFlag.BOC_INC: "not available ! @%?°",
+        # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
+    }
+
+
+class MySQLScript(SQLScript):
+    sql_templates = {
+        SQLTemplate.TABLELIST: """ SELECT table_name FROM information_schema.tables
+                                    WHERE table_schema = DATABASE()
+                                """,
+        SQLTemplate.TABLEINFO: """ SELECT columns.column_name AS name,
+                                CONCAT_WS(' ',
+                                    columns.COLUMN_NAME,
+                                    UPPER(CASE WHEN SUBSTR(constraints.CHECK_CLAUSE, 1, 4) = 'json' THEN 'json'
+                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit' ) THEN columns.COLUMN_TYPE
+                                        ELSE columns.DATA_TYPE END),
+                                    UPPER(CASE WHEN columns.IS_NULLABLE <> 'YES' AND columns.COLUMN_KEY <> 'PRI' THEN 'NOT NULL' 
+                                        ELSE NULL END),
+                                    UPPER(CASE WHEN columns.EXTRA <> '' THEN columns.EXTRA ELSE NULL END),
+                                    UPPER(CASE WHEN key_cols.CONSTRAINT_NAME = 'PRIMARY' THEN 'PRIMARY KEY' 
+                                        ELSE NULL END),
+                                    UPPER(CASE WHEN columns.COLUMN_DEFAULT IS NULL OR columns.COLUMN_DEFAULT = 'NULL' THEN NULL
+                                        WHEN columns.COLUMN_DEFAULT = 'current_timestamp()' THEN 'default current_timestamp'
+                                        ELSE CONCAT('default', columns.COLUMN_DEFAULT) END),
+                                    CASE WHEN key_cols.REFERENCED_TABLE_NAME IS NOT NULL
+                                        THEN CONCAT('REFERENCES ', key_cols.REFERENCED_TABLE_NAME, ' (', key_cols.REFERENCED_COLUMN_NAME, ')')
+                                        ELSE NULL END
+                                    ) AS column_info
+                                FROM information_schema.columns columns
+                                LEFT JOIN information_schema.check_constraints constraints 
+                                    ON columns.TABLE_SCHEMA = constraints.CONSTRAINT_SCHEMA 
+                                        AND columns.TABLE_NAME = constraints.TABLE_NAME 
+                                        AND columns.COLUMN_NAME = constraints.CONSTRAINT_NAME
+                                LEFT JOIN information_schema.key_column_usage key_cols
+                                    ON columns.TABLE_SCHEMA = key_cols.TABLE_SCHEMA
+                                        AND columns.TABLE_NAME = key_cols.TABLE_NAME
+                                        AND columns.COLUMN_NAME = key_cols.COLUMN_NAME
+                                WHERE columns.TABLE_NAME = :table
+                                    AND columns.table_schema = DATABASE()
+                            """,
+        SQLTemplate.VIEWLIST: """ SELECT name as view_name FROM information_schema.views
+                                    WHERE table_schema = DATABASE()
+                                """,
+    }
+
+
 class MySQLDB(DB):
     def __init__(self, **cfg) -> None:
-        if not AIOMYSQL_IMPORT_ERROR:
-            raise ModuleNotFoundError(f"Import error: {err}")
+        if AIOMYSQL_IMPORT_ERROR:
+            raise ModuleNotFoundError(f"Import error: {AIOMYSQL_IMPORT_ERROR}")
         super().__init__(**cfg)
 
     @property
     def sql_factory(self):
-        return SQLFactory
+        return MySQLFactory
+
+    async def _get_table_info(self, table_name: str) -> dict[str, str]:
+        # LOG.debug(f"MySQLDB._get_table_info({table_name=})")
+        async with SQL() as sql:
+            table_info = await (
+                await sql.script(SQLTemplate.TABLEINFO, table=table_name).execute()
+            ).fetchall()
+        # LOG.debug(f"MySQLDB._get_table_info({table_name=}) -> {table_info=}")
+        return {columns["name"]: columns["column_info"] for columns in table_info}
 
     async def connect(self):
         "Open a connection"
         return await MySQLConnection(db_obj=self, **self._cfg).connect()
 
-    # def sql(self, query: SQL, **kwargs) -> str:
-    #    if query == SQL.TABLE_LIST:
-    #        return f""" SELECT table_name FROM information_schema.tables
-    #                    WHERE table_schema = '{self._cfg['db']}'
-    #                """
-    #    else:
-    #        return super().sql(query=query, **kwargs)*/
-
 
 class MySQLConnection(Connection):
     async def connect(self):
-        self._connection = await aiomysql.connect(
+        # LOG.debug(f"MySQLConnection.connect({self._cfg=})")
+        self._connection: aiomysql.Connection = await aiomysql.connect(
             host=self._cfg[Config.CONFIG_DBHOST],
-            # db=self._cfg[Config.CONFIG_DB_DB],
+            db=self._cfg[Config.CONFIG_DBDBNAME],
             user=self._cfg[Config.CONFIG_DBUSER],
             password=self._cfg[Config.CONFIG_DBPW],
         )
         return self
 
-    async def execute(self, sql: str):
+    async def close(self):
+        "close the connection"
+        if self._connection:
+            # LOG.debug("Connection.close: closing connection")
+            self._connection.close()
+            self._db._connections.remove(self)
+            self._connection = None
+            # LOG.debug(f"------------------------------- {self._db._connections=}")
+
+    async def execute(self, query: str, params=None) -> "MySQLCursor":
         "execute an SQL statement and return a cursor"
-        cur = MySQLCursor(cur=await self._connection.cursor(), con=self)
-        await cur.execute(sql)
+        cur = MySQLCursor(
+            cur=await self._connection.cursor(aiomysql.DictCursor), con=self
+        )
+        await cur.execute(query, params=params)
         return cur
 
 
 class MySQLCursor(Cursor):
 
-    async def execute(self, sql: str):
-        self._rowcount = await self._cursor.execute(sql)
+    async def execute(self, query: str, params=None):
+        # LOG.debug(f"MySQLCursor.execute({query=}, {params=})")
+
+        conv_sql, args = self.convert_params_named_2_format(
+            query, params or {}, dump_json=True
+        )
+        # LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
+
+        self._rowcount = await self._cursor.execute(conv_sql, args=args)

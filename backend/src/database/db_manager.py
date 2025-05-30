@@ -1,5 +1,4 @@
-""" Manage connection to the database
-"""
+"""Manage connection to the database"""
 
 from contextlib import asynccontextmanager
 
@@ -46,7 +45,7 @@ async def get_db():
                 )
             yield
             return
-    elif db_type == "MySQL":
+    elif db_type == "MySQL" or db_type == "MariaDB":
         LOG.info("Connect to MySQL DB")
         try:
             db = MySQLDB(**db_config)

@@ -1,7 +1,10 @@
 """Base class for DB connections"""
 
+from typing import Any
+import re
+import json
+
 from core.app_logging import getLogger, log_exit
-from .sql_executable import SQLExecutable
 
 LOG = getLogger(__name__)
 
@@ -161,6 +164,26 @@ class Cursor:
         self._cursor = cur
         self._connection = con
         self._rowcount = None
+
+    def convert_params_named_2_format(
+        self, query, params, dump_json: bool = False
+    ) -> tuple[str, tuple[Any, ...]]:
+        param_order = []
+
+        def replacer(match):
+            key = match.group(1)
+            if key not in params:
+                raise ValueError(f"Fehlender Parameter: {key}")
+            param = params[key]
+            if dump_json and isinstance(param, (dict, list)):
+                param = json.dumps(param)
+            elif isinstance(param, str):
+                param = param.replace("'", "''")
+            param_order.append(param)
+            return "%s"
+
+        converted_query = re.sub(r":(\w+)", replacer, query)
+        return converted_query, tuple(param_order)
 
     async def execute(self, query: str, params=None):
         """execute an SQL statement and return the Cursor instance (self)."""
