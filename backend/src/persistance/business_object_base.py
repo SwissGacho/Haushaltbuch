@@ -3,7 +3,9 @@
 Business objects are classes that support persistance in the data base
 """
 
-from typing import TypeAlias, Optional, Callable
+from asyncio import Task, get_running_loop
+from re import sub
+from typing import Any, Coroutine, TypeAlias, Optional, Callable
 import copy
 from datetime import date, datetime, UTC
 
@@ -13,7 +15,7 @@ LOG = getLogger(__name__)
 
 # pylint: disable=wrong-import-position
 
-from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
+from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BODatetime, BOId
 
 
 class _classproperty:
@@ -25,19 +27,32 @@ class _classproperty:
 
 
 AttributeDescription: TypeAlias = tuple[str, type, BOColumnFlag, dict[str, str]]
+BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 
 
 class BOBase(BOBaseBase):
     "Business Object baseclass"
 
-    id = BOInt(BOColumnFlag.BOC_PK_INC)
+    id = BOId(BOColumnFlag.BOC_PK_INC)
     last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR)
     _table = None
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, type["BOBase"]] = {}
 
+    _loaded_instances: dict[int, "BOBase"] = {}
+
+    _creation_subscribers: dict[int, BOCallback] = {}
+    _last_subscriber_id = 0
+
+    def __new__(cls, id: int | None = None, **attributes):
+        if id is not None:
+            if id in cls._loaded_instances:
+                return cls._loaded_instances[id]
+
+        return super().__new__(cls)
+
     # pylint: disable=redefined-builtin
-    def __init__(self, id=None, **attributes) -> None:
+    def __init__(self, id: int | None = None, **attributes) -> None:
         # LOG.debug(f"BOBase({id=},{attributes})")
         self._data = {}
         self._db_data = {}
@@ -46,11 +61,38 @@ class BOBase(BOBaseBase):
         for attribute, value in attributes.items():
             self._data[attribute] = value
 
+        loop = get_running_loop()
+        for callback in self._creation_subscribers.values():
+            try:
+                task = loop.create_task(
+                    callback(self),
+                    name=f"creation_callback_{callback.__name__}_{self.id}",
+                )
+                task.add_done_callback(self._handle_callback_result)
+            except Exception:
+                LOG.exception(
+                    f"Error scheduling creation callback {callback.__name__} for {self!r}"
+                )
+
+    def _handle_callback_result(self, task: Task):
+        """Logs exceptions from background callback tasks."""
+        try:
+            task.result()  # Raise exception if one occurred during the task
+        except Exception:
+            LOG.exception(
+                f"Exception raised in background creation callback task: {task.get_name()}"
+            )
+
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__} "
             f"({', '.join([a+': '+str(v) for a,v in self._data.items()])})"
         )
+
+    @classmethod
+    def register_instance(cls, instance: "BOBase"):
+        if instance.id is not None:
+            cls._loaded_instances[instance.id] = instance  # type: ignore
 
     def __str__(self) -> str:
         return str(self.id)
@@ -146,7 +188,7 @@ class BOBase(BOBaseBase):
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
-        raise NotImplementedError("fetch not implemented")
+        return self
 
     async def store(self):
         """Store the business object in the database.
@@ -154,6 +196,24 @@ class BOBase(BOBaseBase):
         Else the existing row is updated
         """
         raise NotImplementedError("store not implemented")
+
+    @classmethod
+    def subscribe_to_creation(cls, callback: BOCallback):
+        """Register a callback to be called when a new instance is created. Return a unique id that can be used to unsubscribe."""
+        if not callable(callback):
+            raise ValueError("Callback must be callable")
+        subscriber_id = cls._last_subscriber_id
+        cls._last_subscriber_id += 1
+        cls._creation_subscribers[subscriber_id] = callback
+        return subscriber_id
+
+    @classmethod
+    def unsubscribe_from_creation(cls, callback_id: int):
+        """Unregister a callback from the creation list."""
+        if callback_id in cls._creation_subscribers:
+            del cls._creation_subscribers[callback_id]
+        else:
+            LOG.warning(f"Callback ID {callback_id} not found in creation subscribers")
 
 
 log_exit(LOG)

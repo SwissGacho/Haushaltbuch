@@ -98,6 +98,14 @@ class BOInt(_PersistantAttr):
         return super().validate(value) or isinstance(value, int)
 
 
+class BOId(BOInt):
+    def __set__(self, obj, value):
+        if obj._data[self.my_name] is not None:
+            raise ValueError("Cannot set id of existing object")
+        obj.__class__.register_instance(obj)
+        super().__set__(obj=obj, value=value)
+
+
 class BOStr(_PersistantAttr):
     @classmethod
     def data_type(cls):

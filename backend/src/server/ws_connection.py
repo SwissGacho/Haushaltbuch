@@ -1,11 +1,11 @@
-""" Handle a websocket connection """
+"""Handle a websocket connection"""
 
 import websockets
 
 import core.exceptions
 from core.app import App
 from server.ws_token import WSToken
-from messages.message import Message, MessageType, MessageAttribute
+from messages.message import Message, MessageAttribute
 from messages.login import HelloMessage, ByeMessage, LoginMessage
 from messages.admin import EchoMessage
 from messages.setup import FetchSetupMessage, StoreSetupMessage
@@ -30,7 +30,7 @@ class WS_Connection:
         )
         self._register_connection()
 
-    def _register_connection(self, key: str = None) -> None:
+    def _register_connection(self, key: str | None = None) -> None:
         if key:
             self._comp = key
         # remove existing entry
@@ -128,9 +128,13 @@ class WS_Connection:
             self.LOG.debug("connection started")
             return True
 
-    async def abort_connection(self, reason: str = None, token=None, status=False):
+    async def abort_connection(
+        self, reason: str | None = None, token: WSToken | None = None, status=False
+    ):
         "say goodbye"
-        await self.send_message(ByeMessage(token=token, reason=reason, status=status))
+        await self.send_message(
+            ByeMessage(token=token, reason=reason, status=str(status))
+        )
         raise core.exceptions.ConnectionClosed(f"Connection aborted ({reason})")
 
     def connection_closed(self):

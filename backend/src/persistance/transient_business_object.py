@@ -30,9 +30,3 @@ class TransientBusinessObject(BOBase):
     @classmethod
     async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         return [bo.id for bo in cls._instances if isinstance(bo.id, int)]
-
-    async def fetch(self, id=None, newest=None):
-        return self
-
-    async def store(self, id=None, newest=None):
-        pass
