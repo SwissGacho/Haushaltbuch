@@ -138,11 +138,7 @@ class BOBase(BOBaseBase):
     @classmethod
     async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
-        sql = SQL().select(["id"]).from_(cls.table)
-        sql.where(Filter(conditions))
-        result = await (await sql.execute(close=1)).fetchall()
-        # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
-        return [id["id"] for id in result]
+        raise NotImplementedError("get_matching_ids not implemented")
 
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
