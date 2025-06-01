@@ -142,7 +142,7 @@ class BOBase(BOBaseBase):
         return result["count"]
 
     @classmethod
-    async def get_matching_ids(cls, conditions: dict) -> list[int]:
+    async def get_matching_ids(cls, conditions: dict = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
         sql = SQL().select(["id"]).from_(cls.table)
         sql.where(Filter(conditions))
