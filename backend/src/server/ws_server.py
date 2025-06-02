@@ -1,7 +1,7 @@
-""" Setup a websocket server and handle connection call """
+"""Setup a websocket server and handle connection call"""
 
 from contextlib import asynccontextmanager
-import websockets
+import websockets.asyncio.server as websockets
 import socket
 
 from core.app_logging import getLogger, log_exit
@@ -13,34 +13,12 @@ from server.ws_connection import WS_Connection
 from messages.message import Message
 
 
-class WSProtocol(websockets.WebSocketServerProtocol):
-    async def process_request(self, path, headers):
-        LOG.debug(f"Request, path: {path} ")
-        LOG.debug(f"  Headers: {headers} ")
-        # self.cookies = {}
-        # # Loop over all Cookie headers
-        # for value in headers.get_all("Cookie"):
-        #     # split header value by ';' to get each cookie, the split
-        #     # cookie by '=' to get name and content of cookie and
-        #     # collect these in a dict
-        #     self.cookies.update(
-        #         {
-        #             e[0]: e[1]
-        #             for e in [
-        #                 v.strip().split("=") for v in value.split(";") if len(v) > 0
-        #             ]
-        #         }
-        #     )
-        # # LOG.debug(f"Cookies: {self.cookies} ")
-        # gacho_cookie = json.loads(self.cookies.get("gacho", "{}"))
-        # user = gacho_cookie.get("user", None)
-
-
 class WSHandler:
     "Container for Websocket handler"
+
     counter = 0
 
-    async def handler(self, websocket, path):
+    async def handler(self, websocket):
         "Handle a ws connection"
         sock_nbr = WSHandler.counter
         WSHandler.counter += 1
@@ -85,7 +63,6 @@ async def get_websocket():
         ws_handler.handler,
         ["localhost", hostname],
         WEBSOCKET_PORT,
-        # create_protocol=WSProtocol
     )
     if not ws_server.is_serving():
         LOG.error("Failed to start WS server")

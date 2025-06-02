@@ -41,8 +41,8 @@ class AsyncTest_100_SQLExecutable(unittest.IsolatedAsyncioTestCase):
 
     async def test_101_execute(self):
         # Test the execute method
-        result = await self.sql_executable.execute(close="mock", commit="mick")
-        self.mockParent.execute.assert_awaited_once_with(close="mock", commit="mick")
+        result = await self.sql_executable.execute()
+        self.mockParent.execute.assert_awaited_once_with()
         self.assertEqual(result, "Mock execute")
 
     async def test_102_close(self):

@@ -1,5 +1,6 @@
 #!/usr/bin/env /usr/bin/python
 
+import sys
 import asyncio
 
 from core.app_logging import getLogger
@@ -11,6 +12,7 @@ from core.app import App
 from core.status import Status
 from core.configuration.config import Config
 from core.configuration.db_config import DBConfig
+from core.util import check_environment
 from database.db_manager import get_db
 from server.ws_server import get_websocket
 
@@ -54,9 +56,15 @@ async def main():
             App.db_restart.set()
 
 
-LOG.debug(f"{__name__} (main) module initialized")
+# LOG.debug(f"{__name__} (main) module initialized")
+if sys.version_info < (3, 12):
+    sys.stderr.write(
+        "Error: Python 3.12 or higher is required to run this application.\n"
+    )
+    sys.exit(1)
 
 if __name__ == "__main__":
+    check_environment()
     try:
         App.initialize(__file__)
         asyncio.run(main())

@@ -1,4 +1,4 @@
-""" Test suite for websocket server """
+"""Test suite for websocket server"""
 
 import unittest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
@@ -24,7 +24,7 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
             patch("server.ws_server.WS_Connection", return_value=mock_connection),
             patch("server.ws_server.Message") as Mock_Msg,
         ):
-            await handler.handler(websocket=mock_socket, path=mock_path)
+            await handler.handler(websocket=mock_socket)
             mock_connection.start_connection.assert_awaited_once_with()
             self.assertEqual(
                 Mock_Msg.call_count, no_messages, "number of Messages created"
