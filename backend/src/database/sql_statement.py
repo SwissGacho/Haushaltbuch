@@ -37,6 +37,7 @@ class SQLTemplate(Enum):
     TABLELIST = auto()
     TABLESQL = auto()
     VIEWLIST = auto()
+    DBVERSION = auto()
 
 
 NamedValue: TypeAlias = tuple[str, Any] | Value

@@ -46,7 +46,7 @@ async def get_db():
             yield
             return
     elif db_type == "MySQL" or db_type == "MariaDB":
-        LOG.info("Connect to MySQL DB")
+        LOG.info(f"Connect to {db_type}")
         try:
             db = MySQLDB(**db_config)
         except ModuleNotFoundError as exc:

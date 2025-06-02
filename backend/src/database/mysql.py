@@ -3,11 +3,14 @@
 from typing import Self
 import datetime
 
-from core.configuration.config import Config
+from core.app import App
+from core.configuration.config import Config, DBConfig
+from core.exceptions import ConfigurationError
+from core.util import get_config_item
 from database.db_base import DB, Connection, Cursor
 from database.sql_factory import SQLFactory
 from database.sql import SQL
-from database.sql_statement import SQLTemplate, SQLScript
+from database.sql_statement import SQLTemplate, SQLScript, Insert, Update
 from database.sql_clause import SQLColumnDefinition
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase
 from persistance.business_attribute_base import BaseFlag
@@ -29,7 +32,12 @@ class MySQLFactory(SQLFactory):
     @classmethod
     def get_sql_class(cls, sql_cls: type):
         # LOG.debug(f"MySQLFactory.get_sql_class({sql_cls=})")
-        for mysql_class in [MySQLColumnDefinition, MySQLScript]:
+        for mysql_class in [
+            MySQLColumnDefinition,
+            MySQLScript,
+            MySQLInsert,
+            MySQLUpdate,
+        ]:
             if sql_cls.__name__ in [b.__name__ for b in mysql_class.__bases__]:
                 return mysql_class
         return super().get_sql_class(sql_cls)
@@ -103,7 +111,29 @@ class MySQLScript(SQLScript):
         SQLTemplate.VIEWLIST: """ SELECT name as view_name FROM information_schema.views
                                     WHERE table_schema = DATABASE()
                                 """,
+        SQLTemplate.DBVERSION: """ SELECT VERSION() AS version """,
     }
+
+
+class MySQLInsert(Insert):
+    def returning(self, column: str):
+        db_type = get_config_item(DBConfig.db_configuration, Config.CONFIG_DB_DB)
+        LOG.debug(f"MySQLInsert.returning({column=});  {db_type=}")
+        if db_type == "MySQL":
+            raise NotImplementedError(
+                "MySQL does not support returning values from INSERT statements."
+            )
+        return super().returning(column)
+
+
+class MySQLUpdate(Update):
+    def returning(self, column: str):
+        db_type = get_config_item(DBConfig.db_configuration, Config.CONFIG_DB_DB)
+        if db_type == "MySQL":
+            raise NotImplementedError(
+                "MySQL does not support returning values from UPDATE statements."
+            )
+        return super().returning(column)
 
 
 class MySQLDB(DB):
@@ -131,6 +161,35 @@ class MySQLDB(DB):
 
 
 class MySQLConnection(Connection):
+    "Connection to the MySQL DB"
+
+    _version_checked = False
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    async def _check_db_version(self):
+        if MySQLConnection._version_checked:
+            return
+        async with SQL(connection=self) as sql:
+            db_version = (
+                await (await sql.script(SQLTemplate.DBVERSION).execute()).fetchone()
+            )["version"]
+            LOG.info(f"Connected to DB version {db_version}")
+        if get_config_item(DBConfig.db_configuration, Config.CONFIG_DB_DB) == "MariaDB":
+            if not "MariaDB" in db_version:
+                raise ConfigurationError(
+                    "Connected DB is not a MariaDB database."
+                    " Consider changing the configuration to 'MySQL'."
+                )
+        else:
+            if "MariaDB" in db_version:
+                raise ConfigurationError(
+                    "Connected DB is not a MySQL database."
+                    " Consider changing the configuration to 'MariaDB'."
+                )
+        MySQLConnection._version_checked = True
+
     async def connect(self):
         # LOG.debug(f"MySQLConnection.connect({self._cfg=})")
         self._connection: aiomysql.Connection = await aiomysql.connect(
@@ -139,6 +198,7 @@ class MySQLConnection(Connection):
             user=self._cfg[Config.CONFIG_DBUSER],
             password=self._cfg[Config.CONFIG_DBPW],
         )
+        await self._check_db_version()
         return self
 
     async def close(self):
