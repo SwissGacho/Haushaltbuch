@@ -54,7 +54,7 @@ async def main():
             App.db_restart.set()
 
 
-LOG.debug(f"{__name__} (main) module initialized")
+# LOG.debug(f"{__name__} (main) module initialized")
 
 if __name__ == "__main__":
     try:
