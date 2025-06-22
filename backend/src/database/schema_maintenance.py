@@ -3,7 +3,7 @@
 import core
 import database
 import database.db_manager
-import database.db_base
+import database.dbms.db_base
 import persistance
 
 # import data.management
@@ -43,7 +43,7 @@ async def check_db_schema():
     verify compatibility of the persistance tables
     """
     this_database = core.app.App.db
-    if this_database.__class__ == database.db_base.DB:
+    if this_database.__class__ == database.dbms.db_base.DB:
         raise TypeError("cannot check abstract DB")
     LOG.debug("checking DB Schema")
     cur = await SQL().script(SQLTemplate.TABLELIST).execute()

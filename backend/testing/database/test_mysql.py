@@ -1,4 +1,4 @@
-""" Test suite for MySQL attachement """
+"""Test suite for MySQL attachement"""
 
 import sys
 import types
@@ -23,13 +23,13 @@ def setUpModule():
     )
     # print("====================== patch sys.modules['aiomysql']")
     sys.modules["aiomysql"] = types.ModuleType("aiomysql")
-    if sys.modules.get("database.mysql"):
-        importlib.reload(sys.modules.get("database.mysql"))
+    if sys.modules.get("database.dbms.mysql"):
+        importlib.reload(sys.modules.get("database.dbms.mysql"))
     else:
-        import database.mysql
+        import database.dbms.mysql
 
 
-import database.db_base
+import database.dbms.db_base
 
 
 @unittest.skip("MySQL module is not maintained currently")
@@ -41,7 +41,7 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
             "user": "mockuser",
             "password": "mockpw",
         }
-        self.db = database.mysql.MySQLDB(**self.db_cfg)
+        self.db = database.dbms.mysql.MySQLDB(**self.db_cfg)
         return super().setUp()
 
     def test_001_MySQLDB(self):
@@ -50,17 +50,17 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
     def test_002_MySQLDB_no_lib(self):
         save_aiomysql = sys.modules["aiomysql"]
         sys.modules["aiomysql"] = None
-        importlib.reload(sys.modules.get("database.mysql"))
+        importlib.reload(sys.modules.get("database.dbms.mysql"))
         with self.assertRaises(ModuleNotFoundError):
-            database.mysql.MySQLDB(**self.db_cfg)
+            database.dbms.mysql.MySQLDB(**self.db_cfg)
         sys.modules["aiomysql"] = save_aiomysql
-        importlib.reload(sys.modules.get("database.mysql"))
+        importlib.reload(sys.modules.get("database.dbms.mysql"))
 
     async def test_101_connect(self):
         mock_con_obj = AsyncMock()
         mock_con_obj.connect = AsyncMock(return_value=mock_con_obj)
         Mock_Connection = Mock(return_value=mock_con_obj)
-        with (patch("database.mysql.MySQLConnection", Mock_Connection),):
+        with (patch("database.dbms.mysql.MySQLConnection", Mock_Connection),):
             reply = await self.db.connect()
             self.assertEqual(reply, mock_con_obj)
             Mock_Connection.assert_called_once_with(db_obj=self.db, **self.db_cfg)
@@ -74,7 +74,7 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
     def test_202_sql_any_other(self):
         params = {"par1": ["el1", "el2"], "par2": "val"}
         mock_super = Mock(return_value="mock_sql")
-        with patch("database.db_base.DB.sql", mock_super):
+        with patch("database.dbms.db_base.DB.sql", mock_super):
             reply = self.db.sql("ANY", **params)
             self.assertEqual(reply, mock_super.return_value)
             mock_super.assert_called_once_with(sql="ANY", **params)
@@ -91,7 +91,7 @@ class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
             "user": "mock_user",
             "password": "mock_pw",
         }
-        self.con = database.mysql.MySQLConnection(self.mock_db, **self.db_cfg)
+        self.con = database.dbms.mysql.MySQLConnection(self.mock_db, **self.db_cfg)
         return super().setUp()
 
     def test_001_connection(self):
@@ -110,7 +110,7 @@ class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
         MockCursor = Mock(return_value=mock_cur)
         self.con._connection = AsyncMock()
         self.con._connection.cursor.return_value = "mock_cur"
-        with (patch("database.mysql.MySQLCursor", MockCursor),):
+        with (patch("database.dbms.mysql.MySQLCursor", MockCursor),):
             reply = await self.con.execute(sql)
             self.assertEqual(reply, mock_cur)
             MockCursor.assert_called_once_with(
@@ -131,7 +131,7 @@ class TestMySQLCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_con = Mock()
         self.mock_cur = AsyncMock()
-        self.cur = database.mysql.MySQLCursor(self.mock_cur, self.mock_con)
+        self.cur = database.dbms.mysql.MySQLCursor(self.mock_cur, self.mock_con)
         return super().setUp()
 
     async def test_101_execute(self):

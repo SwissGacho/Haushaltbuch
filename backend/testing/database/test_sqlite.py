@@ -41,7 +41,7 @@ def setUpModule() -> None:
     remove("sqlite3")
 
 
-import database.db_base
+import database.dbms.db_base
 import database.sql_statement
 
 
@@ -51,26 +51,26 @@ class TestSQLiteDB__init__(unittest.TestCase):
         return super().setUp()
 
     def test_001_SQLiteDB(self):
-        database.sqlite.AIOSQLITE_IMPORT_ERROR = None
-        with patch("database.db_base.DB.__init__") as mock_db_init:
-            self.db = database.sqlite.SQLiteDB(**self.db_cfg)
+        database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = None
+        with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
+            self.db = database.dbms.sqlite.SQLiteDB(**self.db_cfg)
             mock_db_init.assert_called_once_with(**self.db_cfg)
 
     def test_002_SQLiteDB_no_lib(self):
-        database.sqlite.AIOSQLITE_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
+        database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
         with (
             self.assertRaises(ModuleNotFoundError),
-            patch("database.db_base.DB.__init__") as mock_db_init,
+            patch("database.dbms.db_base.DB.__init__") as mock_db_init,
         ):
-            database.sqlite.SQLiteDB(**self.db_cfg)
+            database.dbms.sqlite.SQLiteDB(**self.db_cfg)
             mock_db_init.assert_not_called()
 
 
 class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.db_cfg = {"db": "SQLite", "file": "sqlite_file.db"}
-        database.sqlite.AIOSQLITE_IMPORT_ERROR = None
-        self.db = database.sqlite.SQLiteDB(**self.db_cfg)
+        database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = None
+        self.db = database.dbms.sqlite.SQLiteDB(**self.db_cfg)
         self.mockCur = AsyncMock(name="mockCursor")
         with patch("core.app.App.db", self.db):
             self.sql = database.sql_statement.SQL()
@@ -83,7 +83,7 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
         mock_con_obj = AsyncMock()
         mock_con_obj.connect = AsyncMock(return_value=mock_con_obj)
         Mock_Connection = Mock(return_value=mock_con_obj)
-        with (patch("database.sqlite.SQLiteConnection", Mock_Connection),):
+        with (patch("database.dbms.sqlite.SQLiteConnection", Mock_Connection),):
             reply = await self.db.connect()
             self.assertEqual(reply, mock_con_obj)
             Mock_Connection.assert_called_once_with(db_obj=self.db, **self.db_cfg)
@@ -108,7 +108,7 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
                 f"{expected['mock-col-2']})mock-bar"
             }
         )
-        with patch("database.sqlite.SQL", self.MockSQL):
+        with patch("database.dbms.sqlite.SQL", self.MockSQL):
             reply = await self.db._get_table_info(mock_table)
             self.sql.execute.assert_awaited_once_with(close=1, commit=False)
             self.mockCur.fetchone.assert_awaited_once_with()
@@ -126,7 +126,7 @@ class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
         self.mock_db = Mock()
         self.mock_con = AsyncMock()
         self.db_cfg = {"db": "SQLite", "file": "mock_sqlite_file.db"}
-        self.con = database.sqlite.SQLiteConnection(self.mock_db, **self.db_cfg)
+        self.con = database.dbms.sqlite.SQLiteConnection(self.mock_db, **self.db_cfg)
         return super().setUp()
 
     def test_001_connection(self):
@@ -140,7 +140,7 @@ class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
         mock_sqlite_connect = AsyncMock(
             name="mock_aioconnect", return_value=mock_aioconnection
         )
-        with patch("database.sqlite.aiosqlite") as mock_sqlite:
+        with patch("database.dbms.sqlite.aiosqlite") as mock_sqlite:
             mock_sqlite.connect = mock_sqlite_connect
             reply = await self.con.connect()
         self.assertEqual(reply, self.con)
@@ -167,7 +167,7 @@ class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
         mock_aiocursor = "mock_cur"
         self.con._connection.cursor.return_value = mock_aiocursor
         self.con.commit = sentinel.COMMIT
-        with (patch("database.sqlite.SQLiteCursor", MockCursor),):
+        with (patch("database.dbms.sqlite.SQLiteCursor", MockCursor),):
             if params is DEFAULT and close is DEFAULT and commit is DEFAULT:
                 reply = await self.con.execute(sql)
             elif params is not DEFAULT and close is DEFAULT and commit is DEFAULT:
@@ -231,7 +231,7 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_con = Mock(name="mock_connection")
         self.mock_aiocursor = AsyncMock(name="mock_aiocursor")
-        self.cur = database.sqlite.SQLiteCursor(self.mock_aiocursor, self.mock_con)
+        self.cur = database.dbms.sqlite.SQLiteCursor(self.mock_aiocursor, self.mock_con)
         self.mock_con_close = AsyncMock(name="mock_conclose")
         self.mock_con.close = self.mock_con_close
         return super().setUp()
