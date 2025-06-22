@@ -1,13 +1,11 @@
 """Base class for DB connections"""
 
 from core.app_logging import getLogger, log_exit
-from .sql_executable import SQLExecutable
-
-LOG = getLogger(__name__)
-
 from core.base_objects import DBBaseClass
 from database.sql_statement import SQL, SQLTemplate
 from database.sql_clause import SQLColumnDefinition
+
+LOG = getLogger(__name__)
 
 
 class DB(DBBaseClass):

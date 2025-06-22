@@ -1,5 +1,4 @@
-""" Manage connection to the database
-"""
+"""Manage connection to the database"""
 
 from contextlib import asynccontextmanager
 
@@ -9,8 +8,8 @@ from core.status import Status
 from core.configuration.config import Config
 from core.configuration.db_config import DBConfig
 from core.app_logging import getLogger
-from database.sqlite import SQLiteDB
-from database.mysql import MySQLDB
+from database.dbms.sqlite import SQLiteDB
+from database.dbms.mysql import MySQLDB
 from database.schema_maintenance import check_db_schema
 
 
