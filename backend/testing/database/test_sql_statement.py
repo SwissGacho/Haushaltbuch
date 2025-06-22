@@ -10,6 +10,7 @@ from database.sql_statement import (
     SQLScript,
     SQLTemplate,
     CreateTable,
+    CreateView,
     TableValuedQuery,
     Select,
     Insert,
@@ -582,5 +583,88 @@ class Test_B00_Update(unittest.TestCase):
             {
                 "query": "UPDATE users SET (age) = :param WHERE (id = :param1) RETURNING id",
                 "params": {"param": 42, "param1": 1},
+            },
+        )
+
+
+class Test_C000_CreateView(unittest.TestCase):
+    """Test the SQLExecutable.CreateView class"""
+
+    def setUp(self) -> None:
+        self.patcher = patch("database.sql_executable.App", MockApp)
+        self.patcher.start()
+        self.mockParent = Mock(spec=SQL)
+        self.mockParent.sql_factory = MockSQLFactory
+        self.mockParent._get_db = Mock(return_value=MockDB())
+
+    def tearDown(self):
+        self.patcher.stop()
+
+    def test_C01_create_view(self):
+        """Test the create view SQLStatement"""
+        create_view = CreateView("user_view", parent=self.mockParent).from_("users")
+        self.assertEqual(
+            clean_sql(create_view.get_sql()),
+            {
+                "query": "CREATE VIEW user_view AS SELECT * FROM users",
+                "params": {},
+            },
+        )
+
+    def test_C02_create_temp_view(self):
+        """Test the create view SQLStatement"""
+        create_view = CreateView(
+            "user_view", temporary=True, parent=self.mockParent
+        ).from_("users")
+        self.assertEqual(
+            clean_sql(create_view.get_sql()),
+            {
+                "query": "CREATE TEMPORARY VIEW user_view AS SELECT * FROM users",
+                "params": {},
+            },
+        )
+
+    def test_C03_create_view_with_cols(self):
+        """Test the create view SQLStatement"""
+        create_view = CreateView(
+            "user_view", ["u_num", "u_name"], ["id", "name"], parent=self.mockParent
+        ).from_("users")
+        self.assertEqual(
+            clean_sql(create_view.get_sql()),
+            {
+                "query": "CREATE VIEW user_view ( u_num, u_name ) AS SELECT id, name FROM users",
+                "params": {},
+            },
+        )
+
+    def test_C04_complex_view_with_params(self):
+        create_view = (
+            CreateView("user_view", parent=self.mockParent)
+            .from_("users")
+            .where(
+                And(
+                    [
+                        Eq(ColumnName("id1"), Value("mock_val", "test1")),
+                        Eq(ColumnName("id2"), Value("mock_val", "test2")),
+                    ]
+                )
+            )
+        ).having(Eq(ColumnName("age"), Value("mock_val", 18)))
+        self.assertEqual(
+            clean_sql(create_view.get_sql()),
+            {
+                "query": " ".join(
+                    [
+                        "CREATE VIEW user_view AS",
+                        "SELECT * FROM users",
+                        "WHERE ((id1 = :mock_val) AND (id2 = :mock_val1))",
+                        "HAVING (age = :mock_val2)",
+                    ]
+                ),
+                "params": {
+                    "mock_val": "test1",
+                    "mock_val1": "test2",
+                    "mock_val2": 18,
+                },
             },
         )

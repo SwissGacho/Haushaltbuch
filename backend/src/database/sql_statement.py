@@ -36,6 +36,7 @@ class SQLTemplate(Enum):
     TABLEINFO = auto()
     TABLELIST = auto()
     TABLESQL = auto()
+    VIEWLIST = auto()
 
 
 NamedValue: TypeAlias = tuple[str, Any] | Value
@@ -62,7 +63,7 @@ class SQLScript(SQLStatement):
     def __init__(
         self,
         script_or_template: str | SQLTemplate,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
         **kwargs,
     ):
         super().__init__(parent)
@@ -84,7 +85,7 @@ class TableValuedQuery(SQLStatement):
     """SQLStatement representing a statement that has a table as its result set.
     Should not be instantiated directly."""
 
-    def __init__(self, parent: SQLExecutable):
+    def __init__(self, parent: SQLExecutable | None = None):
         super().__init__(parent)
 
     def get_sql(self) -> SQL_Dict:
@@ -103,24 +104,24 @@ class Select(TableValuedQuery):
 
     def __init__(
         self,
-        column_list: list[str] = None,
+        column_list: list[str] | None = None,
         distinct: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         super().__init__(parent)
-        self._init_attrs(column_list, distinct)
+        self._init_attrs(column_list or [], distinct)
 
     def _init_attrs(
         self,
-        column_list: list[str] = None,
+        column_list: list[str] | None = None,
         distinct: bool = False,
     ):
-        self._column_list = [] if column_list is None else column_list
+        self._column_list = column_list or []
         self._distinct = distinct
         self._from_statement: From | None = None
-        self._where: Where = None
-        self._group_by: GroupBy = None
-        self._having: Having = None
+        self._where: Where | None = None
+        self._group_by: GroupBy | None = None
+        self._having: Having | None = None
 
     def get_query(self) -> str:
         """Get a string representation of the current SQL statement."""
@@ -166,7 +167,7 @@ class Select(TableValuedQuery):
     def join(
         self,
         table: str,
-        join_constraint: SQLExpression = None,
+        join_constraint: SQLExpression | None = None,
         join_operator: JoinOperator = JoinOperator.FULL,
     ):
         """Sets the join clause for the select statement."""
@@ -310,7 +311,7 @@ class CreateTable(SQLStatement):
         table: str = "",
         columns: list[tuple[str, type, BOColumnFlag | None, dict]] = None,
         temporary: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         # LOG.debug(f"CreateTable({table=}, {columns=}, {temporary=})")
         super().__init__(parent)
@@ -382,9 +383,9 @@ class CreateTableAsSelect(CreateTable, Select):
     def __init__(
         self,
         table: str = "",
-        columns: list[tuple[str, type, BOColumnFlag | None, dict]] = None,
+        columns: list[tuple[str, type, BOColumnFlag | None, dict]] | None = None,
         temporary: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         super().__init__(table, columns, temporary, parent)
 
@@ -398,6 +399,49 @@ class CreateTableAsSelect(CreateTable, Select):
                     self._table,
                     "AS",
                     self.get_query(),
+                ]
+            ),
+            "params": self.params,
+        }
+
+
+class CreateView(Select):
+    """A SQLStatement representing a CREATE VIEW statement.
+    Default implementation complies with SQLite syntax."""
+
+    def __init__(
+        self,
+        view: str = "",
+        view_columns: list[str] | None = None,
+        *args,
+        temporary: bool = False,
+        parent: SQLExecutable | None = None,
+        **kwargs,
+    ):
+        # LOG.debug(f"CreateTable({table=}, {columns=}, {temporary=})")
+        self._view = view
+        self._columns: list[str] = view_columns or []
+        self._temporary = temporary
+        super().__init__(parent=parent, *args, **kwargs)
+
+    def get_sql(self) -> SQL_Dict:
+        """Get a string representation of the current SQL statement."""
+        if self._view is None or len(self._view) == 0:
+            raise InvalidSQLStatementException(
+                "CREATE VIEW statement must have a view name."
+            )
+        return {
+            "query": " ".join(
+                [
+                    "CREATE",
+                    "TEMPORARY VIEW" if self._temporary else "VIEW",
+                    self._view,
+                    (
+                        ("( " + ", ".join(self._columns) + " ) AS")
+                        if self._columns
+                        else "AS"
+                    ),
+                    super().get_query(),
                 ]
             ),
             "params": self.params,
