@@ -2,9 +2,9 @@ import unittest
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch
 
+from database.sql import SQL
 from database.sql_key_manager import SQL_Dict
 from database.sql_statement import (
-    SQL,
     SQLStatement,
     SQLScript,
     SQLTemplate,
@@ -119,13 +119,17 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
         """Test direct execute method when an SQL statement is set"""
         self.sql.script("MOCK SQL")
         await self.sql.execute()
-        MockApp.db.execute.assert_awaited_once_with("MOCK SQL", {}, False, False)
+        MockApp.db.execute.assert_awaited_once_with(
+            "MOCK SQL", {}, False, False, connection=None
+        )
 
     async def test_203_execute_indirect(self):
         """Test indirect execute method when an SQL statement is set"""
         self.sql.script("MOCK SQL")
         await self.sql._sql_statement.execute()
-        MockApp.db.execute.assert_awaited_once_with("MOCK SQL", {}, False, False)
+        MockApp.db.execute.assert_awaited_once_with(
+            "MOCK SQL", {}, False, False, connection=None
+        )
 
     async def test_204_execute_with_params(self):
         """Test indirect execute method when an SQL statement is set"""
@@ -136,6 +140,7 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
             {"param1": "test1", "param2": "test2"},
             False,
             False,
+            connection=None,
         )
 
     async def test_205_close(self):

@@ -1,4 +1,4 @@
-""" Applications base classes and common objects. """
+"""Applications base classes and common objects."""
 
 from typing import TypeAlias, Union
 from enum import StrEnum
@@ -16,6 +16,7 @@ class BaseObject:
 
 class Status(StrEnum):
     "Values for global app status"
+
     STATUS_UNCONFIGURED = "unconfigured"
     STATUS_NO_DB = "noDB"
     STATUS_DB_CFG = "DBconfigured"
@@ -37,6 +38,7 @@ class StatusBaseClass(BaseObject):
 
 class Config(StrEnum):
     "Configuration keys"
+
     CONFIG_APP = "app"
     CONFIG_USR_MODE = "userMode"
     CONFIG_APP_USRMODE = "/".join([CONFIG_APP, CONFIG_USR_MODE])
@@ -86,9 +88,23 @@ class DBBaseClass(BaseObject):
     async def connect(self):
         "Open a connection and return the Connection instance"
 
-    async def execute(self, query: str, params=None, close=False, commit=False):
+    async def execute(
+        self, query: str, params=None, close=False, commit=False, connection=None
+    ):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
 
     async def close(self):
         "close all activities"
+
+
+class ConnectionBaseClass(BaseObject):
+    "Connection Baseclass"
+
+    async def connect(self):
+        "Open a connection and return the Connection instance"
+        raise ConnectionError("Called from DB base class.")
+
+    async def close(self):
+        "close the connection"
+        raise ConnectionError("Called from DB base class.")
