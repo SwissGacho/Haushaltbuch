@@ -11,6 +11,7 @@ from core.app import App
 from core.status import Status
 from core.configuration.config import Config
 from core.configuration.db_config import DBConfig
+from core.util import check_environment
 from database.db_manager import get_db
 from server.ws_server import get_websocket
 
@@ -57,6 +58,7 @@ async def main():
 # LOG.debug(f"{__name__} (main) module initialized")
 
 if __name__ == "__main__":
+    check_environment()
     try:
         App.initialize(__file__)
         asyncio.run(main())
