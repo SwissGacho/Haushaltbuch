@@ -1,6 +1,5 @@
 #!/usr/bin/env /usr/bin/python
 
-import sys
 import asyncio
 
 from core.app_logging import getLogger
@@ -56,11 +55,6 @@ async def main():
 
 
 # LOG.debug(f"{__name__} (main) module initialized")
-if sys.version_info < (3, 12):
-    sys.stderr.write(
-        "Error: Python 3.12 or higher is required to run this application.\n"
-    )
-    sys.exit(1)
 
 if __name__ == "__main__":
     try:
