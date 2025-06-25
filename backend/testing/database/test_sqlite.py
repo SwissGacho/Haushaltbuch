@@ -161,7 +161,7 @@ class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
         mock_aiocursor = "mock_cur"
         self.con._connection.cursor.return_value = mock_aiocursor
         self.con.commit = sentinel.COMMIT
-        with (patch("database.sqlite.SQLiteCursor", MockCursor),):
+        with (patch("database.dbms.sqlite.SQLiteCursor", MockCursor),):
             if params is DEFAULT:
                 reply = await self.con.execute(sql)
             else:
