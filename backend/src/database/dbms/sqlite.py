@@ -9,8 +9,8 @@ import re
 from core.exceptions import OperationalError
 from core.configuration.config import Config
 from core.app_logging import getLogger
-from database.db_base import DB, Connection, Cursor
 from database.sql import SQL
+from database.dbms.db_base import DB, Connection, Cursor
 from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
 from database.sql_factory import SQLFactory
