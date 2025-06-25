@@ -22,11 +22,10 @@ def setUpModule() -> None:
         if mod in sys.modules:
             del sys.modules[mod]
 
-    remove("db.mysql")
+    remove("database.mysql")
     remove("aiomysql")
 
 
-@unittest.skip("implementation pending")
 class MySQLImport(unittest.TestCase):
 
     def test_101_successful_import(self):

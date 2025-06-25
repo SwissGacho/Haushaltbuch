@@ -24,14 +24,15 @@ def check_environment():
         try:
             installed_version = Version(importlib.metadata.version(lib))
         except importlib.metadata.PackageNotFoundError:
-            raise EnvironmentError(f"The '{lib}' package is not installed.")
+            if raise_error:
+                raise EnvironmentError(f"The '{lib}' package is not installed.")
+            return None, False
 
         if installed_version < required:
-            if raise_error:
-                raise EnvironmentError(
-                    f"'{lib}' version {required} or higher required, "
-                    f"but found: {installed_version}"
-                )
+            raise EnvironmentError(
+                f"'{lib}' version {required} or higher required, "
+                f"but found: {installed_version}"
+            )
             return installed_version, False
         return installed_version, True
 
@@ -44,6 +45,8 @@ def check_environment():
         )
 
     check_lib_version("websockets", Version("15.0.1"))
+    check_lib_version("aiosqlite", Version("0.21.0"), raise_error=False)
+    check_lib_version("aiomysql", Version("0.2.0"), raise_error=False)
 
 
 class _classproperty:

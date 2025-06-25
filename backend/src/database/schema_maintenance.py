@@ -1,18 +1,18 @@
 """Manage DB schema versins and check compatibility"""
 
+from graphlib import TopologicalSorter
+
 import core
 import database
-import database.db_manager
 import database.dbms.db_base
 import persistance
 
-# import data.management
-from data.management.db_schema import DBSchema
-from core.app_logging import getLogger
-from core.exceptions import DBSchemaError
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
-import persistance.business_object_base
+from data.management.db_schema import DBSchema
+
+from core.exceptions import DBSchemaError, DataError, OperationalError
+from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
@@ -21,7 +21,14 @@ COMPATIBLE_DB_SCHEMA_VERSIONS = [1]
 
 
 async def _create_all_tables(objects: list[persistance.business_object_base.BOBase]):
-    for bo in objects:
+    for bo in TopologicalSorter({b: b.references() for b in objects}).static_order():
+        if not (
+            isinstance(bo, type)
+            and issubclass(bo, persistance.business_object_base.BOBase)
+        ):
+            raise TypeError(
+                f"Business object {bo} is not a subclass of BOBase, cannot create table"
+            )
         LOG.info(f"creating table '{bo.table}' for business class '{bo.__name__}'")
         await bo.sql_create_table()
 
@@ -60,7 +67,15 @@ async def check_db_schema():
 
             try:
                 db_schema = await DBSchema().fetch(newest=True)
-            except core.exceptions.OperationalError:
+                # LOG.debug(f"DB schema version {db_schema.version_nr} found in DB")
+                if db_schema.version_nr is None:
+                    LOG.error(
+                        "No DB schema version found in DB. Save data and remove tables from DB to rebuild schema."
+                    )
+                    raise DataError()
+            except DataError as exc:
+                raise DataError("Inconsistent DB") from exc
+            except OperationalError:
                 db_schema = DBSchema()
             except Exception as exc:  # pylint: disable=broad-exception-caught
                 LOG.error(
