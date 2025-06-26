@@ -64,7 +64,7 @@ class TestSQLiteDB__init__(unittest.TestCase):
             patch("database.db_base.DB.__init__") as mock_db_init,
         ):
             database.sqlite.SQLiteDB(**self.db_cfg)
-            mock_db_init.assert_not_called()
+        mock_db_init.assert_not_called()
 
 
 class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):

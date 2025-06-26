@@ -165,9 +165,6 @@ class MySQLConnection(Connection):
 
     _version_checked = False
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
     async def _check_db_version(self):
         if MySQLConnection._version_checked:
             return
