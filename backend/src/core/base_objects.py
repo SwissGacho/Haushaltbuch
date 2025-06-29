@@ -47,7 +47,8 @@ class Config(StrEnum):
     CONFIG_DB_DB = "/".join([CONFIG_DB, "db"])
     CONFIG_DBFILE = "file"
     CONFIG_DBHOST = "host"
-    CONFIG_DBUSER = "user"
+    CONFIG_DBDBNAME = "dbname"
+    CONFIG_DBUSER = "dbuser"
     CONFIG_DBPW = "password"
     CONFIG_CFG_SEARCH_PATH = "config_search_path"
     CONFIG_SYSTEM = "system"

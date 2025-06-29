@@ -64,7 +64,7 @@ class TestSQLiteDB__init__(unittest.TestCase):
             patch("database.db_base.DB.__init__") as mock_db_init,
         ):
             database.sqlite.SQLiteDB(**self.db_cfg)
-            mock_db_init.assert_not_called()
+        mock_db_init.assert_not_called()
 
 
 class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
@@ -213,13 +213,10 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
         self.mock_aiocursor.execute.assert_awaited_once_with(
             sql=query, parameters=params
         )
-        return self.mock_aiocursor.execute
 
     async def test_101_execute(self):
-        result = await self._101_execute()
-        result.assert_awaited_once_with(sql="ANY_SQL", parameters={})
-        result = await self._101_execute(sentinel.PARAMS)
-        result.assert_awaited_once_with(sql="ANY_SQL", parameters=sentinel.PARAMS)
+        await self._101_execute()
+        await self._101_execute(sentinel.PARAMS)
 
     async def test_201_rowcount_get_11(self):
         self.cur._rowcount = 11

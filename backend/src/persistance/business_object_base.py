@@ -5,6 +5,7 @@ Business objects are classes that support persistance in the data base
 
 from typing import Self, TypeAlias, Optional, Callable
 import copy
+import json
 from datetime import date, datetime, UTC
 
 from core.app_logging import getLogger, log_exit
@@ -27,7 +28,7 @@ class _classproperty:
         return self.fget(owner_cls)
 
 
-AttributeDescription: TypeAlias = tuple[str, type, str, dict[str, str]]
+AttributeDescription: TypeAlias = tuple[str, type, str, dict[str, str | BOBaseBase]]
 
 
 class BOBase(BOBaseBase):
@@ -109,6 +110,26 @@ class BOBase(BOBaseBase):
         return cls_cols
 
     @classmethod
+    def primary_key(cls) -> str:
+        "Name of the primary key attribute"
+        for name, data_type, constraint, pars in cls.attribute_descriptions():
+            if (
+                constraint == BOColumnFlag.BOC_PK
+                or constraint == BOColumnFlag.BOC_PK_INC
+            ):
+                return name
+        raise ValueError(f"No primary key defined for {cls.__name__}")
+
+    @classmethod
+    def references(cls) -> list[str | BOBaseBase | None]:
+        "list of business objects referenced by this class"
+        return [
+            a[3].get("relation")
+            for a in cls.attribute_descriptions()
+            if a[1] == BOBaseBase and a[2] == BOColumnFlag.BOC_FK
+        ]
+
+    @classmethod
     async def sql_create_table(cls):
         "Create a DB table for this class"
         attributes = cls.attribute_descriptions()
@@ -124,15 +145,21 @@ class BOBase(BOBaseBase):
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
+        # LOG.debug(f"BOBase.convert_from_db({value=}, {type(value)=}, {typ=})")
         if value is None:
             return None
-        if typ == date:
+        if typ == date and isinstance(value, str):
             return date.fromisoformat(value)
-        if typ == datetime:
+        if typ == datetime and isinstance(value, str):
             dt = datetime.fromisoformat(value)
             if dt.tzinfo in [None, UTC]:
                 dt = dt.replace(tzinfo=UTC).astimezone(tz=None)
             return dt
+        if typ in [dict, list] and isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError as exc:
+                LOG.error(f"BOBase.convert_from_db: JSONDecodeError: {exc}")
         return copy.deepcopy(value)
 
     @classmethod
@@ -179,6 +206,7 @@ class BOBase(BOBaseBase):
             self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
+            # LOG.debug(f"BOBase.fetch: {self._db_data=}")
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
                 self._data[attr] = self.convert_from_db(self._db_data.get(attr), typ)
         return self

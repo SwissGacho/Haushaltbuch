@@ -1,5 +1,4 @@
-""" Manage connection to the database
-"""
+"""Manage connection to the database"""
 
 from contextlib import asynccontextmanager
 
@@ -46,8 +45,8 @@ async def get_db():
                 )
             yield
             return
-    elif db_type == "MySQL":
-        LOG.info("Connect to MySQL DB")
+    elif db_type == "MySQL" or db_type == "MariaDB":
+        LOG.info(f"Connect to {db_type}")
         try:
             db = MySQLDB(**db_config)
         except ModuleNotFoundError as exc:
