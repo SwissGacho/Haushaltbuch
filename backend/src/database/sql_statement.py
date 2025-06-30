@@ -19,7 +19,6 @@ from database.sql_expression import (
     SQLExpression,
     Value,
 )
-from database.sql_factory import SQLFactory
 from database.sql_key_manager import SQL_Dict
 
 from persistance.bo_descriptors import BOColumnFlag
@@ -37,103 +36,13 @@ class SQLTemplate(Enum):
     TABLEINFO = auto()
     TABLELIST = auto()
     TABLESQL = auto()
+    VIEWLIST = auto()
+    DBVERSION = auto()
 
 
 NamedValue: TypeAlias = tuple[str, Any] | Value
 NamedValueList: TypeAlias = list[NamedValue]
 NamedValueListList: TypeAlias = list[NamedValueList] | NamedValueList
-
-
-class SQL(SQLExecutable):
-    """Usage:
-    sql = SQL_statement().create_table(
-        "users",
-        [
-            ("name", SQL_data_type.TEXT),
-            ("age",  SQL_data_type.INTEGER)
-        ],
-    ).execute()"""
-
-    def __new__(cls, *args, **kwargs):
-        factory = cls._get_db().sql_factory
-        actual_class = factory.get_sql_class(cls)
-        return object().__new__(actual_class, *args, **kwargs)
-
-    def __init__(self):
-        super().__init__(None)
-        self._rslt = None
-        self._sql_statement: "SQLStatement" = None
-
-    def __repr__(self):
-        return f"SQL({self._sql_statement})"
-
-    def __str__(self):
-        return f"SQL({self._sql_statement})"
-
-    def get_sql(self) -> SQL_Dict:
-        """Get a string representation of the current SQL statement."""
-        if self._sql_statement is None:
-            raise InvalidSQLStatementException("No SQL statement to execute.")
-        return self._sql_statement.get_sql()
-
-    @property
-    def sql_factory(self) -> SQLFactory:
-        """Get the SQLFactory of the current database. Usually call get_sql_class instead."""
-        return SQL._get_db().sql_factory
-
-    def create_table(
-        self,
-        table: str,
-        columns: list[tuple[str, type, BOColumnFlag | None, dict]] = [],
-        temporary: bool = False,
-    ) -> "CreateTable":
-        """Sets the SQL statement to create a table and returns a create_table object"""
-        # LOG.debug(f"SQL.create_table({table=}, {columns=}, {temporary=})")
-        create_table = CreateTable(table, columns, temporary=temporary, parent=self)
-        self._sql_statement = create_table
-        return create_table
-
-    def select(self, column_list: list[str] = None, distinct: bool = False) -> "Select":
-        """Sets the SQL statement to a select statement and returns a select object"""
-        select = Select(column_list, distinct, parent=self)
-        self._sql_statement = select
-        return select
-
-    def insert(self, table: str, columns: NamedValueListList = None) -> "Insert":
-        """Sets the SQL statement to a insert statement and returns an insert object"""
-        insert = Insert(table, columns, parent=self)
-        self._sql_statement = insert
-        return insert
-
-    def update(self, table: str) -> "Update":
-        """Sets the SQL statement to a update statement and returns an update object"""
-        update = Update(table, parent=self)
-        self._sql_statement = update
-        return update
-
-    def script(self, script_or_template: str | SQLTemplate, **kwargs) -> "SQLScript":
-        """Set the SQL statement to execute the specific script or
-        use a template to build an SQLScript
-        """
-        if "parent" in kwargs:
-            raise ValueError(
-                f"'parent={kwargs['parent']}' must not be a template argument"
-            )
-        self._sql_statement = SQLScript(script_or_template, parent=self, **kwargs)
-        return self._sql_statement
-
-    async def execute(self, close=False, commit=False):
-        """Execute the current SQL statement on the database.
-        Must create the statement before calling this method"""
-
-        if self._sql_statement is None:
-            raise InvalidSQLStatementException("No SQL statement to execute.")
-        LOG.debug(f"{self.get_sql()=},  {close=}, {commit=}")
-        sql = self.get_sql()
-        return await SQL._get_db().execute(sql["query"], sql["params"], close, commit)
-
-    async def close(self):
-        await SQL._get_db().close()
 
 
 class SQLStatement(SQLManagedExecutable):
@@ -155,7 +64,7 @@ class SQLScript(SQLStatement):
     def __init__(
         self,
         script_or_template: str | SQLTemplate,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
         **kwargs,
     ):
         super().__init__(parent)
@@ -177,7 +86,7 @@ class TableValuedQuery(SQLStatement):
     """SQLStatement representing a statement that has a table as its result set.
     Should not be instantiated directly."""
 
-    def __init__(self, parent: SQLExecutable):
+    def __init__(self, parent: SQLExecutable | None = None):
         super().__init__(parent)
 
     def get_sql(self) -> SQL_Dict:
@@ -196,24 +105,24 @@ class Select(TableValuedQuery):
 
     def __init__(
         self,
-        column_list: list[str] = None,
+        column_list: list[str] | None = None,
         distinct: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         super().__init__(parent)
-        self._init_attrs(column_list, distinct)
+        self._init_attrs(column_list or [], distinct)
 
     def _init_attrs(
         self,
-        column_list: list[str] = None,
+        column_list: list[str] | None = None,
         distinct: bool = False,
     ):
-        self._column_list = [] if column_list is None else column_list
+        self._column_list = column_list or []
         self._distinct = distinct
         self._from_statement: From | None = None
-        self._where: Where = None
-        self._group_by: GroupBy = None
-        self._having: Having = None
+        self._where: Where | None = None
+        self._group_by: GroupBy | None = None
+        self._having: Having | None = None
 
     def get_query(self) -> str:
         """Get a string representation of the current SQL statement."""
@@ -259,7 +168,7 @@ class Select(TableValuedQuery):
     def join(
         self,
         table: str,
-        join_constraint: SQLExpression = None,
+        join_constraint: SQLExpression | None = None,
         join_operator: JoinOperator = JoinOperator.FULL,
     ):
         """Sets the join clause for the select statement."""
@@ -403,7 +312,7 @@ class CreateTable(SQLStatement):
         table: str = "",
         columns: list[tuple[str, type, BOColumnFlag | None, dict]] = None,
         temporary: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         # LOG.debug(f"CreateTable({table=}, {columns=}, {temporary=})")
         super().__init__(parent)
@@ -475,9 +384,9 @@ class CreateTableAsSelect(CreateTable, Select):
     def __init__(
         self,
         table: str = "",
-        columns: list[tuple[str, type, BOColumnFlag | None, dict]] = None,
+        columns: list[tuple[str, type, BOColumnFlag | None, dict]] | None = None,
         temporary: bool = False,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         super().__init__(table, columns, temporary, parent)
 
@@ -491,6 +400,49 @@ class CreateTableAsSelect(CreateTable, Select):
                     self._table,
                     "AS",
                     self.get_query(),
+                ]
+            ),
+            "params": self.params,
+        }
+
+
+class CreateView(Select):
+    """A SQLStatement representing a CREATE VIEW statement.
+    Default implementation complies with SQLite syntax."""
+
+    def __init__(
+        self,
+        view: str = "",
+        view_columns: list[str] | None = None,
+        *args,
+        temporary: bool = False,
+        parent: SQLExecutable | None = None,
+        **kwargs,
+    ):
+        # LOG.debug(f"CreateTable({table=}, {columns=}, {temporary=})")
+        self._view = view
+        self._columns: list[str] = view_columns or []
+        self._temporary = temporary
+        super().__init__(parent=parent, *args, **kwargs)
+
+    def get_sql(self) -> SQL_Dict:
+        """Get a string representation of the current SQL statement."""
+        if self._view is None or len(self._view) == 0:
+            raise InvalidSQLStatementException(
+                "CREATE VIEW statement must have a view name."
+            )
+        return {
+            "query": " ".join(
+                [
+                    "CREATE",
+                    "TEMPORARY VIEW" if self._temporary else "VIEW",
+                    self._view,
+                    (
+                        ("( " + ", ".join(self._columns) + " ) AS")
+                        if self._columns
+                        else "AS"
+                    ),
+                    super().get_query(),
                 ]
             ),
             "params": self.params,

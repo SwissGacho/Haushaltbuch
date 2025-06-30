@@ -13,7 +13,7 @@ from database.sql_clause import (
     Values,
     Assignment,
 )
-from database.sql_statement import SQL
+from database.sql import SQL
 from database.sql_expression import ColumnName, Row, SQLExpression, Value, Eq
 from persistance.bo_descriptors import BOColumnFlag
 

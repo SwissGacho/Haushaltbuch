@@ -5,6 +5,7 @@ Business objects are classes that support persistance in the data base
 
 from typing import Self, TypeAlias, Optional, Callable
 import copy
+import json
 from datetime import date, datetime, UTC
 
 from core.app_logging import getLogger, log_exit
@@ -14,7 +15,8 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
-from database.sql_statement import SQL, CreateTable
+from database.sql import SQL, SQLTransaction
+from database.sql_statement import CreateTable
 from database.sql_expression import Eq, Filter, SQLExpression, Value
 
 
@@ -26,7 +28,7 @@ class _classproperty:
         return self.fget(owner_cls)
 
 
-AttributeDescription: TypeAlias = tuple[str, type, str, dict[str, str]]
+AttributeDescription: TypeAlias = tuple[str, type, str, dict[str, str | BOBaseBase]]
 
 
 class BOBase(BOBaseBase):
@@ -108,45 +110,76 @@ class BOBase(BOBaseBase):
         return cls_cols
 
     @classmethod
+    def primary_key(cls) -> str:
+        "Name of the primary key attribute"
+        for name, data_type, constraint, pars in cls.attribute_descriptions():
+            if (
+                constraint == BOColumnFlag.BOC_PK
+                or constraint == BOColumnFlag.BOC_PK_INC
+            ):
+                return name
+        raise ValueError(f"No primary key defined for {cls.__name__}")
+
+    @classmethod
+    def references(cls) -> list[str | BOBaseBase | None]:
+        "list of business objects referenced by this class"
+        return [
+            a[3].get("relation")
+            for a in cls.attribute_descriptions()
+            if a[1] == BOBaseBase and a[2] == BOColumnFlag.BOC_FK
+        ]
+
+    @classmethod
     async def sql_create_table(cls):
         "Create a DB table for this class"
         attributes = cls.attribute_descriptions()
-        sql: CreateTable = SQL().create_table(cls.table)
-        LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
-        for name, data_type, constraint, pars in attributes:
-            LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
-            sql.column(name, data_type, constraint, **pars)
-        await sql.execute(close=0)
+        async with SQLTransaction() as txaction:
+            # create_table: CreateTable = txaction.sql().create_table(cls.table)
+            s = txaction.sql()
+            create_table: CreateTable = s.create_table(cls.table)
+            # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+            for name, data_type, constraint, pars in attributes:
+                # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
+                create_table.column(name, data_type, constraint, **pars)
+            await create_table.execute()
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
+        # LOG.debug(f"BOBase.convert_from_db({value=}, {type(value)=}, {typ=})")
         if value is None:
             return None
-        if typ == date:
+        if typ == date and isinstance(value, str):
             return date.fromisoformat(value)
-        if typ == datetime:
+        if typ == datetime and isinstance(value, str):
             dt = datetime.fromisoformat(value)
             if dt.tzinfo in [None, UTC]:
                 dt = dt.replace(tzinfo=UTC).astimezone(tz=None)
             return dt
+        if typ in [dict, list] and isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError as exc:
+                LOG.error(f"BOBase.convert_from_db: JSONDecodeError: {exc}")
         return copy.deepcopy(value)
 
     @classmethod
     async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
-        sql = SQL().select(["count(*) as count"]).from_(cls.table)
-        if conditions:
-            sql.where(Filter(conditions))
-        result = await (await sql.execute(close=1)).fetchone()
+        async with SQL() as sql:
+            select = sql.select(["count(*) as count"]).from_(cls.table)
+            if conditions:
+                select.where(Filter(conditions))
+            result = await (await select.execute()).fetchone()
         # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
         return result["count"]
 
     @classmethod
     async def get_matching_ids(cls, conditions: dict) -> list[int]:
         """Get the ids of business objects matching the conditions"""
-        sql = SQL().select(["id"]).from_(cls.table)
-        sql.where(Filter(conditions))
-        result = await (await sql.execute(close=1)).fetchall()
+        async with SQL() as sql:
+            select = sql.select(["id"]).from_(cls.table)
+            select.where(Filter(conditions))
+            result = await (await select.execute()).fetchall()
         # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
 
@@ -164,14 +197,16 @@ class BOBase(BOBaseBase):
             return self
         # LOG.debug(f"fetching {self} with {id=}, {newest=}")
 
-        sql = SQL().select([], True).from_(self.table)
-        if id is not None:
-            sql.where(Eq("id", id))
-        elif newest:
-            sql.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-        self._db_data = await (await sql.execute(close=1)).fetchone()
+        async with SQL() as sql:
+            select = sql.select([], True).from_(self.table)
+            if id is not None:
+                select.where(Eq("id", id))
+            elif newest:
+                select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
+            self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
+            # LOG.debug(f"BOBase.fetch: {self._db_data=}")
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
                 self._data[attr] = self.convert_from_db(self._db_data.get(attr), typ)
         return self
@@ -189,40 +224,41 @@ class BOBase(BOBaseBase):
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
 
-        self.id = (
-            await (
+        async with SQLTransaction() as txaction:
+            self.id = (
                 await (
-                    SQL()
-                    .insert(self.table)
-                    .rows(
-                        [
-                            (k, v)
-                            for k, v in self._data.items()
-                            if k != "id" and v is not None
-                        ]
-                    )
-                    .returning("id")
-                ).execute(close=1, commit=True)
-            ).fetchone()
-        ).get("id")
+                    await (
+                        txaction.sql()
+                        .insert(self.table)
+                        .rows(
+                            [
+                                (k, v)
+                                for k, v in self._data.items()
+                                if k != "id" and v is not None
+                            ]
+                        )
+                        .returning("id")
+                    ).execute()
+                ).fetchone()
+            ).get("id")
 
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
-        sql = SQL()
-        value_class = Value
-        sql = sql.update(self.table).where(Eq("id", self.id))
-        changes = False
-        for k, v in self._data.items():
-            if k != "id" and v != self.convert_from_db(
-                self._db_data.get(k), self.attributes_as_dict()[k]
-            ):
-                changes = True
-                sql.assignment(k, value_class(k, v))
-        try:
-            if changes:
-                await sql.execute(close=0, commit=True)
-        finally:
-            await self.fetch()
+        async with SQLTransaction() as txaction:
+            value_class = Value
+            update = txaction.sql().update(self.table).where(Eq("id", self.id))
+            changes = False
+            for k, v in self._data.items():
+                if k != "id" and v != self.convert_from_db(
+                    self._db_data.get(k), self.attributes_as_dict()[k]
+                ):
+                    changes = True
+                    update.assignment(k, value_class(k, v))
+            try:
+                if changes:
+                    await update.execute()
+            finally:
+                await self.fetch()
 
 
 log_exit(LOG)

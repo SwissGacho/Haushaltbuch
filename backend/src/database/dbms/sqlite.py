@@ -1,5 +1,6 @@
 """Connection to SQLit DB using aiosqlite"""
 
+from typing import Self
 import datetime
 from pathlib import Path
 import json
@@ -9,7 +10,8 @@ from core.exceptions import OperationalError
 from core.configuration.config import Config
 from core.app_logging import getLogger
 from database.dbms.db_base import DB, Connection, Cursor
-from database.sql_statement import SQL, SQLTemplate, SQLScript
+from database.sql import SQL
+from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
 from database.sql_factory import SQLFactory
 from persistance.bo_descriptors import BOColumnFlag, BOBaseBase
@@ -76,7 +78,7 @@ def _adapt_list(value: list) -> str:
 
 
 def _adapt_flag(value: BaseFlag) -> str:
-    LOG.debug(f"SQLite._adapt_flag({value=})")
+    # LOG.debug(f"SQLite._adapt_flag({value=})")
     return str(value)
 
 
@@ -93,7 +95,7 @@ if sqlite3:
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):
-        LOG.debug(f"Registering adapter and converter for {flag_type=}")
+        # LOG.debug(f"Registering adapter and converter for {flag_type=}")
         sqlite3.register_adapter(flag_type, _adapt_flag)
 
     # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses
@@ -115,6 +117,9 @@ class SQLiteScript(SQLScript):
         SQLTemplate.TABLESQL: """SELECT sql FROM sqlite_master
                                 WHERE type='table' AND name = :table
                             """,
+        SQLTemplate.VIEWLIST: """ SELECT name as view_name FROM sqlite_master
+                                    WHERE type = 'view' and substr(name,1,7) <> 'sqlite_'
+                                """,
     }
 
 
@@ -129,13 +134,13 @@ class SQLiteDB(DB):
         return SQLiteSQLFactory
 
     async def _get_table_info(self, table_name: str) -> dict[str, str]:
-        sql_text = (
-            await (
-                await SQL()
-                .script(SQLTemplate.TABLESQL, table=table_name)
-                .execute(close=1)
-            ).fetchone()
-        )["sql"]
+        # LOG.debug(f"SQLiteDB._get_table_info({table_name=})")
+        async with SQL() as sql:
+            sql_text = (
+                await (
+                    await sql.script(SQLTemplate.TABLESQL, table=table_name).execute()
+                ).fetchone()
+            )["sql"]
         match = re.search(r"\(([^\)]*)\)", sql_text)
         info = {
             col.split(" ")[0]: col for col in [s.strip() for s in match[1].split(",")]
@@ -143,19 +148,18 @@ class SQLiteDB(DB):
         # LOG.debug(f"SQLiteDB._get_table_info({table_name=}) -> {info}")
         return info
 
-    async def connect(self):
+    async def connect(self) -> "SQLiteConnection":
         "Open a connection"
         return await SQLiteConnection(db_obj=self, **self._cfg).connect()
 
 
 class SQLiteConnection(Connection):
-    async def connect(self):
+    async def connect(self) -> Self:
         def row_factory(cursor, row):
             fields = [column[0] for column in cursor.description]
             return {key: value for key, value in zip(fields, row)}
 
         db_path = Path(self._cfg[Config.CONFIG_DBFILE])
-        LOG.debug(f"Connecting to {db_path=}")
         if not db_path.parent.exists():
             LOG.info(f"Create missing directory '{db_path.parent}' for SQLite DB.")
             db_path.parent.mkdir(parents=True)
@@ -163,43 +167,42 @@ class SQLiteConnection(Connection):
             raise FileExistsError(
                 f"Path containing SQLite DB exists and is not a directory: {db_path.parent}"
             )
+        # LOG.debug(f"Connecting to SQLite DB: {db_path}")
         self._connection = await aiosqlite.connect(
-            database=db_path, detect_types=sqlite3.PARSE_DECLTYPES
+            database=db_path, detect_types=sqlite3.PARSE_DECLTYPES, autocommit=False
         )
+        # LOG.debug(f"............................... {self._db._connections=}")
         await (await self._connection.execute("PRAGMA foreign_keys = ON")).close()
         self._connection.row_factory = row_factory
         return self
 
-    async def execute(self, query: str, params=None, close=False, commit=False):
+    async def execute(self, query: str, params=None) -> "SQLiteCursor":
         "execute an SQL statement and return a cursor"
-        if commit:
-            self._commit = commit
+        # LOG.debug(f"SQLiteConnection.execute({query=}, {params=})")
         cur = SQLiteCursor(cur=await self._connection.cursor(), con=self)
-        await cur.execute(query, params=params, close=close)
+        await cur.execute(query, params=params)
         return cur
 
 
 class SQLiteCursor(Cursor):
 
-    async def execute(self, query: str, params=None, close=False):
+    async def execute(self, query: str, params={}):
         self._last_query = query
-        self._close = close
+        self._last_params = params
         try:
-            # LOG.debug(f"Executing: {query=}, {params=}, {close=}")
-            await self._cursor.execute(query, params)
+            # LOG.debug(f"SQLiteCursor.execute({query=}, {params=})")
+            await self._cursor.execute(sql=query, parameters=params)
             self._rowcount = self._cursor.rowcount
         except sqlite3.OperationalError as err:
             raise OperationalError(err)
-        if close is 0:
-            await self._connection.close()
-            return None
         return self
 
     @property
     async def rowcount(self):
         if self._rowcount == -1:
             async with self._connection._connection.execute(
-                f"SELECT COUNT(*) AS rowcount FROM ({self._last_query})"
+                sql=f"SELECT COUNT(*) AS rowcount FROM ({self._last_query})",
+                parameters=self._last_params,
             ) as sub_cur:
                 self._rowcount = (await sub_cur.fetchone())["rowcount"]
         return self._rowcount
