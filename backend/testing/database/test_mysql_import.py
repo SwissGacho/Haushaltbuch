@@ -22,7 +22,7 @@ def setUpModule() -> None:
         if mod in sys.modules:
             del sys.modules[mod]
 
-    remove("database.mysql")
+    remove("database.dbms.mysql")
     remove("aiomysql")
 
 

@@ -63,7 +63,7 @@ class TestSQLiteDB__init__(unittest.TestCase):
             self.assertRaises(ModuleNotFoundError),
             patch("database.dbms.db_base.DB.__init__") as mock_db_init,
         ):
-            database.sqlite.SQLiteDB(**self.db_cfg)
+            database.dbms.sqlite.SQLiteDB(**self.db_cfg)
         mock_db_init.assert_not_called()
 
 

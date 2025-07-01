@@ -123,6 +123,13 @@ class SQLiteScript(SQLScript):
     }
 
 
+def get_db(db_type: str = None, **cfg) -> DB:
+    """Get a DB instance based on the db_type"""
+    LOG.debug(f"sqlite.get_db({db_type=}, {cfg=})")
+    if db_type == "SQLite":
+        return SQLiteDB(**cfg)
+
+
 class SQLiteDB(DB):
     def __init__(self, **cfg) -> None:
         if AIOSQLITE_IMPORT_ERROR:

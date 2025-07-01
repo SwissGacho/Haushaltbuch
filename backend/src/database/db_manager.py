@@ -1,5 +1,7 @@
 """Manage connection to the database"""
 
+import importlib
+import pkgutil
 from contextlib import asynccontextmanager
 
 from core.app import App
@@ -31,39 +33,62 @@ async def get_db():
         yield
         return
     # LOG.debug(f"DB configuration: {db_config=}, {db_type=}")
-    if db_type == "SQLite":
-        LOG.debug("Connect to SQLite")
+    # if db_type == "SQLite":
+    #     LOG.debug("Connect to SQLite")
+    #     try:
+    #         db = SQLiteDB(**db_config)
+    #     except ModuleNotFoundError as exc:
+    #         App.status = Status.STATUS_DB_UNSUPPORTED
+    #         LOG.error(f"{exc}")
+    #         if "aiosqlite" in str(exc):
+    #             LOG.error(
+    #                 "Library 'aiosqlite' could not be imported. "
+    #                 "Please install using 'pip install aiosqlite'"
+    #             )
+    #         yield
+    #         return
+    # elif db_type == "MySQL" or db_type == "MariaDB":
+    #     LOG.info(f"Connect to {db_type}")
+    #     try:
+    #         db = MySQLDB(**db_config)
+    #     except ModuleNotFoundError as exc:
+    #         App.status = Status.STATUS_DB_UNSUPPORTED
+    #         LOG.error(f"{exc}")
+    #         if "aiomysql" in str(exc):
+    #             LOG.error(
+    #                 "Library 'aiomysql' could not be imported. "
+    #                 "Please install using 'pip install aiomysql'"
+    #             )
+    #         yield
+    #         return
+    # else:
+    #     App.status = Status.STATUS_DB_UNSUPPORTED
+    #     LOG.warning(f"Invalid DB configuration: {db_config}")
+    #     yield
+    #     return
+
+    db = None
+    dbms_package = "database.dbms"
+    for _, name, _ in pkgutil.iter_modules(
+        importlib.import_module(dbms_package).__path__
+    ):
+        module_name = f"{dbms_package}.{name}"
         try:
-            db = SQLiteDB(**db_config)
-        except ModuleNotFoundError as exc:
-            App.status = Status.STATUS_DB_UNSUPPORTED
-            LOG.error(f"{exc}")
-            if "aiosqlite" in str(exc):
-                LOG.error(
-                    "Library 'aiosqlite' could not be imported. "
-                    "Please install using 'pip install aiosqlite'"
-                )
-            yield
-            return
-    elif db_type == "MySQL" or db_type == "MariaDB":
-        LOG.info(f"Connect to {db_type}")
-        try:
-            db = MySQLDB(**db_config)
-        except ModuleNotFoundError as exc:
-            App.status = Status.STATUS_DB_UNSUPPORTED
-            LOG.error(f"{exc}")
-            if "aiomysql" in str(exc):
-                LOG.error(
-                    "Library 'aiomysql' could not be imported. "
-                    "Please install using 'pip install aiomysql'"
-                )
-            yield
-            return
-    else:
+            module = importlib.import_module(module_name)
+            get_db_func = getattr(module, "get_db", None)
+            if callable(get_db_func):
+                db = get_db_func(db_type, **db_config)
+                LOG.info(f"Connect to {db_type}")
+                if db:
+                    break
+        except Exception as exc:
+            LOG.error(f"Error loading DB module '{module_name}': {exc}")
+    if not db:
         App.status = Status.STATUS_DB_UNSUPPORTED
-        LOG.warning(f"Invalid DB configuration: {db_config}")
+        LOG.warning(f"Invalid DB configuration or no suitable DBMS found: {db_config}")
         yield
         return
+
     try:
         App.db = db
         await check_db_schema()
