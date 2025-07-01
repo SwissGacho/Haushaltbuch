@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call, ANY
 
 
-import database.db_base
+import database.dbms.db_base
 from database.sql_executable import SQLExecutable
 from database.sql import SQL
 from database.sql_clause import SQLColumnDefinition
@@ -33,7 +33,7 @@ class MockSQL(SQLExecutable):
 class TestDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.db_cfg = {"cfg1": "mick", "cfg2": "mack", "cfg3": "mock"}
-        self.db = database.db_base.DB(**self.db_cfg)
+        self.db = database.dbms.db_base.DB(**self.db_cfg)
         return super().setUp()
 
     def test_001_db(self):
@@ -57,8 +57,8 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
         mockColDef.get_query = Mock(return_value=mock_col_def)
         MockColDef = Mock(return_value=mockColDef)
         with (
-            patch("database.db_base.SQL", MockSQL),
-            patch("database.db_base.SQLColumnDefinition", MockColDef),
+            patch("database.dbms.db_base.SQL", MockSQL),
+            patch("database.dbms.db_base.SQLColumnDefinition", MockColDef),
         ):
             result = self.db.check_column(
                 tab="mock_tab",
@@ -102,7 +102,7 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
         self.mock_db = Mock()
         self.mock_db._connections = set()
         self.db_cfg = {"cfg1": "mick", "cfg2": "mack", "cfg3": "mock"}
-        self.con = database.db_base.Connection(db_obj=self.mock_db, **self.db_cfg)
+        self.con = database.dbms.db_base.Connection(db_obj=self.mock_db, **self.db_cfg)
         return super().setUp()
 
     def test_001_Connection(self):
@@ -123,10 +123,10 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
 
     def test_301_connection_prop(self):
         with patch(
-            "database.db_base.Connection.connection", new_callable=PropertyMock
+            "database.dbms.db_base.Connection.connection", new_callable=PropertyMock
         ) as mock_con:
             mock_con.return_value = "mock_con1"
-            con = database.db_base.Connection(self.mock_db)
+            con = database.dbms.db_base.Connection(self.mock_db)
             self.assertEqual(con.connection, "mock_con1")
 
     async def test_401_commit(self):
@@ -142,7 +142,7 @@ class TestCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_con = Mock()
         self.mock_cur = AsyncMock()
-        self.cur = database.db_base.Cursor(self.mock_cur, self.mock_con)
+        self.cur = database.dbms.db_base.Cursor(self.mock_cur, self.mock_con)
         return super().setUp()
 
     def test_001_Connection(self):

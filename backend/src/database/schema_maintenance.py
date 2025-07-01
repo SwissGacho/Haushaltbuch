@@ -4,6 +4,8 @@ from graphlib import TopologicalSorter
 
 import core
 import database
+import database.db_manager
+import database.dbms.db_base
 import persistance
 
 from database.sql import SQL
@@ -50,7 +52,7 @@ async def check_db_schema():
     verify compatibility of the persistance tables
     """
     this_database = core.app.App.db
-    if this_database.__class__ == database.db_base.DB:
+    if this_database.__class__ == database.dbms.db_base.DB:
         raise TypeError("cannot check abstract DB")
     LOG.debug("checking DB Schema")
     async with SQL() as sql:

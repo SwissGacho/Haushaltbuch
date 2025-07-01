@@ -5,13 +5,12 @@ import re
 import json
 
 from core.app_logging import getLogger, log_exit
-
-LOG = getLogger(__name__)
-
 from core.base_objects import DBBaseClass, ConnectionBaseClass
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
 from database.sql_clause import SQLColumnDefinition
+
+LOG = getLogger(__name__)
 
 
 class DB(DBBaseClass):

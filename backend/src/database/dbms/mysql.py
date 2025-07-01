@@ -7,7 +7,7 @@ from core.app import App
 from core.configuration.config import Config, DBConfig
 from core.exceptions import ConfigurationError
 from core.util import get_config_item
-from database.db_base import DB, Connection, Cursor
+from database.dbms.db_base import DB, Connection, Cursor
 from database.sql_factory import SQLFactory
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript, Insert, Update
