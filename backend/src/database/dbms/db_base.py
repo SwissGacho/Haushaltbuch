@@ -5,7 +5,6 @@ import re
 import json
 
 from core.app_logging import getLogger, log_exit
-
 from core.base_objects import DBBaseClass, ConnectionBaseClass
 from database.sql_statement import SQLTemplate
 from core.base_objects import DBBaseClass

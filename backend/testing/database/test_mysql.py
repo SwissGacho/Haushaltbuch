@@ -41,7 +41,6 @@ def setUpModule() -> None:
 
 
 from core.exceptions import ConfigurationError
-import database.dbms.db_base
 import database.sql_statement
 
 
