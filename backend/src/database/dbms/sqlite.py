@@ -125,7 +125,7 @@ class SQLiteScript(SQLScript):
 
 def get_db(db_type: str = None, **cfg) -> DB:
     """Get a DB instance based on the db_type"""
-    LOG.debug(f"sqlite.get_db({db_type=}, {cfg=})")
+    # LOG.debug(f"sqlite.get_db({db_type=}, {cfg=})")
     if db_type == "SQLite":
         return SQLiteDB(**cfg)
 

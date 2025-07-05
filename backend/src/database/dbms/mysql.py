@@ -137,7 +137,7 @@ class MySQLUpdate(Update):
 
 def get_db(db_type: str = None, **cfg) -> DB:
     """Get a DB instance based on the db_type"""
-    LOG.debug(f"mysql.get_db({db_type=}, {cfg=})")
+    # LOG.debug(f"mysql.get_db({db_type=}, {cfg=})")
     if db_type in ["MySQL", "MariaDB"]:
         return MySQLDB(**cfg)
 

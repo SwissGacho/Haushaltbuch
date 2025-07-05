@@ -3,6 +3,7 @@
 import importlib
 import pkgutil
 from contextlib import asynccontextmanager
+from re import L
 
 from core.app import App
 from core.util import get_config_item
@@ -38,15 +39,17 @@ async def get_db():
         importlib.import_module(dbms_package).__path__
     ):
         module_name = f"{dbms_package}.{name}"
-        LOG.debug(f"Trying to load DB module '{module_name}'")
+        # LOG.debug(f"Checking module '{module_name}'")
         try:
             module = importlib.import_module(module_name)
             get_db_func = getattr(module, "get_db", None)
             if callable(get_db_func):
                 db = get_db_func(db_type, **db_config)
-                LOG.info(f"Connect to {db_type}")
                 if db:
+                    LOG.info(f"Connect to {db_type}")
+                    # LOG.debug(f"      using module '{module_name}'")
                     break
+                # LOG.debug(f"DB module '{module_name}' does not support {db_type}")
         except Exception as exc:
             LOG.error(f"Error loading DB module '{module_name}': {exc}")
     if not db:
