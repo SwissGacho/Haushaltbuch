@@ -1,191 +1,152 @@
-""" Test suite for the DB context manager """
+"""Test suite for the DB context manager"""
 
-import logging
 import unittest
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
+from unittest.mock import Mock, MagicMock, AsyncMock, patch, call
 
-from contextlib import _AsyncGeneratorContextManager
-from ...src.core.configuration.db_config import DBConfig
 from core.status import Status
 from core.configuration.config import Config
 import database.db_manager
 
 
-class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
+class Test_100_DB_ContextManager(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.MockApp = Mock(name="MockApp")
         self.MockApp.status = Status.STATUS_DB_CFG
-        self.MockDBConfig = Mock(name="DBConfig")
-        self.mockdbpackage = Mock()
+        self.MockApp.db = None
+        Mock_DBConfig = Mock(name="MockDBConfig")
+        Mock_DBConfig.db_configuration = "MockDBConfig"
+
+        self.mock_get_config_item = Mock(name="get_config_item")
+        self.mock_get_config_item.side_effect = [
+            {"key1": "value1", "key2": "value2"},
+            "TheDB",
+        ]
+
         self.mock_db = AsyncMock(name="db")
-        self.MockSQLiteDB = Mock(name="DB", return_value=self.mock_db)
-        self.MockMySQLDB = Mock(name="DB", return_value=self.mock_db)
+        self.mock_db.close = AsyncMock(name="close")
         self.mock_check_db_schema = AsyncMock(name="check_db_schema")
+
+        self.mock_pkgutil = Mock(name="pkgutil")
+        self.mock_importlib = Mock(name="importlib")
+        mock_package = Mock(name="db_package")
+        mock_package.__path__ = "mock_path"
+        self.mock_pkgutil.iter_modules = Mock(
+            name="iter_modules",
+            return_value=[("mick", "mock_db_1", "mack"), ("meck", "mock_db_2", "muck")],
+        )
+        self.mock_module = Mock(name="mock_module")
+        self.mock_module.get_db = Mock(name="get_db", return_value=self.mock_db)
+        self.mock_importlib.import_module = Mock(
+            name="import_module",
+            side_effect=[mock_package, self.mock_module, self.mock_module],
+        )
+
         self.patch = patch.multiple(
             "database.db_manager",
             App=self.MockApp,
-            DBConfig=self.MockDBConfig,
-            SQLiteDB=self.MockSQLiteDB,
-            MySQLDB=self.MockMySQLDB,
+            DBConfig=Mock_DBConfig,
+            get_config_item=self.mock_get_config_item,
+            pkgutil=self.mock_pkgutil,
+            importlib=self.mock_importlib,
             check_db_schema=self.mock_check_db_schema,
         )
         return super().setUp()
 
-    async def test_001_get_db_no_db_config(self):
+    async def test_101_get_db_no_db_config(self):
         self.MockApp.status = Status.STATUS_NO_DB
         with self.patch:
-            ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            async with database.db_manager.get_db() as db:
+                self.assertIsNone(db)
+        self.mock_get_config_item.assert_not_called()
+        self.mock_pkgutil.iter_modules.assert_not_called()
+        self.mock_importlib.import_module.assert_not_called()
+        self.mock_check_db_schema.assert_not_awaited()
+        self.mock_db.close.assert_not_awaited()
 
-            ctx_bind = await ctx_mgr.__aenter__()
-            self.assertIsNone(ctx_bind)
-
-            reply = await ctx_mgr.__aexit__(None, None, None)
-            self.assertEqual(reply, False)
-            self.MockSQLiteDB.assert_not_called()
-            self.MockMySQLDB.assert_not_called()
-            self.mock_check_db_schema.assert_not_awaited()
-            self.mock_db.close.assert_not_called()
-
-    async def test_001_get_db_invalid_db_config(self):
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: {"invalid": "Config"}}
-
+    async def test_102_get_db_invalid_db_config(self):
+        self.mock_get_config_item.side_effect = [None, "TheDB"]
         with self.patch:
-            ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            async with database.db_manager.get_db() as db:
+                self.assertIsNone(db)
+        self.assertEqual(self.mock_get_config_item.call_count, 2)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB_DB)
+        self.mock_pkgutil.iter_modules.assert_not_called()
+        self.mock_importlib.import_module.assert_not_called()
+        self.mock_check_db_schema.assert_not_awaited()
+        self.mock_db.close.assert_not_awaited()
 
-            ctx_bind = await ctx_mgr.__aenter__()
-            self.assertIsNone(ctx_bind)
-
-            reply = await ctx_mgr.__aexit__(None, None, None)
-            self.assertEqual(reply, False)
-            self.MockSQLiteDB.assert_not_called()
-            self.MockMySQLDB.assert_not_called()
-            self.mock_check_db_schema.assert_not_awaited()
-            self.mock_db.close.assert_not_called()
-
-    async def test_101_get_db_sqlite(self):
-        self.mock_db_filename = "theDBfile.sqlite"
-        self.db_config = {
-            "db": "SQLite",
-            "file": self.mock_db_filename,
-        }
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: self.db_config}
+    async def test_103_get_db_no_db_type(self):
+        self.mock_get_config_item.side_effect = [
+            {"key1": "value1", "key2": "value2"},
+            None,
+        ]
         with self.patch:
-            # test creation of context manager
-            ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            async with database.db_manager.get_db() as db:
+                self.assertIsNone(db)
+        self.assertEqual(self.mock_get_config_item.call_count, 2)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB_DB)
+        self.mock_pkgutil.iter_modules.assert_not_called()
+        self.mock_importlib.import_module.assert_not_called()
+        self.mock_check_db_schema.assert_not_awaited()
+        self.mock_db.close.assert_not_awaited()
 
-            # test context entrance
-            ctx_bind = await ctx_mgr.__aenter__()
-            self.assertEqual(ctx_bind, self.mock_db)
-            self.MockSQLiteDB.assert_called_once_with(**self.db_config)
-            self.MockMySQLDB.assert_not_called()
-            self.mock_check_db_schema.assert_awaited_once_with()
-            self.mock_db.close.assert_not_called()
-
-            # test context exit
-            reply = await ctx_mgr.__aexit__(None, None, None)
-            self.assertEqual(reply, False)
-            self.MockSQLiteDB.assert_called_once_with(**self.db_config)
-            self.MockMySQLDB.assert_not_called()
-            self.mock_check_db_schema.assert_awaited_once_with()
-            self.mock_db.close.assert_called_once_with()
-
-    async def test_102_get_db_sqlite_missing(self):
-        self.mock_db_filename = "theDBfile.sqlite"
-        self.db_config = {
-            "db": "SQLite",
-            "file": self.mock_db_filename,
-        }
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: self.db_config}
-        self.MockSQLiteDB.side_effect = ModuleNotFoundError(
-            "No module named 'aiosqlite'"
+    async def test_104_get_db_1(self):
+        with self.patch:
+            async with database.db_manager.get_db() as db:
+                self.assertIs(db, self.mock_db)
+        self.assertEqual(self.mock_get_config_item.call_count, 2)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB_DB)
+        self.mock_pkgutil.iter_modules.assert_called_once_with("mock_path")
+        self.assertEqual(self.mock_importlib.import_module.call_count, 2)
+        self.mock_importlib.import_module.assert_any_call("database.dbms")
+        self.mock_importlib.import_module.assert_any_call("database.dbms.mock_db_1")
+        self.mock_module.get_db.assert_called_once_with(
+            "TheDB", key1="value1", key2="value2"
         )
+        self.mock_check_db_schema.assert_awaited_once_with()
+        self.mock_db.close.assert_awaited_once_with()
+
+    async def test_105_get_db_2(self):
+        self.mock_module.get_db.side_effect = [None, self.mock_db]
         with self.patch:
-            with self.assertLogs(None, logging.ERROR) as err_msg:
-                # test creation of context manager
-                ctx_mgr = database.db_manager.get_db()
-                self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            async with database.db_manager.get_db() as db:
+                self.assertIs(db, self.mock_db)
+        self.assertEqual(self.mock_get_config_item.call_count, 2)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB_DB)
+        self.mock_pkgutil.iter_modules.assert_called_once_with("mock_path")
+        self.assertEqual(self.mock_importlib.import_module.call_count, 3)
+        self.mock_importlib.import_module.assert_any_call("database.dbms")
+        self.mock_importlib.import_module.assert_any_call("database.dbms.mock_db_1")
+        self.mock_importlib.import_module.assert_any_call("database.dbms.mock_db_2")
+        expected_call = call("TheDB", key1="value1", key2="value2")
+        self.assertEqual(self.mock_module.get_db.call_count, 2)
+        self.mock_module.get_db.assert_has_calls(
+            [expected_call] * 2  # Called twice, once for each mock module
+        )
+        self.mock_check_db_schema.assert_awaited_once_with()
+        self.mock_db.close.assert_awaited_once_with()
 
-                # test context entrance
-                ctx_bind = await ctx_mgr.__aenter__()
-                self.assertIsNone(ctx_bind)
-                self.MockSQLiteDB.assert_called_once_with(**self.db_config)
-                self.MockMySQLDB.assert_not_called()
-                self.mock_check_db_schema.assert_not_awaited()
-                self.mock_db.close.assert_not_called()
-                self.assertTrue(
-                    err_msg.output[0].find("No module named 'aiosqlite'") >= 0
-                )
-
-                # test context exit
-                reply = await ctx_mgr.__aexit__(None, None, None)
-                self.assertEqual(reply, False)
-                self.MockSQLiteDB.assert_called_once_with(**self.db_config)
-                self.MockMySQLDB.assert_not_called()
-                self.mock_check_db_schema.assert_not_awaited()
-                self.mock_db.close.assert_not_called()
-
-    @unittest.skip("implementation pending")
-    async def test_201_get_db_mysql(self):
-        self.mock_db_config = {
-            Config.CONFIG_DBHOST: "mockHost",
-            # Config.CONFIG_DB_DB: "mockDB",
-            Config.CONFIG_DBUSER: "mockUser",
-            Config.CONFIG_DBPW: "mockPW",
-        }
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: self.mock_db_config}
+    async def test_106_db_not_found(self):
+        self.mock_module.get_db.side_effect = [None, None]
         with self.patch:
-            # test creation of context manager
-            ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
-
-            # test context entrance
-            ctx_bind = await ctx_mgr.__aenter__()
-            self.assertEqual(ctx_bind, self.mock_db)
-            self.MockSQLiteDB.assert_not_called()
-            self.MockMySQLDB.assert_called_once_with(**self.mock_db_config)
-            self.mock_check_db_schema.assert_awaited_once_with()
-            self.mock_db.close.assert_not_called()
-
-            # test context exit
-            self.mockdbpackage.reset_mock()
-            reply = await ctx_mgr.__aexit__(None, None, None)
-            self.assertEqual(reply, False)
-            self.MockSQLiteDB.assert_not_called()
-            self.MockMySQLDB.assert_called_once_with(**self.mock_db_config)
-            self.mock_check_db_schema.assert_awaited_once_with()
-            self.mock_db.close.assert_called_once_with()
-
-    @unittest.skip("implementation pending")
-    async def test_202_get_db_mysql_missing(self):
-        self.mock_db_config = {
-            Config.CONFIG_DBHOST: "mockHost",
-            # Config.CONFIG_DB_DB: "mockDB",
-            Config.CONFIG_DBUSER: "mockUser",
-            Config.CONFIG_DBPW: "mockPW",
-        }
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: self.mock_db_config}
-        self.MockMySQLDB.side_effect = ModuleNotFoundError("No module named 'aiomysql'")
-        with self.patch:
-            # test creation of context manager
-            ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
-
-            # test context entrance
-            ctx_bind = await ctx_mgr.__aenter__()
-            self.assertIsNone(ctx_bind)
-            self.MockSQLiteDB.assert_not_called()
-            self.MockMySQLDB.assert_called_once_with(**self.mock_db_config)
-            self.mock_check_db_schema.assert_not_awaited()
-            self.mock_db.close.assert_not_called()
-
-            # test context exit
-            self.mockdbpackage.reset_mock()
-            reply = await ctx_mgr.__aexit__(None, None, None)
-            self.assertEqual(reply, False)
-            self.MockSQLiteDB.assert_not_called()
-            self.MockMySQLDB.assert_called_once_with(**self.mock_db_config)
-            self.mock_check_db_schema.assert_not_awaited()
-            self.mock_db.close.assert_not_called()
+            async with database.db_manager.get_db() as db:
+                self.assertIsNone(db)
+        self.assertEqual(self.mock_get_config_item.call_count, 2)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB)
+        self.mock_get_config_item.assert_any_call("MockDBConfig", Config.CONFIG_DB_DB)
+        self.mock_pkgutil.iter_modules.assert_called_once_with("mock_path")
+        self.assertEqual(self.mock_importlib.import_module.call_count, 3)
+        self.mock_importlib.import_module.assert_any_call("database.dbms")
+        self.mock_importlib.import_module.assert_any_call("database.dbms.mock_db_1")
+        self.mock_importlib.import_module.assert_any_call("database.dbms.mock_db_2")
+        expected_call = call("TheDB", key1="value1", key2="value2")
+        self.assertEqual(self.mock_module.get_db.call_count, 2)
+        self.mock_module.get_db.assert_has_calls(
+            [expected_call] * 2  # Called twice, once for each mock module
+        )
+        self.mock_check_db_schema.assert_not_awaited()
+        self.mock_db.close.assert_not_awaited()

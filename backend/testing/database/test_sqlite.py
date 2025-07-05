@@ -20,44 +20,35 @@ from unittest.mock import (
 from contextlib import asynccontextmanager
 from datetime import datetime as dt, date
 
-
-def restore_sys_modules(name, module=None):
-    print(f"====================== restoring sys.modules['{name}'] -> {module}")
-    if module:
-        sys.modules[name] = module
-    elif name in sys.modules:
-        del sys.modules[name]
-
-
-def setUpModule() -> None:
-    def remove(mod):
-        print(f"----------------- remove {mod}")
-        unittest.addModuleCleanup(
-            restore_sys_modules, name=mod, module=sys.modules.get(mod)
-        )
-        if mod in sys.modules:
-            del sys.modules[mod]
-
-    remove("aiosqlite")
-    remove("sqlite3")
-
-
-import database.dbms.db_base
 import database.sql_statement
+import database.dbms.sqlite
 
 
-class TestSQLiteDB__init__(unittest.TestCase):
+class Test_100_SQLiteDB__init__(unittest.TestCase):
     def setUp(self) -> None:
+        database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = None
         self.db_cfg = {"file": "mock_sqlite_file.db"}
         return super().setUp()
 
-    def test_001_SQLiteDB(self):
-        database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = None
+    # def test_001_SQLiteDB(self):
+    #     with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
+    #         self.db = database.dbms.sqlite.SQLiteDB(**self.db_cfg)
+    #         mock_db_init.assert_called_once_with(**self.db_cfg)
+
+    # def test_002_SQLiteDB_no_lib(self):
+    #     database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
+    #     with (
+    #         self.assertRaises(ModuleNotFoundError),
+    #         patch("database.dbms.db_base.DB.__init__") as mock_db_init,
+    #     ):
+    #         database.dbms.sqlite.SQLiteDB(**self.db_cfg)
+    #     mock_db_init.assert_not_called()
+    def test_101_SQLiteDB(self):
         with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
             self.db = database.dbms.sqlite.SQLiteDB(**self.db_cfg)
-            mock_db_init.assert_called_once_with(**self.db_cfg)
+        mock_db_init.assert_called_once_with(**self.db_cfg)
 
-    def test_002_SQLiteDB_no_lib(self):
+    def test_102_SQLiteDB_no_lib(self):
         database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
         with (
             self.assertRaises(ModuleNotFoundError),
@@ -66,9 +57,31 @@ class TestSQLiteDB__init__(unittest.TestCase):
             database.dbms.sqlite.SQLiteDB(**self.db_cfg)
         mock_db_init.assert_not_called()
 
+    def test_103_get_db_SQLite_success(self):
+        with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
+            self.db = database.dbms.sqlite.get_db("SQLite", **self.db_cfg)
+        mock_db_init.assert_called_once_with(**self.db_cfg)
+        self.assertIsInstance(self.db, database.dbms.sqlite.SQLiteDB)
 
-class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
+    def test_104_get_db_other_DBMS(self):
+        with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
+            self.db = database.dbms.sqlite.get_db("OtherDBMS", **self.db_cfg)
+        mock_db_init.assert_not_called()
+        self.assertIsNone(self.db)
+
+    def test_105_get_db_no_lib(self):
+        database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
+        with (
+            self.assertRaises(ModuleNotFoundError),
+            patch("database.dbms.db_base.DB.__init__") as mock_db_init,
+        ):
+            database.dbms.sqlite.get_db("SQLite", **self.db_cfg)
+        mock_db_init.assert_not_called()
+
+
+class Test_200_SQLiteDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = None
         self.db_cfg = {"db": "SQLite", "file": "sqlite_file.db"}
         database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = None
         self.db = database.dbms.sqlite.SQLiteDB(**self.db_cfg)
@@ -115,8 +128,9 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
             self.assertDictEqual(reply, expected)
 
 
-class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
+class Test_300_SQLiteConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = None
         self.mock_db = Mock()
         self.mock_con = AsyncMock()
         self.db_cfg = {"db": "SQLite", "file": "mock_sqlite_file.db"}
@@ -187,8 +201,9 @@ async def spec_async_context_manager():
     yield
 
 
-class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
+class Test_400_SQLiteCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR = None
         self.mock_con = Mock(name="mock_connection")
         self.mock_aiocursor = AsyncMock(name="mock_aiocursor")
         self.cur = database.dbms.sqlite.SQLiteCursor(self.mock_aiocursor, self.mock_con)

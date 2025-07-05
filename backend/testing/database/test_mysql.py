@@ -18,34 +18,14 @@ from unittest.mock import (
     sentinel,
 )
 from contextlib import asynccontextmanager
-
-
-def restore_sys_modules(name, module=None):
-    # print(f"====================== restoring sys.modules['{name}'] -> {module}")
-    if module:
-        sys.modules[name] = module
-    elif name in sys.modules:
-        del sys.modules[name]
-
-
-def setUpModule() -> None:
-    def remove(mod):
-        # print(f"----------------- remove {mod}")
-        unittest.addModuleCleanup(
-            restore_sys_modules, name=mod, module=sys.modules.get(mod)
-        )
-        if mod in sys.modules:
-            del sys.modules[mod]
-
-    remove("aiomysql")
-
-
 from core.exceptions import ConfigurationError
 import database.sql_statement
+import database.dbms.mysql
 
 
-class TestMySQLDB__init__(unittest.TestCase):
+class Test_100_MySQLDB__init__(unittest.TestCase):
     def setUp(self) -> None:
+        database.dbms.mysql.AIOMYSQL_IMPORT_ERROR = None
         self.db_cfg = {
             "host": "mockhost",
             "db": "mockdb",
@@ -53,13 +33,12 @@ class TestMySQLDB__init__(unittest.TestCase):
         }
         return super().setUp()
 
-    def test_001_MySQLDB(self):
-        database.dbms.mysql.AIOMYSQL_IMPORT_ERROR = None
+    def test_101_MySQLDB(self):
         with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
             self.db = database.dbms.mysql.MySQLDB(**self.db_cfg)
-            mock_db_init.assert_called_once_with(**self.db_cfg)
+        mock_db_init.assert_called_once_with(**self.db_cfg)
 
-    def test_002_MySQLDB_no_lib(self):
+    def test_102_MySQLDB_no_lib(self):
         database.dbms.mysql.AIOMYSQL_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
         with (
             self.assertRaises(ModuleNotFoundError),
@@ -68,9 +47,37 @@ class TestMySQLDB__init__(unittest.TestCase):
             database.dbms.mysql.MySQLDB(**self.db_cfg)
         mock_db_init.assert_not_called()
 
+    def test_103a_get_db_MySQL_success(self):
+        with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
+            self.db = database.dbms.mysql.get_db("MySQL", **self.db_cfg)
+        mock_db_init.assert_called_once_with(**self.db_cfg)
+        self.assertIsInstance(self.db, database.dbms.mysql.MySQLDB)
 
-class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
+    def test_103b_get_db_MariaDB_success(self):
+        with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
+            self.db = database.dbms.mysql.get_db("MariaDB", **self.db_cfg)
+        mock_db_init.assert_called_once_with(**self.db_cfg)
+        self.assertIsInstance(self.db, database.dbms.mysql.MySQLDB)
+
+    def test_104_get_db_other_DBMS(self):
+        with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
+            self.db = database.dbms.mysql.get_db("OtherDBMS", **self.db_cfg)
+        mock_db_init.assert_not_called()
+        self.assertIsNone(self.db)
+
+    def test_105_get_db_no_lib(self):
+        database.dbms.mysql.AIOMYSQL_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
+        with (
+            self.assertRaises(ModuleNotFoundError),
+            patch("database.dbms.db_base.DB.__init__") as mock_db_init,
+        ):
+            database.dbms.mysql.get_db("MariaDB", **self.db_cfg)
+        mock_db_init.assert_not_called()
+
+
+class Test_200_MySQLDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        database.dbms.mysql.AIOMYSQL_IMPORT_ERROR = None
         self.db_cfg = {
             "host": "mockhost",
             "db": "mockdb",
@@ -121,8 +128,9 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
             self.assertDictEqual(reply, expected)
 
 
-class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
+class Test_300_MySQLConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        database.dbms.mysql.AIOMYSQL_IMPORT_ERROR = None
         self.mock_db = Mock()
         self.mock_con = AsyncMock()
         self.db_cfg = {
@@ -247,8 +255,9 @@ async def spec_async_context_manager():
     yield
 
 
-class TestMySQLCursor(unittest.IsolatedAsyncioTestCase):
+class Test_400_MySQLCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        database.dbms.mysql.AIOMYSQL_IMPORT_ERROR = None
         self.mock_con = Mock()
         self.mock_aiocursor = AsyncMock()
         self.cur = database.dbms.mysql.MySQLCursor(self.mock_aiocursor, self.mock_con)
