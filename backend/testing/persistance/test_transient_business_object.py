@@ -2,6 +2,7 @@
 
 import unittest
 import gc
+from unittest.mock import patch
 
 from persistance.transient_business_object import TransientBusinessObject
 
@@ -14,11 +15,14 @@ class MockBOBase:
         self.attributes = attributes
 
 
-# Patch BOBase for testing
-TransientBusinessObject.__bases__ = (MockBOBase,)
-
-
 class Test_100_Transient_Business_Object_classmethods(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self) -> None:
+        self.patcher = patch("persistance.transient_business_object.BOBase", MockBOBase)
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
 
     async def test_101_instance_creation(self):
         """Test that instances are created and added to the weakref set."""

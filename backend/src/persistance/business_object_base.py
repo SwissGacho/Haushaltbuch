@@ -44,7 +44,7 @@ class BOBase(BOBaseBase):
     _creation_subscribers: dict[int, BOCallback] = {}
     _last_subscriber_id = 0
 
-    def __new__(cls, id: int | None = None, **attributes):
+    def __new__(cls, id: int | None = None, *args, **attributes):
         if id is not None:
             if id in cls._loaded_instances:
                 return cls._loaded_instances[id]
@@ -52,8 +52,8 @@ class BOBase(BOBaseBase):
         return super().__new__(cls)
 
     # pylint: disable=redefined-builtin
-    def __init__(self, id: int | None = None, **attributes) -> None:
-        # LOG.debug(f"BOBase({id=},{attributes})")
+    def __init__(self, id: int | None = None, *args, **attributes) -> None:
+        LOG.debug(f"BOBase({id=},{attributes})")
         self._data = {}
         self._db_data = {}
         self.id = id
@@ -210,6 +210,8 @@ class BOBase(BOBaseBase):
     @classmethod
     def unsubscribe_from_creation(cls, callback_id: int):
         """Unregister a callback from the creation list."""
+        LOG.debug(f"Unsubscribing callback {callback_id} from creation subscribers")
+        LOG.debug(f"Current subscribers: {cls._creation_subscribers}")
         if callback_id in cls._creation_subscribers:
             del cls._creation_subscribers[callback_id]
         else:

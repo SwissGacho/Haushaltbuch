@@ -100,7 +100,7 @@ class BOInt(_PersistantAttr):
 
 class BOId(BOInt):
     def __set__(self, obj, value):
-        if obj._data[self.my_name] is not None:
+        if self.my_name in obj._data and obj._data[self.my_name] is not None:
             raise ValueError("Cannot set id of existing object")
         obj.__class__.register_instance(obj)
         super().__set__(obj=obj, value=value)

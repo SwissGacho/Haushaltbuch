@@ -14,6 +14,7 @@ from core.configuration.config import Config
 from core.base_objects import BaseObject
 from core.app_logging import getLogger
 from persistance.business_object_base import BOBase
+from persistance.bo_list import BOList
 
 LOG = getLogger(__name__)
 
@@ -123,26 +124,16 @@ class FetchListMessage(Message):
         object_type = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
         name_list: list[str] = []
         for name in business_objects:
+
             # right now we just assume every BO is a root tree object
             if name == object_type:
                 my_type = business_objects[name]
                 assert issubclass(my_type, BOBase)
-                ids = await my_type.get_matching_ids()
-                for id in ids:
-                    # in future we'll also get the name of the object
-                    name_list.append(str(id))
-
-        # log the ids
-        LOG.debug(f"FetchListMessage.handle_message {name_list=}")
-        msg = ObjectList(token=self.message.get(MessageAttribute.WS_ATTR_TOKEN))
-        msg.message |= {MessageAttribute.WS_ATTR_PAYLOAD: {"objects": name_list}}
-        LOG.debug(f"FetchListMessage.handle_message {msg=}")
-        await connection.send_message(msg)
-
-
-class ObjectList(Message):
-    "Message containing a list of business objects"
-
-    @classmethod
-    def message_type(cls) -> MessageType:
-        return MessageType.WS_TYPE_OBJECT_LIST
+                boList = BOList(
+                    bo_type=my_type,
+                    connection=connection,
+                )
+                assert isinstance(
+                    boList, BOList
+                ), "BOList should be a subclass of BOList"
+                await boList.notify_subscribers()
