@@ -16,7 +16,7 @@ LOG = getLogger(__name__)
 
 # pylint: disable=wrong-import-position
 
-from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOInt, BODatetime
+from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOId, BOInt, BODatetime
 from database.sql import SQL, SQLTransaction
 from database.sql_statement import CreateTable
 from database.sql_expression import Eq, Filter, SQLExpression, Value
@@ -182,16 +182,6 @@ class BOBase(BOBaseBase):
     async def sql_create_table(cls):
         "Create a DB table for this class"
         raise NotImplementedError("sql_create_table not implemented")
-        attributes = cls.attribute_descriptions()
-        async with SQLTransaction() as txaction:
-            # create_table: CreateTable = txaction.sql().create_table(cls.table)
-            s = txaction.sql()
-            create_table: CreateTable = s.create_table(cls.table)
-            # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
-            for name, data_type, constraint, pars in attributes:
-                # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
-                create_table.column(name, data_type, constraint, **pars)
-            await create_table.execute()
 
     def convert_from_db(self, value, typ):
         "convert a value of type 'typ' read from the DB"
@@ -216,24 +206,11 @@ class BOBase(BOBaseBase):
     async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
         raise NotImplementedError("count_rows not implemented")
-        async with SQL() as sql:
-            select = sql.select(["count(*) as count"]).from_(cls.table)
-            if conditions:
-                select.where(Filter(conditions))
-            result = await (await select.execute()).fetchone()
-        # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
-        return result["count"]
 
     @classmethod
     async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
         raise NotImplementedError("get_matching_ids not implemented")
-        async with SQL() as sql:
-            select = sql.select(["id"]).from_(cls.table)
-            select.where(Filter(conditions))
-            result = await (await select.execute()).fetchall()
-        # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
-        return [id["id"] for id in result]
 
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
@@ -241,26 +218,6 @@ class BOBase(BOBaseBase):
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
-        # LOG.debug(f'BOBase.fetch({id=}, {newest=})')
-        if id is None:
-            id = self.id
-        if id is None and newest is None:
-            LOG.debug(f"fetching {self} without id or newest")
-            return self
-        # LOG.debug(f"fetching {self} with {id=}, {newest=}")
-
-        async with SQL() as sql:
-            select = sql.select([], True).from_(self.table)
-            if id is not None:
-                select.where(Eq("id", id))
-            elif newest:
-                select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-            self._db_data = await (await select.execute()).fetchone()
-
-        if self._db_data:
-            # LOG.debug(f"BOBase.fetch: {self._db_data=}")
-            for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
-                self._data[attr] = self.convert_from_db(self._db_data.get(attr), typ)
         return self
 
     async def store(self):
@@ -288,46 +245,15 @@ class BOBase(BOBaseBase):
         if callback_id in cls._creation_subscribers:
             del cls._creation_subscribers[callback_id]
         else:
-            await self._update_self()
+            LOG.warning(
+                f"Callback id {callback_id} not found in creation subscribers: {cls._creation_subscribers}"
+            )
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
 
-        async with SQLTransaction() as txaction:
-            self.id = (
-                await (
-                    await (
-                        txaction.sql()
-                        .insert(self.table)
-                        .rows(
-                            [
-                                (k, v)
-                                for k, v in self._data.items()
-                                if k != "id" and v is not None
-                            ]
-                        )
-                        .returning("id")
-                    ).execute()
-                ).fetchone()
-            ).get("id")
-
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
-        async with SQLTransaction() as txaction:
-            value_class = Value
-            update = txaction.sql().update(self.table).where(Eq("id", self.id))
-            changes = False
-            for k, v in self._data.items():
-                if k != "id" and v != self.convert_from_db(
-                    self._db_data.get(k), self.attributes_as_dict()[k]
-                ):
-                    changes = True
-                    update.assignment(k, value_class(k, v))
-            try:
-                if changes:
-                    await update.execute()
-            finally:
-                await self.fetch()
 
 
 log_exit(LOG)

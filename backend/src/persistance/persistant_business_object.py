@@ -8,9 +8,10 @@ from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
+from database.sql import SQL, SQLTransaction
 from database.sql_executable import SQLExecutable
 from database.sql_expression import Eq, Filter, SQLExpression
-from database.sql_statement import CreateTable, SQL, Value
+from database.sql_statement import CreateTable, Value
 from persistance.business_object_base import BOBase
 
 
@@ -22,30 +23,34 @@ class PersistentBusinessObject(BOBase):
     async def sql_create_table(cls):
         "Create a DB table for this class"
         attributes = cls.attribute_descriptions()
-        sql: CreateTable = SQL().create_table(cls.table)
-        LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
-        for name, data_type, constraint, pars in attributes:
-            LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
-            sql.column(name, data_type, constraint, **pars)
-        await sql.execute(close=0)
+        async with SQLTransaction() as txaction:
+            # create_table: CreateTable = txaction.sql().create_table(cls.table)
+            s = txaction.sql()
+            create_table: CreateTable = s.create_table(cls.table)
+            # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+            for name, data_type, constraint, pars in attributes:
+                # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
+                create_table.column(name, data_type, constraint, **pars)
+            await create_table.execute()
 
     @classmethod
     async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
-        sql = SQL().select(["count(*) as count"]).from_(cls.table)
-        if conditions:
-            sql.where(Filter(conditions))
-        result = await (await sql.execute(close=1)).fetchone()
+        async with SQL() as sql:
+            select = sql.select(["count(*) as count"]).from_(cls.table)
+            if conditions:
+                select.where(Filter(conditions))
+            result = await (await select.execute()).fetchone()
         # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
         return result["count"]
 
     @classmethod
     async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
-        sql = SQL().select(["id"]).from_(cls.table)
-        if conditions:
-            sql.where(Filter(conditions))
-        result = await (await sql.execute(close=1)).fetchall()
+        async with SQL() as sql:
+            select = sql.select(["id"]).from_(cls.table)
+            select.where(Filter(conditions))
+            result = await (await select.execute()).fetchall()
         # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
 
@@ -63,14 +68,16 @@ class PersistentBusinessObject(BOBase):
             return self
         # LOG.debug(f"fetching {self} with {id=}, {newest=}")
 
-        sql = SQL().select([], True).from_(self.table)
-        if id is not None:
-            sql.where(Eq("id", id))
-        elif newest:
-            sql.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-        self._db_data = await (await sql.execute(close=1)).fetchone()
+        async with SQL() as sql:
+            select = sql.select([], True).from_(self.table)
+            if id is not None:
+                select.where(Eq("id", id))
+            elif newest:
+                select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
+            self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
+            # LOG.debug(f"BOBase.fetch: {self._db_data=}")
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
                 self._data[attr] = self.convert_from_db(self._db_data.get(attr), typ)
         return self
@@ -88,35 +95,38 @@ class PersistentBusinessObject(BOBase):
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
 
-        self.id = (
-            await (
+        async with SQLTransaction() as txaction:
+            self.id = (
                 await (
-                    SQL()
-                    .insert(self.table)
-                    .rows(
-                        [
-                            (k, v)
-                            for k, v in self._data.items()
-                            if k != "id" and v is not None
-                        ]
-                    )
-                    .returning("id")
-                ).execute(close=1, commit=True)
-            ).fetchone()
-        ).get("id")
+                    await (
+                        txaction.sql()
+                        .insert(self.table)
+                        .rows(
+                            [
+                                (k, v)
+                                for k, v in self._data.items()
+                                if k != "id" and v is not None
+                            ]
+                        )
+                        .returning("id")
+                    ).execute()
+                ).fetchone()
+            ).get("id")
 
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
-        sql: SQLExecutable = SQL().update(self.table).where(Eq("id", self.id))
-        changes = False
-        for k, v in self._data.items():
-            if k != "id" and v != self.convert_from_db(
-                self._db_data.get(k), self.attributes_as_dict()[k]
-            ):
-                changes = True
-                sql.assignment(k, Value(k, v))
-        try:
-            if changes:
-                await sql.execute(close=0, commit=True)
-        finally:
-            await self.fetch()
+        async with SQLTransaction() as txaction:
+            value_class = Value
+            update = txaction.sql().update(self.table).where(Eq("id", self.id))
+            changes = False
+            for k, v in self._data.items():
+                if k != "id" and v != self.convert_from_db(
+                    self._db_data.get(k), self.attributes_as_dict()[k]
+                ):
+                    changes = True
+                    update.assignment(k, value_class(k, v))
+            try:
+                if changes:
+                    await update.execute()
+            finally:
+                await self.fetch()
