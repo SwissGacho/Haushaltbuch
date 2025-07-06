@@ -1,4 +1,4 @@
-""" Testsuite testing the importing of the aiomysql library """
+"""Testsuite testing the importing of the aiomysql library"""
 
 import sys, types
 import unittest
@@ -22,23 +22,22 @@ def setUpModule() -> None:
         if mod in sys.modules:
             del sys.modules[mod]
 
-    remove("db.mysql")
+    remove("database.dbms.mysql")
     remove("aiomysql")
 
 
-@unittest.skip("implementation pending")
 class MySQLImport(unittest.TestCase):
 
     def test_101_successful_import(self):
         with patch.dict("sys.modules", {"aiomysql": types.ModuleType("aiomysql")}):
-            import database.mysql
+            import database.dbms.mysql
 
-            self.assertIsNone(database.mysql.AIOMYSQL_IMPORT_ERROR)
+            self.assertIsNone(database.dbms.mysql.AIOMYSQL_IMPORT_ERROR)
 
     def test_101_failed_aiomysql_import(self):
         with patch.dict("sys.modules", {"aiomysql": None}):
-            import database.mysql
+            import database.dbms.mysql
 
             self.assertIsInstance(
-                database.mysql.AIOMYSQL_IMPORT_ERROR, ModuleNotFoundError
+                database.dbms.mysql.AIOMYSQL_IMPORT_ERROR, ModuleNotFoundError
             )

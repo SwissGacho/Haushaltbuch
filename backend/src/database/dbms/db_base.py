@@ -1,13 +1,16 @@
 """Base class for DB connections"""
 
+from typing import Any
+import re
+import json
+
 from core.app_logging import getLogger, log_exit
-from .sql_executable import SQLExecutable
+from core.base_objects import DBBaseClass, ConnectionBaseClass
+from database.sql import SQL
+from database.sql_statement import SQLTemplate
+from database.sql_clause import SQLColumnDefinition
 
 LOG = getLogger(__name__)
-
-from core.base_objects import DBBaseClass
-from database.sql_statement import SQL, SQLTemplate
-from database.sql_clause import SQLColumnDefinition
 
 
 class DB(DBBaseClass):
@@ -52,13 +55,16 @@ class DB(DBBaseClass):
         return True
 
     async def _get_table_info(self, table_name: str) -> dict[str, str]:
+        LOG.debug(f"DB._get_table_info({table_name=})")
+        async with SQL() as sql:
+            table_info = await (
+                await sql.script(SQLTemplate.TABLEINFO, table=table_name).execute()
+            ).fetchall()
         return {
             c["column_name"]: " ".join(
                 [c["column_name"], c["column_type"], c["constraint"], c["params"]]
             )
-            for c in await (
-                await SQL().script(SQLTemplate.TABLEINFO, table=table_name).execute()
-            ).fetchall()
+            for c in table_info
         }
 
     async def check_table(self, obj: "BOBase"):
@@ -76,33 +82,42 @@ class DB(DBBaseClass):
         LOG.debug(f"Check table '{obj.table}': {'OK'if ok else 'FAIL'}")
         return ok
 
-    async def connect(self):
+    async def connect(self) -> "Connection":
         "Open a connection and return the Connection instance"
         raise ConnectionError("Called from DB base class.")
 
-    async def execute(self, query: str, params=None, close=False, commit=False):
+    async def execute(
+        self,
+        query: str,
+        params=None,
+        connection: "Connection" = None,
+    ):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
-        # LOG.debug(f"execute: {query=}, {params=}, {close=}, {commit=}")
-        return await (await self.connect()).execute(
-            query=query, params=params, close=close, commit=commit
+        # LOG.debug(f"DB.execute: {query=}, {params=}, {close=}, {commit=} {connection=}")
+        return await (connection or await self.connect()).execute(
+            query=query, params=params
         )
 
     async def close(self):
         "close all activities"
-        for con in [c for c in self._connections]:
-            await con.close()
+        if self._connections:
+            LOG.warning(
+                f"DB.close: closing {len(self._connections)} unclosed connections"
+            )
+            for con in [c for c in self._connections]:
+                await con.close()
 
 
-class Connection:
+class Connection(ConnectionBaseClass):
     "Connection to the DB"
 
-    def __init__(self, db_obj: DB, commit=False, **cfg) -> None:
+    def __init__(self, db_obj: DB, **cfg) -> None:
         self._cfg = cfg
         self._connection = None
         self._db = db_obj
         self._db._connections.add(self)
-        self._commit = commit
+        # LOG.debug(f"++++++++++++++++++++++++++++++ {self._db._connections=}")
 
     async def connect(self):
         "Open a connection and return the Connection instance"
@@ -111,19 +126,18 @@ class Connection:
     async def close(self):
         "close the connection"
         if self._connection:
-            if self._commit:
-                await self.commit()
-            # LOG.debug("close connection")
+            # LOG.debug("Connection.close: closing connection")
             await self._connection.close()
             self._db._connections.remove(self)
             self._connection = None
+            # LOG.debug(f"------------------------------- {self._db._connections=}")
 
     @property
     def connection(self):
         "'real' DB connection"
         return self._connection
 
-    async def execute(self, query: str, params=None, close=False, commit=False):
+    async def execute(self, query: str, params=None):
         """execute an SQL statement and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
         raise ConnectionError("Called from DB base class.")
@@ -133,6 +147,11 @@ class Connection:
         # LOG.debug("commit connection")
         await self._connection.commit()
 
+    async def rollback(self):
+        "rollback current transaction"
+        # LOG.debug("rollback connection")
+        await self._connection.rollback()
+
     def __repr__(self) -> str:
         return f"connection: {self._connection}"
 
@@ -140,54 +159,61 @@ class Connection:
 class Cursor:
     "query cursor"
 
-    def __init__(self, cur=None, con=None, close=False) -> None:
+    def __init__(self, cur=None, con=None) -> None:
         self._cursor = cur
         self._connection = con
         self._rowcount = None
-        self._close = close
 
-    async def execute(self, query: str, params=None, close: bool | int = False):
-        """execute an SQL statement and return the Cursor instance (self).
-        If 'close'=True close connection after fetching all rows
-        If 'close'=1 close connection after fetching one row
-        If 'close'=0 close connection immediatly (used for stetemants w/o result)"""
+    def convert_params_named_2_format(
+        self, query, params, dump_json: bool = False
+    ) -> tuple[str, tuple[Any, ...]]:
+        param_order = []
+
+        def replacer(match):
+            key = match.group(1)
+            if key not in params:
+                raise ValueError(f"Fehlender Parameter: {key}")
+            param = params[key]
+            if dump_json and isinstance(param, (dict, list)):
+                param = json.dumps(param)
+            elif isinstance(param, str):
+                param = param.replace("'", "''")
+            param_order.append(param)
+            return "%s"
+
+        converted_query = re.sub(r":(\w+)", replacer, query)
+        return converted_query, tuple(param_order)
+
+    async def execute(self, query: str, params=None):
+        """execute an SQL statement and return the Cursor instance (self)."""
         raise ConnectionError("Called from DB base class.")
 
     @property
     async def rowcount(self):
         return self._rowcount
 
-    async def fetchone(self, commit=False):
+    async def fetchone(self):
         "fetch the next row"
+        # LOG.debug(f"Cursor.fetchone()")
         result = await self._cursor.fetchone()
-        if self._close == 1:
-            if commit:
-                self._connection._commit = commit
-            await self.close()
-            await self._connection.close()
+        # LOG.debug(f"   Cursor.fetchone: {result=}")
         return result
 
-    async def fetchall(self, commit=False):
+    async def fetchall(self):
         "fetch all remaining rows from cursor"
+        # LOG.debug(f"Cursor.fetchall()")
         result = await self._cursor.fetchall()
-        if self._close:
-            if commit:
-                self._connection._commit = commit
-            await self.close()
-            await self._connection.close()
         return result
 
     async def __aiter__(self):
         "row generator to support the iterator protocol"
         while col := await self.fetchone() is not None:
             yield col
-        if self._close:
-            await self._connection.close()
         raise StopIteration
 
     async def close(self):
         "close the cursor"
-        # LOG.debug("close cursor")
+        # LOG.debug("Cursor.close: close cursor")
         if self._cursor:
             await self._cursor.close()
             self._cursor = None
