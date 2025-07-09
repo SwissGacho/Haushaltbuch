@@ -1,6 +1,5 @@
 from logging import Logger
 from persistance.bo_list import BOList
-from persistance.business_object_base import BOBase
 from messages.message import Message, MessageAttribute, MessageType
 from core.app_logging import getLogger
 
@@ -15,19 +14,11 @@ class FetchListMessage(Message):
         return MessageType.WS_TYPE_FETCH_LIST
 
     async def handle_message(self, connection):
-        business_objects: dict[str, type["BOBase"]] = BOBase.all_business_objects
-        object_type = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
-        for name in business_objects:
+        object_type_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
 
-            # right now we just assume every BO is a root tree object
-            if name == object_type:
-                my_type = business_objects[name]
-                assert issubclass(my_type, BOBase)
-                boList = BOList(
-                    bo_type=my_type,
-                    connection=connection,
-                )
-                assert isinstance(
-                    boList, BOList
-                ), "BOList should be a subclass of BOList"
-                await boList.notify_subscribers()
+        # Maybe the connection should have a method that creates a BOList?
+        BOList(
+            bo_type=object_type_name,
+            connection=connection,
+            notify_subscribers_on_init=True,
+        )

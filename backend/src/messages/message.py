@@ -5,9 +5,8 @@ from enum import StrEnum
 from json import dumps, loads
 from typing import Any, Optional
 from core.base_objects import BaseObject
-from server.ws_token import WSToken
 from core.app_logging import getLogger
-import messages
+from server.ws_token import WSToken
 
 LOG = getLogger(__name__)
 

@@ -14,6 +14,18 @@ from core.app_logging import getLogger
 LOG: Logger = getLogger(__name__)
 
 
+JSONAble: TypeAlias = Union[
+    str,
+    int,
+    bool,
+    NoneType,
+    dict[str, "JSONAble"],
+    list["JSONAble"],
+    BaseObject,
+    pathlib.Path,
+]
+
+
 class DataObjectTypes(StrEnum):
     DO_TYPE_SETUP_CONFIG = "setup_config"
 
@@ -27,18 +39,6 @@ class FetchMessage(Message):
 
     async def handle_message(self, connection):
         "handle a fetch message"
-
-
-JSONAble: TypeAlias = Union[
-    str,
-    int,
-    bool,
-    NoneType,
-    dict[str, "JSONAble"],
-    list["JSONAble"],
-    BaseObject,
-    pathlib.Path,
-]
 
 
 class ObjectMessage(Message):
@@ -58,8 +58,10 @@ class ObjectMessage(Message):
     ) -> None:
         self.message = {}
         super().__init__(token=token, status=status)
-        self.message |= {
-            MessageAttribute.WS_ATTR_OBJECT: object_type,
-            MessageAttribute.WS_ATTR_INDEX: index,
-            MessageAttribute.WS_ATTR_PAYLOAD: payload,
-        }
+        self.add(
+            {
+                MessageAttribute.WS_ATTR_OBJECT: object_type,
+                MessageAttribute.WS_ATTR_INDEX: index,
+                MessageAttribute.WS_ATTR_PAYLOAD: payload,
+            }
+        )

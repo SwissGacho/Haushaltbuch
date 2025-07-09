@@ -4,18 +4,19 @@ import websockets
 
 import core.exceptions
 from core.app import App
+from core.app_logging import getLogger
+from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 from server.ws_token import WSToken
 from messages.message import Message, MessageAttribute
 from messages.login import HelloMessage, ByeMessage, LoginMessage
 from messages.admin import EchoMessage
 from messages.setup import FetchSetupMessage, StoreSetupMessage
-from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
 
-class WS_Connection:
+class WS_Connection(WSConnectionBase):
     """Websocket connection created by the client"""
 
     connections: dict[str, "WS_Connection"] = {}

@@ -4,7 +4,6 @@ Business objects are classes that support persistance in the data base
 """
 
 from asyncio import Task, get_running_loop
-from re import sub
 from typing import Any, Coroutine, TypeAlias, Optional, Callable
 import copy
 import json

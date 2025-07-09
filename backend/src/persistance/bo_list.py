@@ -7,6 +7,7 @@
 
 from typing import Type
 from core.app_logging import getLogger
+import asyncio
 
 # from server.ws_connection import WS_Connection
 from messages.message import MessageAttribute
@@ -14,6 +15,7 @@ from messages.message import MessageAttribute
 from messages.object_list import ObjectList
 from persistance.business_object_base import BOBase
 from persistance.transient_business_object import TransientBusinessObject
+from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 
 
@@ -23,15 +25,30 @@ LOG = getLogger(__name__)
 class BOList(TransientBusinessObject, WSMessageSender):
     """Represents a list of business objects of a certain type. The list subscribes to events of the business object type and updates its own subscribers accordingly."""
 
-    def __init__(self, bo_type: Type[BOBase], connection) -> None:
-        print(f"BOList.__init__({bo_type=}, {connection=})")
-        LOG.debug(f"===============================================")
-        LOG.debug(f"BOList.__init__({bo_type=}, {connection=})")
+    def __init__(
+        self,
+        bo_type: Type[BOBase] | str,
+        connection: WSConnectionBase,
+        notify_subscribers_on_init: bool = False,
+    ) -> None:
+        # print(f"BOList.__init__({bo_type=}, {connection=})")
+        # LOG.debug(f"===============================================")
+        # LOG.debug(f"BOList.__init__({bo_type=}, {connection=})")
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
-        LOG.debug(f"BOList super called")
+        if bo_type is str:
+            try:
+                bo_type = BOBase.get_business_object_by_name(bo_type)
+            except ValueError as e:
+                LOG.error(
+                    f"BOList.__init__: Invalid business object type {bo_type}: {e}"
+                )
+                raise e
+        assert isinstance(bo_type, type) and issubclass(bo_type, BOBase)
         self._bo_type = bo_type
         self._subscription_id = self._bo_type.subscribe_to_creation(self._handle_event_)
+        if notify_subscribers_on_init:
+            asyncio.create_task(self.notify_subscribers())
 
     async def _get_objects_(self):
         rslt = await self._bo_type.get_matching_ids()
@@ -54,7 +71,7 @@ class BOList(TransientBusinessObject, WSMessageSender):
         LOG.debug(f"BOList.update_subscribers {msg=}")
         await self.send_message(msg)
 
-    def handle_connection_closed(self):
-        LOG.debug(f"BOList.handle_connection_closed({self._connection})")
+    def cleanup(self):
+        LOG.debug(f"BOList.cleanup({self._connection})")
         LOG.debug(f"{self._subscription_id=}, {self._bo_type=}")
         self._bo_type.unsubscribe_from_creation(self._subscription_id)
