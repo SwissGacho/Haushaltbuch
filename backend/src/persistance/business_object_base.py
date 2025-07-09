@@ -132,6 +132,13 @@ class BOBase(BOBaseBase):
         return self._business_objects
 
     @classmethod
+    def get_business_object_by_name(cls, name: str) -> type["BOBase"]:
+        "Get a business object class by its name"
+        if name in cls._business_objects:
+            return cls._business_objects[name]
+        raise ValueError(f"No type of business object with name '{name}' found")
+
+    @classmethod
     def _name(cls) -> str:
         return cls.__name__.lower()
 
