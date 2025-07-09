@@ -109,6 +109,7 @@ class Message(BaseObject):
         msg_type: MessageType | None = MessageType.WS_TYPE_NONE,
         token: WSToken | None = None,
         status: str | None = None,
+        **kwargs,
     ) -> None:
         if json_message and isinstance(json_message, str):
             self.message = loads(json_message)
@@ -123,6 +124,7 @@ class Message(BaseObject):
             }
             if status:
                 self.message |= {MessageAttribute.WS_ATTR_STATUS: status}
+        self.add(kwargs)
 
     @classmethod
     def message_type(cls) -> MessageType:
@@ -147,7 +149,7 @@ class Message(BaseObject):
         return val if isinstance(val, dict) else None
 
     def add(self, attrs: dict):
-        "Add items to the payload"
+        "Add items to the message root that will be serialized and sent via websocket"
         self.message |= attrs
 
     def serialize(self):
