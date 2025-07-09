@@ -2,7 +2,6 @@
 
 import datetime
 from enum import auto
-from re import M
 import unittest
 
 import persistance.bo_descriptors

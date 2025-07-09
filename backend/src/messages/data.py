@@ -1,19 +1,29 @@
-""" Messages to request and send business objects
-"""
+"""Messages to request and send business objects"""
 
+from logging import Logger
 from types import NoneType
-from typing import TypeAlias, Optional, Union
+from typing import TypeAlias, Union
 from enum import StrEnum
 import pathlib
 
 from server.ws_token import WSToken
 from messages.message import Message, MessageType, MessageAttribute
-from core.app import App
-from core.configuration.config import Config
 from core.base_objects import BaseObject
 from core.app_logging import getLogger
 
-LOG = getLogger(__name__)
+LOG: Logger = getLogger(__name__)
+
+
+JSONAble: TypeAlias = Union[
+    str,
+    int,
+    bool,
+    NoneType,
+    dict[str, "JSONAble"],
+    list["JSONAble"],
+    BaseObject,
+    pathlib.Path,
+]
 
 
 class DataObjectTypes(StrEnum):
@@ -31,18 +41,6 @@ class FetchMessage(Message):
         "handle a fetch message"
 
 
-JSONAble: TypeAlias = Union[
-    str,
-    int,
-    bool,
-    NoneType,
-    dict[str, "JSONAble"],
-    list["JSONAble"],
-    BaseObject,
-    pathlib.Path,
-]
-
-
 class ObjectMessage(Message):
     "Message containing a single requested business object"
 
@@ -53,29 +51,17 @@ class ObjectMessage(Message):
     def __init__(
         self,
         object_type: DataObjectTypes,
-        index: Optional[int | str],
+        index: int | str | None,
         payload: JSONAble,
-        token: Optional[WSToken] = None,
-        status: str = None,
+        token: WSToken | None = None,
+        status: str | None = None,
     ) -> None:
         self.message = {}
-        super().__init__(
-            msg_type=self.__class__.message_type(), token=token, status=status
+        super().__init__(token=token, status=status)
+        self.add(
+            {
+                MessageAttribute.WS_ATTR_OBJECT: object_type,
+                MessageAttribute.WS_ATTR_INDEX: index,
+                MessageAttribute.WS_ATTR_PAYLOAD: payload,
+            }
         )
-        self.message |= {
-            MessageAttribute.WS_ATTR_OBJECT: object_type,
-            MessageAttribute.WS_ATTR_INDEX: index,
-            MessageAttribute.WS_ATTR_PAYLOAD: payload,
-        }
-
-
-class StoreMessage(Message):
-    "Business object to be stored in the DB"
-
-    @classmethod
-    def message_type(cls) -> MessageType:
-        return MessageType.WS_TYPE_STORE
-
-    async def handle_message(self, connection):
-        "Handle a StoreMessage"
-        LOG.debug(f"StoreMessage.handle_message {self.message=}")

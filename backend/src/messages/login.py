@@ -66,7 +66,10 @@ class WelcomeMessage(Message):
     "provide session token after successful login"
 
     def __init__(
-        self, token: WSToken, ses_token: WSToken = None, status: str = None
+        self,
+        token: WSToken,
+        ses_token: WSToken | None = None,
+        status: str | None = None,
     ) -> None:
         super().__init__(
             msg_type=MessageType.WS_TYPE_WELCOME, token=token, status=status
@@ -78,7 +81,10 @@ class ByeMessage(Message):
     "provide info why the connection will now be closed"
 
     def __init__(
-        self, token: WSToken = None, reason: str = "Error", status: str = None
+        self,
+        token: WSToken | None = None,
+        reason: str | None = "Error",
+        status: str | None = None,
     ) -> None:
         super().__init__(msg_type=MessageType.WS_TYPE_BYE, token=token, status=status)
         self.message |= {MessageAttribute.WS_ATTR_REASON: reason}
