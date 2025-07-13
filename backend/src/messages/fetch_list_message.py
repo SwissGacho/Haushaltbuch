@@ -1,5 +1,5 @@
 from logging import Logger
-from persistance.bo_list import BOList
+from business_objects.bo_list import BOList
 from messages.message import Message, MessageAttribute, MessageType
 from core.app_logging import getLogger
 

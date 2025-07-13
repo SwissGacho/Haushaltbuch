@@ -12,8 +12,8 @@ from database.sql_factory import SQLFactory
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript, Insert, Update
 from database.sql_clause import SQLColumnDefinition
-from persistance.bo_descriptors import BOColumnFlag, BOBaseBase
-from persistance.business_attribute_base import BaseFlag
+from business_objects.bo_descriptors import BOColumnFlag, BOBaseBase
+from business_objects.business_attribute_base import BaseFlag
 
 from core.app_logging import getLogger
 

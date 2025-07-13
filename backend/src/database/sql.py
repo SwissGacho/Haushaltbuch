@@ -19,7 +19,7 @@ from database.sql_statement import (
     Select,
     Update,
 )
-from persistance.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnFlag
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)

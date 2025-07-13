@@ -2,8 +2,8 @@
 
 from logging import Logger
 from core.app_logging import getLogger
-from persistance.bo_descriptors import BORelation
-from persistance.business_object_base import BOBase
+from business_objects.bo_descriptors import BORelation
+from business_objects.business_object_base import BOBase
 from messages.message import Message, MessageAttribute, MessageType
 from server.ws_connection_base import WSConnectionBase
 

@@ -4,10 +4,10 @@ import datetime
 from enum import auto
 import unittest
 
-import persistance.bo_descriptors
+import business_objects.bo_descriptors
 
 
-class MockAttr(persistance.bo_descriptors._PersistantAttr):
+class MockAttr(business_objects.bo_descriptors._PersistantAttr):
     @classmethod
     def data_type(cls):
         return str
@@ -53,7 +53,7 @@ class Test_100__PersistantAttr(unittest.TestCase):
             (
                 "mock_attr",
                 str,
-                persistance.bo_descriptors.BOColumnFlag.BOC_NONE,
+                business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
                 {},
             ),
         )
@@ -69,38 +69,39 @@ class Test_100__PersistantAttr(unittest.TestCase):
         self.assertEqual(mock_bo2.mock_attr, "value2")
 
 
-class MockRel(persistance.bo_descriptors.BOBaseBase):
+class MockRel(business_objects.bo_descriptors.BOBaseBase):
     pass
 
 
-class MockNotRel(persistance.bo_descriptors.BOBaseBase):
+class MockNotRel(business_objects.bo_descriptors.BOBaseBase):
     pass
 
 
-class MockFlag(persistance.bo_descriptors.BaseFlag):
+class MockFlag(business_objects.bo_descriptors.BaseFlag):
     FLAG_1 = auto()
     FLAG_2 = auto()
 
 
-class MockObj(persistance.bo_descriptors.BOBaseBase):
+class MockObj(business_objects.bo_descriptors.BOBaseBase):
     _attributes = {"MockObj": []}
     _data = {}
-    int_attr = persistance.bo_descriptors.BOInt(
-        persistance.bo_descriptors.BOColumnFlag.BOC_PK_INC
+    int_attr = business_objects.bo_descriptors.BOInt(
+        business_objects.bo_descriptors.BOColumnFlag.BOC_PK_INC
     )
-    str_attr = persistance.bo_descriptors.BOStr(
-        persistance.bo_descriptors.BOColumnFlag.BOC_NOT_NULL
+    str_attr = business_objects.bo_descriptors.BOStr(
+        business_objects.bo_descriptors.BOColumnFlag.BOC_NOT_NULL
     )
-    dt_attr = persistance.bo_descriptors.BODatetime(
-        persistance.bo_descriptors.BOColumnFlag.BOC_DEFAULT_CURR
+    dt_attr = business_objects.bo_descriptors.BODatetime(
+        business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT_CURR
     )
-    d_attr = persistance.bo_descriptors.BODate()
-    dict_attr = persistance.bo_descriptors.BODict(
-        persistance.bo_descriptors.BOColumnFlag.BOC_DEFAULT, default={"a": 1, "b": 2}
+    d_attr = business_objects.bo_descriptors.BODate()
+    dict_attr = business_objects.bo_descriptors.BODict(
+        business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT,
+        default={"a": 1, "b": 2},
     )
-    list_attr = persistance.bo_descriptors.BOList()
-    rel_attr = persistance.bo_descriptors.BORelation(MockRel)
-    flag_attr = persistance.bo_descriptors.BOFlag(flag_type=MockFlag)
+    list_attr = business_objects.bo_descriptors.BOList()
+    rel_attr = business_objects.bo_descriptors.BORelation(MockRel)
+    flag_attr = business_objects.bo_descriptors.BOFlag(flag_type=MockFlag)
 
     @classmethod
     def add_attribute(cls, attribute_name, data_type, constraint_flag, **flag_values):
@@ -111,37 +112,42 @@ class MockObj(persistance.bo_descriptors.BOBaseBase):
 
 expected_attributes = {
     "MockObj": [
-        ("int_attr", int, persistance.bo_descriptors.BOColumnFlag.BOC_PK_INC, {}),
-        ("str_attr", str, persistance.bo_descriptors.BOColumnFlag.BOC_NOT_NULL, {}),
+        ("int_attr", int, business_objects.bo_descriptors.BOColumnFlag.BOC_PK_INC, {}),
+        (
+            "str_attr",
+            str,
+            business_objects.bo_descriptors.BOColumnFlag.BOC_NOT_NULL,
+            {},
+        ),
         (
             "dt_attr",
             datetime.datetime,
-            persistance.bo_descriptors.BOColumnFlag.BOC_DEFAULT_CURR,
+            business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT_CURR,
             {},
         ),
         (
             "d_attr",
             datetime.date,
-            persistance.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
             {},
         ),
         (
             "dict_attr",
             dict,
-            persistance.bo_descriptors.BOColumnFlag.BOC_DEFAULT,
+            business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT,
             {"default": {"a": 1, "b": 2}},
         ),
-        ("list_attr", list, persistance.bo_descriptors.BOColumnFlag.BOC_NONE, {}),
+        ("list_attr", list, business_objects.bo_descriptors.BOColumnFlag.BOC_NONE, {}),
         (
             "rel_attr",
-            persistance.bo_descriptors.BOBaseBase,
-            persistance.bo_descriptors.BOColumnFlag.BOC_FK,
+            business_objects.bo_descriptors.BOBaseBase,
+            business_objects.bo_descriptors.BOColumnFlag.BOC_FK,
             {"relation": MockRel},
         ),
         (
             "flag_attr",
-            persistance.bo_descriptors.BaseFlag,
-            persistance.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.BaseFlag,
+            business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
             {"flag_type": MockFlag},
         ),
     ]

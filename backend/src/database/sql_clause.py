@@ -6,7 +6,7 @@ from typing import Self
 
 from database.sql_executable import SQLExecutable, SQLManagedExecutable
 from database.sql_expression import ColumnName, Row, SQLExpression, Value
-from persistance.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnFlag
 
 from core.app_logging import getLogger
 

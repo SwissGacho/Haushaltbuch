@@ -8,7 +8,7 @@ from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
-from persistance.business_attribute_base import BaseFlag
+from business_objects.business_attribute_base import BaseFlag
 
 
 class BOColumnFlag(Flag):

@@ -151,12 +151,10 @@ class WS_Connection(WSConnectionBase):
             return True
 
     async def abort_connection(
-        self, reason: str | None = None, token: WSToken | None = None, status=False
+        self, reason: str | None = None, token: WSToken | None = None
     ):
         "say goodbye"
-        await self.send_message(
-            ByeMessage(token=token, reason=reason, status=str(status))
-        )
+        await self.send_message(ByeMessage(token=token, reason=reason))
         raise core.exceptions.ConnectionClosed(f"Connection aborted ({reason})")
 
     def connection_closed(self):

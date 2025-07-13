@@ -10,8 +10,8 @@ from database.sql_statement import CreateTable, CreateView, Insert, SQLStatement
 from database.sql_clause import SQLColumnDefinition
 from core.base_objects import ConnectionBaseClass
 from core.exceptions import InvalidSQLStatementException
-from persistance.bo_descriptors import BOBaseBase, BOColumnFlag
-from persistance.business_attribute_base import BaseFlag
+from business_objects.bo_descriptors import BOBaseBase, BOColumnFlag
+from business_objects.business_attribute_base import BaseFlag
 
 
 class MockColumnDefinition(SQLColumnDefinition):

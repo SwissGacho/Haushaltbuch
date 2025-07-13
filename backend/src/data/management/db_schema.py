@@ -4,8 +4,8 @@ from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
-from persistance.persistant_business_object import PersistentBusinessObject
-from persistance.bo_descriptors import BOInt
+from business_objects.persistant_business_object import PersistentBusinessObject
+from business_objects.bo_descriptors import BOInt
 
 
 class DBSchema(PersistentBusinessObject):

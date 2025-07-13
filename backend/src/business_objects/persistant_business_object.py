@@ -3,21 +3,53 @@
 Persistent Business Objects are stored in the database and represent the
 application's data model."""
 
+import copy
+import json
 from typing import Optional
 from core.app_logging import getLogger
+from datetime import date, datetime, UTC
 
 LOG = getLogger(__name__)
 
+from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
-from database.sql_executable import SQLExecutable
 from database.sql_expression import Eq, Filter, SQLExpression
 from database.sql_statement import CreateTable, Value
-from persistance.business_object_base import BOBase
+from business_objects.business_object_base import BOBase
 
 
 class PersistentBusinessObject(BOBase):
     """Base class for persistent Business Objects.
     Every subclass will be registered in a table in the database."""
+
+    @_classproperty
+    def all_business_objects(self) -> dict[str, type["PersistentBusinessObject"]]:
+        "Set of registered Business Objects"
+        return {
+            name: cls
+            for name, cls in BOBase.all_business_objects.items()
+            if issubclass(cls, PersistentBusinessObject)
+        }
+
+    @classmethod
+    def convert_from_db(cls, value, typ):
+        "convert a value of type 'typ' read from the DB"
+        # LOG.debug(f"BOBase.convert_from_db({value=}, {type(value)=}, {typ=})")
+        if value is None:
+            return None
+        if typ == date and isinstance(value, str):
+            return date.fromisoformat(value)
+        if typ == datetime and isinstance(value, str):
+            dt = datetime.fromisoformat(value)
+            if dt.tzinfo in [None, UTC]:
+                dt = dt.replace(tzinfo=UTC).astimezone(tz=None)
+            return dt
+        if typ in [dict, list] and isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError as exc:
+                LOG.error(f"BOBase.convert_from_db: JSONDecodeError: {exc}")
+        return copy.deepcopy(value)
 
     @classmethod
     async def sql_create_table(cls):
@@ -79,7 +111,9 @@ class PersistentBusinessObject(BOBase):
         if self._db_data:
             # LOG.debug(f"BOBase.fetch: {self._db_data=}")
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
-                self._data[attr] = self.convert_from_db(self._db_data.get(attr), typ)
+                self._data[attr] = PersistentBusinessObject.convert_from_db(
+                    self._db_data.get(attr), typ
+                )
         return self
 
     async def store(self):
@@ -120,7 +154,7 @@ class PersistentBusinessObject(BOBase):
             update = txaction.sql().update(self.table).where(Eq("id", self.id))
             changes = False
             for k, v in self._data.items():
-                if k != "id" and v != self.convert_from_db(
+                if k != "id" and v != PersistentBusinessObject.convert_from_db(
                     self._db_data.get(k), self.attributes_as_dict()[k]
                 ):
                     changes = True

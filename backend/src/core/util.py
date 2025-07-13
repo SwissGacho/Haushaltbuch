@@ -7,7 +7,7 @@ from packaging.version import Version
 
 
 from core.base_objects import ConfigDict
-from persistance.bo_descriptors import BODict
+from business_objects.bo_descriptors import BODict
 
 
 class EnvironmentError(Exception):

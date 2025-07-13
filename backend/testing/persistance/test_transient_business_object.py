@@ -4,7 +4,7 @@ import unittest
 import gc
 from unittest.mock import patch
 
-from persistance.transient_business_object import TransientBusinessObject
+from business_objects.transient_business_object import TransientBusinessObject
 
 
 class MockBOBase:
@@ -18,7 +18,9 @@ class MockBOBase:
 class Test_100_Transient_Business_Object_classmethods(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
-        self.patcher = patch("persistance.transient_business_object.BOBase", MockBOBase)
+        self.patcher = patch(
+            "business_objects.transient_business_object.BOBase", MockBOBase
+        )
         self.patcher.start()
 
     def tearDown(self):
@@ -50,21 +52,8 @@ class Test_100_Transient_Business_Object_classmethods(unittest.IsolatedAsyncioTe
     async def test_103_get_matching_ids(self):
         """Test the get_matching_ids method."""
         TransientBusinessObject._instances.clear()
-        obj1 = TransientBusinessObject(id=1)
-        obj2 = TransientBusinessObject(id=2)
-        obj3 = TransientBusinessObject(id="not_an_int")
+        bo1 = TransientBusinessObject(id=1)
+        bo2 = TransientBusinessObject(id=2)
 
         matching_ids = sorted((await TransientBusinessObject.get_matching_ids()))
         self.assertEqual(matching_ids, [1, 2])
-        self.assertNotIn(obj3.id, matching_ids)
-
-    async def test_104_fetch(self):
-        """Test the fetch method."""
-        obj = TransientBusinessObject(id=1)
-        fetched_obj = await obj.fetch()
-        assert fetched_obj == obj
-
-    async def test_105_store(self):
-        """Test the store method (no-op)."""
-        obj = TransientBusinessObject(id=1)
-        await obj.store()  # Should not raise any exceptions

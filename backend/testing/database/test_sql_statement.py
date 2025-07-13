@@ -18,8 +18,8 @@ from database.sql_statement import (
 )
 from database.sql_clause import SQLColumnDefinition
 from database.sql_expression import Eq, And, ColumnName, Value
-from persistance.bo_descriptors import BOBaseBase, BOColumnFlag
-from persistance.business_attribute_base import BaseFlag
+from business_objects.bo_descriptors import BOBaseBase, BOColumnFlag
+from business_objects.business_attribute_base import BaseFlag
 from core.exceptions import InvalidSQLStatementException
 
 

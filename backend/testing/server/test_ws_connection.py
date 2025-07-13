@@ -1,4 +1,4 @@
-""" Test suite for websocket connections """
+"""Test suite for websocket connections"""
 
 import unittest
 from unittest.mock import Mock, AsyncMock, patch
@@ -149,7 +149,6 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         MockByeMessage.assert_called_once_with(
             token=args.get("token"),
             reason=args.get("reason"),
-            status=args.get("status", False),
         )
 
     async def test_104a_abort_connection_no_args(self):
@@ -162,6 +161,4 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         await self._104_abort_connection({"token": "MockToken"})
 
     async def test_104d_abort_connection_with_all_args(self):
-        await self._104_abort_connection(
-            {"status": True, "token": "MockToken", "reason": "MockReason"}
-        )
+        await self._104_abort_connection({"token": "MockToken", "reason": "MockReason"})

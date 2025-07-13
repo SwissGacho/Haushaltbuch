@@ -36,9 +36,7 @@ class WSConnectionBase:
         "say hello and expect Login"
         raise NotImplementedError()
 
-    async def abort_connection(
-        self, reason: str | None = None, token=None, status=False
-    ):
+    async def abort_connection(self, reason: str | None = None, token=None):
         "say goodbye"
         raise NotImplementedError()
 

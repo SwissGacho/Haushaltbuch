@@ -13,8 +13,8 @@ import asyncio
 from messages.message import MessageAttribute
 
 from messages.object_list import ObjectList
-from persistance.business_object_base import BOBase
-from persistance.transient_business_object import TransientBusinessObject
+from business_objects.business_object_base import BOBase
+from business_objects.transient_business_object import TransientBusinessObject
 from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 

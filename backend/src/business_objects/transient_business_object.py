@@ -6,7 +6,7 @@ temporarily hold data during processing or for communication with the frontend."
 from core.app_logging import getLogger
 from typing import Optional
 import weakref
-from persistance.business_object_base import BOBase
+from business_objects.business_object_base import BOBase
 
 LOG = getLogger(__name__)
 

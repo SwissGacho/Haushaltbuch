@@ -21,7 +21,7 @@ from database.sql_expression import (
 )
 from database.sql_key_manager import SQL_Dict
 
-from persistance.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnFlag
 
 from core.exceptions import InvalidSQLStatementException
 

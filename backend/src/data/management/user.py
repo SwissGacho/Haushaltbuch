@@ -6,9 +6,9 @@ from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
-from persistance.business_attribute_base import BaseFlag
-from persistance.persistant_business_object import PersistentBusinessObject
-from persistance.bo_descriptors import BOStr, BOFlag
+from business_objects.business_attribute_base import BaseFlag
+from business_objects.persistant_business_object import PersistentBusinessObject
+from business_objects.bo_descriptors import BOStr, BOFlag
 
 
 class UserRole(BaseFlag):

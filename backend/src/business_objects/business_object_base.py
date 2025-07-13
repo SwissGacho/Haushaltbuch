@@ -3,30 +3,23 @@
 Business objects are classes that support persistance in the data base
 """
 
-from asyncio import Task, get_running_loop
+import asyncio
 from typing import Any, Coroutine, TypeAlias, Optional, Callable
-import copy
-import json
-from datetime import date, datetime, UTC
 
+from core.util import _classproperty
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
 # pylint: disable=wrong-import-position
 
-from persistance.bo_descriptors import BOColumnFlag, BOBaseBase, BOId, BOInt, BODatetime
-from database.sql import SQL, SQLTransaction
-from database.sql_statement import CreateTable
-from database.sql_expression import Eq, Filter, SQLExpression, Value
-
-
-class _classproperty:
-    def __init__(self, fget: Callable) -> None:
-        self.fget = fget
-
-    def __get__(self, owner_self, owner_cls=None):
-        return self.fget(owner_cls)
+from business_objects.bo_descriptors import (
+    BOColumnFlag,
+    BOBaseBase,
+    BOId,
+    BOInt,
+    BODatetime,
+)
 
 
 AttributeDescription: TypeAlias = tuple[str, type, str, dict[str, str | BOBaseBase]]
@@ -64,10 +57,9 @@ class BOBase(BOBaseBase):
         for attribute, value in attributes.items():
             self._data[attribute] = value
 
-        loop = get_running_loop()
         for callback in self._creation_subscribers.values():
             try:
-                task = loop.create_task(
+                task = asyncio.create_task(
                     callback(self),
                     name=f"creation_callback_{callback.__name__}_{self.id}",
                 )
@@ -77,7 +69,7 @@ class BOBase(BOBaseBase):
                     f"Error scheduling creation callback {callback.__name__} for {self!r}"
                 )
 
-    def _handle_callback_result(self, task: Task):
+    def _handle_callback_result(self, task: asyncio.Task):
         """Logs exceptions from background callback tasks."""
         try:
             task.result()  # Raise exception if one occurred during the task
@@ -122,8 +114,8 @@ class BOBase(BOBaseBase):
     @classmethod
     def register_persistant_class(cls):
         "Register the Business Object."
-        BOBase._business_objects |= {cls.__name__: cls}
-        LOG.debug(f"registered class '{cls.__name__}'")
+        BOBase._business_objects |= {cls._name(): cls}
+        LOG.debug(f"registered class '{cls.__name__}' as {cls._name()}")
 
     @_classproperty
     def all_business_objects(self) -> dict[str, type["BOBase"]]:
@@ -185,30 +177,6 @@ class BOBase(BOBaseBase):
         ]
 
     @classmethod
-    async def sql_create_table(cls):
-        "Create a DB table for this class"
-        raise NotImplementedError("sql_create_table not implemented")
-
-    def convert_from_db(self, value, typ):
-        "convert a value of type 'typ' read from the DB"
-        # LOG.debug(f"BOBase.convert_from_db({value=}, {type(value)=}, {typ=})")
-        if value is None:
-            return None
-        if typ == date and isinstance(value, str):
-            return date.fromisoformat(value)
-        if typ == datetime and isinstance(value, str):
-            dt = datetime.fromisoformat(value)
-            if dt.tzinfo in [None, UTC]:
-                dt = dt.replace(tzinfo=UTC).astimezone(tz=None)
-            return dt
-        if typ in [dict, list] and isinstance(value, str):
-            try:
-                return json.loads(value)
-            except json.JSONDecodeError as exc:
-                LOG.error(f"BOBase.convert_from_db: JSONDecodeError: {exc}")
-        return copy.deepcopy(value)
-
-    @classmethod
     async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
         raise NotImplementedError("count_rows not implemented")
@@ -217,21 +185,6 @@ class BOBase(BOBaseBase):
     async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
         raise NotImplementedError("get_matching_ids not implemented")
-
-    async def fetch(self, id=None, newest=None):
-        """Fetch the content for a business object instance from the DB.
-        If 'id' is given, fetch the identified object
-        If 'id' omitted and 'newest'=True fetch the object with highest id
-        If the oject is not found in the DB return the instance unchanged
-        """
-        return self
-
-    async def store(self):
-        """Store the business object in the database.
-        If 'self.id is None' a new row is inserted
-        Else the existing row is updated
-        """
-        raise NotImplementedError("store not implemented")
 
     @classmethod
     def subscribe_to_creation(cls, callback: BOCallback):
