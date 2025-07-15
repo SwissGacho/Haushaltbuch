@@ -1,14 +1,12 @@
-""" Websocket messages exchanged between backend and frontend
-"""
+"""Websocket messages exchanged between backend and frontend"""
 
 import pathlib
 from enum import StrEnum
 from json import dumps, loads
 from typing import Any, Optional
 from core.base_objects import BaseObject
-from server.ws_token import WSToken
 from core.app_logging import getLogger
-import messages
+from server.ws_token import WSToken
 
 LOG = getLogger(__name__)
 
@@ -27,10 +25,15 @@ class MessageType(StrEnum):
     WS_TYPE_FETCH_SETUP = "FetchSetup"
     WS_TYPE_OBJECT_SETUP = "ObjectSetup"
     WS_TYPE_STORE_SETUP = "StoreSetup"
+    WS_TYPE_FETCH_NAVIGATION_HEADERS = "FetchNavigationHeaders"
+    WS_TYPE_FETCH_LIST = "FetchList"
+    WS_TYPE_NAVIGATION_HEADERS = "NavigationHeaders"
+    WS_TYPE_OBJECT_LIST = "ObjectList"
 
 
 class MessageAttribute(StrEnum):
     "Key used in message paylod"
+
     WS_ATTR_TYPE = "type"
     WS_ATTR_TOKEN = "token"
     WS_ATTR_STATUS = "status"
@@ -58,6 +61,9 @@ class MessageAttribute(StrEnum):
 
     # Echo
     WS_ATTR_COMPONENT = "component"
+
+    # Navigation Headers
+    WS_ATTR_NAVIGATION_HEADERS = "navigation_headers"
 
 
 def json_encode(obj: Any) -> Any:
@@ -98,22 +104,26 @@ class Message(BaseObject):
 
     def __init__(
         self,
-        json_message: str = None,
-        msg_type: MessageType = MessageType.WS_TYPE_NONE,
-        token: WSToken = None,
-        status: str = None,
+        json_message: str | None = None,
+        msg_type: MessageType | None = MessageType.WS_TYPE_NONE,
+        token: WSToken | None = None,
+        status: str | None = None,
+        **kwargs,
     ) -> None:
         if json_message and isinstance(json_message, str):
             self.message = loads(json_message)
             if not self.message.get(MessageAttribute.WS_ATTR_TYPE):
                 self.message[MessageAttribute.WS_ATTR_TYPE] = MessageType.WS_TYPE_NONE
         else:
+            if (msg_type is None) or (msg_type == MessageType.WS_TYPE_NONE):
+                msg_type = self.__class__.message_type()
             self.message = {
                 MessageAttribute.WS_ATTR_TYPE: msg_type,
                 MessageAttribute.WS_ATTR_TOKEN: token,
             }
             if status:
                 self.message |= {MessageAttribute.WS_ATTR_STATUS: status}
+        self.add(kwargs)
 
     @classmethod
     def message_type(cls) -> MessageType:
@@ -138,7 +148,7 @@ class Message(BaseObject):
         return val if isinstance(val, dict) else None
 
     def add(self, attrs: dict):
-        "Add items to the payload"
+        "Add items to the message root that will be serialized and sent via websocket"
         self.message |= attrs
 
     def serialize(self):

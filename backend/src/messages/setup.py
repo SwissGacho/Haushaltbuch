@@ -1,9 +1,9 @@
-""" Messages used during application setup
-"""
+"""Messages used during application setup"""
 
 from enum import StrEnum
+from messages.store_message import StoreMessage
 from messages.message import MessageType, MessageAttribute
-from messages.data import FetchMessage, ObjectMessage, StoreMessage, DataObjectTypes
+from messages.bo_message import FetchMessage, ObjectMessage, DataObjectTypes
 from core.app import App
 from core.configuration.db_config import DBConfig
 from core.configuration.setup_config import ConfigSetup

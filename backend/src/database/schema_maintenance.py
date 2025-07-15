@@ -2,11 +2,11 @@
 
 from graphlib import TopologicalSorter
 
+import business_objects.persistant_business_object
 import core
 import database
-import database.db_manager
 import database.dbms.db_base
-import persistance
+from business_objects.persistant_business_object import PersistentBusinessObject
 
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
@@ -21,12 +21,11 @@ CURRENT_DB_SCHEMA_VERSION = 1
 COMPATIBLE_DB_SCHEMA_VERSIONS = [1]
 
 
-async def _create_all_tables(objects: list[persistance.business_object_base.BOBase]):
+async def _create_all_tables(
+    objects: list[type[PersistentBusinessObject]],
+):
     for bo in TopologicalSorter({b: b.references() for b in objects}).static_order():
-        if not (
-            isinstance(bo, type)
-            and issubclass(bo, persistance.business_object_base.BOBase)
-        ):
+        if not (isinstance(bo, type) and issubclass(bo, PersistentBusinessObject)):
             raise TypeError(
                 f"Business object {bo} is not a subclass of BOBase, cannot create table"
             )
@@ -37,7 +36,7 @@ async def _create_all_tables(objects: list[persistance.business_object_base.BOBa
 async def upgrade_db_schema(
     from_version: int,
     to_version: int,
-    objects: list[persistance.business_object_base.BOBase],
+    objects: list[type[PersistentBusinessObject]],
 ):
     "Apply changes to the DB schema"
     LOG.info(f"Upgrade DB schema from version {from_version} to {to_version}")
@@ -85,9 +84,7 @@ async def check_db_schema():
                 db_schema = DBSchema()
         else:
             db_schema = DBSchema()
-    all_business_objects = (
-        persistance.business_object_base.BOBase.all_business_objects.values()
-    )
+    all_business_objects = PersistentBusinessObject.all_business_objects.values()
     if (
         db_schema.version_nr is None
         or db_schema.version_nr < CURRENT_DB_SCHEMA_VERSION

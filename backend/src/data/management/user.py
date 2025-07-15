@@ -1,26 +1,26 @@
-""" User business object """
+"""User business object"""
 
-from typing import Optional, Union, Self
-from enum import Flag, auto
+from enum import auto
 
 from core.app_logging import getLogger, log_exit
-from persistance.bo_descriptors import BOStr
 
 LOG = getLogger(__name__)
 
-from persistance.business_attribute_base import BaseFlag
-from persistance.business_object_base import BOBase
-from persistance.bo_descriptors import BOStr, BOFlag
+from business_objects.business_attribute_base import BaseFlag
+from business_objects.persistant_business_object import PersistentBusinessObject
+from business_objects.bo_descriptors import BOStr, BOFlag
 
 
 class UserRole(BaseFlag):
     "User Roles/Permissions"
+
     ADMIN = auto()
     USER = auto()
 
 
-class User(BOBase):
+class User(PersistentBusinessObject):
     "Persistant user object"
+
     name = BOStr()
     password = BOStr()
     role = BOFlag(UserRole)

@@ -8,7 +8,7 @@ from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
-from persistance.business_attribute_base import BaseFlag
+from business_objects.business_attribute_base import BaseFlag
 
 
 class BOColumnFlag(Flag):
@@ -96,6 +96,14 @@ class BOInt(_PersistantAttr):
 
     def validate(self, value):
         return super().validate(value) or isinstance(value, int)
+
+
+class BOId(BOInt):
+    def __set__(self, obj, value):
+        if self.my_name in obj._data and obj._data[self.my_name] is not None:
+            raise ValueError("Cannot set id of existing object")
+        obj.__class__.register_instance(obj)
+        super().__set__(obj=obj, value=value)
 
 
 class BOStr(_PersistantAttr):

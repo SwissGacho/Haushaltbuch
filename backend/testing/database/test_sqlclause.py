@@ -15,7 +15,7 @@ from database.sql_clause import (
 )
 from database.sql import SQL
 from database.sql_expression import ColumnName, Row, SQLExpression, Value, Eq
-from persistance.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnFlag
 
 
 class SQLStatementMockFactory:
