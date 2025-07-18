@@ -182,7 +182,7 @@ class BOBase(BOBaseBase):
         raise NotImplementedError("count_rows not implemented")
 
     @classmethod
-    async def get_matching_ids(cls, conditions: dict = {}) -> list[int]:
+    async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
         raise NotImplementedError("get_matching_ids not implemented")
 

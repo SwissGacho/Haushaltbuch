@@ -77,11 +77,11 @@ class PersistentBusinessObject(BOBase):
         return result["count"]
 
     @classmethod
-    async def get_matching_ids(cls, conditions: dict = {}) -> list[int]:
+    async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
         async with SQL() as sql:
             select = sql.select(["id"]).from_(cls.table)
-            if conditions != {}:
+            if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
         # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
