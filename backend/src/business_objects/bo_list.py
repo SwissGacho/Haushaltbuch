@@ -31,7 +31,7 @@ class BOList(TransientBusinessObject, WSMessageSender):
         connection: WSConnectionBase,
         notify_subscribers_on_init: bool = False,
     ) -> None:
-        # Initialize _subbscription_id ans selb._bo_type, as it is used in cleanup if __init__ fails
+        # Initialize _subscription_id and self._bo_type, as it is used in cleanup if __init__ fails
         self._subscription_id: int | None = None
         self._bo_type: Type[BOBase] | None = None
         # print(f"BOList.__init__({bo_type=}, {connection=})")
