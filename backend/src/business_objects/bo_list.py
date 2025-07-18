@@ -31,26 +31,37 @@ class BOList(TransientBusinessObject, WSMessageSender):
         connection: WSConnectionBase,
         notify_subscribers_on_init: bool = False,
     ) -> None:
+        # Initialize _subbscription_id ans selb._bo_type, as it is used in cleanup if __init__ fails
+        self._subscription_id: int | None = None
+        self._bo_type: Type[BOBase] | None = None
         # print(f"BOList.__init__({bo_type=}, {connection=})")
         # LOG.debug(f"===============================================")
-        # LOG.debug(f"BOList.__init__({bo_type=}, {connection=})")
+        LOG.debug(f"BOList.__init__({bo_type=}, {connection=})")
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
-        if bo_type is str:
+
+        if isinstance(bo_type, str):
             try:
                 bo_type = BOBase.get_business_object_by_name(bo_type)
             except ValueError as e:
                 LOG.error(
-                    f"BOList.__init__: Invalid business object type {bo_type}: {e}"
+                    f"BOList.__init__: Invalid business object type {bo_type}: {str(e)}"
                 )
                 raise e
-        assert isinstance(bo_type, type) and issubclass(bo_type, BOBase)
+        try:
+            assert isinstance(bo_type, type) and issubclass(bo_type, BOBase)
+        except AssertionError as e:
+            LOG.error(f"BOList.__init__: Could not resolve bo_type {bo_type}: {str(e)}")
+            raise e
         self._bo_type = bo_type
         self._subscription_id = self._bo_type.subscribe_to_creation(self._handle_event_)
         if notify_subscribers_on_init:
             asyncio.create_task(self.notify_subscribers())
 
     async def _get_objects_(self):
+        if self._bo_type is None:
+            LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
+            return []
         rslt = await self._bo_type.get_matching_ids()
         return [str(cur) for cur in rslt]
 
@@ -61,7 +72,7 @@ class BOList(TransientBusinessObject, WSMessageSender):
     async def notify_subscribers(self):
         name_list = await self._get_objects_()
         LOG.debug(
-            f"Updating subscribers of {self._bo_type.__name__} with {len(name_list)} objects"
+            f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} with {len(name_list)} objects"
         )
         LOG.debug(f"BOList.update_subscribers {name_list=}")
 
@@ -74,4 +85,10 @@ class BOList(TransientBusinessObject, WSMessageSender):
     def cleanup(self):
         LOG.debug(f"BOList.cleanup({self._connection})")
         LOG.debug(f"{self._subscription_id=}, {self._bo_type=}")
+        if self._subscription_id is None:
+            LOG.debug(f"BOList.cleanup: Nothing to cleanup, _subscription_id is None")
+            return
+        if self._bo_type is None:
+            LOG.debug(f"BOList.cleanup: Cannot cleanup, _bo_type is None")
+            return
         self._bo_type.unsubscribe_from_creation(self._subscription_id)
