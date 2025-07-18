@@ -81,7 +81,8 @@ class PersistentBusinessObject(BOBase):
         """Get the ids of business objects matching the conditions"""
         async with SQL() as sql:
             select = sql.select(["id"]).from_(cls.table)
-            select.where(Filter(conditions))
+            if conditions:
+                select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
         # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]

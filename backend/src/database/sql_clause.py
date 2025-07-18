@@ -105,6 +105,8 @@ class Where(SQLManagedExecutable):
         self._condition: SQLExpression = condition
 
     def get_query(self):
+        if not self._condition:
+            return ""
         return f" WHERE {self._condition.get_query(km=self)}"
 
 

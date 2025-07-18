@@ -44,6 +44,10 @@ class SQLMultiExpression(SQLExpression):
             raise NotImplementedError(
                 "SQL_multi_expression is an abstract class and should not be instantiated."
             )
+        if not self._arguments or len(self._arguments) == 0:
+            raise ValueError(
+                f"SQL_multi_expression must have at least one argument, got {len(self._arguments)}"
+            )
         return (
             "("
             + re.sub(
