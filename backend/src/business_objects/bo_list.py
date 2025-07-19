@@ -5,6 +5,7 @@
 - When an event is received, the view is refreshed. If elements were added or removed, the connection sends an appropriate messages
 """
 
+from hmac import new
 from typing import Type
 from core.app_logging import getLogger
 import asyncio
@@ -34,6 +35,7 @@ class BOList(TransientBusinessObject, WSMessageSender):
         # Initialize _subbscription_id ans selb._bo_type, as it is used in cleanup if __init__ fails
         self._subscription_id: int | None = None
         self._bo_type: Type[BOBase] | None = None
+        self._instance_subscriptions: dict[str, int] = {}
         # print(f"BOList.__init__({bo_type=}, {connection=})")
         # LOG.debug(f"===============================================")
         LOG.debug(f"BOList.__init__({bo_type=}, {connection=})")
@@ -62,11 +64,30 @@ class BOList(TransientBusinessObject, WSMessageSender):
         if self._bo_type is None:
             LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
             return []
-        rslt = await self._bo_type.get_matching_ids()
-        return [str(cur) for cur in rslt]
+        rslt = [str(cur) for cur in await self._bo_type.get_matching_ids()]
+        return rslt
 
     async def _handle_event_(self, changed_bo: BOBase):
-        LOG.debug(f"BOList._handle_event_({changed_bo})")
+        # LOG.debug(f"BOList._handle_event_({changed_bo}) - {self._bo_type=}")
+        # Unsubscribe from all the objects that are no longer in the list
+        if self._bo_type is None:
+            LOG.debug("BOList._handle_event_: _bo_type is None, nothing to do")
+            return
+        old_objects = self._instance_subscriptions
+        new_objects = await self._get_objects_()
+        LOG.debug(
+            f"BOList._handle_event_: old_objects: {old_objects}, new_objects: {new_objects}"
+        )
+        for obj in old_objects:
+            if obj not in new_objects:
+                self._bo_type.unsubscribe_from_instance_by(old_objects[obj], int(obj))
+        for obj in new_objects:
+            if obj not in self._instance_subscriptions:
+                sub_id = self._bo_type.subscribe_to_instance_by(
+                    int(obj), self._handle_event_
+                )
+                self._instance_subscriptions[obj] = sub_id
+
         await self.notify_subscribers()
 
     async def notify_subscribers(self):
@@ -74,17 +95,19 @@ class BOList(TransientBusinessObject, WSMessageSender):
         LOG.debug(
             f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} with {len(name_list)} objects"
         )
-        LOG.debug(f"BOList.update_subscribers {name_list=}")
-
-        # log the ids
         msg = ObjectList()
-        msg.add({MessageAttribute.WS_ATTR_PAYLOAD: {"objects": name_list}})
-        LOG.debug(f"BOList.update_subscribers {msg=}")
+        msg.add(
+            {
+                MessageAttribute.WS_ATTR_PAYLOAD: {"objects": name_list},
+                MessageAttribute.WS_ATTR_INDEX: self.id,
+            }
+        )
+        # LOG.debug(f"BOList.update_subscribers {msg=}")
         await self.send_message(msg)
 
     def cleanup(self):
         LOG.debug(f"BOList.cleanup({self._connection})")
-        LOG.debug(f"{self._subscription_id=}, {self._bo_type=}")
+        # LOG.debug(f"{self._subscription_id=}, {self._bo_type=}")
         if self._subscription_id is None:
             LOG.debug(f"BOList.cleanup: Nothing to cleanup, _subscription_id is None")
             return

@@ -1,5 +1,6 @@
 """Data descriptors used in business objects"""
 
+import asyncio
 import json
 from enum import Flag, auto
 
@@ -40,7 +41,7 @@ class BOBaseBase:
         pass
 
 
-class _PersistantAttr:
+class _PersistantAttr[T]:
     def __init__(
         self, flag: BOColumnFlag = BOColumnFlag.BOC_NONE, **flag_values
     ) -> None:
@@ -67,7 +68,7 @@ class _PersistantAttr:
             **(self._flag_values or {}),
         )
 
-    def __get__(self, obj, objtype=None):
+    def __get__(self, obj, objtype=None) -> T | None:
         if obj is None:
             return self
         return obj._data.get(self.my_name)
@@ -78,6 +79,7 @@ class _PersistantAttr:
                 f"'{value}' invalid to set attribute {self.my_name} of type {self.__class__.__name__}"
             )
         obj._data[self.my_name] = value
+        obj.notify_instance_subscribers()
 
     def validate(self, value) -> bool:
         "Validate 'value' for assignability."
@@ -89,7 +91,7 @@ class _PersistantAttr:
 
 
 # pylint: disable=missing-class-docstring
-class BOInt(_PersistantAttr):
+class BOInt(_PersistantAttr[int]):
     @classmethod
     def data_type(cls):
         return int
@@ -106,7 +108,7 @@ class BOId(BOInt):
         super().__set__(obj=obj, value=value)
 
 
-class BOStr(_PersistantAttr):
+class BOStr(_PersistantAttr[str]):
     @classmethod
     def data_type(cls):
         return str
@@ -115,7 +117,7 @@ class BOStr(_PersistantAttr):
         return super().validate(value) or isinstance(value, str)
 
 
-class BODatetime(_PersistantAttr):
+class BODatetime(_PersistantAttr[datetime]):
     @classmethod
     def data_type(cls):
         return datetime
@@ -129,7 +131,7 @@ class BODatetime(_PersistantAttr):
         return super().validate(value) or isinstance(value, datetime)
 
 
-class BODate(_PersistantAttr):
+class BODate(_PersistantAttr[date]):
     @classmethod
     def data_type(cls):
         return date
@@ -143,7 +145,7 @@ class BODate(_PersistantAttr):
         return super().validate(value) or isinstance(value, date)
 
 
-class BODict(_PersistantAttr):
+class BODict(_PersistantAttr[dict]):
     @classmethod
     def data_type(cls):
         return dict
@@ -158,7 +160,7 @@ class BODict(_PersistantAttr):
         return isinstance(value, dict)
 
 
-class BOList(_PersistantAttr):
+class BOList(_PersistantAttr[list]):
     @classmethod
     def data_type(cls):
         return list
@@ -173,7 +175,7 @@ class BOList(_PersistantAttr):
         return isinstance(value, list)
 
 
-class BORelation(_PersistantAttr):
+class BORelation(_PersistantAttr[BOBaseBase]):
     def __init__(
         self, relation: type[BOBaseBase], flag: BOColumnFlag = BOColumnFlag.BOC_FK
     ) -> None:
@@ -197,7 +199,7 @@ class BORelation(_PersistantAttr):
         )
 
 
-class BOFlag(_PersistantAttr):
+class BOFlag(_PersistantAttr[Flag]):
 
     def __init__(
         self, flag_type: type[Flag], flag: BOColumnFlag = BOColumnFlag.BOC_NONE

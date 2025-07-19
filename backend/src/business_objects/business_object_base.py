@@ -4,6 +4,7 @@ Business objects are classes that support persistance in the data base
 """
 
 import asyncio
+from re import sub
 from typing import Any, Coroutine, TypeAlias, Optional, Callable
 
 from core.util import _classproperty
@@ -38,6 +39,7 @@ class BOBase(BOBaseBase):
     _loaded_instances: dict[int, "BOBase"] = {}
 
     _creation_subscribers: dict[int, BOCallback] = {}
+    _instance_subscribers: dict[int, dict[int, BOCallback]] = {}
     _last_subscriber_id = 0
 
     def __new__(cls, id: int | None = None, *args, **attributes):
@@ -90,7 +92,11 @@ class BOBase(BOBaseBase):
             cls._loaded_instances[instance.id] = instance  # type: ignore
 
     def __str__(self) -> str:
-        return str(self.id)
+        return (
+            f"{self.__class__.__name__}({self.id})"
+            if self.id
+            else f"{self.__class__.__name__}(no id)"
+        )
 
     @classmethod
     def add_attribute(
@@ -199,8 +205,8 @@ class BOBase(BOBaseBase):
     @classmethod
     def unsubscribe_from_creation(cls, callback_id: int):
         """Unregister a callback from the creation list."""
-        LOG.debug(f"Unsubscribing callback {callback_id} from creation subscribers")
-        LOG.debug(f"Current subscribers: {cls._creation_subscribers}")
+        # LOG.debug(f"Unsubscribing callback {callback_id} from creation subscribers")
+        # LOG.debug(f"Current subscribers: {cls._creation_subscribers}")
         if callback_id in cls._creation_subscribers:
             del cls._creation_subscribers[callback_id]
         else:
@@ -208,11 +214,58 @@ class BOBase(BOBaseBase):
                 f"Callback id {callback_id} not found in creation subscribers: {cls._creation_subscribers}"
             )
 
+    @classmethod
+    def subscribe_to_instance_by(cls, id: int, callback: BOCallback) -> int:
+        """Register a callback to be called when this instance changes or is deleted."""
+        if not callable(callback):
+            raise ValueError("Callback must be callable")
+        subscriber_id = cls._last_subscriber_id
+        cls._last_subscriber_id += 1
+        cls._instance_subscribers[id] = {subscriber_id: callback}
+        return subscriber_id
+
+    @classmethod
+    def unsubscribe_from_instance_by(cls, id: int, callback_id: int):
+        """Unregister a callback from the instance subscriber list by id."""
+        if id not in cls._instance_subscribers:
+            LOG.warning(
+                f"BOBase.unsubscribe_from_instance_by_id: no subscribers for id {id}"
+            )
+            return
+        subscribers = cls._instance_subscribers[id]
+        if callback_id in subscribers:
+            del subscribers[callback_id]
+        else:
+            LOG.warning(
+                f"{callback_id=} not found in instance subscribers: {subscribers=}"
+            )
+
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
 
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
+
+    def notify_instance_subscribers(self):
+        """Notify all subscribers of this instance about a change."""
+        LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
+        if not self.id:
+            return
+        try:
+            subscribers = self._instance_subscribers[self.id]
+        except KeyError:
+            return
+        for callback in subscribers.values():
+            try:
+                task = asyncio.create_task(
+                    callback(self),
+                    name=f"instance_callback_{callback.__name__}_{self.id}",
+                )
+                task.add_done_callback(self._handle_callback_result)
+            except Exception:
+                LOG.exception(
+                    f"Error scheduling instance callback {callback.__name__} for {self!r}"
+                )
 
 
 log_exit(LOG)
