@@ -194,10 +194,7 @@ class SQLiteCursor(Cursor):
             await self._cursor.execute(sql=query, parameters=params)
             self._rowcount = self._cursor.rowcount
         except sqlite3.OperationalError as err:
-            LOG.error(
-                f"SQLiteCursor.execute: OperationalError while executing {query=}:"
-            )
-            raise OperationalError(err)
+            raise OperationalError(f"SQLiteCursor.execute: OperationalError while executing {query=}.")
         return self
 
     @property

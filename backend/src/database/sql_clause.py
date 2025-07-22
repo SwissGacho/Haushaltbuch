@@ -106,7 +106,9 @@ class Where(SQLManagedExecutable):
 
     def get_query(self):
         if not self._condition:
-            return ""
+            raise ValueError(
+                f"SQL_WHERE must have at least one condition"
+            )
         return f" WHERE {self._condition.get_query(km=self)}"
 
 

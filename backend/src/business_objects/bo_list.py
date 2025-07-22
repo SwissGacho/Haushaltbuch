@@ -42,7 +42,7 @@ class BOList(Generic[T], TransientBusinessObject, WSMessageSender):
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
 
-        if isinstance(bo_type, str):
+        if bo_type is str:
             try:
                 bo_type = BOBase.get_business_object_by_name(str(bo_type))
             except ValueError as e:
