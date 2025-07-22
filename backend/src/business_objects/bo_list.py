@@ -103,4 +103,4 @@ class BOList(Generic[T], TransientBusinessObject, WSMessageSender):
         if self._bo_type is None:
             LOG.debug(f"BOList.cleanup: Cannot cleanup, _bo_type is None")
             return
-        self._bo_type.unsubscribe_from_creation(self._subscription_id)
+        self._bo_type.unsubscribe_from_all_changes(self._subscription_id)
