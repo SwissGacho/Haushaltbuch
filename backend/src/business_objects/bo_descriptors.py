@@ -1,6 +1,5 @@
 """Data descriptors used in business objects"""
 
-import asyncio
 import json
 from enum import Flag, auto
 
@@ -79,7 +78,6 @@ class _PersistantAttr[T]:
                 f"'{value}' invalid to set attribute {self.my_name} of type {self.__class__.__name__}"
             )
         obj._data[self.my_name] = value
-        obj.notify_instance_subscribers()
 
     def validate(self, value) -> bool:
         "Validate 'value' for assignability."

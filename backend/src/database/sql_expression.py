@@ -44,7 +44,7 @@ class SQLMultiExpression(SQLExpression):
             raise NotImplementedError(
                 "SQL_multi_expression is an abstract class and should not be instantiated."
             )
-        if not self._arguments or len(self._arguments) == 0:
+        if not self._arguments:
             raise ValueError(
                 f"SQL_multi_expression must have at least one argument, got {len(self._arguments)}"
             )
@@ -233,7 +233,7 @@ class Value(SQLExpression):
         If only two positional arguments are provided, the first is treated as the name and the second as the value.
         """
 
-        name: str = kwargs.get("name", None)
+        name: str = str(kwargs.get("name", None))
         value: Any = kwargs.get("value", None)
         if len(args) == 1:
             if not value:

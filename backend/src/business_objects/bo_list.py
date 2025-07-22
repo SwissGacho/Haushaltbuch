@@ -5,10 +5,10 @@
 - When an event is received, the view is refreshed. If elements were added or removed, the connection sends an appropriate messages
 """
 
-from hmac import new
-from typing import Type
-from core.app_logging import getLogger
 import asyncio
+from re import sub
+from typing import Generic, Type, TypeVar
+from core.app_logging import getLogger
 
 # from server.ws_connection import WS_Connection
 from messages.message import MessageAttribute
@@ -22,20 +22,20 @@ from server.ws_message_sender import WSMessageSender
 
 LOG = getLogger(__name__)
 
+T = TypeVar("T", bound=BOBase)
 
-class BOList(TransientBusinessObject, WSMessageSender):
+
+class BOList(Generic[T], TransientBusinessObject, WSMessageSender):
     """Represents a list of business objects of a certain type. The list subscribes to events of the business object type and updates its own subscribers accordingly."""
 
     def __init__(
         self,
-        bo_type: Type[BOBase] | str,
+        bo_type: Type[T] | str,
         connection: WSConnectionBase,
         notify_subscribers_on_init: bool = False,
     ) -> None:
         # Initialize _subscription_id and self._bo_type, as it is used in cleanup if __init__ fails
         self._subscription_id: int | None = None
-        self._bo_type: Type[BOBase] | None = None
-        self._instance_subscriptions: dict[str, int] = {}
         # print(f"BOList.__init__({bo_type=}, {connection=})")
         # LOG.debug(f"===============================================")
         LOG.debug(f"BOList.__init__({bo_type=}, {connection=})")
@@ -44,54 +44,43 @@ class BOList(TransientBusinessObject, WSMessageSender):
 
         if isinstance(bo_type, str):
             try:
-                bo_type = BOBase.get_business_object_by_name(bo_type)
+                bo_type = BOBase.get_business_object_by_name(str(bo_type))
             except ValueError as e:
-                LOG.error(
+                raise ValueError(
                     f"BOList.__init__: Invalid business object type {bo_type}: {str(e)}"
-                )
-                raise e
-        try:
-            assert isinstance(bo_type, type) and issubclass(bo_type, BOBase)
-        except AssertionError as e:
-            LOG.error(f"BOList.__init__: Could not resolve bo_type {bo_type}: {str(e)}")
-            raise e
+                ) from e
+        if not (isinstance(bo_type, type) and issubclass(bo_type, BOBase)):
+            raise TypeError(
+                LOG.error(f"BOList.__init__: Could not resolve bo_type {bo_type}")
+            )
         self._bo_type = bo_type
-        self._subscription_id = self._bo_type.subscribe_to_creation(self._handle_event_)
+        self._instance_subscriptions: dict[int, T] = {}
+        self._subscription_id = self._bo_type.subscribe_to_all_changes(
+            self._handle_event_
+        )
         if notify_subscribers_on_init:
-            asyncio.create_task(self.notify_subscribers())
+            asyncio.create_task(self.notify_list_subscribers())
 
-    async def _get_objects_(self):
+    async def _get_objects_(self) -> list[T]:
         if self._bo_type is None:
             LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
             return []
-        rslt = [str(cur) for cur in await self._bo_type.get_matching_ids()]
+        rslt = [self._bo_type(id=cur) for cur in await self._bo_type.get_matching_ids()]
         return rslt
 
-    async def _handle_event_(self, changed_bo: BOBase):
+    async def _handle_event_(self, _: BOBase):
+        """Should be called when the underlying information of the list changes.
+        This method will update the list of objects and notify subscribers."""
         # LOG.debug(f"BOList._handle_event_({changed_bo}) - {self._bo_type=}")
-        # Unsubscribe from all the objects that are no longer in the list
         if self._bo_type is None:
             LOG.debug("BOList._handle_event_: _bo_type is None, nothing to do")
             return
-        old_objects = self._instance_subscriptions
-        new_objects = await self._get_objects_()
-        LOG.debug(
-            f"BOList._handle_event_: old_objects: {old_objects}, new_objects: {new_objects}"
-        )
-        for obj in old_objects:
-            if obj not in new_objects:
-                self._bo_type.unsubscribe_from_instance_by(old_objects[obj], int(obj))
-        for obj in new_objects:
-            if obj not in self._instance_subscriptions:
-                sub_id = self._bo_type.subscribe_to_instance_by(
-                    int(obj), self._handle_event_
-                )
-                self._instance_subscriptions[obj] = sub_id
 
-        await self.notify_subscribers()
+        await self.notify_list_subscribers()
 
-    async def notify_subscribers(self):
-        name_list = await self._get_objects_()
+    async def notify_list_subscribers(self):
+        """Notify subscribers about the current state of the list."""
+        name_list = [cur.id for cur in await self._get_objects_()]
         LOG.debug(
             f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} with {len(name_list)} objects"
         )

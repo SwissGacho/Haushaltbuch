@@ -6,8 +6,8 @@ application's data model."""
 import copy
 import json
 from typing import Optional
-from core.app_logging import getLogger
 from datetime import date, datetime, UTC
+from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
@@ -77,7 +77,7 @@ class PersistentBusinessObject(BOBase):
         return result["count"]
 
     @classmethod
-    async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
+    async def get_matching_ids(cls, conditions: dict | None = None):
         """Get the ids of business objects matching the conditions"""
         async with SQL() as sql:
             select = sql.select(["id"]).from_(cls.table)
@@ -126,6 +126,7 @@ class PersistentBusinessObject(BOBase):
             await self._insert_self()
         else:
             await self._update_self()
+        await super().store()
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
