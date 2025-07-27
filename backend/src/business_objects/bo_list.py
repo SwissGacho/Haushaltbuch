@@ -42,16 +42,19 @@ class BOList(Generic[T], TransientBusinessObject, WSMessageSender):
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
 
-        if bo_type is str:
+        if isinstance(bo_type, str):
+            LOG.debug(f"BOList.__init__: Resolving bo_type from string {bo_type}")
             try:
                 bo_type = BOBase.get_business_object_by_name(str(bo_type))
             except ValueError as e:
                 raise ValueError(
                     f"BOList.__init__: Invalid business object type {bo_type}: {str(e)}"
                 ) from e
+        else:
+            LOG.debug(f"BOList.__init__: bo_type is {type(bo_type)}")
         if not (isinstance(bo_type, type) and issubclass(bo_type, BOBase)):
             raise TypeError(
-                LOG.error(f"BOList.__init__: Could not resolve bo_type {bo_type}")
+                f"BOList.__init__: Could not resolve bo_type {bo_type}, is {type(bo_type)}"
             )
         self._bo_type = bo_type
         self._instance_subscriptions: dict[int, T] = {}

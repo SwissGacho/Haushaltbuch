@@ -63,8 +63,6 @@ class BOBase(BOBaseBase):
         for attribute, value in attributes.items():
             self._data[attribute] = value
 
-        BOBase.notify_bo_subscribers(self._creation_subscribers, self)
-
     def handle_callback_result(self, task: asyncio.Task):
         """Logs exceptions from background callback tasks."""
         try:
@@ -247,11 +245,11 @@ class BOBase(BOBaseBase):
         del self._instance_subscribers[callback_id]
 
     async def store(self):
-        """Store the business object in the database.
-        If 'self.id is None' a new row is inserted
-        Else the existing row is updated. In addition, the instance subscribers are notified.
+        """Store pending changes to the business object.
+        In addition, the instance subscribers are notified.
         """
         self.notify_instance_subscribers()
+        self.__class__.notify_change_subscribers(self)
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
