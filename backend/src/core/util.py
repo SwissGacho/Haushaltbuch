@@ -13,8 +13,6 @@ from business_objects.bo_descriptors import BODict
 class EnvironmentError(Exception):
     """Custom exception for environment requirement errors."""
 
-    pass
-
 
 def check_environment():
     """Check if the environment meets the requirements for running the application."""
@@ -59,7 +57,7 @@ class _classproperty:
         return self.fget(owner_cls)
 
 
-def get_config_item(cfg: dict, key: str):
+def get_config_item(cfg: dict | None, key: str):
     "Extract a value from a dict of dicts using 'key' as '/' separated path."
     if not cfg:
         return None

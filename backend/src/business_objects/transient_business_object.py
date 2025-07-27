@@ -3,6 +3,7 @@
 Transient Business Objects are not stored in the database, but are used to
 temporarily hold data during processing or for communication with the frontend."""
 
+import itertools
 from core.app_logging import getLogger
 from typing import Optional
 import weakref
@@ -19,11 +20,15 @@ class TransientBusinessObject(BOBase):
     """
 
     _instances: weakref.WeakSet["TransientBusinessObject"] = weakref.WeakSet()
+    _next_id = itertools.count(1)
 
     # When creating a new instance, add it to the list of instances
-    def __init__(self, id=None, *args, **attributes) -> None:
+    def __init__(self, *args, id=None, **attributes) -> None:
         LOG.debug(f"TransientBusinessObject.__init__({id=}, {args=}, {attributes=})")
         super().__init__(id=id, *args, **attributes)
+        if id is None:
+            self.id = next(self._next_id)
+        LOG.debug(f"TransientBusinessObject.__init__: assigned id {self.id}")
         self._instances.add(self)
 
     @classmethod

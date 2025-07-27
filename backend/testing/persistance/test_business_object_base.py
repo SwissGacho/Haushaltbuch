@@ -71,3 +71,9 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         print(f"{MockBO2.attribute_descriptions()=}")
         print(f"{mock_attr_desc=}")
         self.assertEqual(MockBO2.attribute_descriptions(), mock_attr_desc)
+
+    def test_106_get_business_object_by_name(self):
+        MockBO2.register_persistant_class()
+        self.assertEqual(BOBase.get_business_object_by_name("mockbo2"), MockBO2)
+        with self.assertRaises(ValueError):
+            BOBase.get_business_object_by_name("non_existent_bo")
