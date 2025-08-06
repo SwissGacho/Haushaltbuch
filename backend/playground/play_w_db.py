@@ -1,13 +1,21 @@
 import asyncio
-from calendar import c
-from core.app import App
+import sys
+import os
 
-from persistance.bo_descriptors import BOColumnFlag
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../src")
+
+from core.app import App
+from business_objects.bo_descriptors import BOColumnFlag
 
 from database.dbms.sqlite import SQLiteDB
 from database.sql import SQLConnection
 from database.sql_statement import SQLTemplate
 from database.sql_clause import Values
+
+SQLiITE_CONFIG = {
+    "db": "SQLite",
+    "file": "C:\\ProgramData\\moneypilot\\money_pilotplayground.sqlite.db",
+}
 
 
 async def cleanup(sql):
@@ -29,12 +37,7 @@ async def cleanup(sql):
 
 async def main():
     print("Starting playing with DB...")
-    cfg = {
-        "db_cfg": {
-            "db": "SQLite",
-            "file": "C:\\ProgramData\\moneypilot\\money_pilotplayground.sqlite.db",
-        }
-    }
+    cfg = {"db_cfg": SQLiITE_CONFIG}
     App.db = SQLiteDB(**cfg["db_cfg"])
     async with SQLConnection() as conn:
         async with conn.transaction() as trx:
