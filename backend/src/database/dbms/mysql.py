@@ -1,11 +1,12 @@
 """Connection to MySQL DB using aiomysql"""
 
+from math import e
 from typing import Self
 import datetime
 
 from core.app import App
 from core.configuration.config import Config, DBConfig
-from core.exceptions import ConfigurationError
+from core.exceptions import ConfigurationError, OperationalError
 from core.util import get_config_item
 from database.dbms.db_base import DB, Connection, Cursor
 from database.sql_factory import SQLFactory
@@ -23,6 +24,7 @@ try:
     import aiomysql
 except ModuleNotFoundError as err:
     AIOMYSQL_IMPORT_ERROR = err
+    aiomysql = None
 else:
     AIOMYSQL_IMPORT_ERROR = None
 
@@ -220,11 +222,15 @@ class MySQLCursor(Cursor):
 
     async def execute(self, query: str, params=None):
         # LOG.debug(f"MySQLCursor.execute({query=}, {params=})")
-
+        if aiomysql is None:
+            raise ImportError("aiomysql module is not available.")
         conv_sql, args = self.convert_params_named_2_format(
             query, params or {}, dump_json=True
         )
-        # LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
 
-        self._rowcount = await self._cursor.execute(conv_sql, args=args)
+        try:
+            # LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
+            self._rowcount = await self._cursor.execute(conv_sql, args=args)
+        except aiomysql.OperationalError as exc:
+            raise OperationalError(f"{exc} during SQL execution") from exc
         return self

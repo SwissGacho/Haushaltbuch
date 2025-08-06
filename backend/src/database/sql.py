@@ -1,10 +1,11 @@
 """SQL statement builder for the database.
 This module provides functionality to create, execute, and manage SQL statements."""
 
+from math import e
 from typing import Self
-from core.exceptions import InvalidSQLStatementException
+from core.exceptions import InvalidSQLStatementException, OperationalError, CommitError
 
-from core.base_objects import ConnectionBaseClass, DBBaseClass
+from core.base_objects import ConnectionBaseClass
 from database.sql_executable import SQLExecutable
 from database.sql_factory import SQLFactory
 from database.sql_key_manager import SQL_Dict
@@ -204,10 +205,23 @@ class SQLTransaction(_SQLBase):
     def __init__(self, connection: ConnectionBaseClass | None = None) -> None:
         super().__init__(connection)
 
+    async def __aenter__(self) -> Self:
+        """Enter the SQL transaction context."""
+        # LOG.debug("Entering SQL transaction context")
+        await self.connect()
+        await self._connection.begin()
+        return self
+
     async def __aexit__(self, exc_type, exc_value, traceback):
         # LOG.debug("Exiting SQL transaction context")
         if exc_type is None:
-            await self.commit()
+            try:
+                await self.commit()
+                LOG.debug("Transaction committed successfully.")
+            except OperationalError as exc:
+                await self.rollback()
+                await self.close()
+                raise CommitError(exc) from exc
         else:
             await self.rollback()
         await self.close()
