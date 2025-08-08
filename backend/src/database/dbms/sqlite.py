@@ -169,7 +169,7 @@ class SQLiteConnection(Connection):
             )
         # LOG.debug(f"Connecting to SQLite DB: {db_path}")
         self._connection = await aiosqlite.connect(
-            database=db_path, detect_types=sqlite3.PARSE_DECLTYPES
+            database=db_path, detect_types=sqlite3.PARSE_DECLTYPES, autocommit=False
         )
         # LOG.debug(f"............................... {self._db._connections=}")
         await (await self._connection.execute("PRAGMA foreign_keys = ON")).close()
