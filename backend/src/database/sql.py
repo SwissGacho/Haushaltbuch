@@ -1,7 +1,6 @@
 """SQL statement builder for the database.
 This module provides functionality to create, execute, and manage SQL statements."""
 
-from math import e
 from typing import Self
 from core.exceptions import InvalidSQLStatementException, OperationalError, CommitError
 
@@ -54,13 +53,14 @@ class _SQLBase(SQLExecutable):
     async def __aexit__(self, exc_type, exc_value, traceback):
         """Exit the runtime context related to this object."""
         # LOG.debug(f"Exiting {self.__class__.__name__} context")
-        await self.close()
+        await self.close(rollback=exc_type is not None)
         return False
 
     async def connect(self) -> ConnectionBaseClass:
         """Create a new connection to the database."""
         if self._my_connection is None:
             self._my_connection = await SQLExecutable._get_db().connect()
+            # LOG.debug("New connection created")
         return self._my_connection
 
     @property
@@ -68,10 +68,11 @@ class _SQLBase(SQLExecutable):
         """Get the currently used connection to the database."""
         return self._my_connection
 
-    async def close(self):
+    async def close(self, rollback: bool = False):
         if self._my_connection is not None and self._connection is None:
             await self._my_connection.close()
             self._my_connection = None
+            # LOG.debug("Connection closed")
 
     async def commit(self):
         "commit current transaction"
@@ -97,18 +98,28 @@ class SQL(_SQLBase):
     ).execute()"""
 
     def __init__(
-        self,
-        connection: ConnectionBaseClass | None = None,
+        self, connection: ConnectionBaseClass | None = None, auto_commit: bool = True
     ) -> None:
         # LOG.debug(f"SQL.__init__({connection=})")
         super().__init__(connection=connection)
         self._sql_statement: SQLStatement | None = None
+        self._auto_commit: bool = auto_commit
 
     def __repr__(self):
         return f"SQL({repr(self._sql_statement)})"
 
     def __str__(self):
         return f"SQL({str(self._sql_statement)})"
+
+    async def close(self, rollback: bool = False):
+        if self._auto_commit:
+            if rollback:
+                # LOG.debug("Rolling back connection due to auto-commit")
+                await self.rollback()
+            else:
+                # LOG.debug("auto-committing connection")
+                await self.commit()
+        await super().close()
 
     def get_sql(self) -> SQL_Dict:
         """Get a string representation of the current SQL statement."""
@@ -209,7 +220,7 @@ class SQLTransaction(_SQLBase):
         """Enter the SQL transaction context."""
         # LOG.debug("Entering SQL transaction context")
         await self.connect()
-        await self._connection.begin()
+        await self._my_connection.begin()
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
@@ -217,7 +228,7 @@ class SQLTransaction(_SQLBase):
         if exc_type is None:
             try:
                 await self.commit()
-                LOG.debug("Transaction committed successfully.")
+                # LOG.debug("Transaction committed successfully.")
             except OperationalError as exc:
                 await self.rollback()
                 await self.close()
@@ -229,7 +240,7 @@ class SQLTransaction(_SQLBase):
 
     def sql(self) -> SQL:
         "Create a new SQL statement object"
-        return SQL(connection=self.connection)
+        return SQL(connection=self.connection, auto_commit=False)
 
 
 class SQLConnection(_SQLBase):
