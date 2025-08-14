@@ -127,10 +127,9 @@ class Connection(ConnectionBaseClass):
     async def begin(self):
         "begin a transaction"
         # LOG.debug("Connection.begin: begin transaction")
-        try:
-            await (await self.execute("BEGIN")).close()
-        except Exception as exc:
-            raise OperationalError(f"{exc} during transaction begin") from exc
+        # No implementation required, assuming either a transaction is started at all times
+        # or with the first execute call. auto_commit should be False.
+        return
 
     async def close(self):
         "close the connection"
