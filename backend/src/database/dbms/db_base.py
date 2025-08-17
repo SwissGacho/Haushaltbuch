@@ -1,11 +1,12 @@
 """Base class for DB connections"""
 
-from typing import Any
+from typing import Any, NoReturn
 import re
 import json
 
 from core.app_logging import getLogger, log_exit
 from core.base_objects import DBBaseClass, ConnectionBaseClass
+from core.exceptions import OperationalError
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
 from database.sql_clause import SQLColumnDefinition
@@ -123,11 +124,21 @@ class Connection(ConnectionBaseClass):
         "Open a connection and return the Connection instance"
         raise ConnectionError("Called from DB base class.")
 
+    async def begin(self):
+        "begin a transaction"
+        # LOG.debug("Connection.begin: begin transaction")
+        # No implementation required, assuming either a transaction is started at all times
+        # or with the first execute call. auto_commit should be False.
+        return
+
     async def close(self):
         "close the connection"
         if self._connection:
             # LOG.debug("Connection.close: closing connection")
-            await self._connection.close()
+            try:
+                await self._connection.close()
+            except Exception as e:
+                raise OperationalError(f"{e} during connection close") from e
             self._db._connections.remove(self)
             self._connection = None
             # LOG.debug(f"------------------------------- {self._db._connections=}")
@@ -137,7 +148,7 @@ class Connection(ConnectionBaseClass):
         "'real' DB connection"
         return self._connection
 
-    async def execute(self, query: str, params=None):
+    async def execute(self, query: str, params=None) -> "Cursor":
         """execute an SQL statement and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
         raise ConnectionError("Called from DB base class.")
@@ -145,12 +156,18 @@ class Connection(ConnectionBaseClass):
     async def commit(self):
         "commit current transaction"
         # LOG.debug("commit connection")
-        await self._connection.commit()
+        try:
+            await self._connection.commit()
+        except Exception as e:
+            raise OperationalError(f"{e} during commit") from e
 
     async def rollback(self):
         "rollback current transaction"
         # LOG.debug("rollback connection")
-        await self._connection.rollback()
+        try:
+            await self._connection.rollback()
+        except Exception as e:
+            raise OperationalError(f"{e} during rollback") from e
 
     def __repr__(self) -> str:
         return f"connection: {self._connection}"

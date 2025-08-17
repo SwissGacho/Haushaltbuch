@@ -187,14 +187,16 @@ class SQLiteConnection(Connection):
 class SQLiteCursor(Cursor):
 
     async def execute(self, query: str, params={}):
+        if sqlite3 is None:
+            raise ImportError("sqlite3 module is not available.")
         self._last_query = query
         self._last_params = params
         try:
             # LOG.debug(f"SQLiteCursor.execute({query=}, {params=})")
             await self._cursor.execute(sql=query, parameters=params)
             self._rowcount = self._cursor.rowcount
-        except sqlite3.OperationalError as err:
-            raise OperationalError(err)
+        except sqlite3.OperationalError as exc:
+            raise OperationalError(f"{exc} during SQL execution") from exc
         return self
 
     @property
