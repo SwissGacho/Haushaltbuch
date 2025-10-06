@@ -21,10 +21,15 @@ SQLiITE_CONFIG = {
 }
 MARIADB_CONFIG = {
     "db": "MariaDB",
-    "host": "infinexus",
-    "dbname": "heinz",
-    "dbuser": "heinz",
-    "password": "9zMKJQRaPS7KwhgU4liL",
+    "host": "db.gacho.duckdns.org",
+    "port": 33306,
+    "dbname": "playground",
+    "dbuser": "playground",
+    "ssl": {
+        "ssl_cert": os.path.dirname(os.path.abspath(__file__))
+        + "\\playground.cert.pem",
+        "ssl_key": os.path.dirname(os.path.abspath(__file__)) + "\\playground.key.pem",
+    },
 }
 SELECT = "select max(Column1) from :table"
 SELECTALL = "select * from :table"
@@ -77,6 +82,21 @@ def help():
     print("  *: Select all from table")
     print("  i: Insert into table")
     print("  x: Cleanup (delete all entries in table)")
+
+
+async def check_table(tab=1):
+    async with SQL() as sql:
+        try:
+            res = await (
+                await sql.script(f"select 1 from {TABLES[tab - 1]}").execute()
+            ).fetchall()
+            print(f"Table '{TABLES[tab-1]}' exists and is accessible: {res}")
+        except Exception as e:
+            print(f"Table '{TABLES[tab-1]}' does not exist or is not accessible: {e}")
+            print("Creating table...")
+            await sql.create_table(
+                TABLES[tab - 1], [("Column1", int, None, {})]
+            ).execute()
 
 
 async def select(ctx, tab=1, all=False):
@@ -166,6 +186,8 @@ async def transaction(conn):
 async def mainloop(conn):
     global print_traceback
     global table
+    await check_table(1)
+    await check_table(2)
     try:
         while True:
             try:
@@ -266,5 +288,7 @@ async def main():
 
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     App.initialize(__file__)
     asyncio.run(main())

@@ -1,7 +1,6 @@
 """Connection to MySQL DB using aiomysql"""
 
-from math import e
-from typing import Self
+import ssl
 import datetime
 
 from core.app import App
@@ -191,11 +190,23 @@ class MySQLConnection(Connection):
 
     async def connect(self):
         # LOG.debug(f"MySQLConnection.connect({self._cfg=})")
+        ssl_cfg = self._cfg.get(Config.CONFIG_DBSSL)
+        if ssl_cfg and isinstance(ssl_cfg, dict):
+            ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+            ssl_ctx.load_cert_chain(
+                certfile=ssl_cfg.get(Config.CONFIG_DBSSL_CERT),
+                keyfile=ssl_cfg.get(Config.CONFIG_DBSSL_KEY),
+            )
+        else:
+            ssl_ctx = None
+
         self._connection: aiomysql.Connection = await aiomysql.connect(
             host=self._cfg[Config.CONFIG_DBHOST],
             db=self._cfg[Config.CONFIG_DBDBNAME],
-            user=self._cfg[Config.CONFIG_DBUSER],
-            password=self._cfg[Config.CONFIG_DBPW],
+            port=self._cfg.get(Config.CONFIG_DBPORT, 3306),
+            user=self._cfg.get(Config.CONFIG_DBUSER),
+            password=self._cfg.get(Config.CONFIG_DBPW),
+            ssl=ssl_ctx,
         )
         await self._check_db_version()
         return self
