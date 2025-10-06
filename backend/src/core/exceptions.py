@@ -1,4 +1,4 @@
-""" module holding Exception definitions """
+"""module holding Exception definitions"""
 
 
 class OperationalError(Exception):
@@ -33,3 +33,7 @@ class InvalidSQLStatementException(Exception):
     """
     Exception raised when an invalid SQL statement is encountered.
     """
+
+
+class CannotStoreEmptyBO(Exception):
+    "Exception raised when trying to store a Business Object with no values."

@@ -25,63 +25,78 @@ LOG = getLogger(__name__)
 T = TypeVar("T", bound=BOBase)
 
 
-class BOList(Generic[T], TransientBusinessObject, WSMessageSender):
-    """Represents a list of business objects of a certain type. The list subscribes to events of the business object type and updates its own subscribers accordingly."""
+class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
 
     def __init__(
         self,
         bo_type: Type[T] | str,
         connection: WSConnectionBase,
         notify_subscribers_on_init: bool = False,
+        id: int | None = None,
     ) -> None:
         # Initialize _subscription_id and self._bo_type, as it is used in cleanup if __init__ fails
         self._subscription_id: int | None = None
         # print(f"BOList.__init__({bo_type=}, {connection=})")
         # LOG.debug(f"===============================================")
-        LOG.debug(f"BOList.__init__({bo_type=}, {connection=})")
+        LOG.debug(f"BOSubscription.__init__({bo_type=}, {connection=})")
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
 
         if isinstance(bo_type, str):
-            LOG.debug(f"BOList.__init__: Resolving bo_type from string {bo_type}")
+            LOG.debug(
+                f"BOSubscription.__init__: Resolving bo_type from string {bo_type}"
+            )
             try:
                 bo_type = BOBase.get_business_object_by_name(str(bo_type))
             except ValueError as e:
                 raise ValueError(
-                    f"BOList.__init__: Invalid business object type {bo_type}: {str(e)}"
+                    f"BOSubscription.__init__: Invalid business object type {bo_type}: {str(e)}"
                 ) from e
-        else:
-            LOG.debug(f"BOList.__init__: bo_type is {type(bo_type)}")
         if not (isinstance(bo_type, type) and issubclass(bo_type, BOBase)):
             raise TypeError(
-                f"BOList.__init__: Could not resolve bo_type {bo_type}, is {type(bo_type)}"
+                f"BOSubscription.__init__: Could not resolve bo_type {bo_type}, is {type(bo_type)}"
             )
         self._bo_type = bo_type
         self._instance_subscriptions: dict[int, T] = {}
-        self._subscription_id = self._bo_type.subscribe_to_all_changes(
-            self._handle_event_
-        )
+        self._initialize_subscriptions(id=id)
         if notify_subscribers_on_init:
-            asyncio.create_task(self.notify_list_subscribers())
+            asyncio.create_task(self.notify_subscription_subscribers())
+
+    def _initialize_subscriptions(self, *args, **kwargs):
+        if not "id" in kwargs:
+            raise ValueError("BOSubscription requires an 'id' argument")
+        if not isinstance(kwargs["id"], int):
+            raise ValueError("BOSubscription requires an 'id' argument of type int")
+
+        bo_id = int(kwargs["id"])
+        bo = BOBase(bo_type=self._bo_type, id=bo_id)
+        self._subscription_id = bo.subscribe_to_all_changes(self._handle_event_)
+        self._obj = bo
 
     async def _get_objects_(self) -> list[T]:
         if self._bo_type is None:
-            LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
+            LOG.debug(
+                "BOSubscription._get_objects_: _bo_type is None, no objects to return"
+            )
             return []
-        rslt = [self._bo_type(id=cur) for cur in await self._bo_type.get_matching_ids()]
-        return rslt
+        if not hasattr(self, "_obj"):
+            LOG.debug(
+                "BOSubscription._get_objects_: _obj not set, no objects to return"
+            )
+            return []
+        return [self._obj]
 
     async def _handle_event_(self, _: BOBase):
         """Should be called when the underlying information of the list changes.
         This method will update the list of objects and notify subscribers."""
         # LOG.debug(f"BOList._handle_event_({changed_bo}) - {self._bo_type=}")
         if self._bo_type is None:
-            LOG.debug("BOList._handle_event_: _bo_type is None, nothing to do")
+            LOG.debug("BOSubscription._handle_event_: _bo_type is None, nothing to do")
             return
 
-        await self.notify_list_subscribers()
+        await self.notify_subscription_subscribers()
 
-    async def notify_list_subscribers(self):
+    async def notify_subscription_subscribers(self):
         """Notify subscribers about the current state of the list."""
         name_list = [cur.id for cur in await self._get_objects_()]
         LOG.debug(
@@ -96,6 +111,37 @@ class BOList(Generic[T], TransientBusinessObject, WSMessageSender):
         )
         # LOG.debug(f"BOList.update_subscribers {msg=}")
         await self.send_message(msg)
+
+    def cleanup(self):
+        LOG.debug(f"BOList.cleanup({self._connection})")
+        # LOG.debug(f"{self._subscription_id=}, {self._bo_type=}")
+        if self._subscription_id is None:
+            LOG.debug(f"BOList.cleanup: Nothing to cleanup, _subscription_id is None")
+            return
+        if self._bo_type is None:
+            LOG.debug(f"BOList.cleanup: Cannot cleanup, _bo_type is None")
+            return
+        if self._obj is None:
+            LOG.debug(f"BOSubscription.cleanup: Cannot cleanup, _obj is None")
+            return
+        self._obj.unsubscribe_from_all_changes(self._subscription_id)
+
+
+class BOList(BOSubscription[T]):
+    """Represents a list of business objects of a certain type. The list subscribes to events of the business object type and updates its own subscribers accordingly."""
+
+    def _initialize_subscriptions(self, *args, **kwargs):
+
+        self._subscription_id = self._bo_type.subscribe_to_all_changes(
+            self._handle_event_
+        )
+
+    async def _get_objects_(self) -> list[T]:
+        if self._bo_type is None:
+            LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
+            return []
+        rslt = [self._bo_type(id=cur) for cur in await self._bo_type.get_matching_ids()]
+        return rslt
 
     def cleanup(self):
         LOG.debug(f"BOList.cleanup({self._connection})")

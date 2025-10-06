@@ -11,10 +11,11 @@ from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
+from core.exceptions import CannotStoreEmptyBO
 from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
 from database.sql_expression import Eq, Filter, SQLExpression
-from database.sql_statement import CreateTable, Value
+from database.sql_statement import CreateTable, NamedValueListList, Value
 from business_objects.business_object_base import BOBase
 
 
@@ -130,20 +131,22 @@ class PersistentBusinessObject(BOBase):
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
-
+        values_to_store: NamedValueListList = [
+            [(k, v)] for k, v in self._data.items() if k != "id" and v is not None
+        ]
+        if len(values_to_store) == 0:
+            raise CannotStoreEmptyBO(f"Cannot store {self._data=} as it has no values")
+        for k, v in self._data.items():
+            if k != "id" and v is None:
+                LOG.debug(f"{k=}: {v}")
+        LOG.debug(f"Inserting new {self} into DB")
         async with SQLTransaction() as txaction:
             self.id = (
                 await (
                     await (
                         txaction.sql()
                         .insert(self.table)
-                        .rows(
-                            [
-                                (k, v)
-                                for k, v in self._data.items()
-                                if k != "id" and v is not None
-                            ]
-                        )
+                        .rows(values_to_store)
                         .returning("id")
                     ).execute()
                 ).fetchone()

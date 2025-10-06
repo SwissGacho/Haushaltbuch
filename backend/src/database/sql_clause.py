@@ -67,10 +67,10 @@ class SQLColumnDefinition(SQLManagedExecutable):
 class From(SQLManagedExecutable):
     """Class for the FROM clause of an SQL statement."""
 
-    def __init__(self, table: str, parent: SQLExecutable = None):
+    def __init__(self, table: str, parent: SQLExecutable | None = None):
         super().__init__(parent)
         self._table = table
-        self._joins: list[tuple[JoinOperator, str, SQLExpression]] = []
+        self._joins: list[tuple[JoinOperator, str, SQLExpression | None]] = []
 
     def get_query(self) -> str:
         sql = f" FROM {self._table} "
@@ -78,8 +78,12 @@ class From(SQLManagedExecutable):
             sql += " ".join([self._get_join_clause(join) for join in self._joins])
         return sql
 
-    def _get_join_clause(self, join: tuple[JoinOperator, str, SQLExpression]) -> str:
-        join_operator = join[0].value
+    def _get_join_clause(
+        self, join: tuple[JoinOperator, str, SQLExpression | None]
+    ) -> str:
+        join_operator = None
+        if join[0]:
+            join_operator = join[0].value
         join_table = join[1]
         join_condition = (
             f"ON {join[2].get_query(km=self)}" if join[2] is not None else ""
@@ -88,8 +92,8 @@ class From(SQLManagedExecutable):
 
     def join(
         self,
-        table: str = None,
-        join_constraint: "SQLExpression" = None,
+        table: str,
+        join_constraint: "SQLExpression | None" = None,
         join_operator: JoinOperator = JoinOperator.FULL,
     ) -> Self:
         """Add a join to another table to the FROM clause."""
@@ -100,22 +104,22 @@ class From(SQLManagedExecutable):
 class Where(SQLManagedExecutable):
     """Represents a WHERE clause in an SQL statement."""
 
-    def __init__(self, condition: SQLExpression, parent: SQLExecutable = None):
+    def __init__(self, condition: SQLExpression, parent: SQLExecutable | None = None):
         super().__init__(parent)
         self._condition: SQLExpression = condition
 
     def get_query(self):
         if not self._condition:
-            raise ValueError(
-                f"SQL_WHERE must have at least one condition"
-            )
+            raise ValueError(f"SQL_WHERE must have at least one condition")
         return f" WHERE {self._condition.get_query(km=self)}"
 
 
 class GroupBy(SQLManagedExecutable):
     """Represents a GROUP BY clause in an SQL statement."""
 
-    def __init__(self, column_list: list[str] | str, parent: SQLExecutable = None):
+    def __init__(
+        self, column_list: list[str] | str, parent: SQLExecutable | None = None
+    ):
         if not column_list:
             raise ValueError("Column list must be provided for GROUP BY clause.")
         super().__init__(parent)
@@ -130,7 +134,7 @@ class GroupBy(SQLManagedExecutable):
 class Having(SQLManagedExecutable):
     """Represents a HAVING clause in an SQL statement."""
 
-    def __init__(self, condition: SQLExpression, parent: SQLExecutable = None):
+    def __init__(self, condition: SQLExpression, parent: SQLExecutable | None = None):
         if not condition:
             raise ValueError("Condition must be provided for HAVING clause.")
         super().__init__(parent)
@@ -146,7 +150,7 @@ class Values(SQLManagedExecutable):
     names of the columns. Each row must have the same number of values.
     """
 
-    def __init__(self, rows: list[Row] = [], parent: SQLExecutable = None):
+    def __init__(self, rows: list[Row] = [], parent: SQLExecutable | None = None):
         # LOG.debug(f"Values({rows=})")
         super().__init__(parent)
         self._rows = rows
@@ -164,6 +168,11 @@ class Values(SQLManagedExecutable):
 
     def get_query(self):
         """Return the SQL expression as a string."""
+        if len(self._rows) == 0:
+            return ""
+        val_str = str.strip(", ".join([row.get_query(km=self) for row in self._rows]))
+        if val_str == "":
+            return "DEFAULT VALUES"
         return f"VALUES {', '.join([row.get_query(km=self) for row in self._rows])}"
 
     def __len__(self) -> int:
@@ -178,7 +187,7 @@ class Assignment(SQLManagedExecutable):
         self,
         columns: list[ColumnName | str] | ColumnName | str,
         value: Value,
-        parent: SQLExecutable = None,
+        parent: SQLExecutable | None = None,
     ):
         super().__init__(parent=parent)
         self._columns = columns if isinstance(columns, list) else [columns]
