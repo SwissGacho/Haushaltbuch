@@ -1,4 +1,4 @@
-"""Connection to MySQL DB using aiomysql"""
+"""Connection to MySQL DB using asyncmy"""
 
 import ssl
 import datetime
@@ -20,10 +20,10 @@ from core.app_logging import getLogger
 LOG = getLogger(__name__)
 
 try:
-    import aiomysql
+    import asyncmy
 except ModuleNotFoundError as err:
     AIOMYSQL_IMPORT_ERROR = err
-    aiomysql = None
+    asyncmy = None
 else:
     AIOMYSQL_IMPORT_ERROR = None
 
@@ -191,16 +191,15 @@ class MySQLConnection(Connection):
     async def connect(self):
         # LOG.debug(f"MySQLConnection.connect({self._cfg=})")
         ssl_cfg = self._cfg.get(Config.CONFIG_DBSSL)
+        ssl_ctx = None
         if ssl_cfg and isinstance(ssl_cfg, dict):
             ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
             ssl_ctx.load_cert_chain(
                 certfile=ssl_cfg.get(Config.CONFIG_DBSSL_CERT),
                 keyfile=ssl_cfg.get(Config.CONFIG_DBSSL_KEY),
             )
-        else:
-            ssl_ctx = None
 
-        self._connection: aiomysql.Connection = await aiomysql.connect(
+        self._connection: asyncmy.Connection = await asyncmy.connect(
             host=self._cfg[Config.CONFIG_DBHOST],
             db=self._cfg[Config.CONFIG_DBDBNAME],
             port=self._cfg.get(Config.CONFIG_DBPORT, 3306),
@@ -223,7 +222,7 @@ class MySQLConnection(Connection):
     async def execute(self, query: str, params=None) -> "MySQLCursor":
         "execute an SQL statement and return a cursor"
         cur = MySQLCursor(
-            cur=await self._connection.cursor(aiomysql.DictCursor), con=self
+            cur=self._connection.cursor(asyncmy.cursors.DictCursor), con=self
         )
         await cur.execute(query, params=params)
         return cur
@@ -233,8 +232,8 @@ class MySQLCursor(Cursor):
 
     async def execute(self, query: str, params=None):
         # LOG.debug(f"MySQLCursor.execute({query=}, {params=})")
-        if aiomysql is None:
-            raise ImportError("aiomysql module is not available.")
+        if asyncmy is None:
+            raise ImportError("asyncmy module is not available.")
         conv_sql, args = self.convert_params_named_2_format(
             query, params or {}, dump_json=True
         )
@@ -242,6 +241,6 @@ class MySQLCursor(Cursor):
         try:
             # LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
             self._rowcount = await self._cursor.execute(conv_sql, args=args)
-        except aiomysql.OperationalError as exc:
+        except asyncmy.OperationalError as exc:
             raise OperationalError(f"{exc} during SQL execution") from exc
         return self
