@@ -52,10 +52,10 @@ async def get_db():
         except ModuleNotFoundError as exc:
             App.status = Status.STATUS_DB_UNSUPPORTED
             LOG.error(f"{exc}")
-            if "aiomysql" in str(exc):
+            if "asyncmy" in str(exc):
                 LOG.error(
-                    "Library 'aiomysql' could not be imported. "
-                    "Please install using 'pip install aiomysql'"
+                    "Library 'asyncmy' could not be imported. "
+                    "Please install using 'pip install asyncmy'"
                 )
             yield
             return
