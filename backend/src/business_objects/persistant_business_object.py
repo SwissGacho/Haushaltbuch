@@ -5,7 +5,7 @@ application's data model."""
 
 import copy
 import json
-from typing import Optional
+from typing import Any, Optional
 from datetime import date, datetime, UTC
 from core.app_logging import getLogger
 
@@ -108,6 +108,7 @@ class PersistentBusinessObject(BOBase):
                 select.where(Eq("id", id))
             elif newest:
                 select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
+            LOG.debug(f"BOBase.fetch: {select=}")
             self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
@@ -128,6 +129,11 @@ class PersistentBusinessObject(BOBase):
         else:
             await self._update_self()
         await super().store()
+
+    async def business_values_as_dict(self) -> dict[str, Any]:
+        LOG.debug(f"{self}.business_values_as_dict: {self.id=}")
+        await self.fetch(self.id)
+        return await super().business_values_as_dict()
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"

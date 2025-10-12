@@ -7,6 +7,8 @@ import asyncio
 import itertools
 from typing import Any, Coroutine, TypeAlias, Optional, Callable
 
+from cycler import V
+
 from core.util import _classproperty
 from core.app_logging import getLogger, log_exit
 
@@ -50,6 +52,11 @@ class BOBase(BOBaseBase):
                 return cls._loaded_instances[identity]
 
         return super().__new__(cls)
+
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
+        cls._creation_subscribers = {}
+        cls._change_subscribers = {}
 
     # pylint: disable=redefined-builtin
     def __init__(self, *args, id: int | None = None, **attributes) -> None:
@@ -211,8 +218,12 @@ class BOBase(BOBaseBase):
     def subscribe_to_all_changes(cls, callback: BOCallback) -> int:
         """Register a callback to be called when any instance of this class changes.
         Return a unique id that can be used to unsubscribe."""
+        LOG.debug(f"Subscribing callback {callback} to all changes on {cls}")
         if not callable(callback):
             raise ValueError("Callback must be callable")
+        # Should only subscribe to subclasses, not to BOBase itself
+        if cls is BOBase:
+            raise ValueError("Cannot subscribe to changes of BOBase itself")
         subscriber_id = next(cls._last_subscriber_id)
         cls._change_subscribers[subscriber_id] = callback
         return subscriber_id
@@ -244,6 +255,12 @@ class BOBase(BOBaseBase):
             return
         del self._instance_subscribers[callback_id]
 
+    async def business_values_as_dict(self) -> dict[str, Any]:
+        "dict of BO attribute values with attribute names as keys"
+
+        value_dict = {k: v for k, v in self._data.items() if k not in ("bo_type")}
+        return value_dict
+
     async def store(self):
         """Store pending changes to the business object.
         In addition, the instance subscribers are notified.
@@ -270,7 +287,7 @@ class BOBase(BOBaseBase):
         LOG.debug(
             f"Notifying {len(cls._change_subscribers)} change subscribers for {changed_bo}"
         )
-        BOBase.notify_bo_subscribers(cls._change_subscribers, changed_bo)
+        cls.notify_bo_subscribers(cls._change_subscribers, changed_bo)
 
     @classmethod
     def notify_bo_subscribers(

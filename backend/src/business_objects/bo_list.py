@@ -6,11 +6,11 @@
 """
 
 import asyncio
-from re import sub
 from typing import Generic, Type, TypeVar
 from core.app_logging import getLogger
 
 # from server.ws_connection import WS_Connection
+from messages.bo_message import ObjectMessage
 from messages.message import MessageAttribute
 
 from messages.object_list import ObjectList
@@ -38,7 +38,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         self._subscription_id: int | None = None
         # print(f"BOList.__init__({bo_type=}, {connection=})")
         # LOG.debug(f"===============================================")
-        LOG.debug(f"BOSubscription.__init__({bo_type=}, {connection=})")
+        LOG.debug(f"BOSubscription.__init__({bo_type=}, {id=}, {connection=})")
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
 
@@ -69,7 +69,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
             raise ValueError("BOSubscription requires an 'id' argument of type int")
 
         bo_id = int(kwargs["id"])
-        bo = BOBase(bo_type=self._bo_type, id=bo_id)
+        bo = self._bo_type(id=bo_id)
         self._subscription_id = bo.subscribe_to_all_changes(self._handle_event_)
         self._obj = bo
 
@@ -102,15 +102,13 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         LOG.debug(
             f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} with {len(name_list)} objects"
         )
-        msg = ObjectList()
-        msg.add(
-            {
-                MessageAttribute.WS_ATTR_PAYLOAD: {"objects": name_list},
-                MessageAttribute.WS_ATTR_INDEX: self.id,
-            }
+        await self.send_message(
+            ObjectMessage(
+                object_type=self._bo_type,
+                index=self._obj.id,
+                payload=await self._obj.business_values_as_dict(),
+            )
         )
-        # LOG.debug(f"BOList.update_subscribers {msg=}")
-        await self.send_message(msg)
 
     def cleanup(self):
         LOG.debug(f"BOList.cleanup({self._connection})")
@@ -135,6 +133,22 @@ class BOList(BOSubscription[T]):
         self._subscription_id = self._bo_type.subscribe_to_all_changes(
             self._handle_event_
         )
+
+    async def notify_subscription_subscribers(self):
+        """Notify subscribers about the current state of the list."""
+        name_list = [cur.id for cur in await self._get_objects_()]
+        LOG.debug(
+            f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} with {len(name_list)} objects"
+        )
+        msg = ObjectList()
+        msg.add(
+            {
+                MessageAttribute.WS_ATTR_PAYLOAD: {"objects": name_list},
+                MessageAttribute.WS_ATTR_INDEX: self.id,
+            }
+        )
+        # LOG.debug(f"BOList.update_subscribers {msg=}")
+        await self.send_message(msg)
 
     async def _get_objects_(self) -> list[T]:
         if self._bo_type is None:
