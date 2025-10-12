@@ -42,7 +42,10 @@ class SQLColumnDefinition(SQLManagedExecutable):
             raise ValueError(
                 f"Unsupported data type for a {self.__class__.__name__}: {data_type}"
             )
-        self._data_type = self.__class__.type_map[data_type]
+        _data_type = self.__class__.type_map[data_type]
+        self._data_type = (
+            _data_type(data_type, **args) if callable(_data_type) else _data_type
+        )
         self._constraint = constraints
         self._arguments = args
         constraint_map = self.__class__.constraint_map
@@ -53,7 +56,7 @@ class SQLColumnDefinition(SQLManagedExecutable):
                 )
 
     def get_query(self):
-        return f"""{self._name} {self._data_type} {' '.join([
+        col_sql = f"""{self._name} {self._data_type} {' '.join([
                 self.__class__.constraint_map[flag].format(
                     **{
                         k: v.table if hasattr(v, 'table') else str(v).lower()
@@ -62,6 +65,8 @@ class SQLColumnDefinition(SQLManagedExecutable):
                 )
                 for flag in self._constraint or BOColumnFlag.BOC_NONE
             ])}"""
+        # LOG.debug(f"SQLColumnDefinition.get_query()={col_sql}")
+        return col_sql
 
 
 class From(SQLManagedExecutable):
