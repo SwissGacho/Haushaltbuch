@@ -1,11 +1,11 @@
-"""Connection to MySQL DB using aiomysql"""
+"""Connection to MySQL DB using asyncmy"""
 
-from typing import Self
+import ssl
 import datetime
 
 from core.app import App
 from core.configuration.config import Config, DBConfig
-from core.exceptions import ConfigurationError
+from core.exceptions import ConfigurationError, OperationalError
 from core.util import get_config_item
 from database.dbms.db_base import DB, Connection, Cursor
 from database.sql_factory import SQLFactory
@@ -20,11 +20,12 @@ from core.app_logging import getLogger
 LOG = getLogger(__name__)
 
 try:
-    import aiomysql
+    import asyncmy
 except ModuleNotFoundError as err:
-    AIOMYSQL_IMPORT_ERROR = err
+    ASYNCMY_IMPORT_ERROR = err
+    asyncmy = None
 else:
-    AIOMYSQL_IMPORT_ERROR = None
+    ASYNCMY_IMPORT_ERROR = None
 
 
 class MySQLFactory(SQLFactory):
@@ -44,7 +45,16 @@ class MySQLFactory(SQLFactory):
 
 
 MYSQL_JSON_TYPE = "JSON"
-MYSQL_BASEFLAG_TYPE = "BIT(64)"
+
+
+def baseflag_datatype(data_type, **args):
+    "Return the datatype for a BaseFlag column"
+    if data_type is not BaseFlag:
+        raise ValueError(f"baseflag_datatype called with invalid type {data_type}")
+    if not issubclass(args.get("flag_type"), BaseFlag):
+        raise ValueError(f"baseflag_datatype called without valid flag_type: {args}")
+    flags = ",".join([f"'{v.name.lower()}'" for v in list(args.get("flag_type"))])
+    return f"SET ({flags})"
 
 
 class MySQLColumnDefinition(SQLColumnDefinition):
@@ -57,7 +67,7 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         dict: MYSQL_JSON_TYPE,
         list: MYSQL_JSON_TYPE,
         BOBaseBase: "INT",
-        BaseFlag: MYSQL_BASEFLAG_TYPE,
+        BaseFlag: baseflag_datatype,
     }
     constraint_map = {
         BOColumnFlag.BOC_NONE: "",
@@ -81,9 +91,10 @@ class MySQLScript(SQLScript):
         SQLTemplate.TABLEINFO: """ SELECT columns.column_name AS name,
                                 CONCAT_WS(' ',
                                     columns.COLUMN_NAME,
-                                    UPPER(CASE WHEN SUBSTR(constraints.CHECK_CLAUSE, 1, 4) = 'json' THEN 'json'
-                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit' ) THEN columns.COLUMN_TYPE
-                                        ELSE columns.DATA_TYPE END),
+                                    CASE WHEN SUBSTR(constraints.CHECK_CLAUSE, 1, 4) = 'json' THEN 'JSON'
+                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit' ) THEN UPPER(columns.COLUMN_TYPE)
+                                        WHEN columns.DATA_TYPE = 'set' THEN CONCAT('SET ', SUBSTR(columns.COLUMN_TYPE,4))
+                                        ELSE UPPER(columns.DATA_TYPE) END,
                                     UPPER(CASE WHEN columns.IS_NULLABLE <> 'YES' AND columns.COLUMN_KEY <> 'PRI' THEN 'NOT NULL' 
                                         ELSE NULL END),
                                     UPPER(CASE WHEN columns.EXTRA <> '' THEN columns.EXTRA ELSE NULL END),
@@ -138,8 +149,8 @@ class MySQLUpdate(Update):
 
 class MySQLDB(DB):
     def __init__(self, **cfg) -> None:
-        if AIOMYSQL_IMPORT_ERROR:
-            raise ModuleNotFoundError(f"Import error: {AIOMYSQL_IMPORT_ERROR}")
+        if ASYNCMY_IMPORT_ERROR:
+            raise ModuleNotFoundError(f"Import error: {ASYNCMY_IMPORT_ERROR}")
         super().__init__(**cfg)
 
     @property
@@ -189,11 +200,22 @@ class MySQLConnection(Connection):
 
     async def connect(self):
         # LOG.debug(f"MySQLConnection.connect({self._cfg=})")
-        self._connection: aiomysql.Connection = await aiomysql.connect(
+        ssl_cfg = self._cfg.get(Config.CONFIG_DBSSL)
+        ssl_ctx = None
+        if ssl_cfg and isinstance(ssl_cfg, dict):
+            ssl_ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+            ssl_ctx.load_cert_chain(
+                certfile=ssl_cfg.get(Config.CONFIG_DBSSL_CERT),
+                keyfile=ssl_cfg.get(Config.CONFIG_DBSSL_KEY),
+            )
+
+        self._connection: asyncmy.Connection = await asyncmy.connect(
             host=self._cfg[Config.CONFIG_DBHOST],
             db=self._cfg[Config.CONFIG_DBDBNAME],
-            user=self._cfg[Config.CONFIG_DBUSER],
-            password=self._cfg[Config.CONFIG_DBPW],
+            port=self._cfg.get(Config.CONFIG_DBPORT, 3306),
+            user=self._cfg.get(Config.CONFIG_DBUSER),
+            password=self._cfg.get(Config.CONFIG_DBPW),
+            ssl=ssl_ctx,
         )
         await self._check_db_version()
         return self
@@ -210,7 +232,7 @@ class MySQLConnection(Connection):
     async def execute(self, query: str, params=None) -> "MySQLCursor":
         "execute an SQL statement and return a cursor"
         cur = MySQLCursor(
-            cur=await self._connection.cursor(aiomysql.DictCursor), con=self
+            cur=self._connection.cursor(asyncmy.cursors.DictCursor), con=self
         )
         await cur.execute(query, params=params)
         return cur
@@ -220,11 +242,15 @@ class MySQLCursor(Cursor):
 
     async def execute(self, query: str, params=None):
         # LOG.debug(f"MySQLCursor.execute({query=}, {params=})")
-
+        if asyncmy is None:
+            raise ImportError("asyncmy module is not available.")
         conv_sql, args = self.convert_params_named_2_format(
             query, params or {}, dump_json=True
         )
-        # LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
 
-        self._rowcount = await self._cursor.execute(conv_sql, args=args)
+        try:
+            # LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
+            self._rowcount = await self._cursor.execute(conv_sql, args=args)
+        except asyncmy.OperationalError as exc:
+            raise OperationalError(f"{exc} during SQL execution") from exc
         return self

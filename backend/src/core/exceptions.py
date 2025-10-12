@@ -5,6 +5,14 @@ class OperationalError(Exception):
     "Error during DB operation"
 
 
+class CommitError(OperationalError):
+    "Error during commit operation"
+
+
+class RollBackRequested(Exception):
+    "Rollback requested by user"
+
+
 class DBSchemaError(Exception):
     "Invalid DB schema detected."
 

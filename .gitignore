@@ -171,4 +171,4 @@ cython_debug/
 backend/src/configuration.json
 backend/src/configuration_mysql.json
 .vscode/settings.json
-backend/src/play_w_db.py
+*.key.pem

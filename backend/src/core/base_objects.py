@@ -51,9 +51,13 @@ class Config(StrEnum):
     CONFIG_DB_DB = "/".join([CONFIG_DB, "db"])
     CONFIG_DBFILE = "file"
     CONFIG_DBHOST = "host"
+    CONFIG_DBPORT = "port"
     CONFIG_DBDBNAME = "dbname"
     CONFIG_DBUSER = "dbuser"
     CONFIG_DBPW = "password"
+    CONFIG_DBSSL = "ssl"
+    CONFIG_DBSSL_CERT = "ssl_cert"
+    CONFIG_DBSSL_KEY = "ssl_key"
     CONFIG_CFG_SEARCH_PATH = "config_search_path"
     CONFIG_SYSTEM = "system"
     CONFIG_DB_LOCATIONS = "db_paths"
