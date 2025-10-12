@@ -202,7 +202,7 @@ class BOFlag(_PersistantAttr):
     def __init__(
         self, flag_type: type[Flag], flag: BOColumnFlag = BOColumnFlag.BOC_NONE
     ) -> None:
-        # LOG.debug(f"{relation=}")
+        # LOG.debug(f"{flag_type=}; {flag=}")
         if not issubclass(flag_type, BaseFlag):
             raise TypeError("BO Flag should be derived from BaseFlag.")
 

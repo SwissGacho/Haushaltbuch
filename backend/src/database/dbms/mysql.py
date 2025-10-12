@@ -22,10 +22,10 @@ LOG = getLogger(__name__)
 try:
     import asyncmy
 except ModuleNotFoundError as err:
-    AIOMYSQL_IMPORT_ERROR = err
+    ASYNCMY_IMPORT_ERROR = err
     asyncmy = None
 else:
-    AIOMYSQL_IMPORT_ERROR = None
+    ASYNCMY_IMPORT_ERROR = None
 
 
 class MySQLFactory(SQLFactory):
@@ -48,6 +48,16 @@ MYSQL_JSON_TYPE = "JSON"
 MYSQL_BASEFLAG_TYPE = "BIT(64)"
 
 
+def baseflag_datatype(data_type, **args):
+    "Return the datatype for a BaseFlag column"
+    if data_type is not BaseFlag:
+        raise ValueError(f"baseflag_datatype called with invalid type {data_type}")
+    if not issubclass(args.get("flag_type"), BaseFlag):
+        raise ValueError(f"baseflag_datatype called without valid flag_type: {args}")
+    flags = ",".join([f"'{v.name.lower()}'" for v in list(args.get("flag_type"))])
+    return f"SET ({flags})"
+
+
 class MySQLColumnDefinition(SQLColumnDefinition):
 
     type_map = {
@@ -58,7 +68,7 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         dict: MYSQL_JSON_TYPE,
         list: MYSQL_JSON_TYPE,
         BOBaseBase: "INT",
-        BaseFlag: MYSQL_BASEFLAG_TYPE,
+        BaseFlag: baseflag_datatype,
     }
     constraint_map = {
         BOColumnFlag.BOC_NONE: "",
@@ -82,9 +92,10 @@ class MySQLScript(SQLScript):
         SQLTemplate.TABLEINFO: """ SELECT columns.column_name AS name,
                                 CONCAT_WS(' ',
                                     columns.COLUMN_NAME,
-                                    UPPER(CASE WHEN SUBSTR(constraints.CHECK_CLAUSE, 1, 4) = 'json' THEN 'json'
-                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit' ) THEN columns.COLUMN_TYPE
-                                        ELSE columns.DATA_TYPE END),
+                                    CASE WHEN SUBSTR(constraints.CHECK_CLAUSE, 1, 4) = 'json' THEN 'JSON'
+                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit' ) THEN UPPER(columns.COLUMN_TYPE)
+                                        WHEN columns.DATA_TYPE = 'set' THEN CONCAT('SET ', SUBSTR(columns.COLUMN_TYPE,4))
+                                        ELSE UPPER(columns.DATA_TYPE) END,
                                     UPPER(CASE WHEN columns.IS_NULLABLE <> 'YES' AND columns.COLUMN_KEY <> 'PRI' THEN 'NOT NULL' 
                                         ELSE NULL END),
                                     UPPER(CASE WHEN columns.EXTRA <> '' THEN columns.EXTRA ELSE NULL END),
@@ -139,8 +150,8 @@ class MySQLUpdate(Update):
 
 class MySQLDB(DB):
     def __init__(self, **cfg) -> None:
-        if AIOMYSQL_IMPORT_ERROR:
-            raise ModuleNotFoundError(f"Import error: {AIOMYSQL_IMPORT_ERROR}")
+        if ASYNCMY_IMPORT_ERROR:
+            raise ModuleNotFoundError(f"Import error: {ASYNCMY_IMPORT_ERROR}")
         super().__init__(**cfg)
 
     @property

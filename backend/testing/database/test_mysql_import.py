@@ -32,12 +32,12 @@ class MySQLImport(unittest.TestCase):
         with patch.dict("sys.modules", {"aiomysql": types.ModuleType("aiomysql")}):
             import database.dbms.mysql
 
-            self.assertIsNone(database.dbms.mysql.AIOMYSQL_IMPORT_ERROR)
+            self.assertIsNone(database.dbms.mysql.ASYNCMY_IMPORT_ERROR)
 
     def test_101_failed_aiomysql_import(self):
         with patch.dict("sys.modules", {"aiomysql": None}):
             import database.dbms.mysql
 
             self.assertIsInstance(
-                database.dbms.mysql.AIOMYSQL_IMPORT_ERROR, ModuleNotFoundError
+                database.dbms.mysql.ASYNCMY_IMPORT_ERROR, ModuleNotFoundError
             )

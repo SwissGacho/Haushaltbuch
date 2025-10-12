@@ -69,6 +69,7 @@ async def main():
             except DBSchemaError as exc:
                 App.status_object.status = Status.STATUS_NO_DB
                 LOG.error(f"DB unusable. ({exc})")
+                break
             LOG.info("DB restarting")
             App.db_available.clear()
             App.db_failure.clear()
