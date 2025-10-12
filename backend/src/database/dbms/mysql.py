@@ -45,7 +45,6 @@ class MySQLFactory(SQLFactory):
 
 
 MYSQL_JSON_TYPE = "JSON"
-MYSQL_BASEFLAG_TYPE = "BIT(64)"
 
 
 def baseflag_datatype(data_type, **args):
