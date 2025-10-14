@@ -188,6 +188,9 @@ class BORelation(_PersistantAttr[BOBaseBase]):
     def data_type(cls):
         return BOBaseBase
 
+    def relation(self):
+        return self._flag_values.get("relation")
+
     def validate(self, value):
         relation = self._flag_values.get("relation")
         return (
