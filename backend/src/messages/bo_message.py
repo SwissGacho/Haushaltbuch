@@ -31,17 +31,6 @@ class DataObjectTypes(StrEnum):
     DO_TYPE_SETUP_CONFIG = "setup_config"
 
 
-def callback(subscribed_object: BOBase):
-    msg = ObjectMessage()
-    msg.add(
-        {
-            MessageAttribute.WS_ATTR_OBJECT: subscribed_object.bo_type_name(),
-            MessageAttribute.WS_ATTR_INDEX: subscribed_object.id,
-            MessageAttribute.WS_ATTR_PAYLOAD: subscribed_object.__class__.attributes_as_dict(),
-        }
-    )
-
-
 class ObjectMessage(Message):
     "Message containing a single requested business object"
 
