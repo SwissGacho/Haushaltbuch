@@ -12,10 +12,6 @@ class MockBOBase(BOBase):
         print(f"MockBOBase.__new__({cls=}, {id=}, {args=}, {attributes=})")
         return super().__new__(cls)
 
-    @classmethod
-    def subscribe_to_creation(cls, callback):
-        return 1
-
 
 class MockConnection:
     pass

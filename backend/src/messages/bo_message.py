@@ -6,6 +6,7 @@ from typing import TypeAlias, Union
 from enum import StrEnum
 import pathlib
 
+from business_objects.business_object_base import BOBase
 from server.ws_token import WSToken
 from messages.message import Message, MessageType, MessageAttribute
 from core.base_objects import BaseObject
@@ -30,17 +31,6 @@ class DataObjectTypes(StrEnum):
     DO_TYPE_SETUP_CONFIG = "setup_config"
 
 
-class FetchMessage(Message):
-    "Message requesting a business object"
-
-    @classmethod
-    def message_type(cls) -> MessageType:
-        return MessageType.WS_TYPE_FETCH
-
-    async def handle_message(self, connection):
-        "handle a fetch message"
-
-
 class ObjectMessage(Message):
     "Message containing a single requested business object"
 
@@ -50,7 +40,7 @@ class ObjectMessage(Message):
 
     def __init__(
         self,
-        object_type: DataObjectTypes,
+        object_type: DataObjectTypes | type[BOBase],
         index: int | str | None,
         payload: JSONAble,
         token: WSToken | None = None,
@@ -58,9 +48,13 @@ class ObjectMessage(Message):
     ) -> None:
         self.message = {}
         super().__init__(token=token, status=status)
+        if isinstance(object_type, type):
+            str_object_type = object_type._name()
+        else:
+            str_object_type = object_type.value
         self.add(
             {
-                MessageAttribute.WS_ATTR_OBJECT: object_type,
+                MessageAttribute.WS_ATTR_OBJECT: str_object_type,
                 MessageAttribute.WS_ATTR_INDEX: index,
                 MessageAttribute.WS_ATTR_PAYLOAD: payload,
             }

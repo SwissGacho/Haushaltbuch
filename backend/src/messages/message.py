@@ -1,5 +1,6 @@
 """Websocket messages exchanged between backend and frontend"""
 
+from datetime import datetime
 import pathlib
 from enum import StrEnum
 from json import dumps, loads
@@ -68,11 +69,9 @@ class MessageAttribute(StrEnum):
 
 def json_encode(obj: Any) -> Any:
     "jsonize objects"
-    return (
-        str(obj)
-        if isinstance(obj, BaseObject) or isinstance(obj, pathlib.Path)
-        else obj
-    )
+    if hasattr(obj, "json_encode"):
+        return obj.json_encode()
+    return str(obj) if isinstance(obj, (datetime, pathlib.Path)) else obj
 
 
 def _serialize(msg_dict: dict) -> dict:
