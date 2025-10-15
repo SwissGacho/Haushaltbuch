@@ -59,7 +59,8 @@ class ColorFormatter(logging.Formatter):
         record.levelname = f"{color}{record.levelname}{RESET}"
         record.msg = f"{color}{record.getMessage()}{RESET}"
         return self.base_formatter.format(record)
-# pylint: disable=invalid-name,unused-argument
+
+
 def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
     "Create module specific logger and log potentially module code entry (when module is imported)"
     logger = logging.getLogger(
