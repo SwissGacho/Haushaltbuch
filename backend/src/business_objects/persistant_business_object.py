@@ -85,7 +85,7 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
-        # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
+        # LOG.debug(f"PersistentBusinessObject.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
 
     async def fetch(self, id=None, newest=None):
