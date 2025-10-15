@@ -94,7 +94,7 @@ class PersistentBusinessObject(BOBase):
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
-        # LOG.debug(f'BOBase.fetch({id=}, {newest=})')
+        # LOG.debug(f"PersistentBusinessObject.fetch({id=}, {newest=})")
         if id is None:
             id = self.id
         if id is None and newest is None:
