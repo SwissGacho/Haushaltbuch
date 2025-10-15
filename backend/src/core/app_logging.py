@@ -43,14 +43,14 @@ class ColorFormatter(logging.Formatter):
 
     def __init__(self):
         base_format = (
-            "%(asctime)s  %(name)-60s:%(lineno)4d " "- %(levelname)-5s - %(message)s"
+            "%(asctime)s  %(name)-55s:%(lineno)4d - %(levelname)-5s - %(message)s"
         )
         super().__init__(base_format)
         self.base_formatter = logging.Formatter(base_format)
 
     def format(self, record):
         color = self.COLORS.get(record.levelno, "")
-        record.levelname = f"{color}{record.levelname}{RESET}"
+        record.levelname = f"{color}{record.levelname:<5s}{RESET}"
         return self.base_formatter.format(record)
 
 
