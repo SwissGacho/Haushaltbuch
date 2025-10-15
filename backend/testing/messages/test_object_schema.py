@@ -1,16 +1,24 @@
 import unittest
 
-from business_objects.business_object_base import BOBase
 from data.management.configuration import Configuration
-from data.management.user import User
 from messages.object_schema import ObjectSchema
+from business_objects.bo_descriptors import (
+    BOStr,
+    BOList,
+    BORelation,
+    BOColumnFlag,
+    BOBaseBase,
+)
 
 
-class MockBOBase(BOBase):
+class MockBOBase(BOBaseBase):
 
     def __new__(cls, id: int | None = None, *args, **attributes):
         print(f"MockBOBase.__new__({cls=}, {id=}, {args=}, {attributes=})")
         return super().__new__(cls)
+
+    mock_str = BOStr(BOColumnFlag.BOC_NOT_NULL)
+    mock_list = BOList()
 
 
 class Test_100__ObjectSchema(unittest.TestCase):

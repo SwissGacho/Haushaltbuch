@@ -41,8 +41,8 @@ BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 class BOBase(BOBaseBase):
     "Business Object baseclass"
 
-    id = BOId(BOColumnFlag.BOC_PK_INC)
-    last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR)
+    id = BOId(BOColumnFlag.BOC_PK_INC, is_technical=True)
+    last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR, is_technical=True)
     _table = None
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, type["BOBase"]] = {}
@@ -112,6 +112,7 @@ class BOBase(BOBaseBase):
         attribute_name: str,
         data_type: type,
         constraint_flag: BOColumnFlag,
+        is_technical: bool = False,
         **flag_values,
     ):
         if not cls._attributes.get(cls.__name__):
@@ -160,6 +161,19 @@ class BOBase(BOBaseBase):
         assert cls.__base__ is not None, "BOBase.__base__ is None"
         if issubclass(cls.__base__, BOBase):
             return cls.__base__.attributes_as_dict() | cls_cols
+        return cls_cols
+
+    @classmethod
+    def business_attributes_as_dict(cls) -> dict[str, type]:
+        "dict of BO attribute types with attribute names as keys"
+        cls_cols = {
+            a.name: a.data_type
+            for a in cls._attributes.get(cls.__name__, [])
+            if not a.is_technical
+        }
+        assert cls.__base__ is not None, "BOBase.__base__ is None"
+        if issubclass(cls.__base__, BOBase):
+            return cls.__base__.business_attributes_as_dict() | cls_cols
         return cls_cols
 
     @classmethod

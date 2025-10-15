@@ -51,11 +51,15 @@ class BOBaseBase:
 
 class _PersistantAttr[T]:
     def __init__(
-        self, flag: BOColumnFlag = BOColumnFlag.BOC_NONE, **flag_values
+        self,
+        flag: BOColumnFlag = BOColumnFlag.BOC_NONE,
+        is_technical: bool = False,
+        **flag_values,
     ) -> None:
         self._flag = flag
         self._flag_values = flag_values
         self.my_name = None
+        self.is_technical: bool = is_technical
 
     @classmethod
     def data_type(cls):
@@ -73,6 +77,7 @@ class _PersistantAttr[T]:
             name,
             self.__class__.data_type(),
             self._flag or BOColumnFlag.BOC_NONE,
+            is_technical=self.is_technical,
             **(self._flag_values or {}),
         )
 
@@ -184,7 +189,10 @@ class BOList(_PersistantAttr[list]):
 
 class BORelation(_PersistantAttr[BOBaseBase]):
     def __init__(
-        self, relation: type[BOBaseBase], flag: BOColumnFlag = BOColumnFlag.BOC_FK
+        self,
+        relation: type[BOBaseBase],
+        flag: BOColumnFlag = BOColumnFlag.BOC_FK,
+        is_technical: bool = False,
     ) -> None:
         flag |= BOColumnFlag.BOC_FK
         # LOG.debug(f"{relation=}")
@@ -192,7 +200,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
         if not issubclass(relation, BOBaseBase):
             raise TypeError("BO relation should be derived from BOBase.")
 
-        super().__init__(flag, relation=relation)
+        super().__init__(flag, relation=relation, is_technical=is_technical)
 
     @classmethod
     def data_type(cls) -> type[BOBaseBase]:
@@ -207,8 +215,9 @@ class BORelation(_PersistantAttr[BOBaseBase]):
         # assert issubclass(owner, BOBaseBase)
         owner.add_attribute(
             name,
-            self._relation,
+            BOBaseBase,  # self._relation,
             self._flag or BOColumnFlag.BOC_NONE,
+            is_technical=self.is_technical,
             **(self._flag_values or {}),
         )
 
