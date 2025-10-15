@@ -1,6 +1,5 @@
 """Clauses used in SQL statements."""
 
-from calendar import c
 from enum import Enum
 from typing import Self
 
@@ -86,7 +85,7 @@ class From(SQLManagedExecutable):
     def _get_join_clause(
         self, join: tuple[JoinOperator, str, SQLExpression | None]
     ) -> str:
-        join_operator = None
+        join_operator = ""
         if join[0]:
             join_operator = join[0].value
         join_table = join[1]

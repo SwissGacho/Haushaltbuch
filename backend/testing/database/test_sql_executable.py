@@ -1,4 +1,3 @@
-from calendar import c
 import unittest
 from unittest.mock import Mock, AsyncMock
 from unittest.mock import patch

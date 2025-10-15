@@ -6,8 +6,8 @@ Business objects are classes that support persistance in the data base
 import asyncio
 import itertools
 from typing import Any, Coroutine, TypeAlias, Optional, Callable
+from dataclasses import dataclass
 
-from cycler import V
 
 from core.util import _classproperty
 from core.app_logging import getLogger, log_exit
@@ -24,9 +24,17 @@ from business_objects.bo_descriptors import (
 )
 
 
-AttributeDescription: TypeAlias = tuple[
-    str, type, BOColumnFlag, dict[str, str | BOBaseBase]
-]
+@dataclass(frozen=True)
+class AttributeDescription:
+    """Description of a business object attribute"""
+
+    name: str
+    data_type: type
+    constraint: BOColumnFlag
+    flag_values: dict[str, str | BOBaseBase]
+    is_technical: bool = False
+
+
 BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 
 
@@ -58,13 +66,13 @@ class BOBase(BOBaseBase):
         cls._creation_subscribers = {}
         cls._change_subscribers = {}
 
-    # pylint: disable=redefined-builtin
-    def __init__(self, *args, id: int | None = None, **attributes) -> None:
-        LOG.debug(f"BOBase({id=},{attributes})")
+    # pylint: disable=redefined-builtin, unused-argument
+    def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
+        LOG.debug(f"BOBase({bo_id=},{attributes})")
         self._instance_subscribers: dict[int, BOCallback] = {}
         self._data = {}
         self._db_data = {}
-        self.id = id
+        self.id = bo_id
         self.last_updated = None
         self._instance_subscriber_id = itertools.count(1)
         for attribute, value in attributes.items():
@@ -74,7 +82,7 @@ class BOBase(BOBaseBase):
         """Logs exceptions from background callback tasks."""
         try:
             task.result()  # Raise exception if one occurred during the task
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             LOG.exception(
                 f"Exception raised in background creation callback task: {task.get_name()}"
             )
@@ -108,13 +116,18 @@ class BOBase(BOBaseBase):
     ):
         if not cls._attributes.get(cls.__name__):
             cls._attributes[cls.__name__] = []
-        if any(a[0] == attribute_name for a in cls._attributes[cls.__name__]):
+        if any(a.name == attribute_name for a in cls._attributes[cls.__name__]):
             LOG.warning(
                 f"BOBase.add_attribute({cls.__name__}, {attribute_name}) already registered"
             )
             return
         cls._attributes[cls.__name__].append(
-            (attribute_name, data_type, constraint_flag, flag_values)
+            AttributeDescription(
+                name=attribute_name,
+                data_type=data_type,
+                constraint=constraint_flag,
+                flag_values=flag_values,
+            )
         )
 
     @classmethod
@@ -143,7 +156,7 @@ class BOBase(BOBaseBase):
     @classmethod
     def attributes_as_dict(cls) -> dict[str, type]:
         "dict of BO attribute types with attribute names as keys"
-        cls_cols = {a[0]: a[1] for a in cls._attributes.get(cls.__name__, [])}
+        cls_cols = {a.name: a.data_type for a in cls._attributes.get(cls.__name__, [])}
         assert cls.__base__ is not None, "BOBase.__base__ is None"
         if issubclass(cls.__base__, BOBase):
             return cls.__base__.attributes_as_dict() | cls_cols
@@ -161,21 +174,21 @@ class BOBase(BOBaseBase):
     @classmethod
     def primary_key(cls) -> str:
         "Name of the primary key attribute"
-        for name, _, constraint, _ in cls.attribute_descriptions():
+        for description in cls.attribute_descriptions():
             if (
-                constraint == BOColumnFlag.BOC_PK
-                or constraint == BOColumnFlag.BOC_PK_INC
+                description.constraint == BOColumnFlag.BOC_PK
+                or description.constraint == BOColumnFlag.BOC_PK_INC
             ):
-                return name
+                return description.name
         raise ValueError(f"No primary key defined for {cls.__name__}")
 
     @classmethod
     def references(cls) -> list[str | BOBaseBase | None]:
         "list of business objects referenced by this class"
         return [
-            a[3].get("relation")
+            a.flag_values.get("relation")
             for a in cls.attribute_descriptions()
-            if a[1] == BOBaseBase and a[2] == BOColumnFlag.BOC_FK
+            if a.data_type == BOBaseBase and a.constraint == BOColumnFlag.BOC_FK
         ]
 
     @classmethod
@@ -203,9 +216,10 @@ class BOBase(BOBaseBase):
         """Unregister a callback from the creation list."""
         # LOG.debug(f"Unsubscribing callback {callback_id} from creation subscribers")
         # LOG.debug(f"Current subscribers: {cls._creation_subscribers}")
-        if not callback_id in cls._creation_subscribers:
+        if callback_id not in cls._creation_subscribers:
             LOG.warning(
-                f"Callback id {callback_id} not found in creation subscribers: {cls._creation_subscribers}"
+                # pylint: disable=line-too-long
+                f"Callback id {callback_id} not in creation subscribers: {cls._creation_subscribers}"
             )
             return
         del cls._creation_subscribers[callback_id]
@@ -227,9 +241,9 @@ class BOBase(BOBaseBase):
     @classmethod
     def unsubscribe_from_all_changes(cls, callback_id: int):
         """Unregister a callback from the change list by id."""
-        if not callback_id in cls._change_subscribers:
+        if callback_id not in cls._change_subscribers:
             LOG.warning(
-                f"Callback id {callback_id} not found in change subscribers: {cls._change_subscribers}"
+                f"Callback id {callback_id} not in change subscribers: {cls._change_subscribers}"
             )
             return
         del cls._change_subscribers[callback_id]
@@ -300,7 +314,7 @@ class BOBase(BOBaseBase):
                     name=f"subscriber_callback_{callback.__name__}_{changed_bo.id}",
                 )
                 task.add_done_callback(changed_bo.handle_callback_result)
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 LOG.exception(
                     f"Error scheduling callback {callback.__name__} for {changed_bo!r}"
                 )

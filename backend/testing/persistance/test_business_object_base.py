@@ -4,7 +4,7 @@ import datetime
 import unittest
 from unittest.mock import DEFAULT, Mock, AsyncMock, patch, call, ANY
 
-from business_objects.business_object_base import BOBase
+from business_objects.business_object_base import AttributeDescription, BOBase
 from business_objects.bo_descriptors import (
     BOStr,
     BOList,
@@ -27,23 +27,31 @@ class MockBO2(BOBase):
     mock_attr3 = BOList()
 
     def __init__(
-        self, id=None, mock_attr1="mockk attriubute 1", mock_attr2=None, mock_attr3=[]
+        self,
+        bo_id=None,
+        mock_attr1="mock attribute 1",
+        mock_attr2=None,
+        mock_attr3=[],
     ) -> None:
-        super().__init__(id=id)
+        super().__init__(bo_id=bo_id)
         self.mock_attr1 = mock_attr1
         self.mock_attr2 = mock_attr2
         self.mock_attr3 = mock_attr3
 
 
 mock_attr_desc = [
-    ("id", int, BOColumnFlag.BOC_PK_INC, {}),
-    ("last_updated", datetime.datetime, BOColumnFlag.BOC_DEFAULT_CURR, {}),
-    ("mock_attr1", str, BOColumnFlag.BOC_NONE, {}),
-    ("mock_attr2", BOBaseBase, BOColumnFlag.BOC_FK, {"relation": MockBO1}),
-    ("mock_attr3", list, BOColumnFlag.BOC_NONE, {}),
+    AttributeDescription("id", int, BOColumnFlag.BOC_PK_INC, {}),
+    AttributeDescription(
+        "last_updated", datetime.datetime, BOColumnFlag.BOC_DEFAULT_CURR, {}
+    ),
+    AttributeDescription("mock_attr1", str, BOColumnFlag.BOC_NONE, {}),
+    AttributeDescription(
+        "mock_attr2", BOBaseBase, BOColumnFlag.BOC_FK, {"relation": MockBO1}
+    ),
+    AttributeDescription("mock_attr3", list, BOColumnFlag.BOC_NONE, {}),
 ]
 
-mock_bo2_as_dict = {a[0]: a[1] for a in mock_attr_desc}
+mock_bo2_as_dict = {a.name: a.data_type for a in mock_attr_desc}
 
 
 class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):

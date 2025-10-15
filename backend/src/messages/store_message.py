@@ -21,10 +21,10 @@ class StoreMessage(Message):
         LOG.debug(f"StoreMessage.handle_message {self.message=}")
         object_type_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
         bo_type = BOBase.get_business_object_by_name(str(object_type_name))
-        id = self.message.get(MessageAttribute.WS_ATTR_INDEX)
-        if id is not None:
-            LOG.debug(f"Updating existing BO {bo_type=} {id=}")
-            updated_bo = bo_type(id=id)
+        bo_id = self.message.get(MessageAttribute.WS_ATTR_INDEX)
+        if bo_id is not None:
+            LOG.debug(f"Updating existing BO {bo_type=} {bo_id=}")
+            updated_bo = bo_type(bo_id=bo_id)
             for key, value in self.message.get(
                 MessageAttribute.WS_ATTR_PAYLOAD, {}
             ).items():
