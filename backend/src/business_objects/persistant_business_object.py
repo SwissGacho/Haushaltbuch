@@ -5,16 +5,17 @@ application's data model."""
 
 import copy
 import json
-from typing import Optional
-from core.app_logging import getLogger
+from typing import Any, Optional
 from datetime import date, datetime, UTC
+from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
+from core.exceptions import CannotStoreEmptyBO
 from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
 from database.sql_expression import Eq, Filter, SQLExpression
-from database.sql_statement import CreateTable, Value
+from database.sql_statement import CreateTable, NamedValueListList, Value
 from business_objects.business_object_base import BOBase
 
 
@@ -34,7 +35,7 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def convert_from_db(cls, value, typ):
         "convert a value of type 'typ' read from the DB"
-        # LOG.debug(f"BOBase.convert_from_db({value=}, {type(value)=}, {typ=})")
+        # LOG.debug(f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=})")
         if value is None:
             return None
         if typ == date and isinstance(value, str):
@@ -48,7 +49,7 @@ class PersistentBusinessObject(BOBase):
             try:
                 return json.loads(value)
             except json.JSONDecodeError as exc:
-                LOG.error(f"BOBase.convert_from_db: JSONDecodeError: {exc}")
+                LOG.error(f"PersistentBusinessObject.convert_from_db: JSONDecodeError: {exc}")
         return copy.deepcopy(value)
 
     @classmethod
@@ -59,7 +60,7 @@ class PersistentBusinessObject(BOBase):
             # create_table: CreateTable = txaction.sql().create_table(cls.table)
             s = txaction.sql()
             create_table: CreateTable = s.create_table(cls.table)
-            # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+            # LOG.debug(f"PersistentBusinessObject.sql_create_table():  {cls.table=}")
             for name, data_type, constraint, pars in attributes:
                 # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
                 create_table.column(name, data_type, constraint, **pars)
@@ -73,17 +74,18 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchone()
-        # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
+        # LOG.debug(f"PersistentBusinessObject.count_rows({conditions=}) {result=} -> return {result["count"]}")
         return result["count"]
 
     @classmethod
-    async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
+    async def get_matching_ids(cls, conditions: dict | None = None):
         """Get the ids of business objects matching the conditions"""
         async with SQL() as sql:
             select = sql.select(["id"]).from_(cls.table)
-            select.where(Filter(conditions))
+            if conditions:
+                select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
-        # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
+        # LOG.debug(f"PersistentBusinessObject.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
 
     async def fetch(self, id=None, newest=None):
@@ -92,7 +94,7 @@ class PersistentBusinessObject(BOBase):
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
-        # LOG.debug(f'BOBase.fetch({id=}, {newest=})')
+        # LOG.debug(f"PersistentBusinessObject.fetch({id=}, {newest=})")
         if id is None:
             id = self.id
         if id is None and newest is None:
@@ -106,10 +108,11 @@ class PersistentBusinessObject(BOBase):
                 select.where(Eq("id", id))
             elif newest:
                 select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
+            LOG.debug(f"BOBase.fetch: {select=}")
             self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
-            # LOG.debug(f"BOBase.fetch: {self._db_data=}")
+            # LOG.debug(f"PersistentBusinessObject.fetch: {self._db_data=}")
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
                 self._data[attr] = PersistentBusinessObject.convert_from_db(
                     self._db_data.get(attr), typ
@@ -125,23 +128,31 @@ class PersistentBusinessObject(BOBase):
             await self._insert_self()
         else:
             await self._update_self()
+        await super().store()
+
+    async def business_values_as_dict(self) -> dict[str, Any]:
+        LOG.debug(f"{self}.business_values_as_dict: {self.id=}")
+        await self.fetch(self.id)
+        return await super().business_values_as_dict()
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
-
+        values_to_store: NamedValueListList = [
+            [(k, v)] for k, v in self._data.items() if k != "id" and v is not None
+        ]
+        if len(values_to_store) == 0:
+            raise CannotStoreEmptyBO(f"Cannot store {self._data=} as it has no values")
+        for k, v in self._data.items():
+            if k != "id" and v is None:
+                LOG.debug(f"{k=}: {v}")
+        LOG.debug(f"Inserting new {self} into DB")
         async with SQLTransaction() as txaction:
             self.id = (
                 await (
                     await (
                         txaction.sql()
                         .insert(self.table)
-                        .rows(
-                            [
-                                (k, v)
-                                for k, v in self._data.items()
-                                if k != "id" and v is not None
-                            ]
-                        )
+                        .rows(values_to_store)
                         .returning("id")
                     ).execute()
                 ).fetchone()

@@ -13,6 +13,10 @@ class BaseObject:
     def __init__(self, *args, **kwargs) -> None:
         pass
 
+    def json_encode(self) -> str:
+        "JSON representation of the object"
+        return str(self)
+
 
 class Status(StrEnum):
     "Values for global app status"
