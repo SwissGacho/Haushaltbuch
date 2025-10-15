@@ -1,0 +1,1 @@
+This PR modifies the BaseFlag behavior to handle value conversion in the setter method rather than the getter method. This improves the consistency and accuracy of flag value handling. Multiple files have been updated to implement this change.
