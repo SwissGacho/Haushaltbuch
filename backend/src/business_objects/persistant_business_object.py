@@ -74,7 +74,7 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchone()
-        # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
+        # LOG.debug(f"PersistentBusinessObject.count_rows({conditions=}) {result=} -> return {result["count"]}")
         return result["count"]
 
     @classmethod
