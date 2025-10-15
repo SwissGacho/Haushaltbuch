@@ -135,15 +135,6 @@ class BOBase(BOBaseBase):
             return cls._business_objects[name]
         raise ValueError(f"No type of business object with name '{name}' found")
 
-    @classmethod
-    def bo_type_name(cls) -> str:
-        "Get the name of this business object type"
-        return cls._name()
-
-    @classmethod
-    def _name(cls) -> str:
-        return cls.__name__.lower()
-
     @_classproperty
     def table(self) -> str:
         "Name of the BO's DB table"

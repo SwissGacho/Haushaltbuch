@@ -39,6 +39,15 @@ class BOBaseBase:
     ):
         pass
 
+    @classmethod
+    def bo_type_name(cls) -> str:
+        "Get the name of this business object type"
+        return cls._name()
+
+    @classmethod
+    def _name(cls) -> str:
+        return cls.__name__.lower()
+
 
 class _PersistantAttr[T]:
     def __init__(
@@ -179,17 +188,29 @@ class BORelation(_PersistantAttr[BOBaseBase]):
     ) -> None:
         flag |= BOColumnFlag.BOC_FK
         # LOG.debug(f"{relation=}")
+        self._relation = relation
         if not issubclass(relation, BOBaseBase):
             raise TypeError("BO relation should be derived from BOBase.")
 
         super().__init__(flag, relation=relation)
 
     @classmethod
-    def data_type(cls):
+    def data_type(cls) -> type[BOBaseBase]:
         return BOBaseBase
 
-    def relation(self):
-        return self._flag_values.get("relation")
+    def __set_name__(self, owner, name):
+        self.my_name = name
+        # LOG.debug(
+        #     f"PersistantAttr.__set_name__({owner=}, {name=})"
+        #     f" {self.__class__.data_type()=} {self._flag=} {self._flag_values=}"
+        # )
+        # assert issubclass(owner, BOBaseBase)
+        owner.add_attribute(
+            name,
+            self._relation,
+            self._flag or BOColumnFlag.BOC_NONE,
+            **(self._flag_values or {}),
+        )
 
     def validate(self, value):
         relation = self._flag_values.get("relation")
