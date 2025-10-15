@@ -65,7 +65,6 @@ def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
         APPNAME if name == "__main__" else (APPNAME + "." + name)
     )
 
-    print(f"{logger.handlers=}")
     if not logger.handlers:
         handler = logging.StreamHandler()
         handler.setFormatter(ColorFormatter())
@@ -74,11 +73,10 @@ def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
 
     if _LOG_MODULE_ENTRY:
         logger.debug("Enter module")
-    print(f"{logger.handlers=}")
     return logger
 
 
 def log_exit(logger):
-    "Log end of execution of the modole code"
+    "Log end of execution of the module code"
     if _LOG_MODULE_EXIT:
         logger.debug("Exit module")
