@@ -33,7 +33,6 @@ class AttributeDescription:
     constraint: BOColumnFlag
     flag_values: dict[str, str | BOBaseBase]
     is_technical: bool = False
-    sub_data_type: type | None = None
 
 
 BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
