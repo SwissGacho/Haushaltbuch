@@ -60,7 +60,7 @@ class PersistentBusinessObject(BOBase):
             # create_table: CreateTable = txaction.sql().create_table(cls.table)
             s = txaction.sql()
             create_table: CreateTable = s.create_table(cls.table)
-            # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+            # LOG.debug(f"PersistentBusinessObject.sql_create_table():  {cls.table=}")
             for name, data_type, constraint, pars in attributes:
                 # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
                 create_table.column(name, data_type, constraint, **pars)
