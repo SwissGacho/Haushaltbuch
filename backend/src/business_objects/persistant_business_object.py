@@ -49,7 +49,7 @@ class PersistentBusinessObject(BOBase):
             try:
                 return json.loads(value)
             except json.JSONDecodeError as exc:
-                LOG.error(f"BOBase.convert_from_db: JSONDecodeError: {exc}")
+                LOG.error(f"PersistentBusinessObject.convert_from_db: JSONDecodeError: {exc}")
         return copy.deepcopy(value)
 
     @classmethod
