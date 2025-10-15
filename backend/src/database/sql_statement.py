@@ -215,7 +215,7 @@ class Insert(SQLStatement):
         """Get a string representation of the current SQL statement."""
         if not self._values:
             raise InvalidSQLStatementException(
-                "INSERT statement must have at least one row of values. {self._return_str=}"
+                "INSERT statement must have at least one row of values."
             )
         query = " ".join(
             [

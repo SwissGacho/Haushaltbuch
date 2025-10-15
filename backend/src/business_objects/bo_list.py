@@ -36,7 +36,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
     ) -> None:
         # Initialize _subscription_id and self._bo_type, as it is used in cleanup if __init__ fails
         self._subscription_id: int | None = None
-        # print(f"BOList.__init__({bo_type=}, {connection=})")
+        # print(f"BOSubscription.__init__({bo_type=}, {connection=})")
         # LOG.debug(f"===============================================")
         LOG.debug(f"BOSubscription.__init__({bo_type=}, {id=}, {connection=})")
         TransientBusinessObject.__init__(self)
@@ -69,7 +69,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
             raise ValueError("BOSubscription requires an 'id' argument of type int")
 
         bo_id = int(kwargs["id"])
-        bo = self._bo_type(id=bo_id)
+        bo = self._bo_type(bo_id=bo_id)
         self._subscription_id = bo.subscribe_to_all_changes(self._handle_event_)
         self._obj = bo
 
@@ -89,7 +89,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
     async def _handle_event_(self, _: BOBase):
         """Should be called when the underlying information of the list changes.
         This method will update the list of objects and notify subscribers."""
-        # LOG.debug(f"BOList._handle_event_({changed_bo}) - {self._bo_type=}")
+        # LOG.debug(f"BOSubscription._handle_event_({changed_bo}) - {self._bo_type=}")
         if self._bo_type is None:
             LOG.debug("BOSubscription._handle_event_: _bo_type is None, nothing to do")
             return
@@ -111,13 +111,15 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         )
 
     def cleanup(self):
-        LOG.debug(f"BOList.cleanup({self._connection})")
+        LOG.debug(f"BOSubscription.cleanup({self._connection})")
         # LOG.debug(f"{self._subscription_id=}, {self._bo_type=}")
         if self._subscription_id is None:
-            LOG.debug(f"BOList.cleanup: Nothing to cleanup, _subscription_id is None")
+            LOG.debug(
+                f"BOSubscription.cleanup: Nothing to cleanup, _subscription_id is None"
+            )
             return
         if self._bo_type is None:
-            LOG.debug(f"BOList.cleanup: Cannot cleanup, _bo_type is None")
+            LOG.debug(f"BOSubscription.cleanup: Cannot cleanup, _bo_type is None")
             return
         if self._obj is None:
             LOG.debug(f"BOSubscription.cleanup: Cannot cleanup, _obj is None")
@@ -154,7 +156,9 @@ class BOList(BOSubscription[T]):
         if self._bo_type is None:
             LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
             return []
-        rslt = [self._bo_type(id=cur) for cur in await self._bo_type.get_matching_ids()]
+        rslt = [
+            self._bo_type(bo_id=cur) for cur in await self._bo_type.get_matching_ids()
+        ]
         return rslt
 
     def cleanup(self):

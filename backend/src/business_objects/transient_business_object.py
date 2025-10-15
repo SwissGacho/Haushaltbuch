@@ -23,10 +23,10 @@ class TransientBusinessObject(BOBase):
     _next_id = itertools.count(1)
 
     # When creating a new instance, add it to the list of instances
-    def __init__(self, *args, id=None, **attributes) -> None:
-        LOG.debug(f"TransientBusinessObject.__init__({id=}, {args=}, {attributes=})")
-        super().__init__(id=id, *args, **attributes)
-        if id is None:
+    def __init__(self, *args, bo_id=None, **attributes) -> None:
+        LOG.debug(f"TransientBusinessObject.__init__({bo_id=}, {args=}, {attributes=})")
+        super().__init__(bo_id=bo_id, *args, **attributes)
+        if bo_id is None:
             self.id = next(self._next_id)
         LOG.debug(f"TransientBusinessObject.__init__: assigned id {self.id}")
         self._instances.add(self)
