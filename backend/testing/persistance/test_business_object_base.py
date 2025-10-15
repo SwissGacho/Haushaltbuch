@@ -27,9 +27,13 @@ class MockBO2(BOBase):
     mock_attr3 = BOList()
 
     def __init__(
-        self, id=None, mock_attr1="mockk attriubute 1", mock_attr2=None, mock_attr3=[]
+        self,
+        bo_id=None,
+        mock_attr1="mockk attriubute 1",
+        mock_attr2=None,
+        mock_attr3=[],
     ) -> None:
-        super().__init__(id=id)
+        super().__init__(bo_id=bo_id)
         self.mock_attr1 = mock_attr1
         self.mock_attr2 = mock_attr2
         self.mock_attr3 = mock_attr3

@@ -96,7 +96,7 @@ class ConfigSetup(BaseObject):
             LOG.error(f"Multiple ({len(rows_in_db)}) global configurations in DB")
             raise ConfigurationError("Multiple global configurations in DB")
         elif len(rows_in_db) == 1:
-            bo = await Configuration(id=rows_in_db[0]).fetch()
+            bo = await Configuration(bo_id=rows_in_db[0]).fetch()
             update_dicts_recursively(target=bo.configuration, source=configuration)
         else:
             bo = Configuration(configuration=configuration)
@@ -122,7 +122,7 @@ class ConfigSetup(BaseObject):
             LOG.error(f"{len(rows_in_db)} users named {initial_user['name']} in DB")
             raise DataError("Multiple users in DB")
         elif len(rows_in_db) == 1:
-            user: User = await User(id=rows_in_db[0]).fetch()
+            user: User = await User(bo_id=rows_in_db[0]).fetch()
             user.password = initial_user["password"]
             user.role |= UserRole.ADMIN
         else:

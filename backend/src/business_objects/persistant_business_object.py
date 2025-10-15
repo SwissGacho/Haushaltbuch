@@ -49,7 +49,9 @@ class PersistentBusinessObject(BOBase):
             try:
                 return json.loads(value)
             except json.JSONDecodeError as exc:
-                LOG.error(f"PersistentBusinessObject.convert_from_db: JSONDecodeError: {exc}")
+                LOG.error(
+                    f"PersistentBusinessObject.convert_from_db: JSONDecodeError: {exc}"
+                )
         return copy.deepcopy(value)
 
     @classmethod
@@ -140,7 +142,7 @@ class PersistentBusinessObject(BOBase):
         values_to_store: NamedValueListList = [
             [(k, v)] for k, v in self._data.items() if k != "id" and v is not None
         ]
-        if len(values_to_store) == 0:
+        if not values_to_store:
             raise CannotStoreEmptyBO(f"Cannot store {self._data=} as it has no values")
         for k, v in self._data.items():
             if k != "id" and v is None:
