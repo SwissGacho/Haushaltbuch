@@ -13,12 +13,6 @@ root_logger.setLevel(logging.INFO)
 app_logger = logging.getLogger(APPNAME)
 app_logger.setLevel(logging.DEBUG)
 
-root_handler = logging.StreamHandler()
-root_handler.setFormatter(
-    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-)
-root_logger.addHandler(root_handler)
-
 root_logger.debug("root logger initialized.")
 app_logger.debug("app logger initialized.")
 
@@ -49,16 +43,20 @@ class ColorFormatter(logging.Formatter):
 
     def __init__(self):
         base_format = (
-            "%(asctime)s  %(name)-60s:%(lineno)4d " "- %(levelname)-5s - %(message)s"
+            "%(asctime)s  %(name)-55s:%(lineno)4d - %(levelname)-5s - %(message)s"
         )
         super().__init__(base_format)
         self.base_formatter = logging.Formatter(base_format)
 
     def format(self, record):
         color = self.COLORS.get(record.levelno, "")
-        record.levelname = f"{color}{record.levelname}{RESET}"
-        record.msg = f"{color}{record.getMessage()}{RESET}"
+        record.levelname = f"{color}{record.levelname:<5s}{RESET}"
         return self.base_formatter.format(record)
+
+
+root_handler = logging.StreamHandler()
+root_handler.setFormatter(ColorFormatter())
+root_logger.addHandler(root_handler)
 
 
 def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
@@ -66,12 +64,6 @@ def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
     logger = logging.getLogger(
         APPNAME if name == "__main__" else (APPNAME + "." + name)
     )
-
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(ColorFormatter())
-        logger.addHandler(handler)
-    logger.propagate = False
 
     if _LOG_MODULE_ENTRY:
         logger.debug("Enter module")
