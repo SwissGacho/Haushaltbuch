@@ -1,6 +1,5 @@
 """Clauses used in SQL statements."""
 
-from calendar import c
 from enum import Enum
 from typing import Self
 
