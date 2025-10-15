@@ -47,17 +47,18 @@ class ColorFormatter(logging.Formatter):
         logging.CRITICAL: BG_RED + FG_WHITE + BOLD,
     }
 
-    def format(self, record):
+    def __init__(self):
         base_format = (
             "%(asctime)s  %(name)-60s:%(lineno)4d " "- %(levelname)-5s - %(message)s"
         )
-        formatter = logging.Formatter(base_format)
+        super().__init__(base_format)
+        self.base_formatter = logging.Formatter(base_format)
+
+    def format(self, record):
         color = self.COLORS.get(record.levelno, "")
         record.levelname = f"{color}{record.levelname}{RESET}"
         record.msg = f"{color}{record.getMessage()}{RESET}"
-        return formatter.format(record)
-
-
+        return self.base_formatter.format(record)
 # pylint: disable=invalid-name,unused-argument
 def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
     "Create module specific logger and log potentially module code entry (when module is imported)"
