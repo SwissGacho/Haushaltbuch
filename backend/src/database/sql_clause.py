@@ -178,7 +178,7 @@ class Values(SQLManagedExecutable):
         val_str = str.strip(", ".join([row.get_query(km=self) for row in self._rows]))
         if val_str == "":
             return "DEFAULT VALUES"
-        return f"VALUES {', '.join([row.get_query(km=self) for row in self._rows])}"
+        return f"VALUES {val_str}"
 
     def __len__(self) -> int:
         """Return the number of rows."""
