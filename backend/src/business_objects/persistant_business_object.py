@@ -35,7 +35,7 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def convert_from_db(cls, value, typ):
         "convert a value of type 'typ' read from the DB"
-        # LOG.debug(f"BOBase.convert_from_db({value=}, {type(value)=}, {typ=})")
+        # LOG.debug(f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=})")
         if value is None:
             return None
         if typ == date and isinstance(value, str):
@@ -49,7 +49,7 @@ class PersistentBusinessObject(BOBase):
             try:
                 return json.loads(value)
             except json.JSONDecodeError as exc:
-                LOG.error(f"BOBase.convert_from_db: JSONDecodeError: {exc}")
+                LOG.error(f"PersistentBusinessObject.convert_from_db: JSONDecodeError: {exc}")
         return copy.deepcopy(value)
 
     @classmethod
@@ -60,7 +60,7 @@ class PersistentBusinessObject(BOBase):
             # create_table: CreateTable = txaction.sql().create_table(cls.table)
             s = txaction.sql()
             create_table: CreateTable = s.create_table(cls.table)
-            # LOG.debug(f"BOBase.sql_create_table():  {cls.table=}")
+            # LOG.debug(f"PersistentBusinessObject.sql_create_table():  {cls.table=}")
             for name, data_type, constraint, pars in attributes:
                 # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
                 create_table.column(name, data_type, constraint, **pars)
@@ -74,7 +74,7 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchone()
-        # LOG.debug(f"BOBase.count_rows({conditions=}) {result=} -> return {result["count"]}")
+        # LOG.debug(f"PersistentBusinessObject.count_rows({conditions=}) {result=} -> return {result["count"]}")
         return result["count"]
 
     @classmethod
@@ -85,7 +85,7 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
-        # LOG.debug(f"BOBase.get_matching_ids({conditions=}) -> {result=}")
+        # LOG.debug(f"PersistentBusinessObject.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
 
     async def fetch(self, id=None, newest=None):
@@ -94,7 +94,7 @@ class PersistentBusinessObject(BOBase):
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
-        # LOG.debug(f'BOBase.fetch({id=}, {newest=})')
+        # LOG.debug(f"PersistentBusinessObject.fetch({id=}, {newest=})")
         if id is None:
             id = self.id
         if id is None and newest is None:
@@ -112,7 +112,7 @@ class PersistentBusinessObject(BOBase):
             self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
-            # LOG.debug(f"BOBase.fetch: {self._db_data=}")
+            # LOG.debug(f"PersistentBusinessObject.fetch: {self._db_data=}")
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
                 self._data[attr] = PersistentBusinessObject.convert_from_db(
                     self._db_data.get(attr), typ
