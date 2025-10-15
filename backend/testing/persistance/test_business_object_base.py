@@ -29,7 +29,7 @@ class MockBO2(BOBase):
     def __init__(
         self,
         bo_id=None,
-        mock_attr1="mock attriubute 1",
+        mock_attr1="mock attribute 1",
         mock_attr2=None,
         mock_attr3=[],
     ) -> None:
