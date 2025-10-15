@@ -1,5 +1,4 @@
-""" Application specific logging
-"""
+"""Application specific logging"""
 
 import logging
 from core.const import APPNAME
@@ -30,8 +29,21 @@ def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
     logger = logging.getLogger(
         APPNAME if name == "__main__" else (APPNAME + "." + name)
     )
+
+    print(f"{logger.handlers=}")
+    if not logger.handlers:
+        ch = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "%(asctime)s %(name)-60s:%(lineno)4d - %(levelname)-5s - %(message)s"
+        )
+        ch.setFormatter(formatter)
+        logger.addHandler(ch)
+        logger.setLevel(level or logging.DEBUG)
+    logger.propagate = False
+
     if _LOG_MODULE_ENTRY:
         logger.debug("Enter module")
+    print(f"{logger.handlers=}")
     return logger
 
 
