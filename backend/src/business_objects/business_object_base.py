@@ -31,7 +31,7 @@ class AttributeDescription:
     name: str
     data_type: type
     constraint: BOColumnFlag
-    flag_values: dict[str, str | BOBaseBase]
+    flag_values: dict[str, str | type[BOBaseBase] | None]
     is_technical: bool = False
 
 
