@@ -28,8 +28,8 @@ class Test_100_Transient_Business_Object_classmethods(unittest.IsolatedAsyncioTe
 
     async def test_101_instance_creation(self):
         """Test that instances are created and added to the weakref set."""
-        obj1 = TransientBusinessObject(id=1)
-        obj2 = TransientBusinessObject(id=2)
+        obj1 = TransientBusinessObject(bo_id=1)
+        obj2 = TransientBusinessObject(bo_id=2)
 
         assert len(TransientBusinessObject._instances) == 2
         assert obj1 in TransientBusinessObject._instances
@@ -42,8 +42,8 @@ class Test_100_Transient_Business_Object_classmethods(unittest.IsolatedAsyncioTe
     async def test_102_count_rows(self):
         """Test the count_rows method."""
         # TransientBusinessObject._instances.clear()
-        obj1 = TransientBusinessObject(id=1)
-        obj2 = TransientBusinessObject(id=2)
+        obj1 = TransientBusinessObject(bo_id=1)
+        obj2 = TransientBusinessObject(bo_id=2)
 
         count = await TransientBusinessObject.count_rows()
 
@@ -52,8 +52,8 @@ class Test_100_Transient_Business_Object_classmethods(unittest.IsolatedAsyncioTe
     async def test_103_get_matching_ids(self):
         """Test the get_matching_ids method."""
         TransientBusinessObject._instances.clear()
-        bo1 = TransientBusinessObject(id=1)
-        bo2 = TransientBusinessObject(id=2)
+        bo1 = TransientBusinessObject(bo_id=1)
+        bo2 = TransientBusinessObject(bo_id=2)
 
         matching_ids = sorted((await TransientBusinessObject.get_matching_ids()))
         self.assertEqual(matching_ids, [1, 2])

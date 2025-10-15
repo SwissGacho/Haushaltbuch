@@ -58,12 +58,12 @@ class BOBase(BOBaseBase):
         cls._change_subscribers = {}
 
     # pylint: disable=redefined-builtin
-    def __init__(self, *args, id: int | None = None, **attributes) -> None:
-        LOG.debug(f"BOBase({id=},{attributes})")
+    def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
+        LOG.debug(f"BOBase({bo_id=},{attributes})")
         self._instance_subscribers: dict[int, BOCallback] = {}
         self._data = {}
         self._db_data = {}
-        self.id = id
+        self.id = bo_id
         self.last_updated = None
         self._instance_subscriber_id = itertools.count(1)
         for attribute, value in attributes.items():
@@ -206,7 +206,7 @@ class BOBase(BOBaseBase):
         """Unregister a callback from the creation list."""
         # LOG.debug(f"Unsubscribing callback {callback_id} from creation subscribers")
         # LOG.debug(f"Current subscribers: {cls._creation_subscribers}")
-        if not callback_id in cls._creation_subscribers:
+        if callback_id not in cls._creation_subscribers:
             LOG.warning(
                 f"Callback id {callback_id} not found in creation subscribers: {cls._creation_subscribers}"
             )
@@ -230,7 +230,7 @@ class BOBase(BOBaseBase):
     @classmethod
     def unsubscribe_from_all_changes(cls, callback_id: int):
         """Unregister a callback from the change list by id."""
-        if not callback_id in cls._change_subscribers:
+        if callback_id not in cls._change_subscribers:
             LOG.warning(
                 f"Callback id {callback_id} not found in change subscribers: {cls._change_subscribers}"
             )

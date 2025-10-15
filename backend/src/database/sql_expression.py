@@ -233,7 +233,7 @@ class Value(SQLExpression):
         If only two positional arguments are provided, the first is treated as the name and the second as the value.
         """
 
-        name: str = str(kwargs.get("name", None))
+        name: str = str(kwargs.get("name", ""))
         value: Any = kwargs.get("value", None)
         if len(args) == 1:
             if not value:

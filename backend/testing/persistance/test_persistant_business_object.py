@@ -27,9 +27,13 @@ class MockPersistantBO2(PersistentBusinessObject):
     mock_attr3 = BOList()
 
     def __init__(
-        self, id=None, mock_attr1="mockk attriubute 1", mock_attr2=None, mock_attr3=[]
+        self,
+        bo_id=None,
+        mock_attr1="mockk attriubute 1",
+        mock_attr2=None,
+        mock_attr3=[],
     ) -> None:
-        super().__init__(id=id)
+        super().__init__(bo_id=bo_id)
         self.mock_attr1 = mock_attr1
         self.mock_attr2 = mock_attr2
         self.mock_attr3 = mock_attr3
@@ -345,21 +349,21 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             await self.mock_bo._update_self()
 
     async def test_205b_update_self(self):
-        self.mock_bo = MockPersistantBO2(id=55)
+        self.mock_bo = MockPersistantBO2(bo_id=55)
         await self._205_update_self()
 
     async def test_205c_update_self(self):
-        self.mock_bo = MockPersistantBO2(id=55, mock_attr2=MockPersistantBO1())
+        self.mock_bo = MockPersistantBO2(bo_id=55, mock_attr2=MockPersistantBO1())
         await self._205_update_self()
 
     async def test_205d_update_self(self):
         self.mock_bo = MockPersistantBO2(
-            id=55, mock_attr2=MockPersistantBO1(), mock_attr3=[1, 2, 3]
+            bo_id=55, mock_attr2=MockPersistantBO1(), mock_attr3=[1, 2, 3]
         )
         await self._205_update_self()
 
     async def test_205e_update_self_exception(self):
-        self.mock_bo = MockPersistantBO2(id=55)
+        self.mock_bo = MockPersistantBO2(bo_id=55)
         await self._205_update_self(exception=True)
 
 
