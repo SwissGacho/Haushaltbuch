@@ -112,7 +112,7 @@ class PersistentBusinessObject(BOBase):
             self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
-            # LOG.debug(f"BOBase.fetch: {self._db_data=}")
+            # LOG.debug(f"PersistentBusinessObject.fetch: {self._db_data=}")
             for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
                 self._data[attr] = PersistentBusinessObject.convert_from_db(
                     self._db_data.get(attr), typ
