@@ -35,7 +35,7 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def convert_from_db(cls, value, typ):
         "convert a value of type 'typ' read from the DB"
-        # LOG.debug(f"BOBase.convert_from_db({value=}, {type(value)=}, {typ=})")
+        # LOG.debug(f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=})")
         if value is None:
             return None
         if typ == date and isinstance(value, str):
