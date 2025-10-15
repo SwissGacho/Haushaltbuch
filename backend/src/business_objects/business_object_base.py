@@ -6,7 +6,7 @@ Business objects are classes that support persistance in the data base
 import asyncio
 import itertools
 from typing import Any, Coroutine, TypeAlias, Optional, Callable
-from attr import dataclass
+from dataclasses import dataclass
 
 
 from core.util import _classproperty
