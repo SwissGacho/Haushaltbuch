@@ -217,7 +217,7 @@ class BOFlag(_PersistantAttr[Flag]):
 
     def __set__(self, obj, value) -> None:
         """Set value of attribute, converting from str if needed"""
-        LOG.debug(f"Setting BOFlag to {value}")
+        # LOG.debug(f"Setting BOFlag to {value}")
         if isinstance(value, str):
             value = self._flag_values["flag_type"].flags(value)
         LOG.debug(f"   converted BOFlag to {value}")
