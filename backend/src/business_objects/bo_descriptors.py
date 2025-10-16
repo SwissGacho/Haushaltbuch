@@ -13,7 +13,7 @@ from business_objects.business_attribute_base import BaseFlag
 
 
 class AttributeType(StrEnum):
-    "Values for global app status"
+    """Attribute type identifiers for business objects."""
 
     ATYPE_INT = "int"
     ATYPE_STR = "str"
