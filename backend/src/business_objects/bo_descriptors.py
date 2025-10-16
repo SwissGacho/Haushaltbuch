@@ -213,16 +213,14 @@ class BOFlag(_PersistantAttr[Flag]):
         return BaseFlag
 
     def validate(self, value):
-        return super().validate(value) or isinstance(value, Flag)
+        return super().validate(value) or isinstance(
+            value, self._flag_values["flag_type"]
+        )
 
-    def __get__(self, obj, objtype=None):
-        if obj is None:
-            return self
-        base_value = super().__get__(obj, objtype)
-        if isinstance(base_value, str):
-            return self._flag_values["flag_type"].flags(base_value)
-        if not isinstance(base_value, self._flag_values["flag_type"]):
-            raise ValueError(
-                f"Attribute {self.my_name} of {obj.__class__.__name__} is not of type {self._flag_values['flag_type']}"
-            )
-        return base_value
+    def __set__(self, obj, value) -> None:
+        """Set value of attribute, converting from str if needed"""
+        # LOG.debug(f"Setting BOFlag to {value}")
+        if isinstance(value, str):
+            value = self._flag_values["flag_type"].flags(value)
+        # LOG.debug(f"   converted BOFlag to {value}")
+        super().__set__(obj=obj, value=value)
