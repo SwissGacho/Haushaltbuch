@@ -25,14 +25,14 @@ class ObjectSchema(Message):
 
     def flag_representation(
         self, flag: str | type[BOBaseBase] | type[Flag] | None
-    ) -> str:
+    ) -> str | dict[str, str | list[str]]:
         if flag is None:
             return ""
         if isinstance(flag, str):
             return flag
         if isinstance(flag, EnumType):
             LOG.debug(f"{flag=}, {type(flag)=}")
-            return flag.__name__
+            return {"name": flag.__name__, "values": [str(v) for v in flag]}
         if issubclass(flag, BOBaseBase):
             return flag.bo_type_name()
         LOG.error(f"Unknown flag type: {flag=}, {type(flag)=}")
