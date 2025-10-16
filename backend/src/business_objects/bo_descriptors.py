@@ -5,8 +5,6 @@ import json
 from enum import Flag, StrEnum, auto
 
 from datetime import date, datetime
-from token import AT
-from xml.dom.minidom import Attr
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
