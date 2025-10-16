@@ -53,7 +53,7 @@ class PersistentBusinessObject(BOBase):
                 LOG.error(
                     f"PersistentBusinessObject.convert_from_db: JSONDecodeError: {exc}"
                 )
-        if typ == BaseFlag and isinstance(value, str):
+        if isinstance(typ, type) and issubclass(typ, BaseFlag) and isinstance(value, str):
             value = subtyp["flag_type"].flags(value)
         return copy.deepcopy(value)
 
