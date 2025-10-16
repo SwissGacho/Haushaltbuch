@@ -73,10 +73,15 @@ class DB(DBBaseClass):
         # LOG.debug(f"Checking table '{obj.table}'")
         tab_info = await self._get_table_info(obj.table)
         ok = True
-        for name, data_type, constraint, pars in obj.attribute_descriptions():
+        for description in obj.attribute_descriptions():
             ok = (
                 self.check_column(
-                    obj.table, tab_info.get(name), name, data_type, constraint, **pars
+                    obj.table,
+                    tab_info.get(description.name),
+                    description.name,
+                    description.data_type,
+                    description.constraint,
+                    **description.flag_values,
                 )
                 and ok
             )

@@ -74,6 +74,8 @@ async def get_db():
         App.status = Status.STATUS_NO_DB
         yield
         return
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        LOG.warning(f"DB connection failed: {exc}")
     finally:
         LOG.debug("DB disconnecting")
         await db.close()

@@ -12,6 +12,10 @@ class MockAttr(business_objects.bo_descriptors._PersistantAttr):
     def data_type(cls):
         return str
 
+    @classmethod
+    def attribute_type(cls) -> business_objects.bo_descriptors.AttributeType:
+        return business_objects.bo_descriptors.AttributeType.ATYPE_STR
+
     def validate(self, value):
         return value is None or isinstance(value, str)
 

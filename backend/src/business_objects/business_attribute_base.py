@@ -3,10 +3,10 @@
 Describes additional data types that can exist on business objects
 """
 
-from enum import Flag, auto
-from typing import Union, Self
+from enum import Flag
+from typing import Self
 
-from core.app_logging import getLogger, log_exit
+from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
