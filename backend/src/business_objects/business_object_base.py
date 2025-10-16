@@ -167,15 +167,6 @@ class BOBase(BOBaseBase):
         return cls_cols
 
     @classmethod
-    def attributeflags_as_dict(cls) -> dict[str, type]:
-        "dict of BO attribute types with attribute names as keys"
-        cls_cols = {a[0]: a[3] for a in cls._attributes.get(cls.__name__, [])}
-        assert cls.__base__ is not None, "BOBase.__base__ is None"
-        if issubclass(cls.__base__, BOBase):
-            return cls.__base__.attributes_as_dict() | cls_cols
-        return cls_cols
-
-    @classmethod
     def attribute_descriptions(cls) -> list[AttributeDescription]:
         "list of attribute descriptions"
         cls_cols = cls._attributes.get(cls.__name__, [])

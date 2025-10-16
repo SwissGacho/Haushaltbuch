@@ -124,11 +124,11 @@ class PersistentBusinessObject(BOBase):
 
         if self._db_data:
             # LOG.debug(f"PersistentBusinessObject.fetch: {self._db_data=}")
-            for attr, typ, subtyp in [
-                (a.name, a.data_type, a[3]) for a in self.attribute_descriptions()
-            ]:
-                self._data[attr] = PersistentBusinessObject.convert_from_db(
-                    self._db_data.get(attr), typ, subtyp
+            for description in self.attribute_descriptions():
+                self._data[description.name] = PersistentBusinessObject.convert_from_db(
+                    self._db_data.get(description.name),
+                    description.data_type,
+                    description.flag_values,
                 )
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
         return self
@@ -178,11 +178,12 @@ class PersistentBusinessObject(BOBase):
             value_class = Value
             update = txaction.sql().update(self.table).where(Eq("id", self.id))
             changes = False
+            descriptions = {d.name: d for d in self.attribute_descriptions()}
             for k, v in self._data.items():
                 if k != "id" and v != PersistentBusinessObject.convert_from_db(
                     self._db_data.get(k),
-                    self.attributes_as_dict()[k],
-                    self.attributeflags_as_dict()[k],
+                    descriptions[k].data_type,
+                    descriptions[k].flag_values,
                 ):
                     changes = True
                     update.assignment(k, value_class(k, v))

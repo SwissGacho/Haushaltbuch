@@ -213,7 +213,9 @@ class BOFlag(_PersistantAttr[Flag]):
         return BaseFlag
 
     def validate(self, value):
-        return super().validate(value) or isinstance(value, Flag)
+        return super().validate(value) or isinstance(
+            value, self._flag_values["flag_type"]
+        )
 
     def __set__(self, obj, value) -> None:
         """Set value of attribute, converting from str if needed"""
