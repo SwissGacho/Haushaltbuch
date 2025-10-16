@@ -220,5 +220,5 @@ class BOFlag(_PersistantAttr[Flag]):
         # LOG.debug(f"Setting BOFlag to {value}")
         if isinstance(value, str):
             value = self._flag_values["flag_type"].flags(value)
-        LOG.debug(f"   converted BOFlag to {value}")
+        # LOG.debug(f"   converted BOFlag to {value}")
         super().__set__(obj=obj, value=value)
