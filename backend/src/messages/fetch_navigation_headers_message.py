@@ -28,9 +28,9 @@ class FetchNavigationHeadersMessage(Message):
         if parent_object is not None:
             parent_object = BOBase.get_business_object_by_name(parent_object_name)
             object_names = [
-                attribute[0]
+                attribute.name
                 for attribute in parent_object.attribute_descriptions()
-                if attribute[1] == BORelation
+                if attribute.data_type == BORelation
             ]
 
         # If no object was specified, return the headers of the root tree - for now these are all business objects
