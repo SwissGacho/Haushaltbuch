@@ -7,6 +7,7 @@ import copy
 import json
 from typing import Any, Optional
 from datetime import date, datetime, UTC
+from business_objects.bo_descriptors import BOBaseBase
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -66,9 +67,14 @@ class PersistentBusinessObject(BOBase):
             s = txaction.sql()
             create_table: CreateTable = s.create_table(cls.table)
             # LOG.debug(f"PersistentBusinessObject.sql_create_table():  {cls.table=}")
-            for name, data_type, constraint, pars in attributes:
-                # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
-                create_table.column(name, data_type, constraint, **pars)
+            for description in attributes:
+                # LOG.debug(f" -  {description.name=}, {description.data_type=}, {description.constraint=}, {description.flag_values=}")
+                create_table.column(
+                    name=description.name,
+                    data_type=description.data_type,
+                    constraint=description.constraint,
+                    **description.flag_values,
+                )
             await create_table.execute()
 
     @classmethod
@@ -113,17 +119,18 @@ class PersistentBusinessObject(BOBase):
                 select.where(Eq("id", id))
             elif newest:
                 select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-            LOG.debug(f"BOBase.fetch: {select=}")
+            # LOG.debug(f"BOBase.fetch: {select=} // {select.get_sql()=}")
             self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
             # LOG.debug(f"PersistentBusinessObject.fetch: {self._db_data=}")
             for attr, typ, subtyp in [
-                (a[0], a[1], a[3]) for a in self.attribute_descriptions()
+                (a.name, a.data_type, a[3]) for a in self.attribute_descriptions()
             ]:
                 self._data[attr] = PersistentBusinessObject.convert_from_db(
                     self._db_data.get(attr), typ, subtyp
                 )
+        # LOG.debug(f"Fetched {self} from DB: {self._data=}")
         return self
 
     async def store(self):
