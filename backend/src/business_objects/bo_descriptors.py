@@ -1,14 +1,30 @@
 """Data descriptors used in business objects"""
 
+from dataclasses import dataclass
 import json
-from enum import Flag, auto
+from enum import Flag, StrEnum, auto
 
 from datetime import date, datetime
+from token import AT
+from xml.dom.minidom import Attr
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
 from business_objects.business_attribute_base import BaseFlag
+
+
+class AttributeType(StrEnum):
+    "Values for global app status"
+
+    ATYPE_INT = "int"
+    ATYPE_STR = "str"
+    ATYPE_DATE = "date"
+    ATYPE_DATETIME = "datetime"
+    ATYPE_DICT = "dict"
+    ATYPE_LIST = "list"
+    ATYPE_FLAG = "flag"
+    ATYPE_RELATION = "relation"
 
 
 class BOColumnFlag(Flag):
@@ -26,6 +42,18 @@ class BOColumnFlag(Flag):
     BOC_DEFAULT_CURR = auto()
 
 
+@dataclass(frozen=True)
+class AttributeDescription:
+    """Description of a business object attribute"""
+
+    name: str
+    data_type: type
+    constraint: BOColumnFlag
+    flag_values: dict[str, str | type["BOBaseBase"] | type[Flag] | None]
+    attribute_type: AttributeType | None = None
+    is_technical: bool = False
+
+
 class BOBaseBase:
     "Base for BOBase to circumvent circular import"
 
@@ -35,9 +63,16 @@ class BOBaseBase:
         attribute_name: str,
         data_type: type,
         constraint_flag: BOColumnFlag,
+        attribute_type: AttributeType,
+        is_technical: bool = False,
         **flag_values,
     ):
         pass
+
+    @classmethod
+    def attribute_descriptions(cls) -> list[AttributeDescription]:
+        "list of attribute descriptions"
+        raise NotImplementedError
 
     @classmethod
     def bo_type_name(cls) -> str:
@@ -62,6 +97,12 @@ class _PersistantAttr[T]:
         self.is_technical: bool = is_technical
 
     @classmethod
+    def attribute_type(cls) -> AttributeType:
+        "Attribute type as string"
+        LOG.warning("attribute_type not implemented")
+        raise NotImplementedError
+
+    @classmethod
     def data_type(cls):
         "Datatype of attribute"
         raise NotImplementedError
@@ -77,6 +118,7 @@ class _PersistantAttr[T]:
             name,
             self.__class__.data_type(),
             self._flag or BOColumnFlag.BOC_NONE,
+            attribute_type=self.__class__.attribute_type(),
             is_technical=self.is_technical,
             **(self._flag_values or {}),
         )
@@ -104,6 +146,11 @@ class _PersistantAttr[T]:
 
 # pylint: disable=missing-class-docstring
 class BOInt(_PersistantAttr[int]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_INT
+
     @classmethod
     def data_type(cls):
         return int
@@ -121,6 +168,11 @@ class BOId(BOInt):
 
 
 class BOStr(_PersistantAttr[str]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_STR
+
     @classmethod
     def data_type(cls):
         return str
@@ -130,6 +182,11 @@ class BOStr(_PersistantAttr[str]):
 
 
 class BODatetime(_PersistantAttr[datetime]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_DATETIME
+
     @classmethod
     def data_type(cls):
         return datetime
@@ -144,6 +201,11 @@ class BODatetime(_PersistantAttr[datetime]):
 
 
 class BODate(_PersistantAttr[date]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_DATE
+
     @classmethod
     def data_type(cls):
         return date
@@ -158,6 +220,11 @@ class BODate(_PersistantAttr[date]):
 
 
 class BODict(_PersistantAttr[dict]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_DICT
+
     @classmethod
     def data_type(cls):
         return dict
@@ -173,6 +240,11 @@ class BODict(_PersistantAttr[dict]):
 
 
 class BOList(_PersistantAttr[list]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_LIST
+
     @classmethod
     def data_type(cls):
         return list
@@ -188,6 +260,11 @@ class BOList(_PersistantAttr[list]):
 
 
 class BORelation(_PersistantAttr[BOBaseBase]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_RELATION
+
     def __init__(
         self,
         relation: type[BOBaseBase],
@@ -217,6 +294,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
             name,
             BOBaseBase,  # self._relation,
             self._flag or BOColumnFlag.BOC_NONE,
+            attribute_type=self.__class__.attribute_type(),
             is_technical=self.is_technical,
             **(self._flag_values or {}),
         )
@@ -231,6 +309,10 @@ class BORelation(_PersistantAttr[BOBaseBase]):
 
 
 class BOFlag(_PersistantAttr[Flag]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_FLAG
 
     def __init__(
         self, flag_type: type[Flag], flag: BOColumnFlag = BOColumnFlag.BOC_NONE

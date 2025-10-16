@@ -4,6 +4,7 @@ Business objects are classes that support persistance in the data base
 """
 
 import asyncio
+from enum import Flag
 import itertools
 from typing import Any, Coroutine, TypeAlias, Optional, Callable
 from dataclasses import dataclass
@@ -17,22 +18,13 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from business_objects.bo_descriptors import (
+    AttributeDescription,
+    AttributeType,
     BOColumnFlag,
     BOBaseBase,
     BOId,
     BODatetime,
 )
-
-
-@dataclass(frozen=True)
-class AttributeDescription:
-    """Description of a business object attribute"""
-
-    name: str
-    data_type: type
-    constraint: BOColumnFlag
-    flag_values: dict[str, str | BOBaseBase]
-    is_technical: bool = False
 
 
 BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
@@ -68,7 +60,7 @@ class BOBase(BOBaseBase):
 
     # pylint: disable=redefined-builtin, unused-argument
     def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
-        LOG.debug(f"BOBase({bo_id=},{attributes})")
+        # LOG.debug(f"BOBase({bo_id=},{attributes})")
         self._instance_subscribers: dict[int, BOCallback] = {}
         self._data = {}
         self._db_data = {}
@@ -112,6 +104,7 @@ class BOBase(BOBaseBase):
         attribute_name: str,
         data_type: type,
         constraint_flag: BOColumnFlag,
+        attribute_type: AttributeType | None = None,
         is_technical: bool = False,
         **flag_values,
     ):
@@ -128,6 +121,8 @@ class BOBase(BOBaseBase):
                 data_type=data_type,
                 constraint=constraint_flag,
                 flag_values=flag_values,
+                is_technical=is_technical,
+                attribute_type=attribute_type,
             )
         )
 
@@ -197,7 +192,7 @@ class BOBase(BOBaseBase):
         raise ValueError(f"No primary key defined for {cls.__name__}")
 
     @classmethod
-    def references(cls) -> list[str | BOBaseBase | None]:
+    def references(cls) -> list[str | type[BOBaseBase] | type[Flag] | None]:
         "list of business objects referenced by this class"
         return [
             a.flag_values.get("relation")

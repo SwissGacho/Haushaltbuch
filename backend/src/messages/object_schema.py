@@ -1,29 +1,19 @@
 """Messages to request and send business objects"""
 
-from datetime import date, datetime
 from logging import Logger
-from enum import Flag
-from typing import Any, Callable
+from enum import EnumType, Flag
 
 from business_objects.bo_descriptors import (
+    AttributeType,
     BOBaseBase,
 )
-from business_objects.business_object_base import BOBase
+from business_objects.business_object_base import AttributeDescription
 from server.ws_token import WSToken
 from messages.message import Message, MessageType, MessageAttribute
 from core.app_logging import getLogger
 
 
 LOG: Logger = getLogger(__name__)
-ATTRIBUTETYPES: dict[type, Callable[[Any], str]] = {
-    int: lambda _: "int",
-    str: lambda _: "str",
-    date: lambda _: "date",
-    datetime: lambda _: "datetime",
-    dict: lambda _: "dict",
-    Flag: lambda _: "flag",
-    BOBaseBase: lambda x: ".".join(["relation", str(x.bo_type_name())]),
-}
 
 
 class ObjectSchema(Message):
@@ -33,25 +23,50 @@ class ObjectSchema(Message):
     def message_type(cls) -> MessageType:
         return MessageType.WS_TYPE_OBJECT
 
-    def generate_payload(self) -> dict[str, str]:
-        properties = self._object_type.attributes_as_dict()
-        print(f"{properties=}")
-        payload = {}
-        for k, v in properties.items():
-            print(f"{k=}")
-            print(f"{v=}")
-            if hasattr(v, "bo_type_name"):
-                print(f"{v.bo_type_name()=}")
-            for attr_type, attr_type_name in ATTRIBUTETYPES.items():
-                print(f"  {attr_type=}")
-                if issubclass(v, attr_type):
-                    payload[k] = attr_type_name(v)
-                    break
+    def flag_representation(
+        self, flag: str | type[BOBaseBase] | type[Flag] | None
+    ) -> str:
+        if flag is None:
+            return ""
+        if isinstance(flag, str):
+            return flag
+        if isinstance(flag, EnumType):
+            LOG.debug(f"{flag=}, {type(flag)=}")
+            return flag.__name__
+        if issubclass(flag, BOBaseBase):
+            return flag.bo_type_name()
+        LOG.error(f"Unknown flag type: {flag=}, {type(flag)=}")
+        return str(flag)
+
+    def attribute_type_representation(
+        self, attribute_type: AttributeType | None
+    ) -> str:
+        if attribute_type is None:
+            return ""
+        return attribute_type.value
+
+    def attribute_representation(
+        self, attribute: AttributeDescription
+    ) -> dict[str, str | dict[str, str]]:
+        return {
+            "type": self.attribute_type_representation(attribute.attribute_type),
+            "flags": {
+                k: self.flag_representation(v) for k, v in attribute.flag_values.items()
+            },
+        }
+
+    def generate_payload(self) -> dict[str, dict[str, str | dict[str, str]]]:
+        properties = self._object_type.attribute_descriptions()
+        payload = {
+            desc.name: self.attribute_representation(desc)
+            for desc in properties
+            if not desc.is_technical
+        }
         return payload
 
     def __init__(
         self,
-        object_type: type[BOBase],
+        object_type: type[BOBaseBase],
         token: WSToken | None = None,
         status: str | None = None,
     ) -> None:
