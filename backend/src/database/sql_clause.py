@@ -202,15 +202,18 @@ class Assignment(SQLManagedExecutable):
             raise ValueError("A value must be assigned to the column.")
 
     def get_query(self):
+        if len(self._columns) != 1:
+            raise NotImplementedError(
+                f"Multiple column assignment not implemented ({len(self._columns)} columns given)."
+            )
         sql = (
-            "("
-            + ",".join(
+            ",".join(
                 [
                     c.get_query(km=self) if isinstance(c, ColumnName) else c
                     for c in self._columns
                 ]
             )
-            + ") = "
+            + " = "
             + self._value.get_query(km=self)
         )
         return sql
