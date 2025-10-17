@@ -7,6 +7,7 @@ import copy
 import json
 from typing import Any, Optional
 from datetime import date, datetime, UTC
+from business_objects.bo_descriptors import BOBaseBase
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -17,6 +18,7 @@ from database.sql import SQL, SQLTransaction
 from database.sql_expression import Eq, Filter, SQLExpression
 from database.sql_statement import CreateTable, NamedValueListList, Value
 from business_objects.business_object_base import BOBase
+from business_objects.business_attribute_base import BaseFlag
 
 
 class PersistentBusinessObject(BOBase):
@@ -33,7 +35,7 @@ class PersistentBusinessObject(BOBase):
         }
 
     @classmethod
-    def convert_from_db(cls, value, typ):
+    def convert_from_db(cls, value, typ, subtyp):
         "convert a value of type 'typ' read from the DB"
         # LOG.debug(f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=})")
         if value is None:
@@ -52,6 +54,8 @@ class PersistentBusinessObject(BOBase):
                 LOG.error(
                     f"PersistentBusinessObject.convert_from_db: JSONDecodeError: {exc}"
                 )
+        if isinstance(typ, type) and issubclass(typ, BaseFlag) and isinstance(value, str):
+            value = subtyp["flag_type"].flags(value)
         return copy.deepcopy(value)
 
     @classmethod
@@ -63,9 +67,14 @@ class PersistentBusinessObject(BOBase):
             s = txaction.sql()
             create_table: CreateTable = s.create_table(cls.table)
             # LOG.debug(f"PersistentBusinessObject.sql_create_table():  {cls.table=}")
-            for name, data_type, constraint, pars in attributes:
-                # LOG.debug(f" -  {name=}, {data_type=}, {constraint=}, {pars=})")
-                create_table.column(name, data_type, constraint, **pars)
+            for description in attributes:
+                # LOG.debug(f" -  {description.name=}, {description.data_type=}, {description.constraint=}, {description.flag_values=}")
+                create_table.column(
+                    name=description.name,
+                    data_type=description.data_type,
+                    constraint=description.constraint,
+                    **description.flag_values,
+                )
             await create_table.execute()
 
     @classmethod
@@ -110,15 +119,18 @@ class PersistentBusinessObject(BOBase):
                 select.where(Eq("id", id))
             elif newest:
                 select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-            LOG.debug(f"BOBase.fetch: {select=}")
+            # LOG.debug(f"BOBase.fetch: {select=} // {select.get_sql()=}")
             self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
             # LOG.debug(f"PersistentBusinessObject.fetch: {self._db_data=}")
-            for attr, typ in [(a[0], a[1]) for a in self.attribute_descriptions()]:
-                self._data[attr] = PersistentBusinessObject.convert_from_db(
-                    self._db_data.get(attr), typ
+            for description in self.attribute_descriptions():
+                self._data[description.name] = PersistentBusinessObject.convert_from_db(
+                    self._db_data.get(description.name),
+                    description.data_type,
+                    description.flag_values,
                 )
+        # LOG.debug(f"Fetched {self} from DB: {self._data=}")
         return self
 
     async def store(self):
@@ -166,9 +178,12 @@ class PersistentBusinessObject(BOBase):
             value_class = Value
             update = txaction.sql().update(self.table).where(Eq("id", self.id))
             changes = False
+            descriptions = {d.name: d for d in self.attribute_descriptions()}
             for k, v in self._data.items():
                 if k != "id" and v != PersistentBusinessObject.convert_from_db(
-                    self._db_data.get(k), self.attributes_as_dict()[k]
+                    self._db_data.get(k),
+                    descriptions[k].data_type,
+                    descriptions[k].flag_values,
                 ):
                     changes = True
                     update.assignment(k, value_class(k, v))
