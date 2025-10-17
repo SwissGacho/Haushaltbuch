@@ -77,9 +77,9 @@ class SQLScript(SQLStatement):
         )
         self._script = self.merge_params(self._script, kwargs)
 
-    def get_sql(self) -> SQL_Dict:
+    def get_query(self) -> str:
         """Get a string representation of the current SQL statement."""
-        return {"query": self._script, "params": self.params}
+        return self._script
 
 
 class TableValuedQuery(SQLStatement):
@@ -211,7 +211,7 @@ class Insert(SQLStatement):
         if rows is not None:
             self.rows(rows=rows)
 
-    def get_sql(self) -> SQL_Dict:
+    def get_query(self) -> str:
         """Get a string representation of the current SQL statement."""
         if not self._values:
             raise InvalidSQLStatementException(
@@ -226,7 +226,7 @@ class Insert(SQLStatement):
             ]
         )
         # LOG.debug(f"Insert.sql() -> query: {query + self._return_str}; params: {self.params}")
-        return {"query": query + self._return_str, "params": self.params}
+        return query + self._return_str
 
     def _single_row(self, cols: NamedValueList):
         """Add a single row of values to be inserted"""
@@ -285,7 +285,7 @@ class Update(SQLStatement):
         self._return_str = f" RETURNING {column}"
         return self
 
-    def get_sql(self) -> SQL_Dict:
+    def get_query(self) -> str:
         """Get a string representation of the current SQL statement."""
         if not self.assignments:
             raise InvalidSQLStatementException(
@@ -300,7 +300,7 @@ class Update(SQLStatement):
                 self._return_str,
             ]
         )
-        return {"query": query, "params": self.params}
+        return query
 
 
 class CreateTable(SQLStatement):
