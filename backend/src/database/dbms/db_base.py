@@ -1,6 +1,6 @@
 """Base class for DB connections"""
 
-from typing import Any, NoReturn
+from typing import Any, Self
 import re
 import json
 
@@ -125,7 +125,7 @@ class Connection(ConnectionBaseClass):
         self._db._connections.add(self)
         # LOG.debug(f"++++++++++++++++++++++++++++++ {self._db._connections=}")
 
-    async def connect(self):
+    async def connect(self) -> Self:
         "Open a connection and return the Connection instance"
         raise ConnectionError("Called from DB base class.")
 
@@ -206,7 +206,7 @@ class Cursor:
         converted_query = re.sub(r":(\w+)", replacer, query)
         return converted_query, tuple(param_order)
 
-    async def execute(self, query: str, params=None):
+    async def execute(self, query: str, params=None) -> Self:
         """execute an SQL statement and return the Cursor instance (self)."""
         raise ConnectionError("Called from DB base class.")
 
