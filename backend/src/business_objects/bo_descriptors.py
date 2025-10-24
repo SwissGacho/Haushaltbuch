@@ -37,7 +37,7 @@ class BOBaseBase:
         constraint_flag: BOColumnFlag,
         **flag_values,
     ):
-        pass
+        "Register an attribute in the business object descriptor"
 
 
 class _PersistantAttr[T]:
@@ -67,15 +67,16 @@ class _PersistantAttr[T]:
             **(self._flag_values or {}),
         )
 
-    def __get__(self, obj, objtype=None) -> T | None:
+    def __get__(self, obj, objtype=None) -> T:
         if obj is None:
-            return self
+            return self  # type: ignore[return-value]
         return obj._data.get(self.my_name)
 
     def __set__(self, obj, value) -> None:
         if not self.validate(value):
             raise ValueError(
-                f"'{value}' invalid to set attribute {self.my_name} of type {self.__class__.__name__}"
+                f"'{value}' invalid to set attribute {self.my_name} "
+                f"of type {self.__class__.__name__}"
             )
         obj._data[self.my_name] = value
 

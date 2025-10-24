@@ -1,8 +1,13 @@
 """Applications base classes and common objects."""
 
-from typing import TypeAlias, Union
+from abc import ABC, abstractmethod
+from typing import TypeAlias, Union, Self
 from enum import StrEnum
 import platform
+
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
 
 
 class BaseObject:
@@ -86,39 +91,60 @@ class ConfigurationBaseClass(BaseObject):
         return {}
 
 
-class DBBaseClass(BaseObject):
+class DBBaseClass(BaseObject, ABC):
     "DB Baseclass"
 
     @property
+    @abstractmethod
     def sql_factory(self):
         "DB specific SQL factory"
         raise NotImplementedError("sqlFactory not defined on base class")
 
+    @abstractmethod
     async def connect(self) -> "ConnectionBaseClass":
         "Open a connection and return the Connection instance"
         raise ConnectionError("Called from DB base class.")
 
-    async def execute(
-        self,
-        query: str,
-        params=None,
-        connection: "ConnectionBaseClass" = None,
-    ):
+    @abstractmethod
+    async def execute(self, query, params, connection):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
         raise NotImplementedError("execute not implemented in base class.")
 
+    @abstractmethod
     async def close(self):
         "close all activities"
 
+    @abstractmethod
+    async def check_table(self, obj) -> bool:
+        "check compatibility of a DB table with a business object"
+        raise NotImplementedError("check_table not implemented in base class.")
 
-class ConnectionBaseClass(BaseObject):
+
+class ConnectionBaseClass(BaseObject, ABC):
     "Connection Baseclass"
 
-    async def connect(self):
+    @abstractmethod
+    async def connect(self) -> Self:
         "Open a connection and return the Connection instance"
         raise ConnectionError("Called from DB base class.")
 
-    async def close(self):
+    @abstractmethod
+    async def begin(self):
+        "Begin a transaction"
+
+    @abstractmethod
+    async def commit(self):
+        "commit current transaction"
+
+    @abstractmethod
+    async def rollback(self):
+        "rollback current transaction"
+
+    @abstractmethod
+    async def close(self) -> None:
         "close the connection"
         raise ConnectionError("Called from DB base class.")
+
+
+log_exit(LOG)

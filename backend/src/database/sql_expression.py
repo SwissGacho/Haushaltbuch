@@ -1,19 +1,21 @@
 """Classes for building SQL expressions that can be used in SQLStatements."""
 
-from typing import Any
+from typing import Any, Optional
 import re
 
-from database.sql_key_manager import SQLKeyManager, SQL_Dict
 
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
+
+from database.sql_key_manager import SQLKeyManager, SQL_Dict
 
 
 class SQLExpression:
     """Base class for an SQL expression.
-    Can be instantiated directly with an str argument to create an expression verbatim from a string.
-    Instantiated with any other type will create a SQL expression with the value of the type.
+    Can be instantiated directly with an str argument to create an expression verbatim
+    from a string. Instantiated with any other type will create a SQL expression with
+    the value of the type.
     """
 
     def __init__(self, expression: str | Any = ""):
@@ -88,13 +90,14 @@ class SQLUnaryExpression(SQLMultiExpression):
             )
         if self.__class__.left_operator:
             self.__class__.operator = self.__class__.left_operator
-            return super().__init__([" ", expression])
+            super().__init__([" ", expression])
         if self.__class__.right_operator:
             self.__class__.operator = self.__class__.right_operator
-            return super().__init__([expression, " "])
-        raise NotImplementedError(
-            "SQLUnaryExpression must have either left or right operator."
-        )
+            super().__init__([expression, " "])
+        else:
+            raise NotImplementedError(
+                "SQLUnaryExpression must have either left or right operator."
+            )
 
 
 class Not(SQLUnaryExpression):
@@ -205,13 +208,13 @@ class SQLTernaryExpression(SQLExpression):
     def get_query(self, km: SQLKeyManager) -> str:
         return " ".join(
             [
-                f"(",
+                "(",
                 f"{self.first.get_query(km=km)}",
                 f"{self.__class__.operator_one}",
                 f"{self.second.get_query(km=km)}",
                 f"{self.__class__.operator_two}",
                 f"{self.third.get_query(km=km)}",
-                f")",
+                ")",
             ]
         )
 
@@ -230,7 +233,8 @@ class Value(SQLExpression):
         """Initialize a value with a name and a value.
         Arguments named 'name' and 'value' are used to set the name and value of the value.
         If only one positional argument is provided, it is treated as the value.
-        If only two positional arguments are provided, the first is treated as the name and the second as the value.
+        If only two positional arguments are provided, the first is treated as the name and
+        the second as the value.
         """
 
         name: str = str(kwargs.get("name", ""))
@@ -266,7 +270,7 @@ class Value(SQLExpression):
 class Row(SQLExpression):
     """Represents a list of values defining a row in an SQL statement such as an INSERT."""
 
-    def __init__(self, values: list[Value] = []):
+    def __init__(self, values: Optional[list[Value]] = None):
         # LOG.debug(f"Row({values=})")
         super().__init__()
         self._values: list[Value] = values or []
@@ -283,3 +287,6 @@ class Row(SQLExpression):
     def get_query(self, km: SQLKeyManager) -> str:
         """Return the SQL expression as a string."""
         return f"({', '.join([v.get_query(km=km) for v in self._values])})"
+
+
+log_exit(LOG)

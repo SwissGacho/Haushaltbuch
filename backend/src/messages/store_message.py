@@ -1,12 +1,12 @@
-"""This message is sent by the frontend when a business object should be persisted in the database."""
+"""This message is sent by the frontend when
+a business object should be persisted in the database."""
 
-from logging import Logger
-
-from business_objects.business_object_base import BOBase
-from core.app_logging import getLogger
-from messages.message import Message, MessageAttribute, MessageType
+from core.app_logging import getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
+
+from business_objects.business_object_base import BOBase
+from messages.message import Message, MessageAttribute, MessageType
 
 
 class StoreMessage(Message):
@@ -35,3 +35,6 @@ class StoreMessage(Message):
         else:
             new_bo = await bo_type().store()
             LOG.debug(f"New BO created from StoreMessage {new_bo=}")
+
+
+log_exit(LOG)

@@ -1,3 +1,8 @@
+"Message from frontend requesting a business object"
+
+from core.app_logging import getLogger, log_exit, Logger
+
+LOG: Logger = getLogger(__name__)
 from business_objects.bo_list import BOSubscription
 from messages.message import Message, MessageType, MessageAttribute
 from server.ws_connection_base import WSConnectionBase
@@ -14,9 +19,13 @@ class FetchMessage(Message):
         "handle a fetch message"
         object_type_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
 
-        BOSubscription(
-            bo_type=object_type_name,
-            connection=connection,
-            id=self.message.get(MessageAttribute.WS_ATTR_INDEX),
-            notify_subscribers_on_init=True,
-        )
+        if object_type_name and isinstance(object_type_name, str):
+            BOSubscription(
+                bo_type=object_type_name,
+                connection=connection,
+                id=self.message.get(MessageAttribute.WS_ATTR_INDEX),
+                notify_subscribers_on_init=True,
+            )
+
+
+log_exit(LOG)

@@ -1,10 +1,13 @@
 """Common utilities"""
 
 import sys
-from typing import Callable, Union
+from typing import Callable, Type, TypeVar, Generic, overload, Union, Optional, Any
 import importlib.metadata
 from packaging.version import Version
 
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
 
 from core.base_objects import ConfigDict
 from business_objects.bo_descriptors import BODict
@@ -21,9 +24,11 @@ def check_environment():
         """Check if the installed library version meets the required version."""
         try:
             installed_version = Version(importlib.metadata.version(lib))
-        except importlib.metadata.PackageNotFoundError:
+        except importlib.metadata.PackageNotFoundError as exc:
             if raise_error:
-                raise EnvironmentError(f"The '{lib}' package is not installed.")
+                raise EnvironmentError(
+                    f"The '{lib}' package is not installed."
+                ) from exc
             return None, False
 
         if installed_version < required:
@@ -31,8 +36,7 @@ def check_environment():
                 f"'{lib}' version {required} or higher required, "
                 f"but found: {installed_version}"
             )
-            return installed_version, False
-        return installed_version, True
+        return installed_version
 
     # Python-Version
     required_python_version = (3, 12)
@@ -47,14 +51,42 @@ def check_environment():
     check_lib_version("aiomysql", Version("0.2.0"), raise_error=False)
 
 
-class _classproperty:
+_T = TypeVar("_T")
+
+
+class _classproperty(Generic[_T]):
     "Property on class level (only getter implemented)"
 
-    def __init__(self, fget: Callable) -> None:
+    def __init__(self, fget: Callable[[Type[Any]], _T]) -> None:
         self.fget = fget
+        self.fset: Optional[Callable[[Type[Any], _T], None]] = None
 
-    def __get__(self, owner_self, owner_cls=None):
+    @overload
+    def __get__(self, instance: None, owner_cls: Type[Any]) -> _T: ...
+
+    @overload
+    def __get__(self, instance: object, owner_cls: Type[Any]) -> _T: ...
+
+    def __get__(self, instance, owner_cls: Optional[Type[Any]] = None) -> _T:
+        if owner_cls is None:
+            owner_cls = type(instance)
         return self.fget(owner_cls)
+
+    def __set__(self, instance, value: _T) -> None:
+        if self.fset is None:
+            raise AttributeError("can't set attribute")
+        # In case of class access, owner_self is the class itself,
+        # In case of instance access, owner_self is the instance
+        owner_cls = instance if isinstance(instance, type) else type(instance)
+        self.fset(owner_cls, value)
+
+    def setter(self, fset: Callable[[Any, _T], None]) -> "_classproperty[_T]":
+        """Decorator to define a setter for the classproperty"""
+        self.fset = fset
+        return self
+
+    def __class_getitem__(cls, item):  # for generic compatibility
+        return cls
 
 
 def get_config_item(cfg: dict | None, key: str):
@@ -70,9 +102,11 @@ def get_config_item(cfg: dict | None, key: str):
 
 
 def update_dicts_recursively(
-    target: Union[ConfigDict, BODict], source: Union[ConfigDict, BODict]
+    target: Optional[Union[ConfigDict, BODict]], source: Union[ConfigDict, BODict]
 ):
     "Merge source into target"
+    if target is None:
+        return
     if not (isinstance(target, dict) and isinstance(source, dict)):
         raise TypeError("Configurations must be mappings.")
     for key, value in source.items():
@@ -80,3 +114,6 @@ def update_dicts_recursively(
             update_dicts_recursively(tgt_dict, value)
         else:
             target[key] = value
+
+
+log_exit(LOG)

@@ -1,16 +1,17 @@
 #!/usr/bin/env /usr/bin/python
+"""Main module for Money Pilot backend application."""
 
 import sys
 import asyncio
+from typing import Optional
 
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
-from core.exceptions import DBRestart, DBSchemaError, ConfigurationError
+from core.exceptions import DBSchemaError, ConfigurationError
 from core.app import App
 from core.status import Status
-from core.configuration.config import Config
 from core.configuration.db_config import DBConfig
 from core.util import check_environment
 from database.db_manager import get_db
@@ -19,7 +20,7 @@ from server.ws_server import get_websocket
 
 def wait_for_keyboard_interrupt():
     """Block until Ctrl+C is pressed (Windows only)."""
-    import msvcrt
+    import msvcrt  # pylint: disable=import-outside-toplevel
 
     while msvcrt.getch() != b"\x03":  # Ctrl+C
         pass
@@ -28,7 +29,7 @@ def wait_for_keyboard_interrupt():
 async def main():
     "connect DB and start servers"
     LOG.debug(f"{App.status=}")
-    kb_task = None
+    kb_task: Optional[asyncio.Task] = None
     if sys.platform == "win32":
         # Start keyboard interrupt watcher in background thread
         kb_task = asyncio.create_task(asyncio.to_thread(wait_for_keyboard_interrupt))
@@ -36,7 +37,7 @@ async def main():
         # LOG.debug(f"got websocket {ws=}")
         while True:
             # LOG.debug("Start DB, config")
-            App.status_object.status = (
+            App.status = (
                 Status.STATUS_DB_CFG
                 if DBConfig.db_configuration
                 else Status.STATUS_NO_DB
@@ -51,7 +52,7 @@ async def main():
                             await App.db_ready()
                         except ConfigurationError as exc:
                             LOG.error(f"Error reading configuration from DB ({exc})")
-                            App.status_object.status = Status.STATUS_NO_DB
+                            App.status = Status.STATUS_NO_DB
                     else:
                         # LOG.debug("DB NOT available.")
                         App.db_failure.set()
@@ -67,7 +68,7 @@ async def main():
                     App.db_request_restart.clear()
 
             except DBSchemaError as exc:
-                App.status_object.status = Status.STATUS_NO_DB
+                App.status = Status.STATUS_NO_DB
                 LOG.error(f"DB unusable. ({exc})")
                 break
             LOG.info("DB restarting")

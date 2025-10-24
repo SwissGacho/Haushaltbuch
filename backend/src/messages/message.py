@@ -5,14 +5,18 @@ import pathlib
 from enum import StrEnum
 from json import dumps, loads
 from typing import Any, Optional
-from core.base_objects import BaseObject
-from core.app_logging import getLogger
-from server.ws_token import WSToken
 
-LOG = getLogger(__name__)
+from core.app_logging import getLogger, log_exit, Logger
+
+LOG: Logger = getLogger(__name__)
+
+from core.base_objects import BaseObject
+from server.ws_token import WSToken
 
 
 class MessageType(StrEnum):
+    "Types of websocket messages"
+
     WS_TYPE_NONE = "None"
     WS_TYPE_HELLO = "Hello"
     WS_TYPE_LOGIN = "Login"
@@ -81,7 +85,7 @@ def _serialize(msg_dict: dict) -> dict:
     }
 
 
-def _all_subclasses(cls):
+def _all_subclasses(cls) -> set[type["Message"]]:
     "return subclasses recursively"
     return set(cls.__subclasses__()).union(
         [s for c in cls.__subclasses__() for s in _all_subclasses(c)]
@@ -91,14 +95,14 @@ def _all_subclasses(cls):
 class Message(BaseObject):
     "Commons of messages"
 
-    def __new__(cls, json_message: str = None, **kwa):
+    def __new__(cls, json_message: str | None = None, **kwa):
         # LOG.debug(f"Message.__new__({cls=} {json_message=} {kwa=})")
         if json_message and isinstance(json_message, str):
             message_type = loads(json_message).get(MessageAttribute.WS_ATTR_TYPE)
             if message_type:
                 for sub in _all_subclasses(cls=cls):
                     if sub.message_type() == message_type:
-                        return super().__new__(sub)
+                        return super().__new__(sub)  # type: ignore[return-value]
         return super().__new__(cls)
 
     def __init__(
@@ -135,14 +139,17 @@ class Message(BaseObject):
         return self.message.get(MessageAttribute.WS_ATTR_TOKEN)
 
     def get_str(self, attr: MessageAttribute) -> Optional[str]:
+        "get string attribute from message"
         val = self.message.get(attr, "")
         return val if isinstance(val, str) else None
 
     def get_int(self, attr: MessageAttribute) -> Optional[int]:
+        "get integer attribute from message"
         val = self.message.get(attr, "")
         return val if isinstance(val, int) else None
 
     def get_dict(self, attr: MessageAttribute) -> Optional[dict]:
+        "get dictionary attribute from message"
         val = self.message.get(attr, "")
         return val if isinstance(val, dict) else None
 
@@ -157,7 +164,8 @@ class Message(BaseObject):
 
     async def handle_message(self, connection):
         "Handle unknown message type"
+        _ = connection
         LOG.error(f"received unknown message ({self.message})")
 
 
-# LOG.debug("module imported")
+log_exit(LOG)

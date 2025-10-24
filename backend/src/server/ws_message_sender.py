@@ -1,8 +1,8 @@
 """Mix-In class for objects that can send messages to a websocket connection."""
 
-from core.app_logging import getLogger
+from core.app_logging import getLogger, Logger, log_exit
 
-LOG = getLogger(__name__)
+LOG: Logger = getLogger(__name__)
 
 
 class WSMessageSender:
@@ -26,5 +26,8 @@ class WSMessageSender:
     async def send_message(self, message):
         """Send a message to the websocket connection."""
         LOG.debug(f"WSMessageSender.send_message({message=})")
-        LOG.debug(f"{self._connection=}")
+        LOG.debug(f"     {self._connection=}")
         await self._connection.send_message(message)
+
+
+log_exit(LOG)

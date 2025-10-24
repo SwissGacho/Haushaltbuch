@@ -5,14 +5,14 @@ from unittest.mock import Mock, AsyncMock, patch
 import inspect
 
 import core.exceptions
-from server.ws_connection import WS_Connection
+from server.ws_connection import WSConnection
 from messages.message import MessageType, MessageAttribute
 from messages.login import HelloMessage, ByeMessage, LoginMessage
 
 
 class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.connection = WS_Connection(
+        self.connection = WSConnection(
             websocket=AsyncMock(name="mockSocket"), sock_nbr=99
         )
         self.connection._token = "mockToken"
@@ -61,7 +61,7 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         mock_message = Mock(name="mock_message")
         mock_login_message = Mock(LoginMessage())
         if inspect.isclass(login_arg):
-            if login_arg is core.exceptions.ConnectionClosed:
+            if login_arg is core.exceptions.WSConnectionClosed:
                 exp_result = "ConnCloseExc"
             else:
                 exp_result = "AnyExc"
@@ -80,7 +80,7 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         )
         self.connection.send_message = AsyncMock(name="send_message")
         self.connection.abort_connection = AsyncMock(
-            name="abort_connection", side_effect=core.exceptions.ConnectionClosed
+            name="abort_connection", side_effect=core.exceptions.WSConnectionClosed
         )
         self.connection.handle_message = AsyncMock(
             name="handle_message",
@@ -130,7 +130,7 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         await self._103_start_connection("mockJSONnoLogin")
 
     async def test_103c_start_connection_invalid_login(self):
-        await self._103_start_connection(core.exceptions.ConnectionClosed)
+        await self._103_start_connection(core.exceptions.WSConnectionClosed)
 
     async def test_103d_start_connection_exception(self):
         await self._103_start_connection(Exception)
@@ -142,7 +142,7 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         self.connection.send_message = AsyncMock(name="send_message")
         with (
             patch("server.ws_connection.ByeMessage", MockByeMessage),
-            self.assertRaises(core.exceptions.ConnectionClosed),
+            self.assertRaises(core.exceptions.WSConnectionClosed),
         ):
             await self.connection.abort_connection(**args)
         self.connection.send_message.assert_awaited_once_with(mock_bye_message)

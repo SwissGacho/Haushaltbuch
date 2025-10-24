@@ -3,13 +3,15 @@
 Transient Business Objects are not stored in the database, but are used to
 temporarily hold data during processing or for communication with the frontend."""
 
-import itertools
-from core.app_logging import getLogger
 from typing import Optional
+import itertools
 import weakref
-from business_objects.business_object_base import BOBase
+
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
+
+from business_objects.business_object_base import BOBase
 
 
 class TransientBusinessObject(BOBase):
@@ -39,3 +41,6 @@ class TransientBusinessObject(BOBase):
     @classmethod
     async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         return [bo.id for bo in cls._instances if isinstance(bo.id, int)]
+
+
+log_exit(LOG)

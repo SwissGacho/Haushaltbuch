@@ -38,7 +38,7 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
 
     def test_001_db(self):
         self.assertDictEqual(self.db._cfg, self.db_cfg)
-        self.assertEqual(self.db._connections, set())
+        self.assertEqual(self.db.db_connections, set())
 
     def _200_check_column(self, col_correct):
 
@@ -91,7 +91,7 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
     async def test_301_close(self):
         con1 = AsyncMock()
         con2 = AsyncMock()
-        self.db._connections = {con1, con2}
+        self.db.db_connections = {con1, con2}
         await self.db.close()
         con1.close.assert_awaited_once_with()
         con2.close.assert_awaited_once_with()

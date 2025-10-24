@@ -1,29 +1,33 @@
-""" Manage tokens with limited lifetime"""
+"""Manage tokens with limited lifetime"""
 
 from datetime import datetime, timedelta
 from secrets import token_hex as token
-from core.base_objects import BaseObject
-from core.app_logging import getLogger
 
-LOG = getLogger(__name__)
+from core.app_logging import getLogger, log_exit, Logger
+
+LOG: Logger = getLogger(__name__)
+
+from core.base_objects import BaseObject
 
 
 class WSToken(BaseObject):
     "a session or connection token with limited lifetime"
+
     _all_tokens = set()
 
-    def __init__(self, valid_for_seconds: int = 300) -> None:
-        self.token = token(16)
+    def __init__(self, tok: str | None = None, valid_for_seconds: int = 300) -> None:
+        self.token = tok or token(16)
         self._valid_for_seconds = valid_for_seconds
         self._expires = datetime.now() + timedelta(seconds=valid_for_seconds)
         self._all_tokens.add(self)
 
     @classmethod
-    def check_token(cls, token: str) -> bool:
+    def check_token(cls, tok: str) -> bool:
         "check if token is valid"
         now = datetime.now()
         for tkn in cls._all_tokens:
-            if token == tkn.token and tkn._expires > now:
+            # pylint: disable=protected-access
+            if tok == tkn.token and tkn._expires > now:
                 tkn._expires = datetime.now() + timedelta(
                     seconds=tkn._valid_for_seconds
                 )
@@ -43,4 +47,4 @@ class WSToken(BaseObject):
         return f"<Token(valid_for_seconds={self._valid_for_seconds}) valid untill {self._expires}>"
 
 
-# LOG.debug("module imported")
+log_exit(LOG)
