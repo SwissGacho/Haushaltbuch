@@ -1,5 +1,6 @@
 """Classes for building SQL expressions that can be used in SQLStatements."""
 
+from math import e
 from typing import Any, Optional
 import re
 
@@ -91,7 +92,7 @@ class SQLUnaryExpression(SQLMultiExpression):
         if self.__class__.left_operator:
             self.__class__.operator = self.__class__.left_operator
             super().__init__([" ", expression])
-        if self.__class__.right_operator:
+        elif self.__class__.right_operator:
             self.__class__.operator = self.__class__.right_operator
             super().__init__([expression, " "])
         else:

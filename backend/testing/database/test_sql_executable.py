@@ -25,6 +25,11 @@ class MockApp:
     db = MockDB()
 
 
+class MockManagedExecutable(SQLManagedExecutable):
+    def get_query(self):
+        return super().get_query()
+
+
 def clean_sql(sql: str) -> str:
     return " ".join(sql.strip().split())
 
@@ -55,7 +60,11 @@ class Test_200_SQLManagedExecutable(unittest.TestCase):
     def setUp(self) -> None:
         self.mockParent = Mock(spec=SQLExecutable)
         self.mockParent._get_db = Mock(return_value=MockDB())
-        self.sql_managed_executable = SQLManagedExecutable(parent=self.mockParent)
+        self.sql_managed_executable = MockManagedExecutable(parent=self.mockParent)
+
+    def test_200_SQLManagedExecutable(self):
+        with self.assertRaises(TypeError):
+            SQLManagedExecutable(parent=self.mockParent)
 
     def test_201_get_query(self):
         # Test the get_query method

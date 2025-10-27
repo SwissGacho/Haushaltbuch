@@ -540,7 +540,7 @@ class Test_B00_Update(unittest.TestCase):
         self.assertEqual(
             clean_sql(update.get_sql()),
             {
-                "query": "UPDATE users SET (name) = :param",
+                "query": "UPDATE users SET name = :param",
                 "params": {"param": "TheName"},
             },
         )
@@ -553,7 +553,7 @@ class Test_B00_Update(unittest.TestCase):
         self.assertEqual(
             clean_sql(update.get_sql()),
             {
-                "query": "UPDATE users SET (name) = :param, (age) = :param1",
+                "query": "UPDATE users SET name = :param, age = :param1",
                 "params": {"param": "TheName", "param1": 42},
             },
         )
@@ -567,7 +567,7 @@ class Test_B00_Update(unittest.TestCase):
         self.assertEqual(
             clean_sql(update.get_sql()),
             {
-                "query": "UPDATE users SET (name) = :param, (age) = :param1 WHERE (id = :param2)",
+                "query": "UPDATE users SET name = :param, age = :param1 WHERE (id = :param2)",
                 "params": {"param": "TheName", "param1": 42, "param2": 1},
             },
         )
@@ -581,7 +581,7 @@ class Test_B00_Update(unittest.TestCase):
         self.assertEqual(
             clean_sql(update.get_sql()),
             {
-                "query": "UPDATE users SET (age) = :param WHERE (id = :param1) RETURNING id",
+                "query": "UPDATE users SET age = :param WHERE (id = :param1) RETURNING id",
                 "params": {"param": 42, "param1": 1},
             },
         )

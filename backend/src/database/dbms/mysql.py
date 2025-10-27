@@ -212,8 +212,8 @@ class MySQLDB(DB):
             raise ImportError("asyncmy module is not available.")
 
         self.connection_pool = await asyncmy.create_pool(
-            host=self._cfg[Config.CONFIG_DBHOST],
-            db=self._cfg[Config.CONFIG_DBDBNAME],
+            host=self._cfg.get(Config.CONFIG_DBHOST, "localhost"),
+            db=self._cfg.get(Config.CONFIG_DBDBNAME, "moneypilot"),
             port=self._cfg.get(Config.CONFIG_DBPORT, 3306),
             user=self._cfg.get(Config.CONFIG_DBUSER),
             password=self._cfg.get(Config.CONFIG_DBPW),

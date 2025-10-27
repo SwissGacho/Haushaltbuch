@@ -109,7 +109,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             mock_get_config_item.assert_called_once_with(
                 mock_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
             )
-            self.assertEqual(MockApp.status_object.status, stat)
+            self.assertEqual(MockApp.status, stat)
             if u_mode == SetupConfigValues.SINGLE_USER:
                 MockColNam.assert_any_call("name")
                 MockUser.get_matching_ids.assert_awaited_once_with(

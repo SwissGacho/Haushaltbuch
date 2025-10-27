@@ -1,6 +1,7 @@
 """Test suite for MySQL attachement"""
 
-import re
+from multiprocessing import pool
+from re import A
 import sys
 import types
 import importlib
@@ -37,14 +38,47 @@ def setUpModule() -> None:
         if mod in sys.modules:
             del sys.modules[mod]
 
-    remove("aiomysql")
+    remove("asyncmy")
 
 
 from core.exceptions import ConfigurationError
 import database.sql_statement
 
 
-class TestMySQLDB__init__(unittest.TestCase):
+class MockConnection:
+    def __init__(self, name, version, ix=-1):
+        self.name = name
+        # mock_cursor = Mock(name="cursor")
+        # mock_cursor.close = AsyncMock()
+        # mock_cursor.fetchone = AsyncMock(return_value=version)
+        # self.execute = AsyncMock(return_value=mock_cursor)
+        self.ix = ix
+
+
+class MockPool:
+    def __init__(self):
+        self.cons = []
+        self.db_vers = {"version": "No Version"}
+
+    async def acquire(self):
+        i = 0
+        while i <= len(self.cons):
+            if i == len(self.cons):
+                self.cons.append(None)
+            if self.cons[i] is None:
+                break
+            i += 1
+        self.cons[i] = MockConnection("mock_connection", self.db_vers, i)
+        return self.cons[i]
+
+    async def release(self, con):
+        for i in range(len(self.cons)):
+            if self.cons[i] == con:
+                self.cons[i] = None
+                break
+
+
+class Test_001_MySQLDB__init__(unittest.TestCase):
     def setUp(self) -> None:
         self.db_cfg = {
             "host": "mockhost",
@@ -53,14 +87,18 @@ class TestMySQLDB__init__(unittest.TestCase):
         }
         return super().setUp()
 
+    def tearDown(self) -> None:
+        database.dbms.mysql.ASYNCMY_IMPORT_ERROR = None
+        return super().tearDown()
+
     def test_001_MySQLDB(self):
-        database.dbms.mysql.AIOMYSQL_IMPORT_ERROR = None
+        database.dbms.mysql.ASYNCMY_IMPORT_ERROR = None
         with patch("database.dbms.db_base.DB.__init__") as mock_db_init:
             self.db = database.dbms.mysql.MySQLDB(**self.db_cfg)
             mock_db_init.assert_called_once_with(**self.db_cfg)
 
     def test_002_MySQLDB_no_lib(self):
-        database.dbms.mysql.AIOMYSQL_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
+        database.dbms.mysql.ASYNCMY_IMPORT_ERROR = ModuleNotFoundError("Mock Error")
         with (
             self.assertRaises(ModuleNotFoundError),
             patch("database.dbms.db_base.DB.__init__") as mock_db_init,
@@ -69,12 +107,12 @@ class TestMySQLDB__init__(unittest.TestCase):
         mock_db_init.assert_not_called()
 
 
-class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
+class Test_002_MySQLDB(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.db_cfg = {
             "host": "mockhost",
-            "db": "mockdb",
-            "user": "mockuser",
+            "dbname": "mockdb",
+            "dbuser": "mockuser",
             "password": "mockpw",
         }
         self.db = database.dbms.mysql.MySQLDB(**self.db_cfg)
@@ -87,16 +125,63 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
         self.sql._get_db = Mock(return_value=self.db)
         self.sql.execute = AsyncMock(return_value=self.mockCur)
         self.sql.script = Mock(return_value=self.sql)
+        self.mock_pool = MockPool()
+        self.create_pool = AsyncMock(return_value=self.mock_pool)
+        self.patchers = {
+            patch("database.dbms.mysql.asyncmy.create_pool", self.create_pool),
+        }
+        for patcher in self.patchers:
+            patcher.start()
         return super().setUp()
 
-    async def test_101_connect(self):
+    def tearDown(self):
+        for patcher in self.patchers:
+            patcher.stop()
+
+    async def test_000_init_db(self):
+        self.assertIsNone(self.db.connection_pool)
+        self.create_pool.assert_not_awaited()
+
+    async def test_001_create_pool(self):
+        self.mock_pool.acquire = AsyncMock()
+        self.mock_pool.release = AsyncMock()
+
+        await self.db.create_pool()
+
+        self.assertEqual(self.db.connection_pool, self.mock_pool)
+        self.create_pool.assert_awaited_once_with(
+            host=self.db_cfg["host"],
+            db=self.db_cfg["dbname"],
+            port=3306,
+            user=self.db_cfg["dbuser"],
+            password=self.db_cfg["password"],
+            ssl=None,
+            minsize=1,
+            maxsize=50,
+            echo=False,
+            pool_recycle=3600,
+        )
+
+        self.db.connection_pool = "mock_pool"
+        self.create_pool.reset_mock()
+        await self.db.create_pool()
+
+        self.assertEqual(self.db.connection_pool, "mock_pool")
+        self.create_pool.assert_not_awaited()
+
+        self.mock_pool.acquire.assert_not_awaited()
+        self.mock_pool.release.assert_not_awaited()
+
+    async def test_102_connect(self):
         mock_con_obj = AsyncMock()
         mock_con_obj.connect = AsyncMock(return_value=mock_con_obj)
         Mock_Connection = Mock(return_value=mock_con_obj)
         with (patch("database.dbms.mysql.MySQLConnection", Mock_Connection),):
+
             reply = await self.db.connect()
+
             self.assertEqual(reply, mock_con_obj)
-            Mock_Connection.assert_called_once_with(db_obj=self.db, **self.db_cfg)
+            Mock_Connection.assert_called_once_with(db_obj=self.db, pool=self.mock_pool)
             mock_con_obj.connect.assert_awaited_once_with()
 
     async def test_201_get_table_info(self):
@@ -121,7 +206,7 @@ class TestMySQLDB(unittest.IsolatedAsyncioTestCase):
             self.assertDictEqual(reply, expected)
 
 
-class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
+class Test_003_MySQLConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_db = Mock()
         self.mock_con = AsyncMock()
@@ -131,24 +216,35 @@ class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
             "dbuser": "mock_user",
             "password": "mock_pw",
         }
-        self.con = database.dbms.mysql.MySQLConnection(self.mock_db, **self.db_cfg)
+        self.mock_pool = MockPool()
+        self.con = database.dbms.mysql.MySQLConnection(
+            self.mock_db, self.mock_pool, **self.db_cfg
+        )
+        self.patchers = {
+            # patch("database.dbms.mysql."),
+        }
+        for patcher in self.patchers:
+            patcher.start()
         return super().setUp()
+
+    def tearDown(self):
+        for patcher in self.patchers:
+            patcher.stop()
 
     def test_001_connection(self):
         self.assertDictEqual(self.con._cfg, self.db_cfg)
+        self.assertEqual(self.con._db, self.mock_db)
+        self.assertEqual(self.con._pool, self.mock_pool)
 
     async def _100_connect(self, mock_db, mock_dbcfg="MySQL", checked=False):
         if mock_dbcfg == "MySQL":
             db_error = "MariaDB" in mock_db
         else:
             db_error = "MariaDB" not in mock_db
-        mock_aioconnection = Mock(name="mock_aioconnection")
+        mock_conn = MockConnection("mock_connection", self.mock_pool.db_vers)
+        self.mock_pool.acquire = AsyncMock(return_value=mock_conn)
         mock_cursor = Mock(name="cursor")
-        mock_aioconnection.execute = AsyncMock(return_value=mock_cursor)
         mock_cursor.close = AsyncMock()
-        mock_mysql_connect = AsyncMock(
-            name="mock_aioconnect", return_value=mock_aioconnection
-        )
         mock_sql = AsyncMock(name="mock_sql")
         mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
         mock_sql.script = Mock(return_value=mock_sql)
@@ -158,28 +254,21 @@ class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
         )
         database.dbms.mysql.MySQLConnection._version_checked = checked
         with (
-            patch("database.dbms.mysql.aiomysql") as mock_mysql,
+            # patch("database.dbms.mysql.asyncmy") as mock_mysql,
             patch("database.dbms.mysql.SQL", return_value=mock_sql) as Mock_SQL,
             patch("database.dbms.mysql.get_config_item", return_value=mock_dbcfg),
         ):
-            mock_mysql.connect = mock_mysql_connect
+            # =============================================
             if db_error and not checked:
                 with self.assertRaises(ConfigurationError):
                     await self.con.connect()
                 return
             else:
                 reply = await self.con.connect()
+            # ============================================
         self.assertEqual(reply, self.con)
-        mock_mysql_connect.assert_awaited_once_with(
-            **{
-                "host": self.db_cfg["host"],
-                "db": self.db_cfg["dbname"],
-                "user": self.db_cfg["dbuser"],
-                "password": self.db_cfg["password"],
-            }
-        )
-        self.assertEqual(self.con._connection, mock_aioconnection)
-        mock_aioconnection.execute.assert_not_awaited()
+        self.mock_pool.acquire.assert_awaited_once_with()
+        self.assertEqual(self.con._connection.ix, -1)
         mock_cursor.close.assert_not_awaited()
         if checked:
             Mock_SQL.assert_not_called()
@@ -212,13 +301,13 @@ class TestMySQLConnection(unittest.IsolatedAsyncioTestCase):
 
     async def _201_execute(self, params=DEFAULT):
         sql = "ANY_SQL"
-        mock_cur = AsyncMock()
-        MockCursor = Mock(return_value=mock_cur)
-        self.con._connection = AsyncMock()
-        self.con._connection.cursor.return_value = "mock_cur"
+        mock_cur = AsyncMock(name="mock_execute_cursor")
+        MockCursor = Mock(name="MockCursor", return_value=mock_cur)
+        self.con._connection = AsyncMock(name="mock_asyncmy_connection")
+        self.con._connection.cursor = Mock(return_value=mock_cur)
         with (
             patch("database.dbms.mysql.MySQLCursor", MockCursor),
-            patch("database.dbms.mysql.aiomysql.DictCursor", "mock_dict_cursor"),
+            patch("database.dbms.mysql.DictCursor", "mock_dict_cursor"),
         ):
 
             if params is DEFAULT:
@@ -247,7 +336,7 @@ async def spec_async_context_manager():
     yield
 
 
-class TestMySQLCursor(unittest.IsolatedAsyncioTestCase):
+class Test_004_MySQLCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_con = Mock()
         self.mock_aiocursor = AsyncMock()

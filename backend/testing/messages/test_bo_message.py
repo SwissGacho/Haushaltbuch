@@ -2,4 +2,4 @@
 
 import unittest
 
-from messages.bo_message import FetchMessage, MessageType
+# from messages.bo_message import FetchMessage, MessageType

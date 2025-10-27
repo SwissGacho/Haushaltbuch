@@ -3,6 +3,12 @@
 
 import sys
 import asyncio
+from asyncio import (
+    create_task as aio_create_task,
+    to_thread as aio_to_thread,
+    wait as aio_wait,
+    FIRST_COMPLETED,
+)
 from typing import Optional
 
 from core.app_logging import getLogger
@@ -32,8 +38,10 @@ async def main():
     kb_task: Optional[asyncio.Task] = None
     if sys.platform == "win32":
         # Start keyboard interrupt watcher in background thread
-        kb_task = asyncio.create_task(asyncio.to_thread(wait_for_keyboard_interrupt))
-    async with get_websocket():
+        kb_task = aio_create_task(
+            aio_to_thread(wait_for_keyboard_interrupt), name="kb_watcher"
+        )
+    async with get_websocket() as ws:
         # LOG.debug(f"got websocket {ws=}")
         while True:
             # LOG.debug("Start DB, config")
@@ -57,12 +65,16 @@ async def main():
                         # LOG.debug("DB NOT available.")
                         App.db_failure.set()
                     LOG.info(f"App running. (Status: {App.status})")
-                    tasks = [asyncio.create_task(App.db_request_restart.wait())]
+                    tasks = [
+                        aio_create_task(
+                            App.db_request_restart.wait(), name="await_db_restart"
+                        )
+                    ]
                     if kb_task:
                         tasks.append(kb_task)
-                    done, _ = await asyncio.wait(
-                        tasks, return_when=asyncio.FIRST_COMPLETED
-                    )
+                    # LOG.debug(f"Waiting for tasks: {[t.get_name() for t in tasks]}")
+                    done, _ = await aio_wait(tasks, return_when=FIRST_COMPLETED)
+                    # LOG.debug(f"Done tasks: {[t.get_name() for t in done]}")
                     if kb_task and kb_task in done:
                         raise KeyboardInterrupt
                     App.db_request_restart.clear()
