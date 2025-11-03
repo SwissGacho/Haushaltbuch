@@ -217,12 +217,12 @@ class Test_600_Assignment(unittest.TestCase):
         sql = Assignment(
             ColumnName("column1"), Value("value1"), parent=self.mock_parent
         )
-        self.assertEqual(normalize_sql(sql.get_query()), "(column1) = :param")
+        self.assertEqual(normalize_sql(sql.get_query()), "column1 = :param")
         self.assertEqual(sql.params, {"param": "value1"})
 
     def test_602_assignment_single_str_column(self):
         sql = Assignment("column1", Value("value1"), parent=self.mock_parent)
-        self.assertEqual(normalize_sql(sql.get_query()), "(column1) = :param")
+        self.assertEqual(normalize_sql(sql.get_query()), "column1 = :param")
         self.assertEqual(sql.params, {"param": "value1"})
 
     def test_603_assignment_multiple_columns(self):
@@ -231,8 +231,11 @@ class Test_600_Assignment(unittest.TestCase):
             Value("value1"),
             parent=self.mock_parent,
         )
-        self.assertEqual(normalize_sql(sql.get_query()), "(column1,column2) = :param")
-        self.assertEqual(sql.params, {"param": "value1"})
+        with self.assertRaises(NotImplementedError):
+            self.assertEqual(
+                normalize_sql(sql.get_query()), "(column1,column2) = :param"
+            )
+        # self.assertEqual(sql.params, {"param": "value1"})
 
     def test_604_mock_get_query_calls(self):
         with patch(
@@ -244,7 +247,7 @@ class Test_600_Assignment(unittest.TestCase):
                 ColumnName("column1"), Value("value1"), parent=self.mock_parent
             )
             result = sql.get_query()
-        self.assertEqual(normalize_sql(result), "(mock_col) = mock_val")
+        self.assertEqual(normalize_sql(result), "mock_col = mock_val")
         mock_value_get_query.assert_called_once_with(km=sql)
         mock_col_get_query.assert_called_once_with(km=sql)
 

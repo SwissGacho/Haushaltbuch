@@ -54,11 +54,30 @@ class MockConnection(ConnectionBaseClass):
         self.rollback = AsyncMock(name="DBrollback")
         self.begin = AsyncMock(name="DBbegin")
         self.close = AsyncMock(name="DBclose")
+        self.connect = AsyncMock(name="DBconnect", return_value=self)
 
     def reset_mock(self):
         self.commit.reset_mock()
         self.rollback.reset_mock()
+        self.begin.reset_mock()
         self.close.reset_mock()
+        self.connect.reset_mock()
+
+    async def connect(self):
+        "Open a connection and return the Connection instance"
+        raise ConnectionError("Called from DB base class.")
+
+    async def begin(self):
+        "Begin a transaction"
+
+    async def commit(self):
+        "commit current transaction"
+
+    async def rollback(self):
+        "rollback current transaction"
+
+    async def close(self) -> None:
+        "close the connection"
 
 
 mocked_connection = MockConnection()
@@ -97,13 +116,19 @@ def clean_sql(sql: str | SQL_Dict) -> str | SQL_Dict:
 class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
-        self.patcher = patch("database.sql_executable.App", MockApp)
-        self.patcher.start()
         MockApp.db.reset_mock()
+        self.patchers = {
+            patch("database.sql_executable.App", MockApp),
+            patch("database.sql.App", MockApp),
+        }
+        for patcher in self.patchers:
+            patcher.start()
         self.sql = SQL()
+        return super().setUp()
 
     def tearDown(self):
-        self.patcher.stop()
+        for patcher in self.patchers:
+            patcher.stop()
 
     async def test_201_execute_default(self):
         """Test exception when no SQL statement is set"""

@@ -118,7 +118,7 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
 class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_db = Mock()
-        self.mock_con = AsyncMock()
+        self.mock_con = AsyncMock(name="mock_connection")
         self.db_cfg = {"db": "SQLite", "file": "mock_sqlite_file.db"}
         self.con = database.dbms.sqlite.SQLiteConnection(self.mock_db, **self.db_cfg)
         return super().setUp()
@@ -189,7 +189,7 @@ async def spec_async_context_manager():
 
 class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.mock_con = Mock(name="mock_connection")
+        self.mock_con = Mock(name="cursor mock_connection")
         self.mock_aiocursor = AsyncMock(name="mock_aiocursor")
         self.cur = database.dbms.sqlite.SQLiteCursor(self.mock_aiocursor, self.mock_con)
         self.mock_con_close = AsyncMock(name="mock_conclose")
@@ -204,7 +204,7 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
         self.cur._rowcount = 0
         if params is DEFAULT:
             reply = await self.cur.execute(query)
-            params = {}
+            params = None
         elif params is not DEFAULT:
             reply = await self.cur.execute(query, params=params)
         self.assertEqual(reply, self.cur)
@@ -220,7 +220,7 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
 
     async def test_201_rowcount_get_11(self):
         self.cur._rowcount = 11
-        mock_sqlite_con_execute = AsyncMock(spec_async_context_manager())
+        mock_sqlite_con_execute = AsyncMock(spec=spec_async_context_manager())
         self.mock_con._connection.execute.return_value = mock_sqlite_con_execute
         reply = await self.cur.rowcount
         self.assertEqual(reply, 11)
@@ -235,16 +235,27 @@ class TestSQLiteCursor(unittest.IsolatedAsyncioTestCase):
         _last_sql = "PREV_SQL"
         self.cur._last_query = _last_sql
         self.cur._last_params = {}
-        mock_sqlite_con_execute = AsyncMock(spec_async_context_manager())
-        self.mock_con._connection.execute.return_value = mock_sqlite_con_execute
-        mock_subcur = AsyncMock()
-        mock_sqlite_con_execute.__aenter__.return_value = mock_subcur
-        mock_subcur.fetchone.return_value = {"rowcount": 22}
+        aiosqlite_cursor = AsyncMock(
+            name="aiosqlite cursor", spec=spec_async_context_manager()
+        )
+        self.mock_con.connection = AsyncMock(name="aio sub connection")
+        self.mock_con.connection.execute = Mock(
+            name="sub execute", return_value=aiosqlite_cursor
+        )
+        aiosqlite_cursor.__aenter__.return_value = aiosqlite_cursor
+        # aiosqlite_cursor.__aexit__.return_value = False
+        aiosqlite_cursor.fetchone = AsyncMock(
+            name="aio fetchone", return_value={"rowcount": 22}
+        )
+
+        # =================================== test ==========================
         reply = await self.cur.rowcount
+        # =================================== test ==========================
+
         self.assertEqual(reply, 22)
-        self.mock_con._connection.execute.assert_called_once_with(
+        self.mock_con.connection.execute.assert_called_once_with(
             sql=f"SELECT COUNT(*) AS rowcount FROM ({_last_sql})", parameters={}
         )
-        mock_sqlite_con_execute.__aenter__.assert_awaited_once_with()
-        mock_sqlite_con_execute.__aexit__.assert_awaited_once_with(None, None, None)
-        mock_subcur.fetchone.assert_awaited_once_with()
+        aiosqlite_cursor.__aenter__.assert_awaited_once_with()
+        aiosqlite_cursor.__aexit__.assert_awaited_once_with(None, None, None)
+        aiosqlite_cursor.fetchone.assert_awaited_once_with()

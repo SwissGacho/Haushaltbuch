@@ -406,38 +406,39 @@ class CreateView(Select):
         self,
         view: str = "",
         view_columns: list[str] | None = None,
+        column_list: list[str] | None = None,
+        distinct: bool = False,
         temporary: bool = False,
         parent: SQLExecutable | None = None,
         **kwargs,
     ):
-        # LOG.debug(f"CreateTable({table=}, {columns=}, {temporary=})")
+        # LOG.debug(f"CreateView({view=}, {view_columns=}, {temporary=})")
         self._view = view
         self._columns: list[str] = view_columns or []
         self._temporary = temporary
-        super().__init__(parent=parent, **kwargs)
+        super().__init__(
+            column_list=column_list, distinct=distinct, parent=parent, **kwargs
+        )
 
-    def get_sql(self) -> SQL_Dict:
+    def get_query(self) -> str:
         """Get a string representation of the current SQL statement."""
         if self._view is None or len(self._view) == 0:
             raise InvalidSQLStatementException(
                 "CREATE VIEW statement must have a view name."
             )
-        return {
-            "query": " ".join(
-                [
-                    "CREATE",
-                    "TEMPORARY VIEW" if self._temporary else "VIEW",
-                    self._view,
-                    (
-                        ("( " + ", ".join(self._columns) + " ) AS")
-                        if self._columns
-                        else "AS"
-                    ),
-                    super().get_query(),
-                ]
-            ),
-            "params": self.params,
-        }
+        return " ".join(
+            [
+                "CREATE",
+                "TEMPORARY VIEW" if self._temporary else "VIEW",
+                self._view,
+                (
+                    ("( " + ", ".join(self._columns) + " ) AS")
+                    if self._columns
+                    else "AS"
+                ),
+                super().get_query(),
+            ]
+        )
 
 
 log_exit(LOG)

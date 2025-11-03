@@ -100,7 +100,7 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
 class TestDBConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_db = Mock()
-        self.mock_db._connections = set()
+        self.mock_db.db_connections = set()
         self.db_cfg = {"cfg1": "mick", "cfg2": "mack", "cfg3": "mock"}
         self.con = database.dbms.db_base.Connection(db_obj=self.mock_db, **self.db_cfg)
         return super().setUp()
@@ -109,7 +109,7 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
         self.assertDictEqual(self.con._cfg, self.db_cfg)
         self.assertEqual(self.con._db, self.mock_db)
         self.assertIsNone(self.con._connection)
-        self.assertEqual(self.mock_db._connections, {self.con})
+        self.assertEqual(self.mock_db.db_connections, {self.con})
 
     async def test_201_close(self):
         mock_con = AsyncMock()
@@ -118,7 +118,7 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
         mock_con.close = mock_close
         await self.con.close()
         mock_close.assert_awaited_once_with()
-        self.assertEqual(self.mock_db._connections, set())
+        self.assertEqual(self.mock_db.db_connections, set())
         self.assertIsNone(self.con._connection)
 
     def test_301_connection_prop(self):
