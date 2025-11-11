@@ -29,7 +29,7 @@ def check_environment():
                 raise EnvironmentError(
                     f"The '{lib}' package is not installed."
                 ) from exc
-            return None, False
+            return None
 
         if installed_version < required:
             raise EnvironmentError(
