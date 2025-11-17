@@ -119,7 +119,6 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
         MockApp.db.reset_mock()
         self.patchers = {
             patch("database.sql_executable.App", MockApp),
-            patch("database.sql.App", MockApp),
         }
         for patcher in self.patchers:
             patcher.start()
