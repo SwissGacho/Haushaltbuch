@@ -4,6 +4,7 @@ Business objects are classes that support persistance in the data base
 """
 
 import asyncio
+from enum import Flag
 import itertools
 from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 from dataclasses import dataclass
@@ -17,6 +18,8 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from business_objects.bo_descriptors import (
+    AttributeDescription,
+    AttributeType,
     BOColumnFlag,
     BOBaseBase,
     BOId,
@@ -41,8 +44,8 @@ BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 class BOBase(BOBaseBase):
     "Business Object baseclass"
 
-    id = BOId(BOColumnFlag.BOC_PK_INC)
-    last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR)
+    id = BOId(BOColumnFlag.BOC_PK_INC, is_technical=True)
+    last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR, is_technical=True)
     _table = None
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, type["BOBase"]] = {}
@@ -72,7 +75,7 @@ class BOBase(BOBaseBase):
 
     # pylint: disable=redefined-builtin, unused-argument
     def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
-        LOG.debug(f"BOBase({bo_id=},{attributes})")
+        # LOG.debug(f"BOBase({bo_id=},{attributes})")
         self._instance_subscribers: dict[int, BOCallback] = {}
         self._data = {}
         self._db_data = {}
@@ -116,6 +119,8 @@ class BOBase(BOBaseBase):
         attribute_name: str,
         data_type: type,
         constraint_flag: BOColumnFlag,
+        attribute_type: AttributeType | None = None,
+        is_technical: bool = False,
         **flag_values,
     ):
         if not cls._attributes.get(cls.__name__):
@@ -131,6 +136,8 @@ class BOBase(BOBaseBase):
                 data_type=data_type,
                 constraint=constraint_flag,
                 flag_values=flag_values,
+                is_technical=is_technical,
+                attribute_type=attribute_type,
             )
         )
 
@@ -174,6 +181,19 @@ class BOBase(BOBaseBase):
         assert cls.__base__ is not None, "BOBase.__base__ is None"
         if issubclass(cls.__base__, BOBase):
             return cls.__base__.attributes_as_dict() | cls_cols
+        return cls_cols
+
+    @classmethod
+    def business_attributes_as_dict(cls) -> dict[str, type]:
+        "dict of BO attribute types with attribute names as keys"
+        cls_cols = {
+            a.name: a.data_type
+            for a in cls._attributes.get(cls.__name__, [])
+            if not a.is_technical
+        }
+        assert cls.__base__ is not None, "BOBase.__base__ is None"
+        if issubclass(cls.__base__, BOBase):
+            return cls.__base__.business_attributes_as_dict() | cls_cols
         return cls_cols
 
     @classmethod

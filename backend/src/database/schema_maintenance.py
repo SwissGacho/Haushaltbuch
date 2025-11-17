@@ -104,6 +104,7 @@ async def check_db_schema():
 
     ok = True
     for bo in all_business_objects:
+        # LOG.debug(f"checking table for business object {bo.__name__}")
         ok = await this_database.check_table(bo) and ok
     if not ok:
         raise DBSchemaError("DB schema not compatible")
