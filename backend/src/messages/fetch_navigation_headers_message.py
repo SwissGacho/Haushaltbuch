@@ -1,7 +1,8 @@
 """Message from frontend requesting a list of navigation headers to show under an object"""
 
-from logging import Logger
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit, Logger
+
+LOG: Logger = getLogger(__name__)
 from business_objects.bo_descriptors import BORelation
 from business_objects.business_object_base import BOBase
 from messages.message import Message, MessageAttribute, MessageType
@@ -11,7 +12,9 @@ LOG: Logger = getLogger(__name__)
 
 
 class FetchNavigationHeadersMessage(Message):
-    "Message requesting the list headers applicable to an object. If no object is provided, return a list of headers applicable to the root tree of the user."
+    """Message requesting the list headers applicable to an object.
+    If no object is provided, return a list of headers applicable to the root tree of the user.
+    """
 
     @classmethod
     def message_type(cls) -> MessageType:
@@ -33,7 +36,8 @@ class FetchNavigationHeadersMessage(Message):
                 if attribute.data_type == BORelation
             ]
 
-        # If no object was specified, return the headers of the root tree - for now these are all business objects
+        # If no object was specified, return the headers of the root tree
+        #  - for now these are all business objects
         else:
             object_names = list(
                 BOBase.all_business_objects.keys()  # pylint:disable=no-member
@@ -51,3 +55,6 @@ class NavigationHeadersMessage(Message):
     @classmethod
     def message_type(cls) -> MessageType:
         return MessageType.WS_TYPE_NAVIGATION_HEADERS
+
+
+log_exit(LOG)

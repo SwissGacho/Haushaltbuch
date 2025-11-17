@@ -20,20 +20,22 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         mock_socket.__aiter__.return_value = messages
         mock_path = Mock
         no_messages = len(messages) if start_conn else 0
+
+        # =================================== test ==========================
         with (
-            patch("server.ws_server.WS_Connection", return_value=mock_connection),
+            patch("server.ws_server.WSConnection", return_value=mock_connection),
             patch("server.ws_server.Message") as Mock_Msg,
         ):
             await handler.handler(websocket=mock_socket)
-            mock_connection.start_connection.assert_awaited_once_with()
-            self.assertEqual(
-                Mock_Msg.call_count, no_messages, "number of Messages created"
-            )
-            self.assertEqual(
-                mock_connection.handle_message.await_count,
-                no_messages,
-                "number of Messages handled",
-            )
+        # =================================== test ==========================
+
+        mock_connection.start_connection.assert_awaited_once_with()
+        self.assertEqual(Mock_Msg.call_count, no_messages, "number of Messages created")
+        self.assertEqual(
+            mock_connection.handle_message.await_count,
+            no_messages,
+            "number of Messages handled",
+        )
 
     async def test_201_ws_handler_normal_login(self):
         messages = [

@@ -2,18 +2,18 @@
 
 from contextlib import asynccontextmanager
 
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
 from core.app import App
 from core.util import get_config_item
 from core.status import Status
 from core.configuration.config import Config
 from core.configuration.db_config import DBConfig
-from core.app_logging import getLogger
 from database.dbms.sqlite import SQLiteDB
 from database.dbms.mysql import MySQLDB
 from database.schema_maintenance import check_db_schema
-
-
-LOG = getLogger(__name__)
 
 
 @asynccontextmanager
@@ -79,3 +79,6 @@ async def get_db():
     finally:
         LOG.debug("DB disconnecting")
         await db.close()
+
+
+log_exit(LOG)

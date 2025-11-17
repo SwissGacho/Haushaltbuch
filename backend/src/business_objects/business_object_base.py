@@ -5,7 +5,7 @@ Business objects are classes that support persistance in the data base
 
 import asyncio
 import itertools
-from typing import Any, Coroutine, TypeAlias, Optional, Callable
+from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 from dataclasses import dataclass
 
 
@@ -57,7 +57,11 @@ class BOBase(BOBaseBase):
     def __new__(cls, *args, identity: int | None = None, **attributes):
         if identity is not None:
             if identity in cls._loaded_instances:
-                return cls._loaded_instances[identity]
+                obj = cls._loaded_instances[identity]
+                assert isinstance(
+                    obj, cls
+                ), f"Loaded instance with id {identity} is not of type {cls.__name__}"
+                return obj
 
         return super().__new__(cls)
 
@@ -136,10 +140,13 @@ class BOBase(BOBaseBase):
         BOBase._business_objects |= {cls._name(): cls}
         LOG.debug(f"registered class '{cls.__name__}' as {cls._name()}")
 
+    # pylint: disable=no-self-argument
     @_classproperty
-    def all_business_objects(self) -> dict[str, type["BOBase"]]:
+    def all_business_objects(
+        cls: Type[Self],  # type: ignore[reportGeneralTypeIssues]
+    ) -> dict[str, type["BOBase"]]:
         "Set of registered Business Objects"
-        return self._business_objects
+        return cls._business_objects
 
     @classmethod
     def get_business_object_by_name(cls, name: str) -> type["BOBase"]:
@@ -152,10 +159,13 @@ class BOBase(BOBaseBase):
     def _name(cls) -> str:
         return cls.__name__.lower()
 
+    # pylint: disable=no-self-argument
     @_classproperty
-    def table(self) -> str:
+    def table(
+        cls: Type[Self],  # type: ignore[reportGeneralTypeIssues]
+    ) -> str:
         "Name of the BO's DB table"
-        return self._table or self._name() + "s"
+        return cls._table or cls._name() + "s"
 
     @classmethod
     def attributes_as_dict(cls) -> dict[str, type]:
@@ -187,7 +197,7 @@ class BOBase(BOBaseBase):
         raise ValueError(f"No primary key defined for {cls.__name__}")
 
     @classmethod
-    def references(cls) -> list[str | BOBaseBase | None]:
+    def references(cls) -> list[str | type[BOBaseBase] | None]:
         "list of business objects referenced by this class"
         return [
             a.flag_values.get("relation")
@@ -274,6 +284,14 @@ class BOBase(BOBaseBase):
 
         value_dict = {k: v for k, v in self._data.items() if k not in ("bo_type")}
         return value_dict
+
+    # removed unused code to avoid warnings in TransientBusinessObject classes
+    # async def fetch(self, id=None, newest=None):
+    #     """Fetch the business object from the database by id.
+    #     If 'id' is None, fetch the latest version of the object.
+    #     If 'newest' is True, fetch the latest version of the object.
+    #     """
+    #     raise NotImplementedError("fetch not implemented")
 
     async def store(self):
         """Store pending changes to the business object.

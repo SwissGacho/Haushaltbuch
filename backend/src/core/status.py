@@ -1,5 +1,4 @@
-""" Store the current status of the backend and manage status changes
-"""
+"""Store the current status of the backend and manage status changes"""
 
 from core.app_logging import getLogger, log_exit
 
@@ -27,4 +26,5 @@ class AppStatus(StatusBaseClass):
 
 
 App.set_status_class(AppStatus, Status)
+
 log_exit(LOG)

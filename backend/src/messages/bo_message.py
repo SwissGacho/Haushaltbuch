@@ -1,19 +1,18 @@
 """Messages to request and send business objects"""
 
-from logging import Logger
 from types import NoneType
 from typing import TypeAlias, Union
 from enum import StrEnum
 import pathlib
 
-from business_objects.business_object_base import BOBase
-from server.ws_token import WSToken
-from messages.message import Message, MessageType, MessageAttribute
-from core.base_objects import BaseObject
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
 
+from core.base_objects import BaseObject
+from business_objects.business_object_base import BOBase
+from server.ws_token import WSToken
+from messages.message import Message, MessageType, MessageAttribute
 
 JSONAble: TypeAlias = Union[
     str,
@@ -28,6 +27,8 @@ JSONAble: TypeAlias = Union[
 
 
 class DataObjectTypes(StrEnum):
+    "Types of business objects"
+
     DO_TYPE_SETUP_CONFIG = "setup_config"
 
 
@@ -59,3 +60,6 @@ class ObjectMessage(Message):
                 MessageAttribute.WS_ATTR_PAYLOAD: payload,
             }
         )
+
+
+log_exit(LOG)
