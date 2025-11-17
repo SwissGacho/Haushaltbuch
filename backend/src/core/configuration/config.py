@@ -7,6 +7,9 @@
 """
 
 from typing import Optional
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
 
 from core.configuration.cmd_line import parse_commandline
 from core.configuration.db_config import DBConfig
@@ -15,14 +18,11 @@ from core.util import get_config_item
 from core.configuration.setup_config import SetupConfigValues
 from core.app import App
 from core.status import Status
-from core.app_logging import getLogger
 from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config, ConfigDict
 from data.management.configuration import Configuration
 from data.management.user import User, UserRole
 from database.sql_expression import ColumnName
-
-LOG = getLogger(__name__)
 
 
 class AppConfiguration(ConfigurationBaseClass):
@@ -64,15 +64,19 @@ class AppConfiguration(ConfigurationBaseClass):
             # LOG.debug(f"AppConfiguration.get_configuration_from_db: {config_ids=}")
             if len(config_ids) == 0:
                 LOG.info(
-                    f"Creating global configuration {str(Config.CONFIG_USR_MODE)}={SetupConfigValues.SINGLE_USER}"
+                    "Creating global configuration "
+                    f"{str(Config.CONFIG_USR_MODE)}={SetupConfigValues.SINGLE_USER}"
                 )
-                self._global_configuration = Configuration(
+                configuration = Configuration(
                     configuration={
                         Config.CONFIG_APP: {
                             Config.CONFIG_USR_MODE: SetupConfigValues.SINGLE_USER
                         }
                     }
                 )
+                if not isinstance(configuration, Configuration):
+                    raise ConfigurationError("Cannot create global configuration.")
+                self._global_configuration = configuration
                 await self._global_configuration.store()
             elif len(config_ids) == 1:
                 self._global_configuration = await Configuration().fetch(
@@ -103,7 +107,7 @@ class AppConfiguration(ConfigurationBaseClass):
                 LOG.info(f"Creating single user '{SINGLE_USER_NAME}'")
                 await User(name=SINGLE_USER_NAME, role=UserRole.ADMIN).store()
             # LOG.debug(f"AppConfiguration.get_configuration_from_db: {user_mode=}")
-            App.status_object.status = (
+            App.status = (
                 Status.STATUS_SINGLE_USER
                 if user_mode == SetupConfigValues.SINGLE_USER
                 else Status.STATUS_MULTI_USER
@@ -121,4 +125,5 @@ class AppConfiguration(ConfigurationBaseClass):
 
 
 App.set_config_class(AppConfiguration, Config)
-# LOG.debug("module imported")
+
+log_exit(LOG)

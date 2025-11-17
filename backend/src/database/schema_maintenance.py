@@ -2,20 +2,19 @@
 
 from graphlib import TopologicalSorter
 
-import business_objects.persistant_business_object
-import core
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
+import core.app
+from core.exceptions import DBSchemaError, DataError, OperationalError
+from business_objects.persistant_business_object import PersistentBusinessObject
 import database
 import database.dbms.db_base
-from business_objects.persistant_business_object import PersistentBusinessObject
-
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
 from data.management.db_schema import DBSchema
 
-from core.exceptions import DBSchemaError, DataError, OperationalError
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
 
 CURRENT_DB_SCHEMA_VERSION = 1
 COMPATIBLE_DB_SCHEMA_VERSIONS = [1]
@@ -70,7 +69,8 @@ async def check_db_schema():
                 # LOG.debug(f"DB schema version {db_schema.version_nr} found in DB")
                 if db_schema.version_nr is None:
                     LOG.error(
-                        "No DB schema version found in DB. Save data and remove tables from DB to rebuild schema."
+                        "No DB schema version found in DB. "
+                        "Save data and remove tables from DB to rebuild schema."
                     )
                     raise DataError()
             except DataError as exc:
@@ -84,16 +84,19 @@ async def check_db_schema():
                 db_schema = DBSchema()
         else:
             db_schema = DBSchema()
-    all_business_objects = PersistentBusinessObject.all_business_objects.values()
+    # pylint: disable=no-member
+    all_business_objects: list[type[PersistentBusinessObject]] = [
+        pbo
+        for pbo in PersistentBusinessObject.all_business_objects.values()
+        if isinstance(pbo, type) and issubclass(pbo, PersistentBusinessObject)
+    ]
     if (
         db_schema.version_nr is None
         or db_schema.version_nr < CURRENT_DB_SCHEMA_VERSION
         or db_schema.version_nr not in COMPATIBLE_DB_SCHEMA_VERSIONS
     ):
         await upgrade_db_schema(
-            db_schema.version_nr,
-            CURRENT_DB_SCHEMA_VERSION,
-            all_business_objects,
+            db_schema.version_nr, CURRENT_DB_SCHEMA_VERSION, all_business_objects
         )
         upgraded = True
     else:
@@ -107,3 +110,6 @@ async def check_db_schema():
         raise DBSchemaError("DB schema not compatible")
     if upgraded:
         await DBSchema(version_nr=CURRENT_DB_SCHEMA_VERSION).store()
+
+
+log_exit(LOG)

@@ -1,7 +1,7 @@
 """Test suite for business object attributes descriptors."""
 
 import datetime
-from enum import auto
+from enum import Flag, auto
 import unittest
 
 import business_objects.bo_descriptors
@@ -219,8 +219,8 @@ class Test_200_BOAttributes(unittest.TestCase):
         self.assertEqual(self.mock_obj.flag_attr, MockFlag.FLAG_1 | MockFlag.FLAG_2)
         self.assertEqual(str(self.mock_obj.flag_attr), "flag_1,flag_2")
 
-        self.mock_obj._data["flag_attr"] = "flag_1"
-        self.assertIsInstance(self.mock_obj._data["flag_attr"], str)
+        self.mock_obj._data["flag_attr"] = MockFlag.FLAG_1
+        self.assertIsInstance(self.mock_obj._data["flag_attr"], Flag)
         self.assertIsInstance(self.mock_obj.flag_attr, MockFlag)
         self.assertEqual(self.mock_obj.flag_attr, MockFlag.FLAG_1)
 

@@ -21,7 +21,11 @@ class DBRestart(Exception):
     "signal that the DB has been reconfigured"
 
 
-class ConnectionClosed(Exception):
+class WSConnectionError(Exception):
+    "a Web socket connection could not be established"
+
+
+class WSConnectionClosed(Exception):
     "a Web socket connection has been closed unexpectedly"
 
 

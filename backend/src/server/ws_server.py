@@ -1,15 +1,15 @@
 """Setup a websocket server and handle connection call"""
 
+import socket
 from contextlib import asynccontextmanager
 import websockets.asyncio.server as websockets
-import socket
 
-from core.app_logging import getLogger, log_exit
+from core.app_logging import getLogger, log_exit, Logger
 
-LOG = getLogger(__name__)
+LOG: Logger = getLogger(__name__)
 
 from core.const import WEBSOCKET_PORT
-from server.ws_connection import WS_Connection
+from server.ws_connection import WSConnection
 from messages.message import Message
 
 
@@ -26,7 +26,7 @@ class WSHandler:
             f"{WSHandler.__module__}(sock #{sock_nbr})"
         )
         local_LOG.debug("connection opened")
-        connection = WS_Connection(websocket, sock_nbr=f"sock #{sock_nbr}")
+        connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
             if await connection.start_connection():
                 local_LOG = getLogger(  # pylint: disable=invalid-name
@@ -61,7 +61,7 @@ async def get_websocket():
     hostname = socket.gethostname()
     ws_server = await websockets.serve(
         ws_handler.handler,
-        ["localhost", hostname],
+        ["localhost", hostname],  # type: ignore[arg-type]
         WEBSOCKET_PORT,
     )
     if not ws_server.is_serving():

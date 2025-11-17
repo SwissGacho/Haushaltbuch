@@ -1,3 +1,5 @@
+"Message containing a list of business objects to be sent to the frontend"
+
 from messages.message import Message, MessageType
 
 

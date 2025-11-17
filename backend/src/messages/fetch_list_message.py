@@ -1,13 +1,16 @@
-from logging import Logger
-from business_objects.bo_list import BOList
-from messages.message import Message, MessageAttribute, MessageType
-from core.app_logging import getLogger
+"Message from frontend requesting a list of BO's."
+
+from core.app_logging import getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
 
+from business_objects.bo_list import BOList
+from messages.message import Message, MessageAttribute, MessageType
+
 
 class FetchListMessage(Message):
-    "Message from the frontend requesting a list of business objects. The list is returned as a list of IDs."
+    """Message from the frontend requesting a list of business objects.
+    The list is returned as a list of IDs."""
 
     @classmethod
     def message_type(cls) -> MessageType:
@@ -18,7 +21,10 @@ class FetchListMessage(Message):
 
         # Maybe the connection should have a method that creates a BOList?
         BOList(
-            bo_type=object_type_name,
+            bo_type=str(object_type_name),
             connection=connection,
             notify_subscribers_on_init=True,
         )
+
+
+log_exit(LOG)

@@ -4,13 +4,12 @@ from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
+from core.app import App
+from core.const import SINGLE_USER_NAME
+from core.status import Status
 from data.management.user import User
 from messages.message import MessageAttribute
 from database.sql_expression import ColumnName
-from core.app import App
-from data.management.user import UserRole
-from core.status import Status
-from core.const import SINGLE_USER_NAME
 
 
 async def check_login(login_message: dict) -> User:
@@ -29,9 +28,8 @@ async def check_login(login_message: dict) -> User:
         raise PermissionError(f"User '{username}' not found.")
     user = await User(bo_id=matching_users[0]).fetch()
     LOG.debug(f"check_login() -> {repr(user)}")
-    LOG.debug(f"{type(user.role)=}")
-    LOG.debug(f"{UserRole.ADMIN in user.role=}")
-    LOG.debug(f"{user._data=}")
+    LOG.debug(f"{type(user.role)=}; {user.role if user.role else 'No role'}")
+    LOG.debug(f"{user._data=}")  # pylint: disable=protected-access
     return user
 
 

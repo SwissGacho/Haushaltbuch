@@ -1,7 +1,5 @@
 """Store app configuration"""
 
-from typing import Optional
-
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
@@ -23,3 +21,6 @@ class Configuration(PersistentBusinessObject):
         if not isinstance(self.configuration, dict):
             return {}
         return self.configuration
+
+
+log_exit(LOG)

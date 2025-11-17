@@ -1,8 +1,14 @@
-from hmac import new
+"Module for managing SQL parameter keys to avoid conflicts."
+
 from typing import Any, TypedDict
 import re
 
+from core.app_logging import getLogger, log_exit
 
+LOG = getLogger(__name__)
+
+
+# pylint: disable=invalid-name
 class SQL_Dict(TypedDict):
     """Dictionary for an SQL query and its parameters."""
 
@@ -11,6 +17,7 @@ class SQL_Dict(TypedDict):
 
 
 class SQLKeyManager:
+    """Class to manage SQL parameter keys to avoid conflicts."""
 
     def __init__(self):
         super().__init__()
@@ -53,9 +60,13 @@ class SQLKeyManager:
         return final_key
 
     def merge_params(self, query: str, params: dict[str, Any]) -> str:
+        "Merge parameters into the current SQLKeyManager"
         for key, value in params.items():
             if not key in query:
                 continue
             final_key = self._create_param(key, value)
             query = re.sub(rf":{key}\b", f":{final_key}", query)
         return query
+
+
+log_exit(LOG)

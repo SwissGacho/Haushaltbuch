@@ -1,4 +1,4 @@
-"""Testsuite testing the importing of the aiomysql library"""
+"""Testsuite testing the importing of the asyncmy library"""
 
 import sys, types
 import unittest
@@ -23,19 +23,19 @@ def setUpModule() -> None:
             del sys.modules[mod]
 
     remove("database.dbms.mysql")
-    remove("aiomysql")
+    remove("asyncmy")
 
 
 class MySQLImport(unittest.TestCase):
 
     def test_101_successful_import(self):
-        with patch.dict("sys.modules", {"aiomysql": types.ModuleType("aiomysql")}):
+        with patch.dict("sys.modules", {"asyncmy": types.ModuleType("asyncmy")}):
             import database.dbms.mysql
 
             self.assertIsNone(database.dbms.mysql.ASYNCMY_IMPORT_ERROR)
 
     def test_101_failed_aiomysql_import(self):
-        with patch.dict("sys.modules", {"aiomysql": None}):
+        with patch.dict("sys.modules", {"asyncmy": None}):
             import database.dbms.mysql
 
             self.assertIsInstance(
