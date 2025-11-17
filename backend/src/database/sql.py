@@ -7,7 +7,6 @@ from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
-from core.app import App
 from core.exceptions import InvalidSQLStatementException, OperationalError, CommitError
 from core.base_objects import ConnectionBaseClass
 from database.sql_executable import SQLExecutable
@@ -217,7 +216,7 @@ class SQL(_SQLBase):
         # )
         sql = self.get_sql()
         # pylint: disable=no-member
-        return await App.db.execute(
+        return await SQL._get_db().execute(
             query=sql["query"], params=sql["params"], connection=await self.connect()
         )
 

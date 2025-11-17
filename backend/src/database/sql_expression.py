@@ -1,6 +1,5 @@
 """Classes for building SQL expressions that can be used in SQLStatements."""
 
-from math import e
 from typing import Any, Optional
 import re
 

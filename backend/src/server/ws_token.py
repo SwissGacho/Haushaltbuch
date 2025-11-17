@@ -19,7 +19,8 @@ class WSToken(BaseObject):
         self.token = tok or token(16)
         self._valid_for_seconds = valid_for_seconds
         self._expires = datetime.now() + timedelta(seconds=valid_for_seconds)
-        self._all_tokens.add(self)
+        if tok is None:
+            self._all_tokens.add(self)
 
     @classmethod
     def check_token(cls, tok: str) -> bool:

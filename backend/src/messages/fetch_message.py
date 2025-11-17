@@ -26,6 +26,11 @@ class FetchMessage(Message):
                 id=self.message.get(MessageAttribute.WS_ATTR_INDEX),
                 notify_subscribers_on_init=True,
             )
+        else:
+            raise TypeError(
+                "FetchMessage missing or invalid "
+                f"{MessageAttribute.WS_ATTR_OBJECT} attribute"
+            )
 
 
 log_exit(LOG)

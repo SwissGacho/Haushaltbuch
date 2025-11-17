@@ -28,7 +28,6 @@ LOGGING_LEVEL = {
     LogLevel.LOG_LEVEL_WARNING: logging.WARNING,
     LogLevel.LOG_LEVEL_ERROR: logging.ERROR,
     LogLevel.LOG_LEVEL_CRITICAL: logging.CRITICAL,
-    0: logging.NOTSET,
 }
 
 
@@ -50,7 +49,7 @@ class LogMessage(Message):
             self.message.get(MessageAttribute.WS_ATTR_CALLER, "")
         )
         # LOG.debug(f"Logging message from {caller=} at level {level}: {text}")
-        getLogger(caller).log(LOGGING_LEVEL.get(level, 0), text)
+        getLogger(caller).log(LOGGING_LEVEL.get(LogLevel(level), logging.NOTSET), text)
 
 
 class EchoMessage(Message):

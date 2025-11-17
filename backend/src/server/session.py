@@ -77,7 +77,7 @@ class Session:
 
     def add_connection(self, connection) -> int:
         "add a connection to session"
-        if not connection in self.connections:
+        if connection not in self.connections:
             self.connections.append(connection)
         return self.connections.index(connection)
 
