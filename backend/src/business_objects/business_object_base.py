@@ -4,7 +4,6 @@ Business objects are classes that support persistance in the data base
 """
 
 import asyncio
-from enum import Flag
 import itertools
 from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 from dataclasses import dataclass
@@ -18,7 +17,6 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from business_objects.bo_descriptors import (
-    AttributeDescription,
     AttributeType,
     BOColumnFlag,
     BOBaseBase,
@@ -35,6 +33,7 @@ class AttributeDescription:
     data_type: type
     constraint: BOColumnFlag
     flag_values: dict[str, str | type[BOBaseBase] | None]
+    attribute_type: AttributeType
     is_technical: bool = False
 
 
@@ -119,7 +118,7 @@ class BOBase(BOBaseBase):
         attribute_name: str,
         data_type: type,
         constraint_flag: BOColumnFlag,
-        attribute_type: AttributeType | None = None,
+        attribute_type: AttributeType,
         is_technical: bool = False,
         **flag_values,
     ):

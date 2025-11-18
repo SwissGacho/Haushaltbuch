@@ -1,10 +1,10 @@
 """Data descriptors used in business objects"""
 
-from dataclasses import dataclass
 import json
 from enum import Flag, StrEnum, auto
 
 from datetime import date, datetime
+from business_objects.business_object_base import AttributeDescription
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -38,18 +38,6 @@ class BOColumnFlag(Flag):
     BOC_DEFAULT = auto()
     BOC_CURRENT_TS = auto()
     BOC_DEFAULT_CURR = auto()
-
-
-@dataclass(frozen=True)
-class AttributeDescription:
-    """Description of a business object attribute"""
-
-    name: str
-    data_type: type
-    constraint: BOColumnFlag
-    flag_values: dict[str, str | type["BOBaseBase"] | type[Flag] | None]
-    attribute_type: AttributeType | None = None
-    is_technical: bool = False
 
 
 class BOBaseBase:
