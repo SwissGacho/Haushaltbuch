@@ -26,6 +26,7 @@ class ObjectSchema(Message):
     def flag_representation(
         self, flag: str | type[BOBaseBase] | type[Flag] | None
     ) -> str | dict[str, str | list[str]]:
+        """Specifies the given flag as a string or dictionary with valid values"""
         if flag is None:
             return ""
         if isinstance(flag, str):
@@ -41,6 +42,7 @@ class ObjectSchema(Message):
     def attribute_type_representation(
         self, attribute_type: AttributeType | None
     ) -> str:
+        """String representation of a business attribute type"""
         if attribute_type is None:
             return ""
         return attribute_type.value
@@ -48,6 +50,7 @@ class ObjectSchema(Message):
     def attribute_representation(
         self, attribute: AttributeDescription
     ) -> dict[str, str | dict[str, str]]:
+        """Dictionary representation of a business attribute"""
         return {
             "type": self.attribute_type_representation(attribute.attribute_type),
             "flags": {
@@ -56,6 +59,7 @@ class ObjectSchema(Message):
         }
 
     def generate_payload(self) -> dict[str, dict[str, str | dict[str, str]]]:
+        """Generate the payload of the message, containing the object schema"""
         properties = self._object_type.attribute_descriptions()
         payload = {
             desc.name: self.attribute_representation(desc)

@@ -6,7 +6,6 @@ Business objects are classes that support persistance in the data base
 import asyncio
 import itertools
 from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
-from dataclasses import dataclass
 
 
 from core.util import _classproperty
@@ -17,24 +16,13 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from business_objects.bo_descriptors import (
+    AttributeDescription,
     AttributeType,
     BOColumnFlag,
     BOBaseBase,
     BOId,
     BODatetime,
 )
-
-
-@dataclass(frozen=True)
-class AttributeDescription:
-    """Description of a business object attribute"""
-
-    name: str
-    data_type: type
-    constraint: BOColumnFlag
-    flag_values: dict[str, str | type[BOBaseBase] | None]
-    attribute_type: AttributeType
-    is_technical: bool = False
 
 
 BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
