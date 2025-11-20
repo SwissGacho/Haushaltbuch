@@ -2,6 +2,7 @@
 
 import datetime
 from enum import Flag, auto
+from operator import is_
 import unittest
 
 import business_objects.bo_descriptors
@@ -29,11 +30,21 @@ class MockBO:
         self.mock_attr = attr
 
     @classmethod
-    def add_attribute(cls, attribute_name, data_type, constraint_flag, **flag_values):
+    def add_attribute(
+        cls,
+        attribute_name: str,
+        data_type: type,
+        constraint_flag,
+        attribute_type,
+        is_technical: bool = False,
+        **flag_values,
+    ):
         cls._add_attributes_args = (
             attribute_name,
             data_type,
             constraint_flag,
+            attribute_type,
+            is_technical,
             flag_values,
         )
 
@@ -58,6 +69,8 @@ class Test_100__PersistantAttr(unittest.TestCase):
                 "mock_attr",
                 str,
                 business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
+                business_objects.bo_descriptors.AttributeType.ATYPE_STR,
+                False,
                 {},
             ),
         )
@@ -108,50 +121,91 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
     flag_attr = business_objects.bo_descriptors.BOFlag(flag_type=MockFlag)
 
     @classmethod
-    def add_attribute(cls, attribute_name, data_type, constraint_flag, **flag_values):
+    def add_attribute(
+        cls,
+        attribute_name,
+        data_type,
+        constraint_flag,
+        attribute_type,
+        is_technical=False,
+        **flag_values,
+    ):
         cls._attributes["MockObj"].append(
-            (attribute_name, data_type, constraint_flag, flag_values)
+            (
+                attribute_name,
+                data_type,
+                constraint_flag,
+                attribute_type,
+                is_technical,
+                flag_values,
+            )
         )
 
 
 expected_attributes = {
     "MockObj": [
-        ("int_attr", int, business_objects.bo_descriptors.BOColumnFlag.BOC_PK_INC, {}),
+        (
+            "int_attr",
+            int,
+            business_objects.bo_descriptors.BOColumnFlag.BOC_PK_INC,
+            business_objects.bo_descriptors.AttributeType.ATYPE_INT,
+            False,
+            {},
+        ),
         (
             "str_attr",
             str,
             business_objects.bo_descriptors.BOColumnFlag.BOC_NOT_NULL,
+            business_objects.bo_descriptors.AttributeType.ATYPE_STR,
+            False,
             {},
         ),
         (
             "dt_attr",
             datetime.datetime,
             business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT_CURR,
+            business_objects.bo_descriptors.AttributeType.ATYPE_DATETIME,
+            False,
             {},
         ),
         (
             "d_attr",
             datetime.date,
             business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.AttributeType.ATYPE_DATE,
+            False,
             {},
         ),
         (
             "dict_attr",
             dict,
             business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT,
+            business_objects.bo_descriptors.AttributeType.ATYPE_DICT,
+            False,
             {"default": {"a": 1, "b": 2}},
         ),
-        ("list_attr", list, business_objects.bo_descriptors.BOColumnFlag.BOC_NONE, {}),
+        (
+            "list_attr",
+            list,
+            business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.AttributeType.ATYPE_LIST,
+            False,
+            {},
+        ),
         (
             "rel_attr",
             business_objects.bo_descriptors.BOBaseBase,
             business_objects.bo_descriptors.BOColumnFlag.BOC_FK,
+            business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
+            False,
             {"relation": MockRel},
         ),
         (
             "flag_attr",
             business_objects.bo_descriptors.BaseFlag,
             business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.AttributeType.ATYPE_FLAG,
+            False,
             {"flag_type": MockFlag},
         ),
     ]

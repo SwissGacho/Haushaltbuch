@@ -6,12 +6,14 @@ from unittest.mock import DEFAULT, Mock, AsyncMock, patch, call, ANY
 
 from business_objects.business_object_base import AttributeDescription, BOBase
 from business_objects.bo_descriptors import (
+    AttributeType,
     BOStr,
     BOList,
     BORelation,
     BOColumnFlag,
     BOBaseBase,
 )
+import data
 
 MOCK_TAB1 = "mock_table"
 MOCK_TAB2 = "mockbo2s"
@@ -40,15 +42,48 @@ class MockBO2(BOBase):
 
 
 mock_attr_desc = [
-    AttributeDescription("id", int, BOColumnFlag.BOC_PK_INC, {}),
     AttributeDescription(
-        "last_updated", datetime.datetime, BOColumnFlag.BOC_DEFAULT_CURR, {}
+        name="id",
+        data_type=int,
+        constraint=BOColumnFlag.BOC_PK_INC,
+        flag_values={},
+        attribute_type=AttributeType.ATYPE_INT,
     ),
-    AttributeDescription("mock_attr1", str, BOColumnFlag.BOC_NONE, {}),
     AttributeDescription(
-        "mock_attr2", BOBaseBase, BOColumnFlag.BOC_FK, {"relation": MockBO1}
+        name="last_updated",
+        data_type=datetime.datetime,
+        constraint=BOColumnFlag.BOC_DEFAULT_CURR,
+        flag_values={},
+        attribute_type=AttributeType.ATYPE_DATETIME,
     ),
-    AttributeDescription("mock_attr3", list, BOColumnFlag.BOC_NONE, {}),
+    AttributeDescription(
+        name="mock_attr1",
+        data_type=str,
+        constraint=BOColumnFlag.BOC_NONE,
+        flag_values={},
+        attribute_type=AttributeType.ATYPE_STR,
+    ),
+    AttributeDescription(
+        name="mock_attr2",
+        data_type=BOBaseBase,
+        constraint=BOColumnFlag.BOC_FK,
+        flag_values={"relation": MockBO1},
+        attribute_type=AttributeType.ATYPE_FLAG,
+    ),
+    AttributeDescription(
+        name="mock_attr2",
+        data_type=BOBaseBase,
+        constraint=BOColumnFlag.BOC_FK,
+        flag_values={"relation": MockBO1},
+        attribute_type=AttributeType.ATYPE_FLAG,
+    ),
+    AttributeDescription(
+        name="mock_attr3",
+        data_type=list,
+        constraint=BOColumnFlag.BOC_NONE,
+        flag_values={},
+        attribute_type=AttributeType.ATYPE_LIST,
+    ),
 ]
 
 mock_bo2_as_dict = {a.name: a.data_type for a in mock_attr_desc}

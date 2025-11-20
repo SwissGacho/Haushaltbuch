@@ -4,7 +4,13 @@ from messages.object_schema import ObjectSchema
 from data.management.user import User
 from business_objects.business_attribute_base import BaseFlag
 from business_objects.business_object_base import BOBase
-from business_objects.bo_descriptors import BOFlag, BOStr, BOList, BORelation
+from business_objects.bo_descriptors import (
+    AttributeType,
+    BOFlag,
+    BOStr,
+    BOList,
+    BORelation,
+)
 
 
 class OtherMockBO(BOBase):
@@ -49,7 +55,7 @@ class Test_100__ObjectSchema(unittest.TestCase):
                 {
                     "type": obj.attribute_type_representation(v.attribute_type),
                     "flags": {
-                        k: (obj.flag_representation(val))
+                        k: (obj.flag_values_representation(val))
                         for k, val in v.flag_values.items()
                     },
                 },
@@ -68,20 +74,28 @@ class Test_100__ObjectSchema(unittest.TestCase):
     def test_103_flag_representation(self):
         test_type = MockBO
         obj = ObjectSchema(object_type=test_type)
-        self.assertEqual(obj.flag_representation(None), "")
-        self.assertEqual("test", obj.flag_representation("test"))
-        self.assertEqual(MockBO.bo_type_name(), obj.flag_representation(MockBO))
-        self.assertEqual(MockBOFlag.__name__, obj.flag_representation(MockBOFlag))
+        self.assertEqual("test", obj.flag_values_representation("test"))
+        self.assertEqual(MockBO.bo_type_name(), obj.flag_values_representation(MockBO))
+        self.assertEqual(
+            {"name": MockBOFlag.__name__, "values": [str(v) for v in MockBOFlag]},
+            obj.flag_values_representation(MockBOFlag),
+        )
 
     def test_104_attribute_type_representation(self):
         test_type = MockBO
         obj = ObjectSchema(object_type=test_type)
-        MockBOAttributeNone = MockAttributeDescription("mock_none", None, {})
+        MockBOAttributeNone = MockAttributeDescription(
+            "mock_none", AttributeType.ATYPE_INT, {}
+        )
         self.assertEqual(
-            obj.attribute_type_representation(MockBOAttributeNone.attribute_type), ""
+            obj.attribute_type_representation(MockBOAttributeNone.attribute_type), "int"
         )
         for v in test_type.attribute_descriptions():
             target_type = v.attribute_type.value if v.attribute_type else None
+            print(
+                f"Testing attribute_type_representation for {v.name=}:"
+                f" {v.attribute_type=}, {target_type=}"
+            )
             self.assertEqual(
                 target_type,
                 obj.attribute_type_representation(v.attribute_type),

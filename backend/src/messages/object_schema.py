@@ -1,7 +1,7 @@
 """Messages to request and send business objects"""
 
 from logging import Logger
-from enum import EnumType, Flag
+from enum import EnumType
 
 from business_objects.bo_descriptors import (
     AttributeType,
@@ -23,42 +23,44 @@ class ObjectSchema(Message):
     def message_type(cls) -> MessageType:
         return MessageType.WS_TYPE_OBJECT
 
-    def flag_representation(
-        self, flag: str | type[BOBaseBase] | type[Flag] | None
+    def flag_values_representation(
+        self, flag: str | type[BOBaseBase] | EnumType
     ) -> str | dict[str, str | list[str]]:
-        """Specifies the given flag as a string or dictionary with valid values"""
+        """Specifies the possible values of a given flag. str for simple flags, dict for enums and relations"""
         if flag is None:
             return ""
         if isinstance(flag, str):
             return flag
         if isinstance(flag, EnumType):
-            LOG.debug(f"{flag=}, {type(flag)=}")
+            # LOG.debug(f"{flag=}, {type(flag)=}")
             return {"name": flag.__name__, "values": [str(v) for v in flag]}
         if issubclass(flag, BOBaseBase):
             return flag.bo_type_name()
         LOG.error(f"Unknown flag type: {flag=}, {type(flag)=}")
         return str(flag)
 
-    def attribute_type_representation(
-        self, attribute_type: AttributeType | None
-    ) -> str:
+    def attribute_type_representation(self, attribute_type: AttributeType):
         """String representation of a business attribute type"""
         if attribute_type is None:
             return ""
-        return attribute_type.value
+        return str(attribute_type.value)
 
     def attribute_representation(
         self, attribute: AttributeDescription
-    ) -> dict[str, str | dict[str, str]]:
-        """Dictionary representation of a business attribute"""
+    ) -> dict[str, str | dict[str, str | str | dict[str, str | list[str]]]]:
+        """Dictionary representation of a business attribute specification"""
         return {
             "type": self.attribute_type_representation(attribute.attribute_type),
             "flags": {
-                k: self.flag_representation(v) for k, v in attribute.flag_values.items()
+                k: self.flag_values_representation(v)
+                for k, v in attribute.flag_values.items()
+                if v is not None
             },
         }
 
-    def generate_payload(self) -> dict[str, dict[str, str | dict[str, str]]]:
+    def generate_payload(
+        self,
+    ) -> dict[str, dict[str, str | dict[str, str | str | dict[str, str | list[str]]]]]:
         """Generate the payload of the message, containing the object schema"""
         properties = self._object_type.attribute_descriptions()
         payload = {
@@ -66,6 +68,7 @@ class ObjectSchema(Message):
             for desc in properties
             if not desc.is_technical
         }
+        LOG.debug(f"{payload=}")
         return payload
 
     def __init__(
