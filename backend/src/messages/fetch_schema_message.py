@@ -18,7 +18,7 @@ class FetchSchemaMessage(Message):
 
     async def handle_message(self, connection: WSConnectionBase):
         "handle a fetch message"
-        # LOG.warning("Handling fetch schema message")
+        # LOG.debug("Handling fetch schema message")
         object_type_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
         if object_type_name is None:
             raise ValueError(
@@ -33,7 +33,7 @@ class FetchSchemaMessage(Message):
             token=self.token,
             object_type=requested_type,
         )
-        LOG.warning(f"Sending object schema message: {msg}")
+        # LOG.debug(f"Sending object schema message: {msg}")
         await connection.send_message(msg)
 
 

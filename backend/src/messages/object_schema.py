@@ -87,7 +87,7 @@ class ObjectSchema(Message):
                 MessageAttribute.WS_ATTR_PAYLOAD: payload,
             }
         )
-        LOG.debug(f"{self.message=}")
+        # LOG.debug(f"{self.message=}")
 
 
 log_exit(LOG)
