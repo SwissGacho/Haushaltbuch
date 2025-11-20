@@ -1,4 +1,4 @@
-"Message from frontend requesting a a description of a business object type"
+"Message from frontend requesting a description of a business object type"
 
 from core.app_logging import getLogger, log_exit, Logger
 

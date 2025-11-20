@@ -13,7 +13,7 @@ from business_objects.bo_descriptors import (
     BOColumnFlag,
     BOBaseBase,
 )
-import data
+
 
 MOCK_TAB1 = "mock_table"
 MOCK_TAB2 = "mockbo2s"

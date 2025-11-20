@@ -2,7 +2,7 @@
 
 import datetime
 from enum import Flag, auto
-from operator import is_
+
 import unittest
 
 import business_objects.bo_descriptors
