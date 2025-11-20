@@ -290,7 +290,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
         # assert issubclass(owner, BOBaseBase)
         owner.add_attribute(
             name,
-            BOBaseBase,  # self._relation,
+            BOBaseBase,
             self._flag or BOColumnFlag.BOC_NONE,
             attribute_type=self.__class__.attribute_type(),
             is_technical=self.is_technical,
@@ -313,7 +313,10 @@ class BOFlag(_PersistantAttr[Flag]):
         return AttributeType.ATYPE_FLAG
 
     def __init__(
-        self, flag_type: type[Flag], flag: BOColumnFlag = BOColumnFlag.BOC_NONE
+        self,
+        flag_type: type[Flag],
+        flag: BOColumnFlag = BOColumnFlag.BOC_NONE,
+        is_technical: bool = False,
     ) -> None:
         # LOG.debug(f"{flag_type=}; {flag=}")
         if not issubclass(flag_type, BaseFlag):
