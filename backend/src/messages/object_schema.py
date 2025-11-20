@@ -10,7 +10,7 @@ from business_objects.bo_descriptors import (
 from business_objects.business_object_base import AttributeDescription
 from server.ws_token import WSToken
 from messages.message import Message, MessageType, MessageAttribute
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit
 
 
 LOG: Logger = getLogger(__name__)
@@ -21,7 +21,7 @@ class ObjectSchema(Message):
 
     @classmethod
     def message_type(cls) -> MessageType:
-        return MessageType.WS_TYPE_OBJECT
+        return MessageType.WS_TYPE_OBJECT_SCHEMA
 
     def flag_values_representation(
         self, flag: str | type[BOBaseBase] | EnumType
@@ -68,7 +68,7 @@ class ObjectSchema(Message):
             for desc in properties
             if not desc.is_technical
         }
-        LOG.debug(f"{payload=}")
+        # LOG.debug(f"{payload=}")
         return payload
 
     def __init__(
@@ -87,3 +87,7 @@ class ObjectSchema(Message):
                 MessageAttribute.WS_ATTR_PAYLOAD: payload,
             }
         )
+        LOG.debug(f"{self.message=}")
+
+
+log_exit(LOG)

@@ -6,6 +6,8 @@ from enum import StrEnum
 from json import dumps, loads
 from typing import Any, Optional
 
+from regex import W
+
 from core.app_logging import getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
@@ -26,6 +28,7 @@ class MessageType(StrEnum):
     WS_TYPE_ECHO = "Echo"
     WS_TYPE_FETCH = "Fetch"
     WS_TYPE_OBJECT = "Object"
+    WS_TYPE_OBJECT_SCHEMA = "ObjectSchema"
     WS_TYPE_STORE = "Store"
     WS_TYPE_FETCH_SETUP = "FetchSetup"
     WS_TYPE_OBJECT_SETUP = "ObjectSetup"
