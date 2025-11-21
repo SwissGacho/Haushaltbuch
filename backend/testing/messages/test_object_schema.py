@@ -5,6 +5,7 @@ from data.management.user import User
 from business_objects.business_attribute_base import BaseFlag
 from business_objects.business_object_base import BOBase
 from business_objects.bo_descriptors import (
+    AttributeAccessLevel,
     AttributeType,
     BOFlag,
     BOStr,
@@ -35,11 +36,17 @@ class MockBO(BOBase):
 
 
 class MockAttributeDescription:
-    def __init__(self, name, attribute_type, flag_values, is_technical=False):
+    def __init__(
+        self,
+        name,
+        attribute_type,
+        flag_values,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
+    ):
         self.name = name
         self.attribute_type = attribute_type
         self.flag_values = flag_values
-        self.is_technical = is_technical
+        self.access_level = access_level
 
 
 class Test_100__ObjectSchema(unittest.TestCase):
@@ -48,7 +55,7 @@ class Test_100__ObjectSchema(unittest.TestCase):
         obj = ObjectSchema(object_type=obj_type)
         payload = obj.generate_payload()
         for v in obj_type.attribute_descriptions():
-            if v.is_technical:
+            if v.access_level == AttributeAccessLevel.AAL_WRITE_ONLY:
                 self.assertNotIn(v.name, payload)
                 continue
             self.assertEqual(

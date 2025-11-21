@@ -4,6 +4,7 @@ from logging import Logger
 from enum import EnumType
 
 from business_objects.bo_descriptors import (
+    AttributeAccessLevel,
     AttributeType,
     BOBaseBase,
 )
@@ -66,7 +67,7 @@ class ObjectSchema(Message):
         payload = {
             desc.name: self.attribute_representation(desc)
             for desc in properties
-            if not desc.is_technical
+            if desc.access_level != AttributeAccessLevel.AAL_WRITE_ONLY
         }
         # LOG.debug(f"{payload=}")
         return payload

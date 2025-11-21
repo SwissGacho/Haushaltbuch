@@ -24,6 +24,13 @@ class AttributeType(StrEnum):
     ATYPE_RELATION = "relation"
 
 
+class AttributeAccessLevel(StrEnum):
+
+    AAL_WRITE_ONLY = "write_only"
+    AAL_READ_ONLY = "read_only"
+    AAL_READ_WRITE = "read_write"
+
+
 class BOColumnFlag(Flag):
     "Column flag of a BO attribute"
 
@@ -48,7 +55,7 @@ class AttributeDescription:
     constraint: BOColumnFlag
     flag_values: dict[str, str | type["BOBaseBase"] | None]
     attribute_type: AttributeType
-    is_technical: bool = False
+    access_level: AttributeAccessLevel
 
 
 class BOBaseBase:
@@ -61,7 +68,7 @@ class BOBaseBase:
         data_type: type,
         constraint_flag: BOColumnFlag,
         attribute_type: AttributeType,
-        is_technical: bool = False,
+        access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
         **flag_values,
     ):
         "Register an attribute in the business object descriptor"
@@ -85,13 +92,13 @@ class _PersistantAttr[T]:
     def __init__(
         self,
         flag: BOColumnFlag = BOColumnFlag.BOC_NONE,
-        is_technical: bool = False,
+        access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
         **flag_values,
     ) -> None:
         self._flag = flag
         self._flag_values = flag_values
         self.my_name = None
-        self.is_technical: bool = is_technical
+        self.access_level: AttributeAccessLevel = access_level
 
     @classmethod
     def attribute_type(cls) -> AttributeType:
@@ -116,7 +123,7 @@ class _PersistantAttr[T]:
             self.__class__.data_type(),
             self._flag or BOColumnFlag.BOC_NONE,
             attribute_type=self.__class__.attribute_type(),
-            is_technical=self.is_technical,
+            access_level=self.access_level,
             **(self._flag_values or {}),
         )
 
@@ -267,7 +274,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
         self,
         relation: type[BOBaseBase],
         flag: BOColumnFlag = BOColumnFlag.BOC_FK,
-        is_technical: bool = False,
+        access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
     ) -> None:
         flag |= BOColumnFlag.BOC_FK
         # LOG.debug(f"{relation=}")
@@ -275,7 +282,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
         if not issubclass(relation, BOBaseBase):
             raise TypeError("BO relation should be derived from BOBase.")
 
-        super().__init__(flag, relation=relation, is_technical=is_technical)
+        super().__init__(flag, relation=relation, access_level=access_level)
 
     @classmethod
     def data_type(cls) -> type[BOBaseBase]:
@@ -293,7 +300,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
             BOBaseBase,
             self._flag or BOColumnFlag.BOC_NONE,
             attribute_type=self.__class__.attribute_type(),
-            is_technical=self.is_technical,
+            access_level=self.access_level,
             **(self._flag_values or {}),
         )
 
@@ -316,13 +323,13 @@ class BOFlag(_PersistantAttr[Flag]):
         self,
         flag_type: type[Flag],
         flag: BOColumnFlag = BOColumnFlag.BOC_NONE,
-        is_technical: bool = False,
+        access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
     ) -> None:
         # LOG.debug(f"{flag_type=}; {flag=}")
         if not issubclass(flag_type, BaseFlag):
             raise TypeError("BO Flag should be derived from BaseFlag.")
 
-        super().__init__(flag, flag_type=flag_type)
+        super().__init__(flag, flag_type=flag_type, access_level=access_level)
 
     @classmethod
     def data_type(cls):

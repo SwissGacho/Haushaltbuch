@@ -6,6 +6,7 @@ from enum import Flag, auto
 import unittest
 
 import business_objects.bo_descriptors
+from business_objects.bo_descriptors import AttributeAccessLevel
 
 
 class MockAttr(business_objects.bo_descriptors._PersistantAttr):
@@ -36,7 +37,7 @@ class MockBO:
         data_type: type,
         constraint_flag,
         attribute_type,
-        is_technical: bool = False,
+        access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
         **flag_values,
     ):
         cls._add_attributes_args = (
@@ -44,7 +45,7 @@ class MockBO:
             data_type,
             constraint_flag,
             attribute_type,
-            is_technical,
+            access_level,
             flag_values,
         )
 
@@ -127,7 +128,7 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
         data_type,
         constraint_flag,
         attribute_type,
-        is_technical=False,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
         **flag_values,
     ):
         cls._attributes["MockObj"].append(
@@ -136,7 +137,7 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
                 data_type,
                 constraint_flag,
                 attribute_type,
-                is_technical,
+                access_level,
                 flag_values,
             )
         )

@@ -16,6 +16,7 @@ LOG = getLogger(__name__)
 # pylint: disable=wrong-import-position
 
 from business_objects.bo_descriptors import (
+    AttributeAccessLevel,
     AttributeDescription,
     AttributeType,
     BOColumnFlag,
@@ -31,8 +32,10 @@ BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 class BOBase(BOBaseBase):
     "Business Object baseclass"
 
-    id = BOId(BOColumnFlag.BOC_PK_INC, is_technical=True)
-    last_updated = BODatetime(BOColumnFlag.BOC_DEFAULT_CURR, is_technical=True)
+    id = BOId(BOColumnFlag.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_WRITE_ONLY)
+    last_updated = BODatetime(
+        BOColumnFlag.BOC_DEFAULT_CURR, access_level=AttributeAccessLevel.AAL_READ_ONLY
+    )
     _table = None
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, type["BOBase"]] = {}
@@ -107,7 +110,7 @@ class BOBase(BOBaseBase):
         data_type: type,
         constraint_flag: BOColumnFlag,
         attribute_type: AttributeType,
-        is_technical: bool = False,
+        access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
         **flag_values,
     ):
         if not cls._attributes.get(cls.__name__):
@@ -123,7 +126,7 @@ class BOBase(BOBaseBase):
                 data_type=data_type,
                 constraint=constraint_flag,
                 flag_values=flag_values,
-                is_technical=is_technical,
+                access_level=access_level,
                 attribute_type=attribute_type,
             )
         )
@@ -176,7 +179,7 @@ class BOBase(BOBaseBase):
         cls_cols = {
             a.name: a.data_type
             for a in cls._attributes.get(cls.__name__, [])
-            if not a.is_technical
+            if a.access_level != AttributeAccessLevel.AAL_WRITE_ONLY
         }
         assert cls.__base__ is not None, "BOBase.__base__ is None"
         if issubclass(cls.__base__, BOBase):
