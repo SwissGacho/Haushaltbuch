@@ -10,7 +10,7 @@ from server.ws_connection_base import WSConnectionBase
 
 
 class FetchSchemaMessage(Message):
-    "Message requesting a business object"
+    "Message requesting the attribute descriptions of a business object"
 
     @classmethod
     def message_type(cls) -> MessageType:

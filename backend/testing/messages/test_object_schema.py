@@ -69,12 +69,12 @@ class Test_100__ObjectSchema(unittest.TestCase):
                 payload[v.name],
             )
 
-    def test101_initialization(self):
+    def test_101_initialization(self):
         test_type = MockBO
         obj = ObjectSchema(object_type=test_type)
         self.assertIs(test_type, obj._object_type)
 
-    def test102_payload_generation(self):
+    def test_102_payload_generation(self):
         self.bo_payload_test(MockBO)
         self.bo_payload_test(User)
 
