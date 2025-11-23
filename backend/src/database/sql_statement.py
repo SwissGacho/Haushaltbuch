@@ -26,7 +26,7 @@ from database.sql_expression import (
     Value,
 )
 from database.sql_key_manager import SQL_Dict
-from business_objects.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnConstraint
 
 
 class SQLTemplate(Enum):
@@ -307,7 +307,9 @@ class CreateTable(SQLStatement):
     def __init__(
         self,
         table: str = "",
-        columns: Optional[list[tuple[str, type, BOColumnFlag | None, dict]]] = None,
+        columns: Optional[
+            list[tuple[str, type, BOColumnConstraint | None, dict]]
+        ] = None,
         temporary: bool = False,
         parent: SQLExecutable | None = None,
     ):
@@ -321,7 +323,11 @@ class CreateTable(SQLStatement):
         self._temporary = temporary
 
     def column(
-        self, name: str, data_type: type, constraint: BOColumnFlag | None = None, **pars
+        self,
+        name: str,
+        data_type: type,
+        constraint: BOColumnConstraint | None = None,
+        **pars,
     ) -> Self:
         """Add a column to the table to be created.
         The column will be added to the end of the column list."""
@@ -378,7 +384,7 @@ class CreateTableAsSelect(CreateTable, Select):
     def __init__(
         self,
         table: str = "",
-        columns: list[tuple[str, type, BOColumnFlag | None, dict]] | None = None,
+        columns: list[tuple[str, type, BOColumnConstraint | None, dict]] | None = None,
         temporary: bool = False,
         parent: SQLExecutable | None = None,
     ):

@@ -20,25 +20,45 @@ LOG: Logger = getLogger(__name__)
 class ObjectSchema(Message):
     "Message containing the schema of a business object"
 
+    def __init__(
+        self,
+        object_type: type[BOBaseBase],
+        token: WSToken | None = None,
+        status: str | None = None,
+    ) -> None:
+        super().__init__(token=token, status=status)
+        self._object_type = object_type
+        payload = self.generate_payload()
+        self.add(
+            {
+                MessageAttribute.WS_ATTR_OBJECT: object_type.bo_type_name(),
+                MessageAttribute.WS_ATTR_PAYLOAD: payload,
+            }
+        )
+        # LOG.debug(f"{self.message=}")
+
     @classmethod
     def message_type(cls) -> MessageType:
         return MessageType.WS_TYPE_OBJECT_SCHEMA
 
-    def flag_values_representation(
-        self, flag: str | type[BOBaseBase] | EnumType
-    ) -> str | dict[str, str | list[str]]:
+    def constraint_values_representation(
+        self, constraint_value: str | type[BOBaseBase] | EnumType
+    ) -> dict[str, str | list[str]]:
         """Specifies the possible values of a given flag. str for simple flags, dict for enums and relations"""
-        if flag is None:
-            return ""
-        if isinstance(flag, str):
-            return flag
-        if isinstance(flag, EnumType):
+        if constraint_value is None:
+            return {}
+        if isinstance(constraint_value, EnumType):
             # LOG.debug(f"{flag=}, {type(flag)=}")
-            return {"name": flag.__name__, "values": [str(v) for v in flag]}
-        if issubclass(flag, BOBaseBase):
-            return flag.bo_type_name()
-        LOG.error(f"Unknown flag type: {flag=}, {type(flag)=}")
-        return str(flag)
+            return {
+                "name": constraint_value.__name__,
+                "values": [str(v) for v in constraint_value],
+            }
+        if isinstance(constraint_value, type) and issubclass(
+            constraint_value, BOBaseBase
+        ):
+            return {"relation": constraint_value.bo_type_name()}
+        LOG.error(f"Unknown flag type: {constraint_value=}, {type(constraint_value)=}")
+        return {"constraint_value": str(constraint_value)}
 
     def attribute_type_representation(self, attribute_type: AttributeType):
         """String representation of a business attribute type"""
@@ -48,20 +68,20 @@ class ObjectSchema(Message):
 
     def attribute_representation(
         self, attribute: AttributeDescription
-    ) -> dict[str, str | dict[str, str | str | dict[str, str | list[str]]]]:
+    ) -> dict[str, str | dict[str, dict[str, str | list[str]]]]:
         """Dictionary representation of a business attribute specification"""
         return {
             "type": self.attribute_type_representation(attribute.attribute_type),
             "flags": {
-                k: self.flag_values_representation(v)
-                for k, v in attribute.flag_values.items()
+                k: self.constraint_values_representation(v)
+                for k, v in attribute.constraint_values.items()
                 if v is not None
             },
         }
 
     def generate_payload(
         self,
-    ) -> dict[str, dict[str, str | dict[str, str | str | dict[str, str | list[str]]]]]:
+    ) -> dict[str, dict[str, str | dict[str, dict[str, str | list[str]]]]]:
         """Generate the payload of the message, containing the object schema"""
         properties = self._object_type.attribute_descriptions()
         payload = {
@@ -71,24 +91,6 @@ class ObjectSchema(Message):
         }
         # LOG.debug(f"{payload=}")
         return payload
-
-    def __init__(
-        self,
-        object_type: type[BOBaseBase],
-        token: WSToken | None = None,
-        status: str | None = None,
-    ) -> None:
-        self._object_type = object_type
-        payload = self.generate_payload()
-        self.message = {}
-        super().__init__(token=token, status=status)
-        self.add(
-            {
-                MessageAttribute.WS_ATTR_OBJECT: object_type.bo_type_name(),
-                MessageAttribute.WS_ATTR_PAYLOAD: payload,
-            }
-        )
-        # LOG.debug(f"{self.message=}")
 
 
 log_exit(LOG)

@@ -9,7 +9,7 @@ import database.dbms.db_base
 from database.sql_executable import SQLExecutable
 from database.sql import SQL
 from database.sql_clause import SQLColumnDefinition
-from business_objects.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnConstraint
 
 
 class MockFactory:

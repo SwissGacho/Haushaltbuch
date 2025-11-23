@@ -3,8 +3,9 @@
 from dataclasses import dataclass
 import json
 from enum import Flag, StrEnum, auto
-
 from datetime import date, datetime
+from typing import Any
+
 from business_objects.business_attribute_base import BaseFlag
 from core.app_logging import getLogger
 
@@ -31,7 +32,7 @@ class AttributeAccessLevel(StrEnum):
     AAL_READ_WRITE = "read_write"
 
 
-class BOColumnFlag(Flag):
+class BOColumnConstraint(Flag):
     "Column flag of a BO attribute"
 
     BOC_NONE = 0
@@ -52,8 +53,8 @@ class AttributeDescription:
 
     name: str
     data_type: type
-    constraint: BOColumnFlag
-    flag_values: dict[str, str | type["BOBaseBase"] | None]
+    constraint: BOColumnConstraint
+    constraint_values: dict[str, Any]
     attribute_type: AttributeType
     access_level: AttributeAccessLevel
 
@@ -66,7 +67,7 @@ class BOBaseBase:
         cls,
         attribute_name: str,
         data_type: type,
-        constraint_flag: BOColumnFlag,
+        constraint_flag: BOColumnConstraint,
         attribute_type: AttributeType,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
         **flag_values,
@@ -91,12 +92,12 @@ class BOBaseBase:
 class _PersistantAttr[T]:
     def __init__(
         self,
-        flag: BOColumnFlag = BOColumnFlag.BOC_NONE,
+        constraint: BOColumnConstraint = BOColumnConstraint.BOC_NONE,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
-        **flag_values,
+        **constraint_values,
     ) -> None:
-        self._flag = flag
-        self._flag_values = flag_values
+        self._constraint = constraint
+        self._constraint_values = constraint_values
         self.my_name = None
         self.access_level: AttributeAccessLevel = access_level
 
@@ -121,10 +122,10 @@ class _PersistantAttr[T]:
         owner.add_attribute(
             name,
             self.__class__.data_type(),
-            self._flag or BOColumnFlag.BOC_NONE,
+            self._constraint or BOColumnConstraint.BOC_NONE,
             attribute_type=self.__class__.attribute_type(),
             access_level=self.access_level,
-            **(self._flag_values or {}),
+            **(self._constraint_values or {}),
         )
 
     def __get__(self, obj, objtype=None) -> T:
@@ -142,7 +143,7 @@ class _PersistantAttr[T]:
 
     def validate(self, value) -> bool:
         "Validate 'value' for assignability."
-        if value is None and BOColumnFlag.BOC_NOT_NULL in self._flag:
+        if value is None and BOColumnConstraint.BOC_NOT_NULL in self._constraint:
             raise ValueError(
                 f"Value must not be 'None' for 'NOT NULL' attribute {self.my_name}"
             )
@@ -273,10 +274,10 @@ class BORelation(_PersistantAttr[BOBaseBase]):
     def __init__(
         self,
         relation: type[BOBaseBase],
-        flag: BOColumnFlag = BOColumnFlag.BOC_FK,
+        flag: BOColumnConstraint = BOColumnConstraint.BOC_FK,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
     ) -> None:
-        flag |= BOColumnFlag.BOC_FK
+        flag |= BOColumnConstraint.BOC_FK
         # LOG.debug(f"{relation=}")
         self._relation = relation
         if not issubclass(relation, BOBaseBase):
@@ -298,14 +299,14 @@ class BORelation(_PersistantAttr[BOBaseBase]):
         owner.add_attribute(
             name,
             BOBaseBase,
-            self._flag or BOColumnFlag.BOC_NONE,
+            self._constraint or BOColumnConstraint.BOC_NONE,
             attribute_type=self.__class__.attribute_type(),
             access_level=self.access_level,
-            **(self._flag_values or {}),
+            **(self._constraint_values or {}),
         )
 
     def validate(self, value):
-        relation = self._flag_values.get("relation")
+        relation = self._constraint_values.get("relation")
         return (
             super().validate(value)
             or isinstance(relation, type)
@@ -322,7 +323,7 @@ class BOFlag(_PersistantAttr[Flag]):
     def __init__(
         self,
         flag_type: type[Flag],
-        flag: BOColumnFlag = BOColumnFlag.BOC_NONE,
+        flag: BOColumnConstraint = BOColumnConstraint.BOC_NONE,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
     ) -> None:
         # LOG.debug(f"{flag_type=}; {flag=}")
@@ -337,13 +338,13 @@ class BOFlag(_PersistantAttr[Flag]):
 
     def validate(self, value):
         return super().validate(value) or isinstance(
-            value, self._flag_values["flag_type"]
+            value, self._constraint_values["flag_type"]
         )
 
     def __set__(self, obj, value) -> None:
         """Set value of attribute, converting from str if needed"""
         # LOG.debug(f"Setting BOFlag to {value}")
         if isinstance(value, str):
-            value = self._flag_values["flag_type"].flags(value)
+            value = self._constraint_values["flag_type"].flags(value)
         # LOG.debug(f"   converted BOFlag to {value}")
         super().__set__(obj=obj, value=value)

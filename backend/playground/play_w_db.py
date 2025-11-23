@@ -5,7 +5,7 @@ import os
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../src")
 
 from core.app import App
-from business_objects.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnConstraint
 
 from database.dbms.sqlite import SQLiteDB
 from database.sql import SQLConnection
@@ -49,9 +49,9 @@ async def main():
                 await sql.create_table(
                     "test_table",
                     [
-                        ("id", int, BOColumnFlag.BOC_PK_INC, {}),
-                        ("name", str, BOColumnFlag.BOC_NONE, {}),
-                        ("value", float, BOColumnFlag.BOC_NONE, {}),
+                        ("id", int, BOColumnConstraint.BOC_PK_INC, {}),
+                        ("name", str, BOColumnConstraint.BOC_NONE, {}),
+                        ("value", float, BOColumnConstraint.BOC_NONE, {}),
                     ],
                 ).execute()
                 print("Created table 'test_table'.")

@@ -76,7 +76,7 @@ class DB(DBBaseClass):
                     description.name,
                     description.data_type,
                     description.constraint,
-                    **description.flag_values,
+                    **description.constraint_values,
                 )
                 and ok
             )

@@ -1,5 +1,6 @@
 """Test suite for business object attributes descriptors."""
 
+from ast import Attribute
 import datetime
 from enum import Flag, auto
 
@@ -69,9 +70,9 @@ class Test_100__PersistantAttr(unittest.TestCase):
             (
                 "mock_attr",
                 str,
-                business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
+                business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
                 business_objects.bo_descriptors.AttributeType.ATYPE_STR,
-                False,
+                AttributeAccessLevel.AAL_READ_WRITE,
                 {},
             ),
         )
@@ -104,17 +105,17 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
     _attributes = {"MockObj": []}
     _data = {}
     int_attr = business_objects.bo_descriptors.BOInt(
-        business_objects.bo_descriptors.BOColumnFlag.BOC_PK_INC
+        business_objects.bo_descriptors.BOColumnConstraint.BOC_PK_INC
     )
     str_attr = business_objects.bo_descriptors.BOStr(
-        business_objects.bo_descriptors.BOColumnFlag.BOC_NOT_NULL
+        business_objects.bo_descriptors.BOColumnConstraint.BOC_NOT_NULL
     )
     dt_attr = business_objects.bo_descriptors.BODatetime(
-        business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT_CURR
+        business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT_CURR
     )
     d_attr = business_objects.bo_descriptors.BODate()
     dict_attr = business_objects.bo_descriptors.BODict(
-        business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT,
+        business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT,
         default={"a": 1, "b": 2},
     )
     list_attr = business_objects.bo_descriptors.BOList()
@@ -148,65 +149,65 @@ expected_attributes = {
         (
             "int_attr",
             int,
-            business_objects.bo_descriptors.BOColumnFlag.BOC_PK_INC,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_PK_INC,
             business_objects.bo_descriptors.AttributeType.ATYPE_INT,
-            False,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {},
         ),
         (
             "str_attr",
             str,
-            business_objects.bo_descriptors.BOColumnFlag.BOC_NOT_NULL,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NOT_NULL,
             business_objects.bo_descriptors.AttributeType.ATYPE_STR,
-            False,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {},
         ),
         (
             "dt_attr",
             datetime.datetime,
-            business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT_CURR,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT_CURR,
             business_objects.bo_descriptors.AttributeType.ATYPE_DATETIME,
-            False,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {},
         ),
         (
             "d_attr",
             datetime.date,
-            business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_DATE,
-            False,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {},
         ),
         (
             "dict_attr",
             dict,
-            business_objects.bo_descriptors.BOColumnFlag.BOC_DEFAULT,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT,
             business_objects.bo_descriptors.AttributeType.ATYPE_DICT,
-            False,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {"default": {"a": 1, "b": 2}},
         ),
         (
             "list_attr",
             list,
-            business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_LIST,
-            False,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {},
         ),
         (
             "rel_attr",
             business_objects.bo_descriptors.BOBaseBase,
-            business_objects.bo_descriptors.BOColumnFlag.BOC_FK,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_FK,
             business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
-            False,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {"relation": MockRel},
         ),
         (
             "flag_attr",
             business_objects.bo_descriptors.BaseFlag,
-            business_objects.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_FLAG,
-            False,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {"flag_type": MockFlag},
         ),
     ]

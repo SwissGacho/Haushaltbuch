@@ -62,8 +62,8 @@ class Test_100__ObjectSchema(unittest.TestCase):
                 {
                     "type": obj.attribute_type_representation(v.attribute_type),
                     "flags": {
-                        k: (obj.flag_values_representation(val))
-                        for k, val in v.flag_values.items()
+                        k: (obj.constraint_values_representation(val))
+                        for k, val in v.constraint_values.items()
                     },
                 },
                 payload[v.name],
@@ -81,11 +81,13 @@ class Test_100__ObjectSchema(unittest.TestCase):
     def test_103_flag_representation(self):
         test_type = MockBO
         obj = ObjectSchema(object_type=test_type)
-        self.assertEqual("test", obj.flag_values_representation("test"))
-        self.assertEqual(MockBO.bo_type_name(), obj.flag_values_representation(MockBO))
+        self.assertEqual("test", obj.constraint_values_representation("test"))
+        self.assertEqual(
+            MockBO.bo_type_name(), obj.constraint_values_representation(MockBO)
+        )
         self.assertEqual(
             {"name": MockBOFlag.__name__, "values": [str(v) for v in MockBOFlag]},
-            obj.flag_values_representation(MockBOFlag),
+            obj.constraint_values_representation(MockBOFlag),
         )
 
     def test_104_attribute_type_representation(self):

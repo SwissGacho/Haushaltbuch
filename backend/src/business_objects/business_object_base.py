@@ -19,7 +19,7 @@ from business_objects.bo_descriptors import (
     AttributeAccessLevel,
     AttributeDescription,
     AttributeType,
-    BOColumnFlag,
+    BOColumnConstraint,
     BOBaseBase,
     BOId,
     BODatetime,
@@ -32,9 +32,12 @@ BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 class BOBase(BOBaseBase):
     "Business Object baseclass"
 
-    id = BOId(BOColumnFlag.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_WRITE_ONLY)
+    id = BOId(
+        BOColumnConstraint.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_WRITE_ONLY
+    )
     last_updated = BODatetime(
-        BOColumnFlag.BOC_DEFAULT_CURR, access_level=AttributeAccessLevel.AAL_READ_ONLY
+        BOColumnConstraint.BOC_DEFAULT_CURR,
+        access_level=AttributeAccessLevel.AAL_READ_ONLY,
     )
     _table = None
     _attributes: dict[str, list[AttributeDescription]] = {}
@@ -108,7 +111,7 @@ class BOBase(BOBaseBase):
         cls,
         attribute_name: str,
         data_type: type,
-        constraint_flag: BOColumnFlag,
+        constraint_flag: BOColumnConstraint,
         attribute_type: AttributeType,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
         **flag_values,
@@ -125,7 +128,7 @@ class BOBase(BOBaseBase):
                 name=attribute_name,
                 data_type=data_type,
                 constraint=constraint_flag,
-                flag_values=flag_values,
+                constraint_values=flag_values,
                 access_level=access_level,
                 attribute_type=attribute_type,
             )
@@ -200,8 +203,8 @@ class BOBase(BOBaseBase):
         "Name of the primary key attribute"
         for description in cls.attribute_descriptions():
             if (
-                description.constraint == BOColumnFlag.BOC_PK
-                or description.constraint == BOColumnFlag.BOC_PK_INC
+                description.constraint == BOColumnConstraint.BOC_PK
+                or description.constraint == BOColumnConstraint.BOC_PK_INC
             ):
                 return description.name
         raise ValueError(f"No primary key defined for {cls.__name__}")
@@ -210,9 +213,9 @@ class BOBase(BOBaseBase):
     def references(cls) -> list[str | type[BOBaseBase] | None]:
         "list of business objects referenced by this class"
         return [
-            a.flag_values.get("relation")
+            a.constraint_values.get("relation")
             for a in cls.attribute_descriptions()
-            if a.data_type == BOBaseBase and a.constraint == BOColumnFlag.BOC_FK
+            if a.data_type == BOBaseBase and a.constraint == BOColumnConstraint.BOC_FK
         ]
 
     @classmethod

@@ -2,15 +2,15 @@
 
 import datetime
 import unittest
-from unittest.mock import DEFAULT, Mock, AsyncMock, patch, call, ANY
 
 from business_objects.business_object_base import AttributeDescription, BOBase
 from business_objects.bo_descriptors import (
+    AttributeAccessLevel,
     AttributeType,
     BOStr,
     BOList,
     BORelation,
-    BOColumnFlag,
+    BOColumnConstraint,
     BOBaseBase,
 )
 
@@ -45,44 +45,42 @@ mock_attr_desc = [
     AttributeDescription(
         name="id",
         data_type=int,
-        constraint=BOColumnFlag.BOC_PK_INC,
-        flag_values={},
+        constraint=BOColumnConstraint.BOC_PK_INC,
+        constraint_values={},
         attribute_type=AttributeType.ATYPE_INT,
+        access_level=AttributeAccessLevel.AAL_WRITE_ONLY,
     ),
     AttributeDescription(
         name="last_updated",
         data_type=datetime.datetime,
-        constraint=BOColumnFlag.BOC_DEFAULT_CURR,
-        flag_values={},
+        constraint=BOColumnConstraint.BOC_DEFAULT_CURR,
+        constraint_values={},
         attribute_type=AttributeType.ATYPE_DATETIME,
+        access_level=AttributeAccessLevel.AAL_READ_ONLY,
     ),
     AttributeDescription(
         name="mock_attr1",
         data_type=str,
-        constraint=BOColumnFlag.BOC_NONE,
-        flag_values={},
+        constraint=BOColumnConstraint.BOC_NONE,
+        constraint_values={},
         attribute_type=AttributeType.ATYPE_STR,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
     AttributeDescription(
         name="mock_attr2",
         data_type=BOBaseBase,
-        constraint=BOColumnFlag.BOC_FK,
-        flag_values={"relation": MockBO1},
+        constraint=BOColumnConstraint.BOC_FK,
+        constraint_values={"relation": MockBO1},
         attribute_type=AttributeType.ATYPE_FLAG,
-    ),
-    AttributeDescription(
-        name="mock_attr2",
-        data_type=BOBaseBase,
-        constraint=BOColumnFlag.BOC_FK,
-        flag_values={"relation": MockBO1},
-        attribute_type=AttributeType.ATYPE_FLAG,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
     AttributeDescription(
         name="mock_attr3",
         data_type=list,
-        constraint=BOColumnFlag.BOC_NONE,
-        flag_values={},
+        constraint=BOColumnConstraint.BOC_NONE,
+        constraint_values={},
         attribute_type=AttributeType.ATYPE_LIST,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
 ]
 
