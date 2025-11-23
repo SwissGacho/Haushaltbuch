@@ -17,7 +17,7 @@ from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
 from database.sql_factory import SQLFactory
-from business_objects.bo_descriptors import BOColumnFlag, BOBaseBase
+from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
 from business_objects.business_attribute_base import BaseFlag
 
 # pylint: disable=invalid-name
@@ -62,14 +62,14 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         BaseFlag: SQLITE_BASEFLAG_TYPE,
     }
     constraint_map = {
-        BOColumnFlag.BOC_NONE: "",
-        BOColumnFlag.BOC_NOT_NULL: "NOT NULL",
-        BOColumnFlag.BOC_UNIQUE: "UNIQUE",
-        BOColumnFlag.BOC_PK: "PRIMARY KEY",
-        BOColumnFlag.BOC_PK_INC: "PRIMARY KEY AUTOINCREMENT",
-        BOColumnFlag.BOC_FK: "REFERENCES {relation}",
-        BOColumnFlag.BOC_DEFAULT: "DEFAULT",
-        BOColumnFlag.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        BOColumnConstraint.BOC_NONE: "",
+        BOColumnConstraint.BOC_NOT_NULL: "NOT NULL",
+        BOColumnConstraint.BOC_UNIQUE: "UNIQUE",
+        BOColumnConstraint.BOC_PK: "PRIMARY KEY",
+        BOColumnConstraint.BOC_PK_INC: "PRIMARY KEY AUTOINCREMENT",
+        BOColumnConstraint.BOC_FK: "REFERENCES {relation}",
+        BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
+        BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }

@@ -23,7 +23,7 @@ from database.sql_statement import (
     Select,
     Update,
 )
-from business_objects.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnConstraint
 
 
 class _SQLBase(SQLExecutable):
@@ -139,7 +139,9 @@ class SQL(_SQLBase):
     def create_table(
         self,
         table: str,
-        columns: Optional[list[tuple[str, type, BOColumnFlag | None, dict]]] = None,
+        columns: Optional[
+            list[tuple[str, type, BOColumnConstraint | None, dict]]
+        ] = None,
         temporary: bool = False,
     ) -> "CreateTable":
         """Sets the SQL statement to create a table and returns a create_table object"""

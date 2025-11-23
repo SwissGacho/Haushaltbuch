@@ -15,7 +15,7 @@ from database.sql_clause import (
 )
 from database.sql import SQL
 from database.sql_expression import ColumnName, Row, SQLExpression, Value, Eq
-from business_objects.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnConstraint
 
 
 class SQLStatementMockFactory:
@@ -35,9 +35,9 @@ def normalize_sql(sql):
 class SQLColumnDefinitionMock(SQLColumnDefinition):
     type_map = {int: "MOCKINTEGER", str: "MOCKSTRING"}
     constraint_map = {
-        BOColumnFlag.BOC_NOT_NULL: "MOCKNOTNULL",
-        BOColumnFlag.BOC_UNIQUE: "MOCKUNIQUE",
-        BOColumnFlag.BOC_DEFAULT: "MOCKDEFAULT ({default})",
+        BOColumnConstraint.BOC_NOT_NULL: "MOCKNOTNULL",
+        BOColumnConstraint.BOC_UNIQUE: "MOCKUNIQUE",
+        BOColumnConstraint.BOC_DEFAULT: "MOCKDEFAULT ({default})",
     }
 
 
@@ -62,7 +62,7 @@ class Test_100_SQLColumnDefinition(unittest.TestCase):
 
     def test_103_init_derived_with_constraint(self):
         sql = SQLColumnDefinitionMock(
-            "mock_column", int, BOColumnFlag.BOC_NOT_NULL, parent=self.mock_parent
+            "mock_column", int, BOColumnConstraint.BOC_NOT_NULL, parent=self.mock_parent
         )
         self.assertEqual(
             normalize_sql(sql.get_query()), "mock_column MOCKINTEGER MOCKNOTNULL"
@@ -73,7 +73,7 @@ class Test_100_SQLColumnDefinition(unittest.TestCase):
         sql = SQLColumnDefinitionMock(
             "mock_column",
             int,
-            BOColumnFlag.BOC_UNIQUE | BOColumnFlag.BOC_NOT_NULL,
+            BOColumnConstraint.BOC_UNIQUE | BOColumnConstraint.BOC_NOT_NULL,
             parent=self.mock_parent,
         )
         self.assertEqual(
@@ -86,7 +86,7 @@ class Test_100_SQLColumnDefinition(unittest.TestCase):
         sql = SQLColumnDefinitionMock(
             "mock_column",
             int,
-            BOColumnFlag.BOC_DEFAULT | BOColumnFlag.BOC_NOT_NULL,
+            BOColumnConstraint.BOC_DEFAULT | BOColumnConstraint.BOC_NOT_NULL,
             parent=self.mock_parent,
             default="mock_default",
         )

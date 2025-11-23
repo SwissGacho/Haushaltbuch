@@ -9,7 +9,7 @@ LOG = getLogger(__name__)
 
 from database.sql_executable import SQLExecutable, SQLManagedExecutable
 from database.sql_expression import ColumnName, Row, SQLExpression, Value
-from business_objects.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnConstraint
 
 
 class JoinOperator(Enum):
@@ -25,13 +25,13 @@ class SQLColumnDefinition(SQLManagedExecutable):
     """Represents the definition of a column in an SQL table."""
 
     type_map = {}
-    constraint_map: dict[BOColumnFlag, str] = {}
+    constraint_map: dict[BOColumnConstraint, str] = {}
 
     def __init__(
         self,
         name: str,
         data_type: type,
-        constraints: BOColumnFlag | None = None,
+        constraints: BOColumnConstraint | None = None,
         parent: SQLExecutable | None = None,
         **args,
     ):
@@ -48,7 +48,7 @@ class SQLColumnDefinition(SQLManagedExecutable):
         self._constraint = constraints
         self._arguments = args
         constraint_map = self.__class__.constraint_map
-        for flag in constraints or BOColumnFlag.BOC_NONE:
+        for flag in constraints or BOColumnConstraint.BOC_NONE:
             if flag not in constraint_map:
                 raise ValueError(
                     f"Unsupported column constraint for a {self.__class__.__name__}: {flag}"
@@ -62,7 +62,7 @@ class SQLColumnDefinition(SQLManagedExecutable):
                         for k, v in self._arguments.items()
                     }
                 )
-                for flag in self._constraint or BOColumnFlag.BOC_NONE
+                for flag in self._constraint or BOColumnConstraint.BOC_NONE
             ])}"""
         # LOG.debug(f"SQLColumnDefinition.get_query()={col_sql}")
         return col_sql

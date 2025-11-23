@@ -82,7 +82,7 @@ class PersistentBusinessObject(BOBase):
                     name=description.name,
                     data_type=description.data_type,
                     constraint=description.constraint,
-                    **description.flag_values,
+                    **description.constraint_values,
                 )
             await create_table.execute()
 
@@ -140,7 +140,7 @@ class PersistentBusinessObject(BOBase):
                 self._data[description.name] = PersistentBusinessObject.convert_from_db(
                     self._db_data.get(description.name),
                     description.data_type,
-                    description.flag_values,
+                    description.constraint_values,
                 )
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
         return self
@@ -195,7 +195,7 @@ class PersistentBusinessObject(BOBase):
                 if k != "id" and v != PersistentBusinessObject.convert_from_db(
                     self._db_data.get(k),
                     descriptions[k].data_type,
-                    descriptions[k].flag_values,
+                    descriptions[k].constraint_values,
                 ):
                     changes = True
                     update.assignment(k, value_class(k, v))

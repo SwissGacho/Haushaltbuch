@@ -2,6 +2,7 @@
 
 import datetime
 import unittest
+from unittest import mock
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
 from business_objects.persistant_business_object import PersistentBusinessObject
@@ -9,7 +10,7 @@ from business_objects.bo_descriptors import (
     BOStr,
     BOList,
     BORelation,
-    BOColumnFlag,
+    BOColumnConstraint,
     BOBaseBase,
 )
 
@@ -40,11 +41,16 @@ class MockPersistantBO2(PersistentBusinessObject):
 
 
 mock_attr_desc = [
-    ("id", int, BOColumnFlag.BOC_PK_INC, {}),
-    ("last_updated", datetime.datetime, BOColumnFlag.BOC_DEFAULT_CURR, {}),
-    ("mock_attr1", str, BOColumnFlag.BOC_NONE, {}),
-    ("mock_attr2", BOBaseBase, BOColumnFlag.BOC_FK, {"relation": MockPersistantBO1}),
-    ("mock_attr3", list, BOColumnFlag.BOC_NONE, {}),
+    ("id", int, BOColumnConstraint.BOC_PK_INC, {}),
+    ("last_updated", datetime.datetime, BOColumnConstraint.BOC_DEFAULT_CURR, {}),
+    ("mock_attr1", str, BOColumnConstraint.BOC_NONE, {}),
+    (
+        "mock_attr2",
+        BOBaseBase,
+        BOColumnConstraint.BOC_FK,
+        {"relation": MockPersistantBO1},
+    ),
+    ("mock_attr3", list, BOColumnConstraint.BOC_NONE, {}),
 ]
 
 mock_bo2_as_dict = {a[0]: a[1] for a in mock_attr_desc}

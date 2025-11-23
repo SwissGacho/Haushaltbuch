@@ -18,7 +18,7 @@ from database.sql_statement import (
 )
 from database.sql_clause import SQLColumnDefinition
 from database.sql_expression import Eq, And, ColumnName, Value
-from business_objects.bo_descriptors import BOBaseBase, BOColumnFlag
+from business_objects.bo_descriptors import BOBaseBase, BOColumnConstraint
 from business_objects.business_attribute_base import BaseFlag
 from core.exceptions import InvalidSQLStatementException
 
@@ -34,14 +34,14 @@ class MockColumnDefinition(SQLColumnDefinition):
         BaseFlag: "DB_FLAG",
     }
     constraint_map = {
-        BOColumnFlag.BOC_NONE: "",
-        BOColumnFlag.BOC_NOT_NULL: "Not Null",
-        BOColumnFlag.BOC_UNIQUE: "Unique",
-        BOColumnFlag.BOC_PK: "Primary Key",
-        BOColumnFlag.BOC_PK_INC: "Primary Key Autoincrement",
-        BOColumnFlag.BOC_FK: "References {relation}",
-        BOColumnFlag.BOC_DEFAULT: "Default",
-        BOColumnFlag.BOC_DEFAULT_CURR: "Default Current Timestamp",
+        BOColumnConstraint.BOC_NONE: "",
+        BOColumnConstraint.BOC_NOT_NULL: "Not Null",
+        BOColumnConstraint.BOC_UNIQUE: "Unique",
+        BOColumnConstraint.BOC_PK: "Primary Key",
+        BOColumnConstraint.BOC_PK_INC: "Primary Key Autoincrement",
+        BOColumnConstraint.BOC_FK: "References {relation}",
+        BOColumnConstraint.BOC_DEFAULT: "Default",
+        BOColumnConstraint.BOC_DEFAULT_CURR: "Default Current Timestamp",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
@@ -249,8 +249,8 @@ class Test_700_CreateTable(unittest.TestCase):
         create_table = CreateTable(
             "test",
             [
-                ("name", str, BOColumnFlag.BOC_NOT_NULL, {}),
-                ("age", int, BOColumnFlag.BOC_DEFAULT, {}),
+                ("name", str, BOColumnConstraint.BOC_NOT_NULL, {}),
+                ("age", int, BOColumnConstraint.BOC_DEFAULT, {}),
             ],
             parent=self.mockParent,
         )

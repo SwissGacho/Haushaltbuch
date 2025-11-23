@@ -2,16 +2,18 @@
 
 import datetime
 import unittest
-from unittest.mock import DEFAULT, Mock, AsyncMock, patch, call, ANY
 
 from business_objects.business_object_base import AttributeDescription, BOBase
 from business_objects.bo_descriptors import (
+    AttributeAccessLevel,
+    AttributeType,
     BOStr,
     BOList,
     BORelation,
-    BOColumnFlag,
+    BOColumnConstraint,
     BOBaseBase,
 )
+
 
 MOCK_TAB1 = "mock_table"
 MOCK_TAB2 = "mockbo2s"
@@ -40,15 +42,46 @@ class MockBO2(BOBase):
 
 
 mock_attr_desc = [
-    AttributeDescription("id", int, BOColumnFlag.BOC_PK_INC, {}),
     AttributeDescription(
-        "last_updated", datetime.datetime, BOColumnFlag.BOC_DEFAULT_CURR, {}
+        name="id",
+        data_type=int,
+        constraint=BOColumnConstraint.BOC_PK_INC,
+        constraint_values={},
+        attribute_type=AttributeType.ATYPE_INT,
+        access_level=AttributeAccessLevel.AAL_WRITE_ONLY,
     ),
-    AttributeDescription("mock_attr1", str, BOColumnFlag.BOC_NONE, {}),
     AttributeDescription(
-        "mock_attr2", BOBaseBase, BOColumnFlag.BOC_FK, {"relation": MockBO1}
+        name="last_updated",
+        data_type=datetime.datetime,
+        constraint=BOColumnConstraint.BOC_DEFAULT_CURR,
+        constraint_values={},
+        attribute_type=AttributeType.ATYPE_DATETIME,
+        access_level=AttributeAccessLevel.AAL_READ_ONLY,
     ),
-    AttributeDescription("mock_attr3", list, BOColumnFlag.BOC_NONE, {}),
+    AttributeDescription(
+        name="mock_attr1",
+        data_type=str,
+        constraint=BOColumnConstraint.BOC_NONE,
+        constraint_values={},
+        attribute_type=AttributeType.ATYPE_STR,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
+    ),
+    AttributeDescription(
+        name="mock_attr2",
+        data_type=BOBaseBase,
+        constraint=BOColumnConstraint.BOC_FK,
+        constraint_values={"relation": MockBO1},
+        attribute_type=AttributeType.ATYPE_FLAG,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
+    ),
+    AttributeDescription(
+        name="mock_attr3",
+        data_type=list,
+        constraint=BOColumnConstraint.BOC_NONE,
+        constraint_values={},
+        attribute_type=AttributeType.ATYPE_LIST,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
+    ),
 ]
 
 mock_bo2_as_dict = {a.name: a.data_type for a in mock_attr_desc}

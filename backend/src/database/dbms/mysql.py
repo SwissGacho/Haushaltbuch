@@ -17,7 +17,7 @@ from database.sql_factory import SQLFactory
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript, Insert, Update
 from database.sql_clause import SQLColumnDefinition
-from business_objects.bo_descriptors import BOColumnFlag, BOBaseBase
+from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
 from business_objects.business_attribute_base import BaseFlag
 
 
@@ -91,14 +91,14 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         BaseFlag: baseflag_datatype,
     }
     constraint_map = {
-        BOColumnFlag.BOC_NONE: "",
-        BOColumnFlag.BOC_NOT_NULL: "NOT NULL",
-        BOColumnFlag.BOC_UNIQUE: "UNIQUE",
-        BOColumnFlag.BOC_PK: "PRIMARY KEY",
-        BOColumnFlag.BOC_PK_INC: "AUTO_INCREMENT PRIMARY KEY",
-        BOColumnFlag.BOC_FK: "REFERENCES {relation} (id)",
-        BOColumnFlag.BOC_DEFAULT: "DEFAULT",
-        BOColumnFlag.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        BOColumnConstraint.BOC_NONE: "",
+        BOColumnConstraint.BOC_NOT_NULL: "NOT NULL",
+        BOColumnConstraint.BOC_UNIQUE: "UNIQUE",
+        BOColumnConstraint.BOC_PK: "PRIMARY KEY",
+        BOColumnConstraint.BOC_PK_INC: "AUTO_INCREMENT PRIMARY KEY",
+        BOColumnConstraint.BOC_FK: "REFERENCES {relation} (id)",
+        BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
+        BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
