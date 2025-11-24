@@ -1,12 +1,15 @@
 """Test suite for Business Objects Base"""
 
 import datetime
+from re import M
 import unittest
 
 from business_objects.business_object_base import AttributeDescription, BOBase
+from business_objects.business_attribute_base import BaseFlag
 from business_objects.bo_descriptors import (
     AttributeAccessLevel,
     AttributeType,
+    BOFlag,
     BOStr,
     BOList,
     BORelation,
@@ -19,6 +22,11 @@ MOCK_TAB1 = "mock_table"
 MOCK_TAB2 = "mockbo2s"
 
 
+class MockFlag(BaseFlag):
+    OPTION_A = 1
+    OPTION_B = 2
+
+
 class MockBO1(BOBase):
     _table = MOCK_TAB1
 
@@ -27,6 +35,7 @@ class MockBO2(BOBase):
     mock_attr1 = BOStr()
     mock_attr2 = BORelation(MockBO1)
     mock_attr3 = BOList()
+    mock_attr4 = BOFlag(MockFlag)
 
     def __init__(
         self,
@@ -34,11 +43,13 @@ class MockBO2(BOBase):
         mock_attr1="mock attribute 1",
         mock_attr2=None,
         mock_attr3=[],
+        mock_attr4=None,
     ) -> None:
         super().__init__(bo_id=bo_id)
         self.mock_attr1 = mock_attr1
         self.mock_attr2 = mock_attr2
         self.mock_attr3 = mock_attr3
+        self.mock_attr4 = mock_attr4
 
 
 mock_attr_desc = [
@@ -71,7 +82,7 @@ mock_attr_desc = [
         data_type=BOBaseBase,
         constraint=BOColumnConstraint.BOC_FK,
         constraint_values={"relation": MockBO1},
-        attribute_type=AttributeType.ATYPE_FLAG,
+        attribute_type=AttributeType.ATYPE_RELATION,
         access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
     AttributeDescription(
@@ -80,6 +91,14 @@ mock_attr_desc = [
         constraint=BOColumnConstraint.BOC_NONE,
         constraint_values={},
         attribute_type=AttributeType.ATYPE_LIST,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
+    ),
+    AttributeDescription(
+        name="mock_attr4",
+        data_type=BaseFlag,
+        constraint=BOColumnConstraint.BOC_NONE,
+        constraint_values={"flag_type": MockFlag},
+        attribute_type=AttributeType.ATYPE_FLAG,
         access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
 ]
@@ -109,9 +128,8 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_105_attribute_descriptions(self):
-        print(f"{MockBO2.attribute_descriptions()=}")
-        print(f"{mock_attr_desc=}")
-        self.assertEqual(MockBO2.attribute_descriptions(), mock_attr_desc)
+        bo2_attr_desc = MockBO2.attribute_descriptions()
+        self.assertEqual(bo2_attr_desc, mock_attr_desc)
 
     def test_106_get_business_object_by_name(self):
         MockBO2.register_persistant_class()
