@@ -46,8 +46,11 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         # print(f"BOSubscription.__init__({bo_type=}, {connection=})")
         # LOG.debug(f"===============================================")
         LOG.debug(f"BOSubscription.__init__({bo_type=}, {id=}, {connection=})")
+
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
+
+        connection.unregister_other_senders(self)
 
         if isinstance(bo_type, str):
             LOG.debug(
@@ -135,6 +138,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
             LOG.debug("BOSubscription.cleanup: Cannot cleanup, _obj is None")
             return
         self._obj.unsubscribe_from_all_changes(self._subscription_id)
+        self._connection.unregister_message_sender(self)
 
 
 class BOList(BOSubscription[T]):
@@ -183,6 +187,7 @@ class BOList(BOSubscription[T]):
             LOG.debug("BOList.cleanup: Cannot cleanup, _bo_type is None")
             return
         self._bo_type.unsubscribe_from_all_changes(self._subscription_id)
+        self._connection.unregister_message_sender(self)
 
 
 log_exit(LOG)

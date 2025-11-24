@@ -6,8 +6,6 @@ from enum import StrEnum
 from json import dumps, loads
 from typing import Any, Optional
 
-from regex import W
-
 from core.app_logging import getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
