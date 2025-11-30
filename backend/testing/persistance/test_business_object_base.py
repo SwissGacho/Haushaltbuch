@@ -1,7 +1,6 @@
 """Test suite for Business Objects Base"""
 
 import datetime
-from re import M
 import unittest
 
 from business_objects.business_object_base import AttributeDescription, BOBase

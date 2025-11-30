@@ -1,9 +1,7 @@
 """Test suite for Business Objects Base"""
 
 import datetime
-from os import name
 import unittest
-from unittest import mock
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
 from business_objects.persistant_business_object import PersistentBusinessObject
