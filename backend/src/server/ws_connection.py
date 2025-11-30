@@ -46,7 +46,7 @@ class WSConnection(WSConnectionBase):
         WSConnection.connections |= {(key or self.connection_id): self}
         # self.LOG.debug(f"{WS_Connection.connections=}")
 
-    def _register_message_sender(self, sender: WSMessageSender):
+    def register_message_sender(self, sender: WSMessageSender):
         "register a message sender to this connection"
         self.subscribers.append(sender)
         self.LOG.debug(f"Registered {sender} as message sender")
@@ -58,13 +58,18 @@ class WSConnection(WSConnectionBase):
             # )
             del WSConnection.connections[key]
 
-    def _unregister_message_sender(self, sender: WSMessageSender):
+    def unregister_message_sender(self, sender: WSMessageSender):
         "unregister a message sender from this connection"
         try:
             self.subscribers.remove(sender)
             self.LOG.debug(f"Unregistered {sender} as message sender")
         except ValueError:
             self.LOG.warning(f"Sender {sender} not found in subscribers list")
+
+    def unregister_other_senders(self, sender_to_keep: WSMessageSender):
+        for sender in self.subscribers:
+            if sender is not sender_to_keep:
+                sender.release_subscriptions()
 
     @property
     def connection_id(self):
