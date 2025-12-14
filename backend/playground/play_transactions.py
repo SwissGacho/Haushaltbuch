@@ -4,6 +4,7 @@ import re
 import sys
 import os
 import traceback
+from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../src")
 
@@ -17,7 +18,7 @@ from database.sql import SQL, SQLConnection, SQLTransaction
 
 SQLiITE_CONFIG = {
     "db": "SQLite",
-    "file": "C:\\Users\\heinz\\Dokumente\\playground.sqlite.db",
+    "file": "playground.sqlite.db",
 }
 MARIADB_CONFIG = {
     "db": "MariaDB",
@@ -263,6 +264,8 @@ async def main():
     while (db := input("DB (l/m): ").strip().lower()) not in ["l", "m"]:
         print("Please enter 'l' for SQLite or 'm' for MariaDB.")
     if db == "l":
+        path = Path(__file__).resolve().parent
+        SQLiITE_CONFIG["file"] = str(Path(path, SQLiITE_CONFIG["file"]))
         App.db = SQLiteDB(**SQLiITE_CONFIG)
     elif db == "m":
         App.db = MySQLDB(**MARIADB_CONFIG)
