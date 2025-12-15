@@ -5,9 +5,8 @@ application's data model."""
 
 import copy
 import json
-from typing import Any, Optional
+from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
-from business_objects.bo_descriptors import BOBaseBase
 from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
@@ -25,13 +24,16 @@ class PersistentBusinessObject(BOBase):
     """Base class for persistent Business Objects.
     Every subclass will be registered in a table in the database."""
 
+    # pylint: disable=no-self-argument
     @_classproperty
-    def all_business_objects(self) -> dict[str, type["PersistentBusinessObject"]]:
+    def all_business_objects(
+        cls: Type[Self],  # type: ignore[reportGeneralTypeIssues]
+    ) -> dict[str, type[BOBase]]:
         "Set of registered Business Objects"
         return {
-            name: cls
-            for name, cls in BOBase.all_business_objects.items()
-            if issubclass(cls, PersistentBusinessObject)
+            _name: _cls
+            for _name, _cls in BOBase.all_business_objects.items()  # pylint: disable=no-member
+            if issubclass(_cls, PersistentBusinessObject)
         }
 
     @classmethod
@@ -54,7 +56,11 @@ class PersistentBusinessObject(BOBase):
                 LOG.error(
                     f"PersistentBusinessObject.convert_from_db: JSONDecodeError: {exc}"
                 )
-        if isinstance(typ, type) and issubclass(typ, BaseFlag) and isinstance(value, str):
+        if (
+            isinstance(typ, type)
+            and issubclass(typ, BaseFlag)
+            and isinstance(value, str)
+        ):
             value = subtyp["flag_type"].flags(value)
         return copy.deepcopy(value)
 
@@ -68,12 +74,15 @@ class PersistentBusinessObject(BOBase):
             create_table: CreateTable = s.create_table(cls.table)
             # LOG.debug(f"PersistentBusinessObject.sql_create_table():  {cls.table=}")
             for description in attributes:
-                # LOG.debug(f" -  {description.name=}, {description.data_type=}, {description.constraint=}, {description.flag_values=}")
+                # LOG.debug(
+                #     f" -  {description.name=}, {description.data_type=}, "
+                #     f"{description.constraint=}, {description.flag_values=}"
+                # )
                 create_table.column(
                     name=description.name,
                     data_type=description.data_type,
                     constraint=description.constraint,
-                    **description.flag_values,
+                    **description.constraint_values,
                 )
             await create_table.execute()
 
@@ -85,7 +94,10 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchone()
-        # LOG.debug(f"PersistentBusinessObject.count_rows({conditions=}) {result=} -> return {result["count"]}")
+        # LOG.debug(
+        #     f"PersistentBusinessObject.count_rows({conditions=}) "
+        #     f"{result=} -> return {result["count"]}"
+        # )
         return result["count"]
 
     @classmethod
@@ -128,7 +140,7 @@ class PersistentBusinessObject(BOBase):
                 self._data[description.name] = PersistentBusinessObject.convert_from_db(
                     self._db_data.get(description.name),
                     description.data_type,
-                    description.flag_values,
+                    description.constraint_values,
                 )
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
         return self
@@ -183,7 +195,7 @@ class PersistentBusinessObject(BOBase):
                 if k != "id" and v != PersistentBusinessObject.convert_from_db(
                     self._db_data.get(k),
                     descriptions[k].data_type,
-                    descriptions[k].flag_values,
+                    descriptions[k].constraint_values,
                 ):
                     changes = True
                     update.assignment(k, value_class(k, v))

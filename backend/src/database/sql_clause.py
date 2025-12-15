@@ -1,15 +1,15 @@
 """Clauses used in SQL statements."""
 
 from enum import Enum
-from typing import Self
+from typing import Optional, Self, Sequence
+
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
 
 from database.sql_executable import SQLExecutable, SQLManagedExecutable
 from database.sql_expression import ColumnName, Row, SQLExpression, Value
-from business_objects.bo_descriptors import BOColumnFlag
-
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
+from business_objects.bo_descriptors import BOColumnConstraint
 
 
 class JoinOperator(Enum):
@@ -25,13 +25,13 @@ class SQLColumnDefinition(SQLManagedExecutable):
     """Represents the definition of a column in an SQL table."""
 
     type_map = {}
-    constraint_map: dict[BOColumnFlag, str] = {}
+    constraint_map: dict[BOColumnConstraint, str] = {}
 
     def __init__(
         self,
         name: str,
         data_type: type,
-        constraints: BOColumnFlag | None = None,
+        constraints: BOColumnConstraint | None = None,
         parent: SQLExecutable | None = None,
         **args,
     ):
@@ -48,7 +48,7 @@ class SQLColumnDefinition(SQLManagedExecutable):
         self._constraint = constraints
         self._arguments = args
         constraint_map = self.__class__.constraint_map
-        for flag in constraints or BOColumnFlag.BOC_NONE:
+        for flag in constraints or BOColumnConstraint.BOC_NONE:
             if flag not in constraint_map:
                 raise ValueError(
                     f"Unsupported column constraint for a {self.__class__.__name__}: {flag}"
@@ -62,7 +62,7 @@ class SQLColumnDefinition(SQLManagedExecutable):
                         for k, v in self._arguments.items()
                     }
                 )
-                for flag in self._constraint or BOColumnFlag.BOC_NONE
+                for flag in self._constraint or BOColumnConstraint.BOC_NONE
             ])}"""
         # LOG.debug(f"SQLColumnDefinition.get_query()={col_sql}")
         return col_sql
@@ -71,7 +71,11 @@ class SQLColumnDefinition(SQLManagedExecutable):
 class From(SQLManagedExecutable):
     """Class for the FROM clause of an SQL statement."""
 
-    def __init__(self, table: str, parent: SQLExecutable | None = None):
+    def __init__(
+        self,
+        table: str | SQLManagedExecutable,
+        parent: Optional[SQLExecutable] = None,
+    ):
         super().__init__(parent)
         self._table = table
         self._joins: list[tuple[JoinOperator, str, SQLExpression | None]] = []
@@ -114,7 +118,7 @@ class Where(SQLManagedExecutable):
 
     def get_query(self):
         if not self._condition:
-            raise ValueError(f"SQL_WHERE must have at least one condition")
+            raise ValueError("SQL_WHERE must have at least one condition")
         return f" WHERE {self._condition.get_query(km=self)}"
 
 
@@ -154,10 +158,12 @@ class Values(SQLManagedExecutable):
     names of the columns. Each row must have the same number of values.
     """
 
-    def __init__(self, rows: list[Row] = [], parent: SQLExecutable | None = None):
+    def __init__(
+        self, rows: Optional[list[Row]] = None, parent: SQLExecutable | None = None
+    ):
         # LOG.debug(f"Values({rows=})")
         super().__init__(parent)
-        self._rows = rows
+        self._rows = rows or []
 
     def row(self, row: Row) -> Self:
         """Add a row to the end of the list."""
@@ -189,7 +195,7 @@ class Assignment(SQLManagedExecutable):
 
     def __init__(
         self,
-        columns: list[ColumnName | str] | ColumnName | str,
+        columns: Sequence[ColumnName | str] | ColumnName | str,
         value: Value,
         parent: SQLExecutable | None = None,
     ):
@@ -209,7 +215,7 @@ class Assignment(SQLManagedExecutable):
         sql = (
             ",".join(
                 [
-                    c.get_query(km=self) if isinstance(c, ColumnName) else c
+                    c.get_query(km=self) if isinstance(c, ColumnName) else str(c)
                     for c in self._columns
                 ]
             )
@@ -217,3 +223,6 @@ class Assignment(SQLManagedExecutable):
             + self._value.get_query(km=self)
         )
         return sql
+
+
+log_exit(LOG)

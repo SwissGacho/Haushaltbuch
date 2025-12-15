@@ -1,24 +1,23 @@
 """Connection to MySQL DB using asyncmy"""
 
-from re import L
 import ssl
 import datetime
 from typing import Optional, Self
 from pathlib import Path
 
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
 from core.configuration.config import Config, DBConfig
 from core.exceptions import ConfigurationError, OperationalError
 from core.util import get_config_item
-from database.dbms.db_base import DB, Connection, Cursor
+from database.dbms.db_base import DB, Connection, Cursor, DBCursorProtocol
 from database.sql_factory import SQLFactory
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript, Insert, Update
 from database.sql_clause import SQLColumnDefinition
-from business_objects.bo_descriptors import BOColumnFlag, BOBaseBase
+from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
 from business_objects.business_attribute_base import BaseFlag
 
 
@@ -28,8 +27,8 @@ try:
     from asyncmy.cursors import DictCursor
     from asyncmy.pool import Pool
 except ModuleNotFoundError as err:
-    asyncmy = None
-    DictCursor = None
+    asyncmy = None  # pylint: disable=invalid-name
+    DictCursor: Optional[DBCursorProtocol] = None
     ASYNCMY_IMPORT_ERROR = err
 else:
     ASYNCMY_IMPORT_ERROR = None
@@ -92,14 +91,14 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         BaseFlag: baseflag_datatype,
     }
     constraint_map = {
-        BOColumnFlag.BOC_NONE: "",
-        BOColumnFlag.BOC_NOT_NULL: "NOT NULL",
-        BOColumnFlag.BOC_UNIQUE: "UNIQUE",
-        BOColumnFlag.BOC_PK: "PRIMARY KEY",
-        BOColumnFlag.BOC_PK_INC: "AUTO_INCREMENT PRIMARY KEY",
-        BOColumnFlag.BOC_FK: "REFERENCES {relation} (id)",
-        BOColumnFlag.BOC_DEFAULT: "DEFAULT",
-        BOColumnFlag.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        BOColumnConstraint.BOC_NONE: "",
+        BOColumnConstraint.BOC_NOT_NULL: "NOT NULL",
+        BOColumnConstraint.BOC_UNIQUE: "UNIQUE",
+        BOColumnConstraint.BOC_PK: "PRIMARY KEY",
+        BOColumnConstraint.BOC_PK_INC: "AUTO_INCREMENT PRIMARY KEY",
+        BOColumnConstraint.BOC_FK: "REFERENCES {relation} (id)",
+        BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
+        BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
@@ -182,11 +181,11 @@ class MySQLDB(DB):
         if ASYNCMY_IMPORT_ERROR:
             raise ModuleNotFoundError(f"Import error: {ASYNCMY_IMPORT_ERROR}")
         super().__init__(**cfg)
-        self._pool: Optional["Pool"] = None
+        self.connection_pool: Optional["Pool"] = None
 
     async def create_pool(self) -> None:
         """Create connection pool if not exists"""
-        if self._pool is not None:
+        if self.connection_pool is not None:
             return
 
         ssl_cfg = self._cfg.get(Config.CONFIG_DBSSL)
@@ -212,9 +211,9 @@ class MySQLDB(DB):
         if asyncmy is None:
             raise ImportError("asyncmy module is not available.")
 
-        self._pool = await asyncmy.create_pool(
-            host=self._cfg[Config.CONFIG_DBHOST],
-            db=self._cfg[Config.CONFIG_DBDBNAME],
+        self.connection_pool = await asyncmy.create_pool(
+            host=self._cfg.get(Config.CONFIG_DBHOST, "localhost"),
+            db=self._cfg.get(Config.CONFIG_DBDBNAME, "moneypilot"),
             port=self._cfg.get(Config.CONFIG_DBPORT, 3306),
             user=self._cfg.get(Config.CONFIG_DBUSER),
             password=self._cfg.get(Config.CONFIG_DBPW),
@@ -241,22 +240,23 @@ class MySQLDB(DB):
     async def connect(self):
         "Get a connection from pool"
         await self.create_pool()
-        if self._pool is None:
+        if self.connection_pool is None:
             raise OperationalError("Connection pool not initialized")
-        return await MySQLConnection(db_obj=self, pool=self._pool).connect()
+        return await MySQLConnection(db_obj=self, pool=self.connection_pool).connect()
 
     async def close(self):
         "Close the connection pool"
-        if self._pool:
+        if self.connection_pool:
             LOG.debug("MySQLDB.close(): Closing connection pool")
+            # pylint: disable=protected-access
             LOG.debug(
-                f"   {self._pool.freesize} free, {len(self._pool._used)} used, "
-                f"{self._pool.size} total, "
-                f"{self._pool.maxsize} possible connections"
+                f"   {self.connection_pool.freesize} free, {len(self.connection_pool._used)} used, "
+                f"{self.connection_pool.size} total, "
+                f"{self.connection_pool.maxsize} possible connections"
             )
-            self._pool.close()
-            await self._pool.wait_closed()
-            self._pool = None
+            self.connection_pool.close()
+            await self.connection_pool.wait_closed()
+            self.connection_pool = None
 
 
 class MySQLConnection(Connection):
@@ -316,7 +316,7 @@ class MySQLConnection(Connection):
         if self._connection:
             # LOG.debug("Connection.close: releasing connection")
             await self._pool.release(self._connection)
-            self._db._connections.remove(self)
+            self._db.db_connections.remove(self)
             self._connection = None
             # LOG.debug(f"------------------------------- {self._db._connections=}")
 
@@ -346,11 +346,17 @@ class MySQLCursor(Cursor):
 
         if self._cursor is None:
             raise OperationalError(
-                "Cursor is not initialized. Make sure to create the cursor before executing queries."
+                "Cursor is not initialized. "
+                "Make sure to create the cursor before executing queries."
             )
         try:
             # LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
             self._rowcount = await self._cursor.execute(conv_sql, args=args)
-        except asyncmy.errors.MySQLError as exc:
+        except (
+            asyncmy.errors.MySQLError  # pylint: disable=c-extension-no-member
+        ) as exc:
             raise OperationalError(f"{exc} during SQL execution") from exc
         return self
+
+
+log_exit(LOG)

@@ -1,4 +1,9 @@
+"""Base class for WebSocket connections"""
+
+
 class WSConnectionBase:
+    "Base class for WebSocket connections"
+
     def _register_connection(self, key: str | None = None) -> None:
         raise NotImplementedError()
 
@@ -13,10 +18,12 @@ class WSConnectionBase:
 
     @property
     def connection_id(self):
+        "get connection identifier"
         raise NotImplementedError()
 
     @property
     def session(self):
+        "get/set session associated with connection"
         raise NotImplementedError()
 
     @session.setter
@@ -27,9 +34,11 @@ class WSConnectionBase:
         raise NotImplementedError()
 
     async def send_message(self, message, status=False):
+        "send a message to the client"
         raise NotImplementedError()
 
     async def send_message_to_component(self, comp, msg):
+        "send a message to a specific component"
         raise NotImplementedError()
 
     async def start_connection(self):

@@ -1,23 +1,22 @@
 """Login related messages"""
 
+from typing import Optional
+
+from core.app_logging import getLogger, log_exit, Logger
+
+LOG: Logger = getLogger(__name__)
+
+from core.validation import check_login
 from server.ws_token import WSToken
 from server.session import Session
 from messages.message import Message, MessageType, MessageAttribute
-from core.app_logging import getLogger
-from core.status import Status
-from core.app import App
-from core.const import SINGLE_USER_NAME
-from core.validation import check_login
 from data.management.user import User
-from database.sql_expression import ColumnName
-
-LOG = getLogger(__name__)
 
 
 class HelloMessage(Message):
     "provide connection token to client"
 
-    def __init__(self, token: WSToken, status: str = None) -> None:
+    def __init__(self, token: WSToken, status: Optional[str] = None) -> None:
         super().__init__(msg_type=MessageType.WS_TYPE_HELLO, token=token, status=status)
 
 
@@ -33,7 +32,7 @@ class LoginMessage(Message):
         LOG = getLogger(  # pylint: disable=invalid-name,redefined-outer-name
             f"{LoginMessage.__module__})"
         )
-        token = self.get_str(MessageAttribute.WS_ATTR_TOKEN)
+        token = WSToken(self.get_str(MessageAttribute.WS_ATTR_TOKEN))
         try:
             ses_token = self.get_str(MessageAttribute.WS_ATTR_SES_TOKEN)
             conn_token = self.get_str(MessageAttribute.WS_ATTR_PREV_TOKEN)
@@ -42,7 +41,7 @@ class LoginMessage(Message):
                     ses_token=ses_token, conn_token=conn_token
                 )
             else:
-                user = await check_login(self.message)
+                user: User = await check_login(self.message)
                 session = Session(user, token, connection)
             if not session:
                 raise PermissionError(
@@ -90,4 +89,4 @@ class ByeMessage(Message):
         self.message |= {MessageAttribute.WS_ATTR_REASON: reason}
 
 
-# LOG.debug("module imported")
+log_exit(LOG)

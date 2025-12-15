@@ -1,9 +1,13 @@
 """SQL statement builder for the database.
 This module provides functionality to create, execute, and manage SQL statements."""
 
-from typing import Self
-from core.exceptions import InvalidSQLStatementException, OperationalError, CommitError
+from typing import Self, Optional
 
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
+from core.exceptions import InvalidSQLStatementException, OperationalError, CommitError
 from core.base_objects import ConnectionBaseClass
 from database.sql_executable import SQLExecutable
 from database.sql_factory import SQLFactory
@@ -19,10 +23,7 @@ from database.sql_statement import (
     Select,
     Update,
 )
-from business_objects.bo_descriptors import BOColumnFlag
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
+from business_objects.bo_descriptors import BOColumnConstraint
 
 
 class _SQLBase(SQLExecutable):
@@ -35,9 +36,9 @@ class _SQLBase(SQLExecutable):
     Should not be instantiated directly."""
 
     def __new__(cls, *args, **kwargs):
-        factory = cls._get_db().sql_factory
+        factory = cls._get_db().sql_factory  # pylint: disable=no-member
         actual_class = factory.get_sql_class(cls)
-        return object().__new__(actual_class)
+        return object.__new__(actual_class)
 
     def __init__(self, connection: ConnectionBaseClass | None = None) -> None:
         super().__init__(None)
@@ -59,16 +60,19 @@ class _SQLBase(SQLExecutable):
     async def connect(self) -> ConnectionBaseClass:
         """Create a new connection to the database."""
         if self._my_connection is None:
+            # pylint: disable=no-member
             self._my_connection = await SQLExecutable._get_db().connect()
             # LOG.debug("New connection created")
         return self._my_connection
 
     @property
-    def connection(self) -> ConnectionBaseClass:
+    def connection(self) -> ConnectionBaseClass | None:
         """Get the currently used connection to the database."""
         return self._my_connection
 
     async def close(self, rollback: bool = False):
+        "Close the connection to the database."
+        _ = rollback  # not used here
         if self._my_connection is not None and self._connection is None:
             await self._my_connection.close()
             self._my_connection = None
@@ -130,17 +134,21 @@ class SQL(_SQLBase):
     @property
     def sql_factory(self) -> SQLFactory:
         """Get the SQLFactory of the current database. Usually call get_sql_class instead."""
-        return SQL._get_db().sql_factory
+        return SQL._get_db().sql_factory  # pylint: disable=no-member
 
     def create_table(
         self,
         table: str,
-        columns: list[tuple[str, type, BOColumnFlag | None, dict]] = [],
+        columns: Optional[
+            list[tuple[str, type, BOColumnConstraint | None, dict]]
+        ] = None,
         temporary: bool = False,
     ) -> "CreateTable":
         """Sets the SQL statement to create a table and returns a create_table object"""
         # LOG.debug(f"SQL.create_table({table=}, {columns=}, {temporary=})")
-        create_table = CreateTable(table, columns, temporary=temporary, parent=self)
+        create_table = CreateTable(
+            table=table, columns=columns or [], temporary=temporary, parent=self
+        )
         self._sql_statement = create_table
         return create_table
 
@@ -156,8 +164,8 @@ class SQL(_SQLBase):
         view_columns: list of columns of the view
         column_list: list of columns to be selected by the view (see .select())"""
         create_view = CreateView(
-            view_name,
-            view_columns,
+            view=view_name,
+            view_columns=view_columns,
             column_list=column_list,
             distinct=distinct,
             temporary=temporary,
@@ -166,13 +174,17 @@ class SQL(_SQLBase):
         self._sql_statement = create_view
         return create_view
 
-    def select(self, column_list: list[str] = None, distinct: bool = False) -> "Select":
+    def select(
+        self, column_list: Optional[list[str]] = None, distinct: bool = False
+    ) -> "Select":
         """Sets the SQL statement to a select statement and returns a select object"""
         select = Select(column_list, distinct, parent=self)
         self._sql_statement = select
         return select
 
-    def insert(self, table: str, columns: NamedValueListList = None) -> "Insert":
+    def insert(
+        self, table: str, columns: Optional[NamedValueListList] = None
+    ) -> "Insert":
         """Sets the SQL statement to a insert statement and returns an insert object"""
         insert = Insert(table, columns, parent=self)
         self._sql_statement = insert
@@ -205,7 +217,8 @@ class SQL(_SQLBase):
         #     f"SQL.execute(): {self.get_sql()=}; {self._my_connection=}"
         # )
         sql = self.get_sql()
-        return await SQLExecutable._get_db().execute(
+        # pylint: disable=no-member
+        return await SQL._get_db().execute(
             query=sql["query"], params=sql["params"], connection=await self.connect()
         )
 
@@ -213,13 +226,12 @@ class SQL(_SQLBase):
 class SQLTransaction(_SQLBase):
     """SQL transaction context manager."""
 
-    def __init__(self, connection: ConnectionBaseClass | None = None) -> None:
-        super().__init__(connection)
-
     async def __aenter__(self) -> Self:
         """Enter the SQL transaction context."""
         # LOG.debug("Entering SQL transaction context")
         await self.connect()
+        if self._my_connection is None:
+            raise ConnectionError("No connection available for transaction.")
         await self._my_connection.begin()
         return self
 
@@ -256,3 +268,6 @@ class SQLConnection(_SQLBase):
     def transaction(self) -> SQLTransaction:
         "Create a new SQL transaction object"
         return SQLTransaction(connection=self.connection)
+
+
+log_exit(LOG)

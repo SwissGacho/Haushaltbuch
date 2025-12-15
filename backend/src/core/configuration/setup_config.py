@@ -5,9 +5,10 @@ from pathlib import Path
 import json
 import asyncio
 
-from data.management.user import User, UserRole
-from data.management.configuration import Configuration
-from database.sql_expression import ColumnName
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
 from core.app import App
 from core.util import get_config_item, update_dicts_recursively
 from core.configuration.db_config import DBConfig
@@ -16,9 +17,9 @@ from core.const import SINGLE_USER_NAME
 from core.base_objects import Config
 from core.base_objects import BaseObject
 from core.exceptions import ConfigurationError, DataError
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
+from data.management.user import User, UserRole
+from data.management.configuration import Configuration
+from database.sql_expression import ColumnName
 
 WAIT_AVAILABLE_TASK = "wait_for_available"
 WAIT_FAILURE_TASK = "wait_for_failure"
@@ -156,3 +157,6 @@ class ConfigSetup(BaseObject):
                 LOG.error("Start DB failed with new configuration.")
 
             await cls._create_or_update_initial_user(setup_cfg=setup_cfg)
+
+
+log_exit(LOG)

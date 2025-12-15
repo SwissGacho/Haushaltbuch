@@ -1,17 +1,19 @@
 """Base class for DB connections"""
 
-from typing import Any, Self
+from typing import Any, Self, Optional, Protocol, AsyncContextManager
 import re
 import json
 
 from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
 from core.base_objects import DBBaseClass, ConnectionBaseClass
 from core.exceptions import OperationalError
+from business_objects.business_object_base import BOBase
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
 from database.sql_clause import SQLColumnDefinition
-
-LOG = getLogger(__name__)
 
 
 class DB(DBBaseClass):
@@ -19,21 +21,12 @@ class DB(DBBaseClass):
 
     def __init__(self, **cfg) -> None:
         self._cfg = cfg
-        self._connections = set()
+        self.db_connections = set()
 
     @property
     def sql_factory(self):
         "DB specific SQL factory"
         raise NotImplementedError("sqlFactory not defined on base class")
-
-    def sql(self, query: SQL, **kwargs) -> str:
-        "return the DB specific SQL"
-        # LOG.debug(f"{query=}, {kwargs=}, query is callable:{callable(query)} ")
-        if callable(query):
-            return query(self, **kwargs)
-        elif isinstance(query.value, str):
-            return query.value
-        raise ValueError(f"value of {query} not defined")
 
     def check_column(self, tab, col, name, data_type, constraint, **pars):
         "check compatibility of a DB column with a business object attribute"
@@ -45,12 +38,14 @@ class DB(DBBaseClass):
         ).get_query()
         if col is None:
             LOG.error(
-                f"column '{name}' in DB table '{tab}' is undefined in the DB instead of '{attr_sql}'"
+                f"column '{name}' in DB table '{tab}' is undefined in the DB "
+                f"instead of '{attr_sql}'"
             )
             return False
         if col.strip() != attr_sql.strip():
             LOG.error(
-                f"column '{name}' in DB table '{tab}' is defined '{col}' in the DB instead of '{attr_sql}'"
+                f"column '{name}' in DB table '{tab}' is defined '{col}' in the DB "
+                f"instead of '{attr_sql}'"
             )
             return False
         return True
@@ -68,7 +63,7 @@ class DB(DBBaseClass):
             for c in table_info
         }
 
-    async def check_table(self, obj: "BOBase"):
+    async def check_table(self, obj: BOBase):
         "check compatibility of a DB table with a business object"
         # LOG.debug(f"Checking table '{obj.table}'")
         tab_info = await self._get_table_info(obj.table)
@@ -81,7 +76,7 @@ class DB(DBBaseClass):
                     description.name,
                     description.data_type,
                     description.constraint,
-                    **description.flag_values,
+                    **description.constraint_values,
                 )
                 and ok
             )
@@ -95,9 +90,9 @@ class DB(DBBaseClass):
     async def execute(
         self,
         query: str,
-        params=None,
-        connection: "Connection" = None,
-    ):
+        params: Optional[dict[str, Any]] = None,
+        connection: Optional["Connection"] = None,
+    ) -> "Cursor":
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
         # LOG.debug(f"DB.execute: {query=}, {params=}, {close=}, {commit=} {connection=}")
@@ -107,12 +102,39 @@ class DB(DBBaseClass):
 
     async def close(self):
         "close all activities"
-        if self._connections:
+        if self.db_connections:
             LOG.warning(
-                f"DB.close: closing {len(self._connections)} unclosed connections"
+                f"DB.close: closing {len(self.db_connections)} unclosed connections"
             )
-            for con in [c for c in self._connections]:
+            for con in [c for c in self.db_connections]:
                 await con.close()
+
+
+# pylint: disable=missing-docstring
+class DBCursorProtocol(AsyncContextManager["DBCursorProtocol"], Protocol):
+    "Protocol for DB cursor classes"
+
+    async def __aenter__(self) -> Self: ...
+    async def __aexit__(self, exc_type, exc, tb) -> None: ...
+    async def execute(self, *args, **kwargs) -> None: ...
+    async def fetchone(self) -> dict[str, Any]: ...
+    async def fetchall(self) -> list[dict[str, Any]]: ...
+    @property
+    def rowcount(self) -> int: ...
+    async def close(self) -> None: ...
+
+
+# pylint: disable=missing-docstring
+class DBConnectionProtocol(AsyncContextManager["DBConnectionProtocol"], Protocol):
+    "Protocol for DB classes"
+
+    async def __aenter__(self) -> Self: ...
+    async def __aexit__(self, exc_type, exc, tb) -> None: ...
+    def cursor(self, factory: Optional[DBCursorProtocol]) -> Any: ...
+    def execute(self, *args, **kwargs) -> DBCursorProtocol: ...
+    async def commit(self) -> None: ...
+    async def rollback(self) -> None: ...
+    async def close(self) -> None: ...
 
 
 class Connection(ConnectionBaseClass):
@@ -120,9 +142,9 @@ class Connection(ConnectionBaseClass):
 
     def __init__(self, db_obj: DB, **cfg) -> None:
         self._cfg = cfg
-        self._connection = None
+        self._connection: Optional[DBConnectionProtocol] = None
         self._db = db_obj
-        self._db._connections.add(self)
+        self._db.db_connections.add(self)
         # LOG.debug(f"++++++++++++++++++++++++++++++ {self._db._connections=}")
 
     async def connect(self) -> Self:
@@ -144,7 +166,7 @@ class Connection(ConnectionBaseClass):
                 await self._connection.close()
             except Exception as e:
                 raise OperationalError(f"{e} during connection close") from e
-            self._db._connections.remove(self)
+            self._db.db_connections.remove(self)
             self._connection = None
             # LOG.debug(f"------------------------------- {self._db._connections=}")
 
@@ -161,6 +183,8 @@ class Connection(ConnectionBaseClass):
     async def commit(self):
         "commit current transaction"
         # LOG.debug("commit connection")
+        if not self._connection:
+            raise OperationalError("No DB connection to commit.")
         try:
             await self._connection.commit()
         except Exception as e:
@@ -169,6 +193,8 @@ class Connection(ConnectionBaseClass):
     async def rollback(self):
         "rollback current transaction"
         # LOG.debug("rollback connection")
+        if not self._connection:
+            raise OperationalError("No DB connection to rollback.")
         try:
             await self._connection.rollback()
         except Exception as e:
@@ -182,8 +208,8 @@ class Cursor:
     "query cursor"
 
     def __init__(self, cur=None, con=None) -> None:
-        self._cursor = cur
-        self._connection = con
+        self._cursor: Optional[DBCursorProtocol] = cur
+        self._connection: Optional[Connection] = con
         self._rowcount = None
 
     def convert_params_named_2_format(
@@ -211,12 +237,14 @@ class Cursor:
         raise ConnectionError("Called from DB base class.")
 
     @property
-    async def rowcount(self):
+    async def rowcount(self) -> Optional[int]:
         return self._rowcount
 
     async def fetchone(self):
         "fetch the next row"
         # LOG.debug(f"Cursor.fetchone()")
+        if not self._cursor:
+            raise OperationalError("No DB cursor to fetch from.")
         result = await self._cursor.fetchone()
         # LOG.debug(f"   Cursor.fetchone: {result=}")
         return result
@@ -224,6 +252,8 @@ class Cursor:
     async def fetchall(self):
         "fetch all remaining rows from cursor"
         # LOG.debug(f"Cursor.fetchall()")
+        if not self._cursor:
+            raise OperationalError("No DB cursor to fetch from.")
         result = await self._cursor.fetchall()
         return result
 

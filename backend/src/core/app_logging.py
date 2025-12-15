@@ -1,6 +1,7 @@
 """Application specific logging"""
 
 import logging
+from logging import Logger
 from core.const import APPNAME
 
 # Control logging of module entry and exit
@@ -59,7 +60,9 @@ root_handler.setFormatter(ColorFormatter())
 root_logger.addHandler(root_handler)
 
 
-def getLogger(name: str, level=logging.NOTSET) -> logging.Logger:
+def getLogger(  # pylint: disable=invalid-name
+    name: str, level=logging.NOTSET  # pylint: disable=unused-argument
+) -> Logger:
     "Create module specific logger and log potentially module code entry (when module is imported)"
     logger = logging.getLogger(
         APPNAME if name == "__main__" else (APPNAME + "." + name)

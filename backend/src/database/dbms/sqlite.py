@@ -1,34 +1,39 @@
 """Connection to SQLit DB using aiosqlite"""
 
-from typing import Self
+from typing import Self, Any, Optional
 import datetime
 from pathlib import Path
 import json
 import re
 
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
 from core.exceptions import OperationalError
 from core.configuration.config import Config
-from core.app_logging import getLogger
 from database.dbms.db_base import DB, Connection, Cursor
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
 from database.sql_factory import SQLFactory
-from business_objects.bo_descriptors import BOColumnFlag, BOBaseBase
+from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
 from business_objects.business_attribute_base import BaseFlag
 
-LOG = getLogger(__name__)
+# pylint: disable=invalid-name
 try:
     import aiosqlite
     import sqlite3
 except ModuleNotFoundError as err:
     AIOSQLITE_IMPORT_ERROR = err
+    aiosqlite = None
     sqlite3 = None
 else:
     AIOSQLITE_IMPORT_ERROR = None
 
 
 class SQLiteSQLFactory(SQLFactory):
+    "SQL Factory for SQLite DB"
 
     @classmethod
     def get_sql_class(cls, sql_cls: type):
@@ -44,6 +49,7 @@ SQLITE_BASEFLAG_TYPE = "FLAG"
 
 
 class SQLiteColumnDefinition(SQLColumnDefinition):
+    "Column definition for SQLite DB"
 
     type_map = {
         int: "INTEGER",
@@ -56,14 +62,14 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         BaseFlag: SQLITE_BASEFLAG_TYPE,
     }
     constraint_map = {
-        BOColumnFlag.BOC_NONE: "",
-        BOColumnFlag.BOC_NOT_NULL: "NOT NULL",
-        BOColumnFlag.BOC_UNIQUE: "UNIQUE",
-        BOColumnFlag.BOC_PK: "PRIMARY KEY",
-        BOColumnFlag.BOC_PK_INC: "PRIMARY KEY AUTOINCREMENT",
-        BOColumnFlag.BOC_FK: "REFERENCES {relation}",
-        BOColumnFlag.BOC_DEFAULT: "DEFAULT",
-        BOColumnFlag.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        BOColumnConstraint.BOC_NONE: "",
+        BOColumnConstraint.BOC_NOT_NULL: "NOT NULL",
+        BOColumnConstraint.BOC_UNIQUE: "UNIQUE",
+        BOColumnConstraint.BOC_PK: "PRIMARY KEY",
+        BOColumnConstraint.BOC_PK_INC: "PRIMARY KEY AUTOINCREMENT",
+        BOColumnConstraint.BOC_FK: "REFERENCES {relation}",
+        BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
+        BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
@@ -101,15 +107,19 @@ if sqlite3:
     # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses
     flag_original_init_subclass = BaseFlag.__init_subclass__
 
-    def flag_init_selfregistering_subclass(cls):
+    def _flag_init_selfregistering_subclass(cls):
+        if sqlite3 is None:
+            raise ImportError("sqlite3 module is not available.")
         flag_original_init_subclass()
         LOG.debug(f"Self-Registering adapter and converter for {cls=}")
         sqlite3.register_adapter(cls, _adapt_flag)
 
-    BaseFlag.__init_subclass__ = classmethod(flag_init_selfregistering_subclass)
+    BaseFlag.__init_subclass__ = classmethod(_flag_init_selfregistering_subclass)  # type: ignore
 
 
 class SQLiteScript(SQLScript):
+    "SQLScripts for SQLite DB"
+
     sql_templates = {
         SQLTemplate.TABLELIST: """ SELECT name as table_name FROM sqlite_master
                                     WHERE type = 'table' and substr(name,1,7) <> 'sqlite_'
@@ -124,6 +134,8 @@ class SQLiteScript(SQLScript):
 
 
 class SQLiteDB(DB):
+    "SQLite Database"
+
     def __init__(self, **cfg) -> None:
         if AIOSQLITE_IMPORT_ERROR:
             raise ModuleNotFoundError(f"Import error: {AIOSQLITE_IMPORT_ERROR}")
@@ -142,9 +154,11 @@ class SQLiteDB(DB):
                 ).fetchone()
             )["sql"]
         match = re.search(r"\(([^\)]*)\)", sql_text)
-        info = {
-            col.split(" ")[0]: col for col in [s.strip() for s in match[1].split(",")]
-        }
+        info = (
+            {col.split(" ")[0]: col for col in [s.strip() for s in match[1].split(",")]}
+            if match
+            else {}
+        )
         # LOG.debug(f"SQLiteDB._get_table_info({table_name=}) -> {info}")
         return info
 
@@ -154,11 +168,15 @@ class SQLiteDB(DB):
 
 
 class SQLiteConnection(Connection):
+    "SQLite Connection"
+
     async def connect(self) -> Self:
         def row_factory(cursor, row):
             fields = [column[0] for column in cursor.description]
             return {key: value for key, value in zip(fields, row)}
 
+        if sqlite3 is None or aiosqlite is None:
+            raise ImportError("aiosqlite, sqlite3: modules not available.")
         db_path = Path(self._cfg[Config.CONFIG_DBFILE])
         if not db_path.parent.exists():
             LOG.info(f"Create missing directory '{db_path.parent}' for SQLite DB.")
@@ -168,8 +186,10 @@ class SQLiteConnection(Connection):
                 f"Path containing SQLite DB exists and is not a directory: {db_path.parent}"
             )
         # LOG.debug(f"Connecting to SQLite DB: {db_path}")
-        self._connection = await aiosqlite.connect(
-            database=db_path, detect_types=sqlite3.PARSE_DECLTYPES, autocommit=False
+        self._connection: aiosqlite.Connection = (  # type: ignore[assignment]
+            await aiosqlite.connect(
+                database=db_path, detect_types=sqlite3.PARSE_DECLTYPES, autocommit=False
+            )
         )
         # LOG.debug(f"............................... {self._db._connections=}")
         await (await self._connection.execute("PRAGMA foreign_keys = ON")).close()
@@ -185,12 +205,21 @@ class SQLiteConnection(Connection):
 
 
 class SQLiteCursor(Cursor):
+    "SQLite Cursor"
 
-    async def execute(self, query: str, params={}):
+    def __init__(self, cur=None, con=None) -> None:
+        super().__init__(cur=cur, con=con)
+        self._rowcount: int = -1
+        self._last_query: str = ""
+        self._last_params: dict[str, Any] | tuple = {}
+
+    async def execute(self, query: str, params=None) -> Self:
         if sqlite3 is None:
             raise ImportError("sqlite3 module is not available.")
+        if self._cursor is None:
+            raise OperationalError("Cannot execute query on closed cursor.")
         self._last_query = query
-        self._last_params = params
+        self._last_params = params or {}
         try:
             # LOG.debug(f"SQLiteCursor.execute({query=}, {params=})")
             await self._cursor.execute(sql=query, parameters=params)
@@ -200,11 +229,16 @@ class SQLiteCursor(Cursor):
         return self
 
     @property
-    async def rowcount(self):
+    async def rowcount(self) -> Optional[int]:
+        if self._connection is None or self._connection.connection is None:
+            raise OperationalError("Cannot get rowcount from closed connection.")
         if self._rowcount == -1:
-            async with self._connection._connection.execute(
+            async with self._connection.connection.execute(
                 sql=f"SELECT COUNT(*) AS rowcount FROM ({self._last_query})",
                 parameters=self._last_params,
             ) as sub_cur:
                 self._rowcount = (await sub_cur.fetchone())["rowcount"]
         return self._rowcount
+
+
+log_exit(LOG)

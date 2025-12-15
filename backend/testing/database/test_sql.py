@@ -10,7 +10,7 @@ from database.sql_statement import CreateTable, CreateView, Insert, SQLStatement
 from database.sql_clause import SQLColumnDefinition
 from core.base_objects import ConnectionBaseClass
 from core.exceptions import InvalidSQLStatementException
-from business_objects.bo_descriptors import BOBaseBase, BOColumnFlag
+from business_objects.bo_descriptors import BOBaseBase, BOColumnConstraint
 from business_objects.business_attribute_base import BaseFlag
 
 
@@ -25,14 +25,14 @@ class MockColumnDefinition(SQLColumnDefinition):
         BaseFlag: "DB_FLAG",
     }
     constraint_map = {
-        BOColumnFlag.BOC_NONE: "",
-        BOColumnFlag.BOC_NOT_NULL: "Not Null",
-        BOColumnFlag.BOC_UNIQUE: "Unique",
-        BOColumnFlag.BOC_PK: "Primary Key",
-        BOColumnFlag.BOC_PK_INC: "Primary Key Autoincrement",
-        BOColumnFlag.BOC_FK: "References {relation}",
-        BOColumnFlag.BOC_DEFAULT: "Default",
-        BOColumnFlag.BOC_DEFAULT_CURR: "Default Current Timestamp",
+        BOColumnConstraint.BOC_NONE: "",
+        BOColumnConstraint.BOC_NOT_NULL: "Not Null",
+        BOColumnConstraint.BOC_UNIQUE: "Unique",
+        BOColumnConstraint.BOC_PK: "Primary Key",
+        BOColumnConstraint.BOC_PK_INC: "Primary Key Autoincrement",
+        BOColumnConstraint.BOC_FK: "References {relation}",
+        BOColumnConstraint.BOC_DEFAULT: "Default",
+        BOColumnConstraint.BOC_DEFAULT_CURR: "Default Current Timestamp",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
@@ -54,11 +54,30 @@ class MockConnection(ConnectionBaseClass):
         self.rollback = AsyncMock(name="DBrollback")
         self.begin = AsyncMock(name="DBbegin")
         self.close = AsyncMock(name="DBclose")
+        self.connect = AsyncMock(name="DBconnect", return_value=self)
 
     def reset_mock(self):
         self.commit.reset_mock()
         self.rollback.reset_mock()
+        self.begin.reset_mock()
         self.close.reset_mock()
+        self.connect.reset_mock()
+
+    async def connect(self):
+        "Open a connection and return the Connection instance"
+        raise ConnectionError("Called from DB base class.")
+
+    async def begin(self):
+        "Begin a transaction"
+
+    async def commit(self):
+        "commit current transaction"
+
+    async def rollback(self):
+        "rollback current transaction"
+
+    async def close(self) -> None:
+        "close the connection"
 
 
 mocked_connection = MockConnection()
@@ -97,13 +116,18 @@ def clean_sql(sql: str | SQL_Dict) -> str | SQL_Dict:
 class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
-        self.patcher = patch("database.sql_executable.App", MockApp)
-        self.patcher.start()
         MockApp.db.reset_mock()
+        self.patchers = {
+            patch("database.sql_executable.App", MockApp),
+        }
+        for patcher in self.patchers:
+            patcher.start()
         self.sql = SQL()
+        return super().setUp()
 
     def tearDown(self):
-        self.patcher.stop()
+        for patcher in self.patchers:
+            patcher.stop()
 
     async def test_201_execute_default(self):
         """Test exception when no SQL statement is set"""

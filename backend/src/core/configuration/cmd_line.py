@@ -1,11 +1,12 @@
-""" Parser for the commandline. """
+"""Parser for the commandline."""
 
 import argparse
 
 from pathlib import Path
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
+
 from core.util import update_dicts_recursively
 from core.const import APPDESC, APPNAME, DBCFG_FILE_NAME
 from core.base_objects import ConfigDict
@@ -45,3 +46,6 @@ def parse_commandline(dbcfg_file_key: str) -> ConfigDict:
     for cfg in args.cfg:
         update_dicts_recursively(result, cfg)
     return result
+
+
+log_exit(LOG)

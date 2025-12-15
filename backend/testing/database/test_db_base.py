@@ -9,7 +9,7 @@ import database.dbms.db_base
 from database.sql_executable import SQLExecutable
 from database.sql import SQL
 from database.sql_clause import SQLColumnDefinition
-from business_objects.bo_descriptors import BOColumnFlag
+from business_objects.bo_descriptors import BOColumnConstraint
 
 
 class MockFactory:
@@ -38,7 +38,7 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
 
     def test_001_db(self):
         self.assertDictEqual(self.db._cfg, self.db_cfg)
-        self.assertEqual(self.db._connections, set())
+        self.assertEqual(self.db.db_connections, set())
 
     def _200_check_column(self, col_correct):
 
@@ -91,7 +91,7 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
     async def test_301_close(self):
         con1 = AsyncMock()
         con2 = AsyncMock()
-        self.db._connections = {con1, con2}
+        self.db.db_connections = {con1, con2}
         await self.db.close()
         con1.close.assert_awaited_once_with()
         con2.close.assert_awaited_once_with()
@@ -100,7 +100,7 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
 class TestDBConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.mock_db = Mock()
-        self.mock_db._connections = set()
+        self.mock_db.db_connections = set()
         self.db_cfg = {"cfg1": "mick", "cfg2": "mack", "cfg3": "mock"}
         self.con = database.dbms.db_base.Connection(db_obj=self.mock_db, **self.db_cfg)
         return super().setUp()
@@ -109,7 +109,7 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
         self.assertDictEqual(self.con._cfg, self.db_cfg)
         self.assertEqual(self.con._db, self.mock_db)
         self.assertIsNone(self.con._connection)
-        self.assertEqual(self.mock_db._connections, {self.con})
+        self.assertEqual(self.mock_db.db_connections, {self.con})
 
     async def test_201_close(self):
         mock_con = AsyncMock()
@@ -118,7 +118,7 @@ class TestDBConnection(unittest.IsolatedAsyncioTestCase):
         mock_con.close = mock_close
         await self.con.close()
         mock_close.assert_awaited_once_with()
-        self.assertEqual(self.mock_db._connections, set())
+        self.assertEqual(self.mock_db.db_connections, set())
         self.assertIsNone(self.con._connection)
 
     def test_301_connection_prop(self):

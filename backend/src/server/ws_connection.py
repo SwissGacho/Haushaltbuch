@@ -2,24 +2,26 @@
 
 import websockets
 
+from core.app_logging import getLogger, Logger, log_exit
+
+LOG: Logger = getLogger(__name__)
+
 import core.exceptions
 from core.app import App
-from core.app_logging import getLogger
-from server.ws_connection_base import WSConnectionBase
-from server.ws_message_sender import WSMessageSender
-from server.ws_token import WSToken
+from core.exceptions import WSConnectionError
 from messages.message import Message, MessageAttribute
 from messages.login import HelloMessage, ByeMessage, LoginMessage
 from messages.admin import EchoMessage
 from messages.setup import FetchSetupMessage, StoreSetupMessage
+from server.ws_connection_base import WSConnectionBase
+from server.ws_message_sender import WSMessageSender
+from server.ws_token import WSToken
 
-LOG = getLogger(__name__)
 
-
-class WS_Connection(WSConnectionBase):
+class WSConnection(WSConnectionBase):
     """Websocket connection created by the client"""
 
-    connections: dict[str, "WS_Connection"] = {}
+    connections: dict[str, "WSConnection"] = {}
 
     def __init__(self, websocket, sock_nbr) -> None:
         self._socket = websocket
@@ -29,7 +31,7 @@ class WS_Connection(WSConnectionBase):
         self._token = WSToken()
         self.subscribers: list[WSMessageSender] = []
         self.LOG = getLogger(  # pylint: disable=invalid-name
-            f"{WS_Connection.__module__}({self.connection_id})"
+            f"{WSConnection.__module__}({self.connection_id})"
         )
         self._register_connection()
 
@@ -41,7 +43,7 @@ class WS_Connection(WSConnectionBase):
         # self.LOG.debug(
         #     f"WS_Connection._register_connection({key=}): adding '{key or self.connection_id}'"
         # )
-        WS_Connection.connections |= {(key or self.connection_id): self}
+        WSConnection.connections |= {(key or self.connection_id): self}
         # self.LOG.debug(f"{WS_Connection.connections=}")
 
     def _register_message_sender(self, sender: WSMessageSender):
@@ -50,11 +52,11 @@ class WS_Connection(WSConnectionBase):
         self.LOG.debug(f"Registered {sender} as message sender")
 
     def _unregister_connection(self):
-        for key in [k for k, v in WS_Connection.connections.items() if v is self]:
+        for key in [k for k, v in WSConnection.connections.items() if v is self]:
             # self.LOG.debug(
             #     f"WS_Connection._unregister_connection(): del connection {key}"
             # )
-            del WS_Connection.connections[key]
+            del WSConnection.connections[key]
 
     def _unregister_message_sender(self, sender: WSMessageSender):
         "unregister a message sender from this connection"
@@ -63,7 +65,6 @@ class WS_Connection(WSConnectionBase):
             self.LOG.debug(f"Unregistered {sender} as message sender")
         except ValueError:
             self.LOG.warning(f"Sender {sender} not found in subscribers list")
-            pass
 
     @property
     def connection_id(self):
@@ -83,7 +84,7 @@ class WS_Connection(WSConnectionBase):
     def session(self, ses):
         self._session = ses
         self._conn_nbr = ses.add_connection(self)
-        self.LOG = getLogger(f"{WS_Connection.__module__}({self.connection_id})")
+        self.LOG = getLogger(f"{WSConnection.__module__}({self.connection_id})")
 
     async def _send(self, payload):
         await self._socket.send(payload)
@@ -107,11 +108,11 @@ class WS_Connection(WSConnectionBase):
         """
         self.LOG.debug(f"Send {msg} to {comp}")
         if comp == "*":
-            conns = WS_Connection.connections.values()
+            conns = WSConnection.connections.values()
         else:
-            conns = [WS_Connection.connections.get(comp, self)]
+            conns = [WSConnection.connections.get(comp, self)]
         for conn in conns:
-            await conn._send(msg)
+            await conn._send(msg)  # pylint: disable=protected-access
 
     async def start_connection(self):
         "say hello and expect Login"
@@ -139,13 +140,12 @@ class WS_Connection(WSConnectionBase):
         except websockets.exceptions.ConnectionClosed as exc:
             self.LOG.debug(f"Connection closed by socket: {exc}")
             return False
-        except core.exceptions.ConnectionClosed as exc:
+        except core.exceptions.WSConnectionClosed as exc:
             self.LOG.debug(f"Connection closed by handler: {exc}")
             return False
         except Exception as exc:
             self.LOG.error(f"Start connection failed in handler ({exc})")
-            raise
-            return False
+            raise WSConnectionError("Connection start failed") from exc
         else:
             self.LOG.debug("connection started")
             return True
@@ -155,7 +155,7 @@ class WS_Connection(WSConnectionBase):
     ):
         "say goodbye"
         await self.send_message(ByeMessage(token=token, reason=reason))
-        raise core.exceptions.ConnectionClosed(f"Connection aborted ({reason})")
+        raise core.exceptions.WSConnectionClosed(f"Connection aborted ({reason})")
 
     def connection_closed(self):
         "call when connection has been closed"
@@ -176,4 +176,4 @@ class WS_Connection(WSConnectionBase):
             await self.abort_connection(reason="Invalid Token", token=message.token)
 
 
-# LOG.debug("module imported")
+log_exit(LOG)
