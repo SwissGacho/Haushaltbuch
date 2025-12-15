@@ -4,6 +4,7 @@ import re
 import sys
 import os
 import traceback
+from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../src")
 
@@ -17,7 +18,7 @@ from database.sql import SQL, SQLConnection, SQLTransaction
 
 SQLiITE_CONFIG = {
     "db": "SQLite",
-    "file": "C:\\Users\\heinz\\Dokumente\\playground.sqlite.db",
+    "file": os.path.dirname(os.path.abspath(__file__)) + "\\playground.sqlite.db",
 }
 MARIADB_CONFIG = {
     "db": "MariaDB",
