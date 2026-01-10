@@ -7,13 +7,20 @@ class WSConnectionBase:
     def _register_connection(self, key: str | None = None) -> None:
         raise NotImplementedError()
 
-    def _register_message_sender(self, sender):
+    def register_message_sender(self, sender):
+        "register a sender that will send messages through this connection"
         raise NotImplementedError()
 
     def _unregister_connection(self):
+        "unregister this connection"
         raise NotImplementedError()
 
-    def _unregister_message_sender(self, sender):
+    def unregister_message_sender(self, sender):
+        "notify the connection that sender will no longer use this connection"
+        raise NotImplementedError()
+
+    def unregister_other_senders(self, sender_to_keep):
+        "unregister all senders except the provided sender from this connection"
         raise NotImplementedError()
 
     @property
