@@ -1,5 +1,6 @@
 """Setup a websocket server and handle connection call"""
 
+import os
 import socket
 from contextlib import asynccontextmanager
 import websockets.asyncio.server as websockets
@@ -59,9 +60,10 @@ async def get_websocket():
     "Context manager for Websockets"
     ws_handler = WSHandler()
     hostname = socket.gethostname()
+    bind_address = os.getenv("WS_BIND_ADDRESS", "localhost")
     ws_server = await websockets.serve(
         ws_handler.handler,
-        ["localhost", hostname],  # type: ignore[arg-type]
+        [bind_address, hostname],  # type: ignore[arg-type]
         WEBSOCKET_PORT,
     )
     if not ws_server.is_serving():

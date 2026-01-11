@@ -1,0 +1,2 @@
+asyncmy==0.2.10
+websockets==15.0.1
