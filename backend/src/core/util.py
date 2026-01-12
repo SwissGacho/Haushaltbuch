@@ -46,6 +46,7 @@ def check_environment():
             f"but found: {sys.version_info.major}.{sys.version_info.minor}"
         )
 
+    check_lib_version("packaging", Version("23.1"))
     check_lib_version("websockets", Version("15.0.1"))
     check_lib_version("aiosqlite", Version("0.21.0"), raise_error=False)
     check_lib_version("asyncmy", Version("0.2.10"), raise_error=False)
