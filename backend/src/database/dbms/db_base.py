@@ -21,6 +21,7 @@ class DB(DBBaseClass):
 
     def __init__(self, **cfg) -> None:
         self._cfg = cfg
+        LOG.debug(f"DB.__init__: {cfg=}")
         self.db_connections = set()
 
     @property
