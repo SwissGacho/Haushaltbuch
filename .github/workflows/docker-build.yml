@@ -61,7 +61,6 @@ jobs:
       - name: Cleanup untagged versions
         uses: actions/delete-package-versions@v5
         with:
-          # Falls dein Package-Name vom Repo-Namen abweicht, hier hart eintragen
           package-name: ${{ github.event.repository.name }}
           package-type: 'container'
           min-versions-to-keep: 10
