@@ -63,7 +63,7 @@ jobs:
           provenance: false
           sbom: false
 
-          - name: Cleanup untagged versions
+      - name: Cleanup untagged versions
         if: startsWith(github.ref, 'refs/tags/')
         uses: actions/delete-package-versions@v5
         with:
