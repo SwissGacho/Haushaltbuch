@@ -55,6 +55,14 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Cleanup untagged versions
+        uses: actions/delete-package-versions@v5
+        with:
+          # Falls dein Package-Name vom Repo-Namen abweicht, hier hart eintragen
+          package-name: ${{ github.event.repository.name }}
+          package-type: 'container'
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: 'true'
