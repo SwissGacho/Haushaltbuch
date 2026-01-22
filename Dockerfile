@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 FROM python:3.12-slim AS stage2
@@ -21,6 +20,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=stage1 /install /usr/local
+
+# Get version information into environment
+ARG APP_VERSION=unknown
+ENV VERSION=$APP_VERSION
 
 # Copy the source code from the src folder into the working directory
 COPY backend/src/ .
