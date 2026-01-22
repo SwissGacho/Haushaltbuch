@@ -1,6 +1,5 @@
 # Nutze ein leichtgewichtiges Python Image
 FROM python:3.12-slim AS stage1
-
 WORKDIR /app
 
 COPY requirements.txt .
@@ -10,13 +9,20 @@ RUN apt-get update && apt-get install -y \
     gcc \
     libmariadb-dev \
     pkg-config \
-    && pip install --no-cache-dir -r requirements.txt
+&& rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 FROM python:3.12-slim AS stage2
 WORKDIR /app
-COPY --from=stage1 /root/.local /root/.local
-COPY --from=stage1 /usr/lib/aarch64-linux-gnu/libmariadb* /usr/lib/aarch64-linux-gnu/
-ENV PATH=/root/.local/bin:$PATH
+
+RUN apt-get update && apt-get install -y \
+    libmariadb3 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=stage1 /install /usr/local
 
 # Copy the source code from the src folder into the working directory
 COPY backend/src/ .
