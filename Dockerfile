@@ -21,6 +21,9 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=stage1 /install /usr/local
 
+# Copy health checker
+COPY backend/health_check/ ./health_check/
+
 # Get version information into environment
 ARG APP_VERSION=unknown
 ENV VERSION=$APP_VERSION
