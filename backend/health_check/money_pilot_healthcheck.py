@@ -1,14 +1,16 @@
 import asyncio
 import websockets
+import socket
 import json
 import sys
 import os
 
 
 async def check_backend():
-    # Port aus Umgebungsvariable oder Default 8765
-    port = os.getenv("WEBSOCKET_PORT", "8765")
-    uri = f"ws://localhost:{port}"
+    hostname = socket.gethostname()
+    bind_address = os.getenv("WS_BIND_ADDRESS", hostname if hostname else "localhost")
+    port = "8765"
+    uri = f"ws://{bind_address}:{port}"
 
     try:
         # Connection-Timeout 3 seconds, to avoid hanging if backend is not running
