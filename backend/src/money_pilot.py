@@ -2,6 +2,7 @@
 """Main module for Money Pilot backend application."""
 
 import sys
+import os
 import asyncio
 from asyncio import (
     create_task as aio_create_task,
@@ -34,6 +35,8 @@ def wait_for_keyboard_interrupt():
 
 async def main():
     "connect DB and start servers"
+    app_version = os.getenv("VERSION", "development")
+    LOG.info(f"Starting Money Pilot backend application - Version: {app_version}")
     LOG.debug(f"{App.status=}")
     kb_task: Optional[asyncio.Task] = None
     if sys.platform == "win32":

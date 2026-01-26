@@ -1,4 +1,4 @@
-""" Global constants """
+"""Global constants"""
 
 APPNAME = "moneypilot"
 APPDESC = f"""'{APPNAME}' helps you keeping control over the money you have available.

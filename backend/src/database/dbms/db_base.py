@@ -21,6 +21,15 @@ class DB(DBBaseClass):
 
     def __init__(self, **cfg) -> None:
         self._cfg = cfg
+        redacted_cfg = {
+            k: (
+                "***redacted***"
+                if re.search(r"(pass|secret|token|key)", k, re.IGNORECASE)
+                else v
+            )
+            for k, v in cfg.items()
+        }
+        LOG.debug(f"DB.__init__: {redacted_cfg=}")
         self.db_connections = set()
 
     @property
