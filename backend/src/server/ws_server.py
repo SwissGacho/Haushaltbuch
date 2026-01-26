@@ -59,12 +59,12 @@ class WSHandler:
 async def get_websocket():
     "Context manager for Websockets"
     ws_handler = WSHandler()
-    hostname = socket.gethostname()
-    bind_address = os.getenv("WS_BIND_ADDRESS", hostname if hostname else "localhost")
+    localhost = [socket.gethostname(), "localhost"]
+    bind_address = os.getenv("WS_BIND_ADDRESS", localhost)
     LOG.info(f"Starting WebSocket server on {bind_address}:{WEBSOCKET_PORT}")
     ws_server = await websockets.serve(
         handler=ws_handler.handler,
-        host=bind_address,
+        host=bind_address,  # type: ignore[arg-type]
         port=WEBSOCKET_PORT,
     )
     if not ws_server.is_serving():
