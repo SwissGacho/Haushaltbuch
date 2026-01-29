@@ -36,12 +36,12 @@ class App:
     _db: Optional[DBBaseClass] = None
 
     @classmethod
-    def initialize(cls, app_location: str):
+    def initialize(cls, app_location: str, app_version: Optional[str] = None):
         "Initialize global objects (Status, Config)"
         if cls._status_class is None:
             raise TypeError("Status class not initialized.")
         else:
-            cls._status = cls._status_class()
+            cls._status = cls._status_class(version=app_version)
         if cls._config_class is None:
             raise TypeError("Configuration class not initialized.")
         else:

@@ -35,8 +35,9 @@ def wait_for_keyboard_interrupt():
 
 async def main():
     "connect DB and start servers"
-    app_version = os.getenv("VERSION", "development")
-    LOG.info(f"Starting Money Pilot backend application - Version: {app_version}")
+    LOG.info(
+        f"Starting Money Pilot backend application - Version: {App.status_object.version}"
+    )
     LOG.debug(f"{App.status=}")
     kb_task: Optional[asyncio.Task] = None
     if sys.platform == "win32":
@@ -98,7 +99,10 @@ if __name__ == "__main__":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     check_environment()
     try:
-        App.initialize(__file__)
+        App.initialize(
+            app_location=__file__,
+            app_version=os.getenv("VERSION", "backend development"),
+        )
         asyncio.run(main())
     except KeyboardInterrupt:
         LOG.info("Stopped by KeyboardInterrupt")

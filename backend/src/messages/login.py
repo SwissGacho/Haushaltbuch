@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+from core.app import App
 from core.app_logging import getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
@@ -52,9 +53,17 @@ class LoginMessage(Message):
                 f"{LoginMessage.__module__}({connection.connection_id})"
             )
             await connection.send_message(
-                WelcomeMessage(token=token, ses_token=session.token)
+                WelcomeMessage(
+                    token=token,
+                    ses_token=session.token,
+                    version_info=(
+                        App.status_object.version if connection.is_primary else None
+                    ),
+                )
             )
-            LOG.debug("login successful")
+            LOG.debug(
+                f"login{' to primary session' if connection.is_primary else ''} successful"
+            )
         except PermissionError:
             await connection.abort_connection(reason="Access denied")
         except ValueError as exc:
@@ -69,11 +78,14 @@ class WelcomeMessage(Message):
         token: WSToken,
         ses_token: WSToken | None = None,
         status: str | None = None,
+        version_info: dict | None = None,
     ) -> None:
         super().__init__(
             msg_type=MessageType.WS_TYPE_WELCOME, token=token, status=status
         )
         self.message |= {MessageAttribute.WS_ATTR_SES_TOKEN: ses_token}
+        if version_info:
+            self.message |= {MessageAttribute.WS_ATTR_VERSION_INFO: version_info}
 
 
 class ByeMessage(Message):
