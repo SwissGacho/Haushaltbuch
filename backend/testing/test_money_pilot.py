@@ -57,6 +57,7 @@ class Test_Main(unittest.IsolatedAsyncioTestCase):
         )
         MockApp = Mock(name="App")
         MockApp.configuration.get = Mock(name="configuration.get")
+        MockApp.status_object.version = "mock development"
         MockApp.db_ready = AsyncMock(name="db_ready")
         # MockApp.db_request_restart.wait = AsyncMock(
         #     name=".db_request_restart.wait", side_effect=KeyboardInterrupt
@@ -134,7 +135,7 @@ class Test_Main(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(MockApp.mock_calls, expected_mock_calls)
         self.assertEqual(len(logs.output), 4, "expect 3 INFO LOG messages")
         self.assertEqual(
-            msg_count("INFO:.*Starting .* - Version: development", logs.output), 1
+            msg_count("INFO:.*Starting .* - Version: mock development", logs.output), 1
         )
         self.assertEqual(msg_count("INFO:.*App running", logs.output), 2)
         self.assertEqual(msg_count("INFO:.*DB restarting", logs.output), 1)
