@@ -144,3 +144,9 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         # self.conPatcher.stop()
         self.patcher.stop()
+
+    @unittest.skip("Not implemented yet")
+    async def test_101_initialization(self):
+        con = Mock()
+        boList = BOList(bo_type=MockBOBase, connection=con)
+        self.assertEqual(boList._bo_type, MockBOBase)

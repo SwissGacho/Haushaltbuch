@@ -132,6 +132,9 @@ class Test_Main(unittest.IsolatedAsyncioTestCase):
             call.db_request_restart.wait(),
         ]
         self.assertEqual(MockApp.mock_calls, expected_mock_calls)
-        self.assertEqual(len(logs.output), 3, "expect 3 INFO LOG messages")
+        self.assertEqual(len(logs.output), 4, "expect 3 INFO LOG messages")
+        self.assertEqual(
+            msg_count("INFO:.*Starting .* - Version: development", logs.output), 1
+        )
         self.assertEqual(msg_count("INFO:.*App running", logs.output), 2)
         self.assertEqual(msg_count("INFO:.*DB restarting", logs.output), 1)
