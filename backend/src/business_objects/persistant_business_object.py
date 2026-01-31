@@ -157,7 +157,7 @@ class PersistentBusinessObject(BOBase):
         await super().store()
 
     async def business_values_as_dict(self) -> dict[str, Any]:
-        LOG.debug(f"{self}.business_values_as_dict: {self.id=}")
+        # LOG.debug(f"{self}.business_values_as_dict: {self.id=}")
         await self.fetch(self.id)
         return await super().business_values_as_dict()
 
