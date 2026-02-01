@@ -21,10 +21,6 @@ class MockConcreteBO(MockBOBase):
         return []
 
 
-MockConcreteBO.unsubscribe_from_all_changes = Mock()
-MockConcreteBO.subscribe_to_all_changes = Mock(return_value=456)
-
-
 class MockConnection:
     pass
 
@@ -33,6 +29,7 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
 
     async def test101_test_initialization(self):
         con = Mock()
+        MockConcreteBO.subscribe_to_all_changes = Mock(return_value=456)
         con.unregister_other_senders = Mock()
         boSubscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=1)
         con.unregister_other_senders.assert_called_once_with(boSubscription)
@@ -72,6 +69,7 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
             mock_send_message.assert_awaited_once()
 
     async def test105_cleanup(self):
+        MockConcreteBO.unsubscribe_from_all_changes = Mock()
         con = Mock()
         con.unregister_message_sender = Mock()
         boSubscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=42)
@@ -96,12 +94,12 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
 class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
 
     async def test201_initialization(self):
+        MockConcreteBO.subscribe_to_all_changes = Mock(return_value=456)
         con = Mock()
         boList = BOList(bo_type=MockConcreteBO, connection=con)
         self.assertEqual(boList._bo_type, MockConcreteBO)
-        self.assertDictEqual(
-            MockConcreteBO._change_subscribers,
-            {boList._subscription_id: boList._handle_event_},
+        MockConcreteBO.subscribe_to_all_changes.assert_called_once_with(
+            boList._handle_event_
         )
 
     async def test202_notify_subscription_subscribers(self):
@@ -125,6 +123,7 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(obj.id, 42)
 
     async def test_204_cleanup(self):
+        MockConcreteBO.unsubscribe_from_all_changes = Mock()
         con = Mock()
         con.unregister_message_sender = Mock()
         boList = BOList(bo_type=MockConcreteBO, connection=con)
@@ -136,11 +135,8 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
         con.unregister_message_sender.assert_called_once()
 
     def setUp(self) -> None:
-        self.patcher = patch("business_objects.bo_list.BOBase", MockBOBase)
+        patcher = patch("business_objects.bo_list.BOBase", MockBOBase)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         # self.conPatcher = patch("server.ws_connection.WS_Connection", MockConnection)
         # self.conPatcher.start()
-        self.patcher.start()
-
-    def tearDown(self):
-        # self.conPatcher.stop()
-        self.patcher.stop()
