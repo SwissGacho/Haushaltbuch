@@ -1,6 +1,5 @@
 """Handle a websocket connection"""
 
-from re import L
 import websockets
 
 from core.app_logging import getLogger, Logger, log_exit
