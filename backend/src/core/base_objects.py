@@ -36,6 +36,12 @@ class Status(StrEnum):
     STATUS_MULTI_USER = "multiUser"
 
 
+class VersionInfo(StrEnum):
+    "Keys for version information"
+
+    VERSION = "version"
+
+
 class StatusBaseClass(BaseObject):
     "Status Baseclass"
 
@@ -43,6 +49,11 @@ class StatusBaseClass(BaseObject):
     def status(self) -> Status:
         "Current status of the app"
         return Status.STATUS_UNCONFIGURED
+
+    @property
+    def version(self) -> dict[VersionInfo, str]:
+        "Current version of the app"
+        return {VersionInfo.VERSION: "unknown"}
 
 
 class Config(StrEnum):

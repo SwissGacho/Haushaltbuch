@@ -28,6 +28,7 @@ class WSConnection(WSConnectionBase):
         self._session = None
         self._conn_nbr = sock_nbr
         self._comp = None
+        self.is_primary = False
         self._token = WSToken()
         self.subscribers: list[WSMessageSender] = []
         self.LOG = getLogger(  # pylint: disable=invalid-name
@@ -93,7 +94,7 @@ class WSConnection(WSConnectionBase):
 
     async def _send(self, payload):
         await self._socket.send(payload)
-        # self.LOG.debug(f"sent message: {payload}")
+        self.LOG.debug(f"sent message: {payload}")
 
     async def send_message(self, message: Message, status=False):
         "Send a message to the client using current connection"
@@ -132,6 +133,9 @@ class WSConnection(WSConnectionBase):
                 if isinstance(msg, LoginMessage):
                     self._register_connection(
                         msg.message.get(MessageAttribute.WS_ATTR_COMPONENT)
+                    )
+                    self.is_primary = msg.message.get(
+                        MessageAttribute.WS_ATTR_IS_PRIMARY, False
                     )
                     await self.handle_message(msg)
                     break
