@@ -157,6 +157,7 @@ class BOBase(BOBaseBase):
 
     @classmethod
     def _name(cls) -> str:
+        "Normalized name of the business object class"
         return cls.__name__.lower()
 
     # pylint: disable=no-self-argument
