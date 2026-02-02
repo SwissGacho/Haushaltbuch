@@ -1,7 +1,9 @@
 """Test suite for Business Objects Base"""
 
-import datetime
+from datetime import date, datetime
+import json
 import unittest
+from unittest import mock
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
 from business_objects.persistant_business_object import PersistentBusinessObject
@@ -49,9 +51,7 @@ class MockAttrDesc:
 
 mock_attr_desc = [
     MockAttrDesc("id", int, BOColumnConstraint.BOC_PK_INC, {}),
-    MockAttrDesc(
-        "last_updated", datetime.datetime, BOColumnConstraint.BOC_DEFAULT_CURR, {}
-    ),
+    MockAttrDesc("last_updated", datetime, BOColumnConstraint.BOC_DEFAULT_CURR, {}),
     MockAttrDesc("mock_attr1", str, BOColumnConstraint.BOC_NONE, {}),
     MockAttrDesc(
         "mock_attr2",
@@ -70,7 +70,48 @@ class Test_100_Persistant_Business_Object_classmethods(
     unittest.IsolatedAsyncioTestCase
 ):
 
-    async def test_101_sql_create_table(self):
+    async def test_101_convert_from_db(self):
+        none_type = PersistentBusinessObject.convert_from_db(None, str, {})
+        self.assertIsNone(none_type)
+
+        test_date_str = "2023-08-15"
+        date_type = PersistentBusinessObject.convert_from_db(test_date_str, date, {})
+        self.assertEqual(date.fromisoformat(test_date_str), date_type)
+
+        test_date_time_str = "2023-08-15T14:30:00+00:00"
+        date_time_type = PersistentBusinessObject.convert_from_db(
+            test_date_time_str, datetime, {}
+        )
+
+        # We need to compare to the actual datetime.fromisoformat result, because the timezone conversion may vary
+        # This is probably preferable to mocking datetime.fromisoformat, since we don't want to test whether the method under test uses it
+        self.assertEqual(datetime.fromisoformat(test_date_time_str), date_time_type)
+
+        test_dict = {"key1": "value1", "key2": 2}
+        test_list = [1, 2, 3, "four"]
+        dict_type = PersistentBusinessObject.convert_from_db(
+            json.dumps(test_dict), dict, {}
+        )
+        self.assertEqual(str(test_dict), str(dict_type))
+        list_type = PersistentBusinessObject.convert_from_db(
+            json.dumps(test_list), list, {}
+        )
+        self.assertEqual(str(test_list), str(list_type))
+
+        with patch(
+            "business_objects.persistant_business_object.BaseFlag"
+        ) as MockBaseFlag:
+
+            class MockFlag(MockBaseFlag):
+                pass
+
+            mock_flag_value = "flag_value"
+            flag_type = PersistentBusinessObject.convert_from_db(
+                "flag_value", MockFlag, {"flag_type": mock_flag_value}
+            )
+            self.assertEqual(mock_flag_value, flag_type)
+
+    async def test_102_sql_create_table(self):
         mock_sql = Mock(name="mock_sql")
         mock_sql.create_table = Mock(return_value=mock_sql)
         mock_sql.column = Mock()
@@ -105,7 +146,7 @@ class Test_100_Persistant_Business_Object_classmethods(
         self.assertEqual(mock_sql.column.call_args_list, exp_arglist)
         mock_sql.execute.assert_awaited_once_with()
 
-    async def test_102_count_rows(self):
+    async def test_103_count_rows(self):
         RESULT = [1, 99]
         FETCH_RESULT = [{"id": i} for i in RESULT]
         mock_cursor = Mock(name="mock_cursor")
