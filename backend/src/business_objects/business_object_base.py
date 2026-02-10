@@ -9,7 +9,7 @@ from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 
 
 from core.util import _classproperty
-from core.app_logging import getLogger, log_exit
+from core.app_logging import getLogger, log_exit, logging
 
 LOG = getLogger(__name__)
 
@@ -362,6 +362,10 @@ class BOBase(BOBaseBase):
     @classmethod
     def global_subscription_statistics(cls) -> dict[str, int]:
         """Return number of subscribers for all business object classes and instances."""
+        # If log level is below DEBUG, return empty dict
+        if LOG.getEffectiveLevel() > logging.DEBUG:
+            return {}
+
         stats: dict[str, int] = {}
         for bo_name, bo_class in cls._business_objects.items():
             total_subscribers = len(bo_class._change_subscribers)
