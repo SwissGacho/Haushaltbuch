@@ -117,6 +117,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
             f"with {len(name_list)} objects"
         )
         LOG.debug(BOBase.global_subscription_statistics())
+        BOBase.subscriptions_report()
 
         await self.send_message(
             ObjectMessage(

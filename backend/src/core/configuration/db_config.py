@@ -80,7 +80,7 @@ class DBConfig(BaseObject):
     @classmethod
     def read_db_config_file(
         cls, cfg_searchpath: Optional[list[Path]] = None, dbcfg_filename: str = ""
-    ):
+    ) -> Optional[dict]:
         "Determine DB configuration from DB config file or commandline"
         # LOG.debug(f"DBConfig.read_db_config_file({cfg_searchpath=}, {dbcfg_filename=})")
         searchpath = cfg_searchpath or cls.cfg_searchpath() or []
@@ -101,7 +101,7 @@ class DBConfig(BaseObject):
                         db_config_from_cfg_file = json.load(cfg_file)
                     # LOG.debug(f"Found DB configuration: {db_config_from_cfg_file}")
                     cls.db_configuration = db_config_from_cfg_file
-                    return
+                    return db_config_from_cfg_file
                 except FileNotFoundError:
                     continue
             LOG.info(f"configuration file {dbcfg_file} not found.")

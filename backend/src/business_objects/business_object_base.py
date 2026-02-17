@@ -4,12 +4,14 @@ Business objects are classes that support persistance in the data base
 """
 
 import asyncio
+from datetime import datetime
 import itertools
 from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 
 
 from core.util import _classproperty
 from core.app_logging import getLogger, log_exit
+from core.app import App
 
 LOG = getLogger(__name__)
 
@@ -77,6 +79,7 @@ class BOBase(BOBaseBase):
         self._instance_subscriber_id = itertools.count(1)
         for attribute, value in attributes.items():
             self._data[attribute] = value
+        BOBase.subscriptions_report()
 
     def handle_callback_result(self, task: asyncio.Task):
         """Logs exceptions from background callback tasks."""
@@ -97,6 +100,7 @@ class BOBase(BOBaseBase):
     def register_instance(cls, instance: "BOBase"):
         """Register an instance of this class as being loaded from the database."""
         if instance.id is not None:
+            LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
             cls._loaded_instances[instance.id] = instance  # type: ignore
 
     def __str__(self) -> str:
@@ -265,6 +269,7 @@ class BOBase(BOBaseBase):
             )
         subscriber_id = next(cls._last_subscriber_id)
         cls._change_subscribers[subscriber_id] = callback
+        BOBase.subscriptions_report()
         return subscriber_id
 
     @classmethod
@@ -277,6 +282,7 @@ class BOBase(BOBaseBase):
             return
         del cls._change_subscribers[callback_id]
         LOG.debug(BOBase.global_subscription_statistics())
+        BOBase.subscriptions_report()
 
     def subscribe_to_instance(self, callback: BOCallback) -> int:
         """Register a callback to be called when this instance changes or is deleted."""
@@ -285,6 +291,7 @@ class BOBase(BOBaseBase):
         subscriber_id: int = next(self._instance_subscriber_id)
         self._instance_subscribers[subscriber_id] = callback
         LOG.debug(BOBase.global_subscription_statistics())
+        BOBase.subscriptions_report()
         return subscriber_id
 
     def unsubscribe_from_instance(self, callback_id: int):
@@ -295,6 +302,7 @@ class BOBase(BOBaseBase):
             )
             return
         del self._instance_subscribers[callback_id]
+        BOBase.subscriptions_report()
 
     async def business_values_as_dict(self) -> dict[str, Any]:
         "dict of BO attribute values with attribute names as keys"
@@ -368,6 +376,90 @@ class BOBase(BOBaseBase):
                 total_subscribers += len(instance._instance_subscribers)
             stats[bo_name] = total_subscribers
         return stats
+
+    @classmethod
+    def subscriptions_report(cls):
+        "Report current subscriptions to external file"
+        stats_file = App.configuration.get("subscriptions_report", {}).get("path")
+        if not stats_file or not isinstance(stats_file, str):
+            return
+        subs = {}
+        include = App.configuration.get("subscriptions_report", {}).get("incl", [])
+        if isinstance(include, str):
+            include = [include]
+        exclude = App.configuration.get("subscriptions_report", {}).get("excl", [])
+        if isinstance(exclude, str):
+            exclude = [exclude]
+        if not isinstance(include, list) or not isinstance(exclude, list):
+            return
+
+        for bo_name, bo_class in [
+            (name, cls)
+            for name, cls in cls._business_objects.items()
+            if name not in exclude and (not include or name in include)
+        ]:
+            subs[bo_name] = {
+                "instances": [f"count={len(bo_class._loaded_instances)}"],
+                "creation subscribers": [
+                    callback.__self__._connection.connection_id
+                    for callback in bo_class._creation_subscribers.values()
+                ],
+                "change subscribers": [
+                    callback.__self__._connection.connection_id
+                    for callback in bo_class._change_subscribers.values()
+                ],
+            }
+            for instance in bo_class._loaded_instances.values():
+                subs[bo_name]["instances"][instance] = repr(instance)
+        try:
+            with open(stats_file, "w", encoding="utf-8") as f:
+                f.write(f"{datetime.now().isoformat()} - Active subscriptions: \n")
+                f.write("\n")
+                pad = LeftPadder.pad
+                f.write(" " * 23)
+                for bo in sorted(subs.keys()):
+                    f.write(pad(bo))
+                f.write("\n")
+                f.write("+".rjust(23))
+                for bo in sorted(subs.keys()):
+                    f.write(pad("=+"))
+                f.write("\n")
+                items = [i for i in list(subs.values())[0].keys()]
+                for item in items:
+                    l = 0
+                    while True:
+                        last = True
+                        f.write(f"{item.rjust(20)}: |" if l == 0 else "|".rjust(23))
+                        for bo in sorted(subs.keys()):
+                            if len(subs[bo][item]) > l:
+                                f.write(pad(subs[bo][item][l]))
+                            else:
+                                f.write(pad(" |"))
+                            last &= len(subs[bo][item]) <= l + 1
+                        if last:
+                            break
+                        l += 1
+                        f.write("\n")
+                    f.write("\n")
+                    f.write("+".rjust(23))
+                    for bo in sorted(subs.keys()):
+                        f.write(pad("-+"))
+                    f.write("\n")
+        except Exception:  # pylint: disable=broad-exception-caught
+            LOG.exception(f"Error writing subscription statistics to {stats_file}")
+
+
+class LeftPadder:
+    "Utility class to left-pad a string with spaces for reporting purposes"
+
+    max_length = 10
+
+    @classmethod
+    def pad(cls, s: str) -> str:
+        if len(s) == 2:
+            return f"{s[0]*(cls.max_length+2)}{s[1]}"
+        cls.max_length = max(cls.max_length, len(s))
+        return f" {s.rjust(cls.max_length)} |"
 
 
 log_exit(LOG)
