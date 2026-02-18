@@ -377,17 +377,33 @@ class BOBase(BOBaseBase):
             stats[bo_name] = total_subscribers
         return stats
 
+    # pylint: disable=no-member
     @classmethod
     def subscriptions_report(cls):
         "Report current subscriptions to external file"
-        stats_file = App.configuration.get("subscriptions_report", {}).get("path")
+
+        # pylint: disable=protected-access
+        def subs_repr(subs, bo_name) -> list[str]:
+            rslt: list[str] = []
+            for sub in subs.values():
+                s = ""
+                if hasattr(sub, "__self__") and hasattr(sub.__self__, "_obj"):
+                    s += f"{bo_name}({sub.__self__._obj.id}): "
+                s += f"{sub.__self__._connection.connection_id}"
+                rslt.append(s)
+            return rslt
+
+        subs_rep_cfg = App.configuration.get("subscriptions_report", {})
+        if not isinstance(subs_rep_cfg, dict):
+            return
+        stats_file = subs_rep_cfg.get("path")
         if not stats_file or not isinstance(stats_file, str):
             return
         subs = {}
-        include = App.configuration.get("subscriptions_report", {}).get("incl", [])
+        include = subs_rep_cfg.get("incl", [])
         if isinstance(include, str):
             include = [include]
-        exclude = App.configuration.get("subscriptions_report", {}).get("excl", [])
+        exclude = subs_rep_cfg.get("excl", [])
         if isinstance(exclude, str):
             exclude = [exclude]
         if not isinstance(include, list) or not isinstance(exclude, list):
@@ -400,14 +416,10 @@ class BOBase(BOBaseBase):
         ]:
             subs[bo_name] = {
                 "instances": [f"count={len(bo_class._loaded_instances)}"],
-                "creation subscribers": [
-                    callback.__self__._connection.connection_id
-                    for callback in bo_class._creation_subscribers.values()
-                ],
-                "change subscribers": [
-                    callback.__self__._connection.connection_id
-                    for callback in bo_class._change_subscribers.values()
-                ],
+                "creation subscribers": subs_repr(
+                    bo_class._creation_subscribers, bo_name
+                ),
+                "change subscribers": subs_repr(bo_class._change_subscribers, bo_name),
             }
             for instance in bo_class._loaded_instances.values():
                 subs[bo_name]["instances"][instance] = repr(instance)
@@ -456,6 +468,7 @@ class LeftPadder:
 
     @classmethod
     def pad(cls, s: str) -> str:
+        "Pad the string s with spaces on the left to align it in a column."
         if len(s) == 2:
             return f"{s[0]*(cls.max_length+2)}{s[1]}"
         cls.max_length = max(cls.max_length, len(s))
