@@ -77,6 +77,12 @@ def baseflag_datatype(data_type: type, **args) -> str:
     return f"SET ({flags})"
 
 
+def timestamp_datatype(data_type: type, constraints: BOColumnConstraint, **args) -> str:
+    if constraints & BOColumnConstraint.BOC_ON_UPDATE_CURR:
+        return "TIMESTAMP"
+    return "DATETIME"
+
+
 class MySQLColumnDefinition(SQLColumnDefinition):
     """Definition of a column in a CREATE TABLE statement for MySQL/MariaDB"""
 
@@ -84,7 +90,7 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         int: "INT",
         float: "DOUBLE",
         str: "VARCHAR(100)",
-        datetime.datetime: "DATETIME",
+        datetime.datetime: timestamp_datatype,
         dict: MYSQL_JSON_TYPE,
         list: MYSQL_JSON_TYPE,
         BOBaseBase: "INT",
@@ -99,6 +105,7 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         BOColumnConstraint.BOC_FK: "REFERENCES {relation} (id)",
         BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
         BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        BOColumnConstraint.BOC_ON_UPDATE_CURR: "ON UPDATE CURRENT_TIMESTAMP()",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
@@ -120,12 +127,12 @@ class MySQLScript(SQLScript):
                                         ELSE UPPER(columns.DATA_TYPE) END,
                                     UPPER(CASE WHEN columns.IS_NULLABLE <> 'YES' AND columns.COLUMN_KEY <> 'PRI' THEN 'NOT NULL' 
                                         ELSE NULL END),
-                                    UPPER(CASE WHEN columns.EXTRA <> '' THEN columns.EXTRA ELSE NULL END),
-                                    UPPER(CASE WHEN key_cols.CONSTRAINT_NAME = 'PRIMARY' THEN 'PRIMARY KEY' 
-                                        ELSE NULL END),
                                     UPPER(CASE WHEN columns.COLUMN_DEFAULT IS NULL OR columns.COLUMN_DEFAULT = 'NULL' THEN NULL
                                         WHEN columns.COLUMN_DEFAULT = 'current_timestamp()' THEN 'default current_timestamp'
                                         ELSE CONCAT('default', columns.COLUMN_DEFAULT) END),
+                                    UPPER(CASE WHEN columns.EXTRA <> '' THEN columns.EXTRA ELSE NULL END),
+                                    UPPER(CASE WHEN key_cols.CONSTRAINT_NAME = 'PRIMARY' THEN 'PRIMARY KEY' 
+                                        ELSE NULL END),
                                     CASE WHEN key_cols.REFERENCED_TABLE_NAME IS NOT NULL
                                         THEN CONCAT('REFERENCES ', key_cols.REFERENCED_TABLE_NAME, ' (', key_cols.REFERENCED_COLUMN_NAME, ')')
                                         ELSE NULL END
@@ -210,7 +217,6 @@ class MySQLDB(DB):
 
         if asyncmy is None:
             raise ImportError("asyncmy module is not available.")
-
         self.connection_pool = await asyncmy.create_pool(
             host=self._cfg.get(Config.CONFIG_DBHOST, "localhost"),
             db=self._cfg.get(Config.CONFIG_DBDBNAME, "moneypilot"),

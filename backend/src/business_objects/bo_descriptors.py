@@ -45,6 +45,7 @@ class BOColumnConstraint(Flag):
     BOC_DEFAULT = auto()
     BOC_CURRENT_TS = auto()
     BOC_DEFAULT_CURR = auto()
+    BOC_ON_UPDATE_CURR = auto()
 
 
 @dataclass(frozen=True)
