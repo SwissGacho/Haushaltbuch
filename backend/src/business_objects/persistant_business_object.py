@@ -191,6 +191,8 @@ class PersistentBusinessObject(BOBase):
             update = txaction.sql().update(self.table).where(Eq("id", self.id))
             changes = False
             descriptions = {d.name: d for d in self.attribute_descriptions()}
+            if not ("last_updated" in self._data and self._data["last_updated"]):
+                self._data["last_updated"] = datetime.now().astimezone()
             for k, v in self._data.items():
                 if k != "id" and v != PersistentBusinessObject.convert_from_db(
                     self._db_data.get(k),

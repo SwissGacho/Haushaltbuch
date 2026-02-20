@@ -1,7 +1,7 @@
 """Connection to SQLit DB using aiosqlite"""
 
 from typing import Self, Any, Optional
-import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import json
 import re
@@ -55,7 +55,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         int: "INTEGER",
         float: "REAL",
         str: "TEXT",
-        datetime.datetime: "TEXT",
+        datetime: "TIMESTAMP",
         dict: SQLITE_JSON_TYPE,
         list: SQLITE_JSON_TYPE,
         BOBaseBase: "INTEGER",
@@ -70,6 +70,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         BOColumnConstraint.BOC_FK: "REFERENCES {relation}",
         BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
         BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        BOColumnConstraint.BOC_ON_UPDATE_CURR: "",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
@@ -88,8 +89,21 @@ def _adapt_flag(value: BaseFlag) -> str:
     return str(value)
 
 
+def _adapt_datetime_iso(value: datetime) -> str:
+    """Adapt datetime.date to ISO 8601 date."""
+    return value.isoformat()
+
+
 def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
+
+
+def _convert_timestamp(value: bytes) -> datetime:
+    dt: datetime = datetime.fromisoformat(value.decode())
+    # Interprete naive values (e.g. from CURRENT_TIMESTAMP) as UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone()
 
 
 if sqlite3:
@@ -97,7 +111,9 @@ if sqlite3:
     sqlite3.register_adapter(dict, _adapt_dict)
     sqlite3.register_adapter(list, _adapt_list)
     sqlite3.register_adapter(BaseFlag, _adapt_flag)
+    sqlite3.register_adapter(datetime, _adapt_datetime_iso)
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
+    sqlite3.register_converter("TIMESTAMP", _convert_timestamp)
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):
