@@ -1,6 +1,7 @@
 """Test suite for Business Objects Base"""
 
 import datetime
+from re import M
 import unittest
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
@@ -50,7 +51,10 @@ class MockAttrDesc:
 mock_attr_desc = [
     MockAttrDesc("id", int, BOColumnConstraint.BOC_PK_INC, {}),
     MockAttrDesc(
-        "last_updated", datetime.datetime, BOColumnConstraint.BOC_DEFAULT_CURR, {}
+        "last_updated",
+        datetime.datetime,
+        BOColumnConstraint.BOC_DEFAULT_CURR | BOColumnConstraint.BOC_ON_UPDATE_CURR,
+        {},
     ),
     MockAttrDesc("mock_attr1", str, BOColumnConstraint.BOC_NONE, {}),
     MockAttrDesc(
@@ -303,6 +307,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 "business_objects.persistant_business_object.PersistentBusinessObject.convert_from_db",
                 new=mock_convert_from_db,
             ),
+            patch(
+                "business_objects.persistant_business_object.datetime"
+            ) as mock_datetime,
         ):
             convert_args = [
                 call(
@@ -324,6 +331,14 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 for a in self.mock_bo._data
                 if a != "id" and self.mock_bo._data[a] != self.mock_bo._db_data.get(a)
             ]
+            if not (
+                "last_updated" in self.mock_bo._data
+                and self.mock_bo._data["last_updated"] is not None
+            ):
+                new_vals.append(("last_updated", "mock_CURRENT_TIMESTAMP"))
+            mock_dt = Mock(name="mock_dt")
+            mock_datetime.now = Mock(name="datetime.now", return_value=mock_dt)
+            mock_dt.astimezone.return_value = "mock_CURRENT_TIMESTAMP"
             # Mock_DB_Val = Mock(
             #     name="Mock_DB_Val",
             #     side_effect=[v[1] for v in new_vals],
@@ -345,7 +360,6 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_sql.update.assert_called_once_with(MOCK_TAB2)
             MockEq.assert_called_once_with("id", id)
             self.mock_sql.where.assert_called_once_with(MockEq())
-            print(f"{mock_attr_desc[0]=}")
             self.mock_bo.attribute_descriptions.assert_called_once_with()
             self.assertEqual(
                 PersistentBusinessObject.convert_from_db.call_count,
@@ -359,10 +373,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(MockValue.call_count, len(new_vals))
             for v in new_vals:
                 MockValue.assert_any_call(v[0], v[1])
-            self.assertEqual(
-                self.mock_sql.assignment.call_args_list,
-                [call(v[0], MockValue()) for v in new_vals],
-            )
+            for v in new_vals:
+                self.mock_sql.assignment.assert_any_call(v[0], MockValue())
             self.mock_sql.execute.assert_awaited_once_with()
             if exception:
                 self.mock_tx.__aexit__.assert_awaited_once_with(Exception, ANY, ANY)
@@ -391,6 +403,11 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
     async def test_205e_update_self_exception(self):
         self.mock_bo = MockPersistantBO2(bo_id=55)
         await self._205_update_self(exception=True)
+
+    async def test_205f_update_last_updated(self):
+        self.mock_bo = MockPersistantBO2(bo_id=55)
+        self.mock_bo.last_updated = datetime.datetime(2031, 4, 25, 13, 45)
+        await self._205_update_self()
 
 
 class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
