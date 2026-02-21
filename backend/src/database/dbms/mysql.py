@@ -79,7 +79,7 @@ def baseflag_datatype(data_type: type, **args) -> str:
 
 def timestamp_datatype(data_type: type, constraints: BOColumnConstraint, **args) -> str:
     if constraints & BOColumnConstraint.BOC_ON_UPDATE_CURR:
-        return "TIMESTAMP"
+        return "TIMESTAMP(6)"
     return "DATETIME"
 
 
@@ -104,8 +104,8 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         BOColumnConstraint.BOC_PK_INC: "AUTO_INCREMENT PRIMARY KEY",
         BOColumnConstraint.BOC_FK: "REFERENCES {relation} (id)",
         BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
-        BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
-        BOColumnConstraint.BOC_ON_UPDATE_CURR: "ON UPDATE CURRENT_TIMESTAMP()",
+        BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP(6)",
+        BOColumnConstraint.BOC_ON_UPDATE_CURR: "ON UPDATE CURRENT_TIMESTAMP(6)",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
@@ -122,14 +122,13 @@ class MySQLScript(SQLScript):
                                 CONCAT_WS(' ',
                                     columns.COLUMN_NAME,
                                     CASE WHEN SUBSTR(constraints.CHECK_CLAUSE, 1, 4) = 'json' THEN 'JSON'
-                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit' ) THEN UPPER(columns.COLUMN_TYPE)
+                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit', 'timestamp' ) THEN UPPER(columns.COLUMN_TYPE)
                                         WHEN columns.DATA_TYPE = 'set' THEN CONCAT('SET ', SUBSTR(columns.COLUMN_TYPE,4))
                                         ELSE UPPER(columns.DATA_TYPE) END,
                                     UPPER(CASE WHEN columns.IS_NULLABLE <> 'YES' AND columns.COLUMN_KEY <> 'PRI' THEN 'NOT NULL' 
                                         ELSE NULL END),
                                     UPPER(CASE WHEN columns.COLUMN_DEFAULT IS NULL OR columns.COLUMN_DEFAULT = 'NULL' THEN NULL
-                                        WHEN columns.COLUMN_DEFAULT = 'current_timestamp()' THEN 'default current_timestamp'
-                                        ELSE CONCAT('default', columns.COLUMN_DEFAULT) END),
+                                        ELSE CONCAT('default ', columns.COLUMN_DEFAULT) END),
                                     UPPER(CASE WHEN columns.EXTRA <> '' THEN columns.EXTRA ELSE NULL END),
                                     UPPER(CASE WHEN key_cols.CONSTRAINT_NAME = 'PRIMARY' THEN 'PRIMARY KEY' 
                                         ELSE NULL END),
@@ -356,7 +355,7 @@ class MySQLCursor(Cursor):
                 "Make sure to create the cursor before executing queries."
             )
         try:
-            # LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
+            LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
             self._rowcount = await self._cursor.execute(conv_sql, args=args)
         except (
             asyncmy.errors.MySQLError  # pylint: disable=c-extension-no-member
