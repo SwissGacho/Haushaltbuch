@@ -373,7 +373,6 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(MockValue.call_count, len(new_vals))
             for v in new_vals:
                 MockValue.assert_any_call(v[0], v[1])
-            for v in new_vals:
                 self.mock_sql.assignment.assert_any_call(v[0], MockValue())
             self.mock_sql.execute.assert_awaited_once_with()
             if exception:
