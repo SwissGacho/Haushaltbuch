@@ -1,7 +1,6 @@
 """Test suite for Business Objects Base"""
 
 import datetime
-from re import M
 import unittest
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
