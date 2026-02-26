@@ -330,14 +330,15 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 for a in self.mock_bo._data
                 if a != "id" and self.mock_bo._data[a] != self.mock_bo._db_data.get(a)
             ]
-            if not (
+            last_updated_present = (
                 "last_updated" in self.mock_bo._data
                 and self.mock_bo._data["last_updated"] is not None
-            ):
+            )
+            if not last_updated_present:
                 new_vals.append(("last_updated", "mock_CURRENT_TIMESTAMP"))
             mock_dt = Mock(name="mock_dt")
+            mock_dt.astimezone = Mock(return_value="mock_CURRENT_TIMESTAMP")
             mock_datetime.now = Mock(name="datetime.now", return_value=mock_dt)
-            mock_dt.astimezone.return_value = "mock_CURRENT_TIMESTAMP"
             # Mock_DB_Val = Mock(
             #     name="Mock_DB_Val",
             #     side_effect=[v[1] for v in new_vals],
@@ -373,6 +374,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             for v in new_vals:
                 MockValue.assert_any_call(v[0], v[1])
                 self.mock_sql.assignment.assert_any_call(v[0], MockValue())
+            if not last_updated_present:
+                mock_datetime.now.assert_called_once_with()
+                mock_dt.astimezone.assert_called_once_with()
             self.mock_sql.execute.assert_awaited_once_with()
             if exception:
                 self.mock_tx.__aexit__.assert_awaited_once_with(Exception, ANY, ANY)
