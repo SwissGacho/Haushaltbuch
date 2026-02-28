@@ -173,3 +173,4 @@ backend/src/configuration_mysql.json
 .vscode/settings.json
 *.key.pem
 backend/playground/playground.sqlite.db
+backend/src/__configuration.json
