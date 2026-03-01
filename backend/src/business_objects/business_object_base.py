@@ -281,7 +281,6 @@ class BOBase(BOBaseBase):
             )
             return
         del cls._change_subscribers[callback_id]
-        LOG.debug(BOBase.global_subscription_statistics())
         BOBase.subscriptions_report()
 
     def subscribe_to_instance(self, callback: BOCallback) -> int:
@@ -290,7 +289,6 @@ class BOBase(BOBaseBase):
             raise ValueError("Callback must be callable")
         subscriber_id: int = next(self._instance_subscriber_id)
         self._instance_subscribers[subscriber_id] = callback
-        LOG.debug(BOBase.global_subscription_statistics())
         BOBase.subscriptions_report()
         return subscriber_id
 
@@ -365,21 +363,6 @@ class BOBase(BOBaseBase):
                 LOG.exception(
                     f"Error scheduling callback {callback.__name__} for {changed_bo!r}"
                 )
-
-    @classmethod
-    def global_subscription_statistics(cls) -> dict[str, int]:
-        """Return number of subscribers for all business object classes and instances."""
-        # If log level is below DEBUG, return empty dict
-        if LOG.getEffectiveLevel() > logging.DEBUG:
-            return {}
-
-        stats: dict[str, int] = {}
-        for bo_name, bo_class in cls._business_objects.items():
-            total_subscribers = len(bo_class._change_subscribers)
-            for instance in bo_class._loaded_instances.values():
-                total_subscribers += len(instance._instance_subscribers)
-            stats[bo_name] = total_subscribers
-        return stats
 
     # pylint: disable=no-member
     @classmethod
