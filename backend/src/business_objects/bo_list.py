@@ -170,7 +170,7 @@ class BOList(BOSubscription[T]):
         )
         # LOG.debug(f"BOList.update_subscribers {msg=}")
 
-        # TODO: Why await? Or rather, why return the reulst of await, which is None?
+        # TODO: Why await? Or rather, why return the result of await, which is None?
         return await self.send_message(msg)
 
     async def _get_objects_(self) -> list[T]:
