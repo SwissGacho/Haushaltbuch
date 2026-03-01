@@ -51,6 +51,10 @@ class BOBase(BOBaseBase):
     _last_subscriber_id = itertools.count(1)
 
     def __new__(cls, *args, identity: int | None = None, **attributes):
+        if cls is BOBase:
+            raise TypeError(
+                "BOBase is an abstract class and cannot be instantiated directly"
+            )
         if identity is not None:
             if identity in cls._loaded_instances:
                 obj = cls._loaded_instances[identity]
@@ -415,7 +419,7 @@ class BOBase(BOBaseBase):
                     )
                 else:
                     subs[bo_name]["instances"].append(f"{instance.id}: no subscribers")
-        LOG.debug(f"{subs=}")
+        # LOG.debug(f"{subs=}")
         try:
             with open(stats_file, "w", encoding="utf-8") as f:
                 f.write(f"{datetime.now().isoformat()} - Active subscriptions: \n")
