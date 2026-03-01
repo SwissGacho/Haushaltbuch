@@ -50,8 +50,6 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
 
-        connection.unregister_other_senders(self)
-
         if isinstance(bo_type, str):
             LOG.debug(
                 f"BOSubscription.__init__: Resolving bo_type from string {bo_type}"
@@ -71,6 +69,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         self._bo_type: Type[T] = bo_type
         self._instance_subscriptions: dict[int, T] = {}
         self._initialize_subscriptions(id=id)
+        connection.unregister_other_senders(self)
         if notify_subscribers_on_init:
             asyncio.create_task(self.notify_subscription_subscribers())
 
