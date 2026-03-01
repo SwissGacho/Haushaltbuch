@@ -115,7 +115,6 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
             f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} "
             f"with {len(name_list)} objects"
         )
-        LOG.debug(BOBase.global_subscription_statistics())
         BOBase.subscriptions_report()
 
         await self.send_message(
