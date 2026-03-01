@@ -45,8 +45,6 @@ class BOBase(BOBaseBase):
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, type["BOBase"]] = {}
 
-    _loaded_instances: dict[int, "BOBase"] = {}
-
     _creation_subscribers: dict[int, BOCallback] = {}
     _change_subscribers: dict[int, BOCallback] = {}
 
@@ -65,6 +63,7 @@ class BOBase(BOBaseBase):
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
+        cls._loaded_instances: dict[int, Self] = {}
         cls._creation_subscribers = {}
         cls._change_subscribers = {}
 
@@ -427,7 +426,13 @@ class BOBase(BOBaseBase):
                 "change subscribers": subs_repr(bo_class._change_subscribers, bo_name),
             }
             for instance in bo_class._loaded_instances.values():
-                subs[bo_name]["instances"][instance] = repr(instance)
+                if len(instance._instance_subscribers) > 0:
+                    subs[bo_name]["instances"].append(
+                        subs_repr(instance._instance_subscribers, bo_name)
+                    )
+                else:
+                    subs[bo_name]["instances"].append(f"{instance.id}: no subscribers")
+        LOG.debug(f"{subs=}")
         try:
             with open(stats_file, "w", encoding="utf-8") as f:
                 f.write(f"{datetime.now().isoformat()} - Active subscriptions: \n")
@@ -449,7 +454,7 @@ class BOBase(BOBaseBase):
                         f.write(f"{item.rjust(20)}: |" if l == 0 else "|".rjust(23))
                         for bo in sorted(subs.keys()):
                             if len(subs[bo][item]) > l:
-                                f.write(pad(subs[bo][item][l]))
+                                f.write(pad(str(subs[bo][item][l])))
                             else:
                                 f.write(pad(" |"))
                             last &= len(subs[bo][item]) <= l + 1

@@ -83,7 +83,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         bo_id = int(kwargs["id"])
         bo = self._bo_type(bo_id=bo_id)
 
-        self._subscription_id = bo.subscribe_to_all_changes(self._handle_event_)
+        self._subscription_id = bo.subscribe_to_instance(self._handle_event_)
         self._obj = bo
 
     async def _get_objects_(self) -> list[T]:
