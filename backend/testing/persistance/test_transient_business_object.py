@@ -41,7 +41,7 @@ class Test_100_Transient_Business_Object_classmethods(unittest.IsolatedAsyncioTe
 
         obj1 = None
         gc.collect()
-        print(TransientBusinessObject._instances)
+
         self.assertEqual(len(TransientBusinessObject._instances), 1)
 
     async def test_102_count_rows(self):
