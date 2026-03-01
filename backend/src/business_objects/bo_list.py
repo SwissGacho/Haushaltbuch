@@ -141,7 +141,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         if self._obj is None:
             LOG.debug("BOSubscription.cleanup: Cannot cleanup, _obj is None")
             return
-        self._obj.unsubscribe_from_all_changes(self._subscription_id)
+        self._obj.unsubscribe_from_instance(self._subscription_id)
         self._connection.unregister_message_sender(self)
 
 
