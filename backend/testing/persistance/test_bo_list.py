@@ -1,4 +1,4 @@
-"""Test suit for business object list attributes."""
+"""Test suite for business object list attributes."""
 
 from typing import Optional
 import unittest
