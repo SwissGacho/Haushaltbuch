@@ -44,11 +44,11 @@ class PersistentBusinessObject(BOBase):
             return None
         if typ == date and isinstance(value, str):
             return date.fromisoformat(value)
-        if typ == datetime and isinstance(value, str):
-            dt = datetime.fromisoformat(value)
-            if dt.tzinfo in [None, UTC]:
-                dt = dt.replace(tzinfo=UTC).astimezone(tz=None)
-            return dt
+        if typ == datetime and isinstance(value, (str, datetime)):
+            dt = value if isinstance(value, datetime) else datetime.fromisoformat(value)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=UTC)
+            return dt.astimezone(UTC)
         if typ in [dict, list] and isinstance(value, str):
             try:
                 return json.loads(value)
@@ -201,7 +201,7 @@ class PersistentBusinessObject(BOBase):
                     update.assignment(k, value_class(k, v))
             k = "last_updated"
             if changes and not (k in self._data and self._data[k]):
-                self._data[k] = datetime.now().astimezone()
+                self._data[k] = datetime.now().astimezone(UTC)
                 update.assignment(k, value_class(k, self._data[k]))
             try:
                 if changes:

@@ -155,6 +155,7 @@ class Test_002_MySQLDB(unittest.IsolatedAsyncioTestCase):
             port=3306,
             user=self.db_cfg["dbuser"],
             password=self.db_cfg["password"],
+            init_command="SET time_zone = '+00:00'",
             ssl=None,
             minsize=1,
             maxsize=50,

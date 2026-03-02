@@ -1,7 +1,7 @@
 """Connection to SQLit DB using aiosqlite"""
 
 from typing import Self, Any, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 import json
 import re
@@ -91,6 +91,8 @@ def _adapt_flag(value: BaseFlag) -> str:
 
 def _adapt_datetime_iso(value: datetime) -> str:
     """Adapt datetime.date to ISO 8601 date."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
     return value.isoformat()
 
 
@@ -102,8 +104,8 @@ def _convert_timestamp(value: bytes) -> datetime:
     dt: datetime = datetime.fromisoformat(value.decode())
     # Interprete naive values (e.g. from CURRENT_TIMESTAMP) as UTC
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone()
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 if sqlite3:

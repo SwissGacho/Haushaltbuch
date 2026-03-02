@@ -222,6 +222,7 @@ class MySQLDB(DB):
             port=self._cfg.get(Config.CONFIG_DBPORT, 3306),
             user=self._cfg.get(Config.CONFIG_DBUSER),
             password=self._cfg.get(Config.CONFIG_DBPW),
+            init_command="SET time_zone = '+00:00'",
             ssl=ssl_ctx,
             minsize=1,
             maxsize=50,
