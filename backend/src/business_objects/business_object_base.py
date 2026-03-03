@@ -229,6 +229,13 @@ class BOBase(BOBaseBase):
         raise NotImplementedError("get_matching_ids not implemented")
 
     @classmethod
+    async def get_matching_objects(
+        cls, conditions: dict | None = None, attributes: list[str] | None = None
+    ):
+        """Get the business objects matching the conditions"""
+        raise NotImplementedError("get_matching_objects not implemented")
+
+    @classmethod
     def subscribe_to_creation(cls, callback: BOCallback):
         """Register a callback to be called when a new instance is created.
         Return a unique id that can be used to unsubscribe."""

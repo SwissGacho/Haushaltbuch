@@ -111,6 +111,28 @@ class PersistentBusinessObject(BOBase):
         # LOG.debug(f"PersistentBusinessObject.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
 
+    @classmethod
+    async def get_matching_objects(
+        cls, conditions: dict | None = None, attributes: list[str] | None = None
+    ):
+        """Get the business objects matching the conditions"""
+        if attributes is None:
+            cols = "*"
+        else:
+            cols = [
+                a
+                for a in attributes
+                if a in [v.name for v in cls.attribute_descriptions()]
+            ]
+            if not "id" in cols:
+                cols.append("id")
+        async with SQL() as sql:
+            select = sql.select(cols).from_(cls.table)
+            if conditions:
+                select.where(Filter(conditions))
+            result = await (await select.execute()).fetchall()
+        return result
+
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
         If 'id' is given, fetch the identified object
