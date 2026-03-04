@@ -154,9 +154,7 @@ class BOList(BOSubscription[T]):
             {"id": cur.id, "display_name": cur.display_name}
             for cur in await self._get_objects_()
         ]
-        LOG.debug(
-            f"Updating subscribers of {bo_type} " f"with {len(name_list)} objects"
-        )
+        LOG.debug(f"Updating subscribers of {bo_type} with {len(name_list)} objects")
         msg = ObjectList()
         msg.add(
             {
