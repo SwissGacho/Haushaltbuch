@@ -119,11 +119,7 @@ class PersistentBusinessObject(BOBase):
         if attributes is None:
             cols = "*"
         else:
-            cols = [
-                a
-                for a in attributes
-                if a in [v.name for v in cls.attribute_descriptions()]
-            ]
+            cols = [a for a in attributes if a in cls.attributes_as_dict()]
             if not "id" in cols:
                 cols.append("id")
         async with SQL() as sql:
