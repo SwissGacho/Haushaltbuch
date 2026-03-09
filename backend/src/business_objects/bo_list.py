@@ -8,7 +8,6 @@
 """
 
 import asyncio
-from re import L
 from typing import Generic, Type, TypeVar, cast
 
 from core.app_logging import getLogger, log_exit
