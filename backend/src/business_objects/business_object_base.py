@@ -238,7 +238,7 @@ class BOBase(BOBaseBase):
     @classmethod
     async def get_matching_objects(
         cls, conditions: dict | None = None, attributes: list[str] | None = None
-    ):
+    ) -> list["BOBase"]:
         """Get the business objects matching the conditions"""
         raise NotImplementedError("get_matching_objects not implemented")
 

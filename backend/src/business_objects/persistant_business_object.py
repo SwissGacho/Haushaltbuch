@@ -114,7 +114,7 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     async def get_matching_objects(
         cls, conditions: dict | None = None, attributes: list[str] | None = None
-    ):
+    ) -> list[BOBase]:
         """Get the business objects matching the conditions"""
         if attributes is None:
             cols = "*"
@@ -127,7 +127,10 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
-        return result
+        return [
+            cls(bo_id=obj.get("id"), **{k: v for k, v in obj.items() if k != "id"})
+            for obj in result
+        ]
 
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
