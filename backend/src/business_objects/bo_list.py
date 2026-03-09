@@ -173,8 +173,7 @@ class BOList(BOSubscription[T]):
             LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
             return []
         rslt = [
-            self._bo_type(bo_id=cur.id)
-            for cur in await self._bo_type.get_matching_objects(attributes=["name"])
+            self._bo_type(bo_id=cur) for cur in await self._bo_type.get_matching_ids()
         ]
         return rslt
 
