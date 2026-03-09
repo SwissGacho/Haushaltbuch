@@ -8,6 +8,7 @@
 """
 
 import asyncio
+from re import L
 from typing import Generic, Type, TypeVar, cast
 
 from core.app_logging import getLogger, log_exit
@@ -170,7 +171,11 @@ class BOList(BOSubscription[T]):
             LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
             return []
         rslt = [
-            self._bo_type(bo_id=cur.get("id"), name=cur.get("name"))
+            (
+                self._bo_type(bo_id=cur.get("id"), name=cur.get("name"))
+                if cur.get("name")
+                else self._bo_type(bo_id=cur.get("id"))
+            )
             for cur in await self._bo_type.get_matching_objects(attributes=["name"])
         ]
         return rslt
