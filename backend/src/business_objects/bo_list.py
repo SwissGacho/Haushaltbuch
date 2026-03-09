@@ -150,10 +150,12 @@ class BOList(BOSubscription[T]):
 
     async def notify_subscription_subscribers(self):
         """Notify subscribers about the current state of the list."""
+        if self._bo_type is None:
+            raise ValueError("BOList.notify_subscription_subscribers: _bo_type is None")
         bo_type = self._bo_type.__name__ if self._bo_type else "Undefined"
         name_list = [
             {"id": cur.id, "display_name": cur.display_name}
-            for cur in await self._get_objects_()
+            for cur in await self._bo_type.get_matching_objects(attributes=["name"])
         ]
         LOG.debug(f"Updating subscribers of {bo_type} with {len(name_list)} objects")
         msg = ObjectList()
@@ -171,11 +173,7 @@ class BOList(BOSubscription[T]):
             LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
             return []
         rslt = [
-            (
-                self._bo_type(bo_id=cur.get("id"), name=cur.get("name"))
-                if cur.get("name")
-                else self._bo_type(bo_id=cur.get("id"))
-            )
+            self._bo_type(bo_id=cur.id)
             for cur in await self._bo_type.get_matching_objects(attributes=["name"])
         ]
         return rslt
