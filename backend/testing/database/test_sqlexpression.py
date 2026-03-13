@@ -194,6 +194,25 @@ class Test_600_Value(unittest.TestCase):
     def test_607_mixed_args(self):
         self._test_600("mick", "mack", "mack", name="mick")
 
+    def test_608_empty_string_value(self):
+        self._test_600("mick", "", "mick", "")
+
+    def test_609_zero_value(self):
+        sql = Value("mick", 0)
+        self.assertEqual(sql.get_query(km=self.SQLKeyManager), "mockmanaged")
+        self.SQLKeyManager.merge_params.assert_called_once_with(
+            query=":mick", params={"mick": 0}
+        )
+        self.assertEqual(sql.get_name(), "mick")
+
+    def test_610_false_value(self):
+        sql = Value("mick", False)
+        self.assertEqual(sql.get_query(km=self.SQLKeyManager), "mockmanaged")
+        self.SQLKeyManager.merge_params.assert_called_once_with(
+            query=":mick", params={"mick": False}
+        )
+        self.assertEqual(sql.get_name(), "mick")
+
 
 class Test_700_Row(unittest.TestCase):
 

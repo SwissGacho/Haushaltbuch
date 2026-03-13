@@ -240,7 +240,7 @@ class Value(SQLExpression):
         name: str = str(kwargs.get("name", ""))
         value: Any = kwargs.get("value", None)
         if len(args) == 1:
-            if not value:
+            if value is None:
                 value = args[0]
             else:
                 name = args[0]
@@ -248,7 +248,7 @@ class Value(SQLExpression):
             name, value = args
         if not name:
             name = "param"
-        if not value:
+        if value is None:
             raise ValueError("Value must be provided")
         if not isinstance(name, str):
             raise ValueError("Name must be a string")
