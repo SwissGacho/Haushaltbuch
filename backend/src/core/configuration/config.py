@@ -48,13 +48,13 @@ class AppConfiguration(ConfigurationBaseClass):
         # LOG.debug("AppConfiguration.initialize_configuration()")
         self._cmdline_configuration = {}
         cmdline_cfg = parse_commandline(Config.CONFIG_DBCFG_FILE)
+        self._cmdline_configuration.update(cmdline_cfg)
         if Config.CONFIG_DB in cmdline_cfg:
             DBConfig.set_db_configuration(
                 {Config.CONFIG_DB: cmdline_cfg[Config.CONFIG_DB]}
             )
         else:
-            self._cmdline_configuration = DBConfig.read_db_config_file() or {}
-        self._cmdline_configuration.update(cmdline_cfg)
+            self._cmdline_configuration.update(DBConfig.read_db_config_file() or {})
 
     async def get_configuration_from_db(self):
         "Fetch configuration from database"
