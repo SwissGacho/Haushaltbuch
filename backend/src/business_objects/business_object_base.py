@@ -7,6 +7,7 @@ import asyncio
 from datetime import datetime
 import itertools
 from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
+import weakref
 
 
 from core.util import _classproperty
@@ -67,7 +68,9 @@ class BOBase(BOBaseBase):
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
-        cls._loaded_instances: dict[int, Self] = {}
+        cls._loaded_instances: weakref.WeakValueDictionary[int, Self] = (
+            weakref.WeakValueDictionary()
+        )
         cls._creation_subscribers = {}
         cls._change_subscribers = {}
 
