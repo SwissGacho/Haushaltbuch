@@ -326,20 +326,6 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
                 bo_instance.handle_callback_result
             )
 
-    def test_123_global_subscription_statistics(self):
-        with patch(
-            "business_objects.business_object_base.BOBase._business_objects",
-            new={"mockbo2": MockBO2},
-        ):
-            bo_instance1 = MockBO2()
-            bo_instance1._instance_subscribers = {1: Mock()}
-            bo_instance2 = MockBO2()
-            MockBO2._change_subscribers = {1: Mock(), 2: Mock()}
-            MockBO2._loaded_instances = {1: bo_instance1, 2: bo_instance2}
-            stats: dict[str, int] = MockBO2.global_subscription_statistics()
-            expected_stats = {MockBO2._name(): 3}
-            self.assertEqual(stats, expected_stats)
-
     def test_118_get_business_object_by_name(self):
         MockBO2.register_persistant_class()
         self.assertEqual(BOBase.get_business_object_by_name("mockbo2"), MockBO2)

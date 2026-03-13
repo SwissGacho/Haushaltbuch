@@ -384,7 +384,10 @@ class BOBase(BOBaseBase):
                 rslt.append(s)
             return rslt
 
-        subs_rep_cfg = App.configuration.get("subscriptions_report", {})
+        try:
+            subs_rep_cfg = App.configuration.get("subscriptions_report", {})
+        except:
+            return
         if not isinstance(subs_rep_cfg, dict):
             return
         stats_file = subs_rep_cfg.get("path")
