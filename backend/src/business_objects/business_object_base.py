@@ -36,7 +36,7 @@ class BOBase(BOBaseBase):
     "Business Object baseclass"
 
     id = BOId(
-        BOColumnConstraint.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_WRITE_ONLY
+        BOColumnConstraint.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_READ_ONLY
     )
     last_updated = BODatetime(
         BOColumnConstraint.BOC_DEFAULT_CURR,
