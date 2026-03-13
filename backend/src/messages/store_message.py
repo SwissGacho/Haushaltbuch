@@ -24,11 +24,13 @@ class StoreMessage(Message):
         bo_id = self.message.get(MessageAttribute.WS_ATTR_INDEX)
 
         affected_bo = bo_type(bo_id=bo_id)
-        for key, value in self.message.get(
-            MessageAttribute.WS_ATTR_PAYLOAD, {}
-        ).items():
-            if key in bo_type.attributes_as_dict().keys():
-                setattr(affected_bo, key, value)
+
+        # If there's a payload, update the affected_bo with the new values
+        payload = self.message.get(MessageAttribute.WS_ATTR_PAYLOAD)
+        if payload is not None:
+            for key, value in payload.items():
+                if key in bo_type.attributes_as_dict().keys():
+                    setattr(affected_bo, key, value)
         await affected_bo.store()
 
 
