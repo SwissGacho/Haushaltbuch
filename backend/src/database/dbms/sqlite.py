@@ -1,7 +1,7 @@
 """Connection to SQLit DB using aiosqlite"""
 
 from typing import Self, Any, Optional
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 from pathlib import Path
 import json
 import re
