@@ -102,7 +102,7 @@ def _convert_json(value: bytes) -> dict | list:
 
 def _convert_timestamp(value: bytes) -> datetime:
     dt: datetime = datetime.fromisoformat(value.decode())
-    # Interprete naive values (e.g. from CURRENT_TIMESTAMP) as UTC
+    # Interpret naive values (e.g. from CURRENT_TIMESTAMP) as UTC
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
     return dt.astimezone(UTC)
