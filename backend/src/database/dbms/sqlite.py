@@ -90,7 +90,7 @@ def _adapt_flag(value: BaseFlag) -> str:
 
 
 def _adapt_datetime_iso(value: datetime) -> str:
-    """Adapt datetime.date to ISO 8601 date."""
+    """Adapt a datetime value to an ISO 8601 timestamp string."""
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
     return value.isoformat()
