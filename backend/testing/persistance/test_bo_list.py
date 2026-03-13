@@ -29,12 +29,12 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
 
     async def test101_test_initialization(self):
         con = Mock()
-        MockConcreteBO.subscribe_to_all_changes = Mock(return_value=456)
+        MockConcreteBO.subscribe_to_instance = Mock(return_value=456)
         con.unregister_other_senders = Mock()
         boSubscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=1)
         con.unregister_other_senders.assert_called_once_with(boSubscription)
         self.assertEqual(boSubscription._bo_type, MockConcreteBO)
-        MockConcreteBO.subscribe_to_all_changes.assert_called_once_with(
+        MockConcreteBO.subscribe_to_instance.assert_called_once_with(
             boSubscription._handle_event_
         )
 
@@ -69,13 +69,13 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
             mock_send_message.assert_awaited_once()
 
     async def test105_cleanup(self):
-        MockConcreteBO.unsubscribe_from_all_changes = Mock()
+        MockConcreteBO.unsubscribe_from_instance = Mock()
         con = Mock()
         con.unregister_message_sender = Mock()
         bo_subscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=42)
         subscription_id = bo_subscription._subscription_id
         bo_subscription.cleanup()
-        MockConcreteBO.unsubscribe_from_all_changes.assert_called_once_with(
+        MockConcreteBO.unsubscribe_from_instance.assert_called_once_with(
             subscription_id
         )
         con.unregister_message_sender.assert_called_once()
