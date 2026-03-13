@@ -102,7 +102,7 @@ class Test_100_Persistant_Business_Object_classmethods(
             "business_objects.persistant_business_object.BaseFlag"
         ) as MockBaseFlag:
 
-            class MockFlag(MockBaseFlag):
+            class MockFlag(MockBaseFlag):  # type: ignore
                 pass
 
             mock_flag_value = "flag_value"
@@ -167,7 +167,7 @@ class Test_100_Persistant_Business_Object_classmethods(
         ):
             mock_conditions = "{mock conditions}"
 
-            result = await MockPersistantBO2.get_matching_ids(mock_conditions)
+            result = await MockPersistantBO2.get_matching_ids(mock_conditions)  # type: ignore
         MockSQL.assert_called_once_with()
         mock_sql.__aenter__.assert_awaited_once_with()
         mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
@@ -389,12 +389,12 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             print(f"{mock_attr_desc[0]=}")
             self.mock_bo.attribute_descriptions.assert_called_once_with()
             self.assertEqual(
-                PersistentBusinessObject.convert_from_db.call_count,
+                PersistentBusinessObject.convert_from_db.call_count,  # type: ignore
                 len(convert_args),
                 "attributes converted",
             )
             self.assertEqual(
-                PersistentBusinessObject.convert_from_db.call_args_list, convert_args
+                PersistentBusinessObject.convert_from_db.call_args_list, convert_args  # type: ignore
             )
             self.assertEqual(self.mock_sql.assignment.call_count, len(new_vals))
             self.assertEqual(MockValue.call_count, len(new_vals))
@@ -454,25 +454,25 @@ class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
             value=mock_dt_cet.isoformat(), typ=datetime, subtyp={}
         )
         self.assertEqual(mock_dt_cet, res)
-        self.assertEqual(mock_dt_cet.tzinfo, res.tzinfo)
+        self.assertEqual(mock_dt_cet.tzinfo, res.tzinfo)  # type: ignore
 
         res = MockPersistantBO2.convert_from_db(
             value=mock_dt_est.isoformat(), typ=datetime, subtyp={}
         )
         self.assertEqual(mock_dt_est, res)
-        self.assertEqual(mock_dt_est.tzinfo, res.tzinfo)
+        self.assertEqual(mock_dt_est.tzinfo, res.tzinfo)  # type: ignore
 
         res = MockPersistantBO2.convert_from_db(
             value=mock_dt_utc.isoformat(), typ=datetime, subtyp={}
         )
         self.assertEqual(mock_dt_utc, res)
-        self.assertEqual(mock_dt_utc.astimezone().tzinfo, res.tzinfo)
+        self.assertEqual(mock_dt_utc.astimezone().tzinfo, res.tzinfo)  # type: ignore
 
         res = MockPersistantBO2.convert_from_db(
             value=mock_dt_none.isoformat(), typ=datetime, subtyp={}
         )
         self.assertEqual(mock_dt_none.replace(tzinfo=UTC).astimezone(), res)
-        self.assertEqual(mock_dt_none.astimezone().tzinfo, res.tzinfo)
+        self.assertEqual(mock_dt_none.astimezone().tzinfo, res.tzinfo)  # type: ignore
 
         res = MockPersistantBO2.convert_from_db(
             value=mock_date.isoformat(), typ=date, subtyp={}

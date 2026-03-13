@@ -72,9 +72,9 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
         MockConcreteBO.unsubscribe_from_all_changes = Mock()
         con = Mock()
         con.unregister_message_sender = Mock()
-        boSubscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=42)
-        subscription_id = boSubscription._subscription_id
-        boSubscription.cleanup()
+        bo_subscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=42)
+        subscription_id = bo_subscription._subscription_id
+        bo_subscription.cleanup()
         MockConcreteBO.unsubscribe_from_all_changes.assert_called_once_with(
             subscription_id
         )
