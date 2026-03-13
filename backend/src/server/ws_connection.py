@@ -68,7 +68,7 @@ class WSConnection(WSConnectionBase):
             self.LOG.warning(f"Sender {sender} not found in subscribers list")
 
     def unregister_other_senders(self, sender_to_keep: WSMessageSender):
-        for sender in self.subscribers:
+        for sender in list(self.subscribers):
             if sender is not sender_to_keep:
                 sender.release_subscriptions()
 
