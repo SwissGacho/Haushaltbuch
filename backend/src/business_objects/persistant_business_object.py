@@ -116,12 +116,12 @@ class PersistentBusinessObject(BOBase):
         cls, conditions: dict | None = None, attributes: list[str] | None = None
     ) -> list[BOBase]:
         """Get the business objects matching the conditions"""
-        if attributes is None:
-            cols = "*"
-        else:
+        if attributes:
             cols = [a for a in attributes if a in cls.attributes_as_dict()]
-            if not "id" in cols:
+            if "id" not in cols:
                 cols.append("id")
+        else:
+            cols = None
         async with SQL() as sql:
             select = sql.select(cols).from_(cls.table)
             if conditions:
