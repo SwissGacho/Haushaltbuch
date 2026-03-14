@@ -4,6 +4,7 @@ import datetime
 import unittest
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
+from business_objects.business_object_base import BOBase
 from business_objects.persistant_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import (
     BOStr,
@@ -29,11 +30,12 @@ class MockPersistantBO2(PersistentBusinessObject):
     def __init__(
         self,
         bo_id=None,
+        last_updated=None,
         mock_attr1="mockk attriubute 1",
         mock_attr2=None,
         mock_attr3=[],
     ) -> None:
-        super().__init__(bo_id=bo_id)
+        super().__init__(bo_id=bo_id, last_updated=last_updated)
         self.mock_attr1 = mock_attr1
         self.mock_attr2 = mock_attr2
         self.mock_attr3 = mock_attr3
@@ -106,10 +108,110 @@ class Test_100_Persistant_Business_Object_classmethods(
         mock_sql.execute.assert_awaited_once_with()
 
     async def test_102_count_rows(self):
-        RESULT = [1, 99]
-        FETCH_RESULT = [{"id": i} for i in RESULT]
+        mock_fetch_result = {"count": 47}
+        mock_conditions = "{mock conditions}"
         mock_cursor = Mock(name="mock_cursor")
-        mock_cursor.fetchall = AsyncMock(return_value=FETCH_RESULT)
+        mock_cursor.fetchone = AsyncMock(return_value=mock_fetch_result)
+        mock_sql = Mock(name="mock_sql")
+        mock_sql.execute = AsyncMock(return_value=mock_cursor)
+        mock_sql.select = Mock(return_value=mock_sql)
+        mock_sql.from_ = Mock(return_value=mock_sql)
+        mock_sql.where = Mock(return_value=mock_sql)
+        mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
+        mock_sql.__aexit__ = AsyncMock(return_value=None)
+        MockSQL = Mock(name="MockSQL", return_value=mock_sql)
+
+        with (
+            patch("business_objects.persistant_business_object.SQL", new=MockSQL),
+            patch("business_objects.persistant_business_object.Filter") as MockFilter,
+        ):
+            result = await MockPersistantBO2.count_rows(mock_conditions)
+        MockSQL.assert_called_once_with()
+        mock_sql.__aenter__.assert_awaited_once_with()
+        mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
+        mock_sql.select.assert_called_once_with(["count(*) as count"])
+        mock_sql.from_.assert_called_once_with(MOCK_TAB2)
+        MockFilter.assert_called_once_with(mock_conditions)
+        mock_sql.where.assert_called_once_with(MockFilter())
+        mock_sql.execute.assert_awaited_once_with()
+        mock_cursor.fetchone.assert_awaited_once_with()
+        self.assertEqual(result, mock_fetch_result["count"])
+
+    async def test_103_get_matching_ids(self):
+        mock_conditions = "{mock conditions}"
+        mock_result = [1, 99]
+        mock_fetch_result = [{"id": i} for i in mock_result]
+        mock_cursor = Mock(name="mock_cursor")
+        mock_cursor.fetchall = AsyncMock(return_value=mock_fetch_result)
+        mock_sql = Mock(name="mock_sql")
+        mock_sql.execute = AsyncMock(return_value=mock_cursor)
+        mock_sql.select = Mock(return_value=mock_sql)
+        mock_sql.from_ = Mock(return_value=mock_sql)
+        mock_sql.where = Mock(return_value=mock_sql)
+        mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
+        mock_sql.__aexit__ = AsyncMock(return_value=None)
+        MockSQL = Mock(name="MockSQL", return_value=mock_sql)
+
+        with (
+            patch("business_objects.persistant_business_object.SQL", new=MockSQL),
+            patch("business_objects.persistant_business_object.Filter") as MockFilter,
+        ):
+            result = await MockPersistantBO2.get_matching_ids(mock_conditions)
+        MockSQL.assert_called_once_with()
+        mock_sql.__aenter__.assert_awaited_once_with()
+        mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
+        mock_sql.select.assert_called_once_with(["id"])
+        mock_sql.from_.assert_called_once_with(MOCK_TAB2)
+        MockFilter.assert_called_once_with(mock_conditions)
+        mock_sql.where.assert_called_once_with(MockFilter())
+        mock_sql.execute.assert_awaited_once_with()
+        mock_cursor.fetchall.assert_awaited_once_with()
+        self.assertEqual(result, mock_result)
+
+    async def _104_get_matching_objects(self, attributes=None):
+        mock_conditions = "{mock conditions}"
+        if attributes:
+            mock_cols = [a for a in attributes if a in mock_bo2_as_dict]
+            if "id" not in mock_cols:
+                mock_cols.append("id")
+        else:
+            mock_cols = attributes
+
+        mock_fetch_result = [
+            {
+                a: (
+                    1
+                    if a == "id"
+                    else (
+                        MockPersistantBO1(bo_id=2)
+                        if a == "mock_attr2"
+                        else [1, 11] if a == "mock_attr3" else a
+                    )
+                )
+                for a in (mock_cols if mock_cols else mock_bo2_as_dict)
+            },
+            {
+                a: (
+                    9
+                    if a == "id"
+                    else (
+                        MockPersistantBO1(bo_id=8)
+                        if a == "mock_attr2"
+                        else [99, 99] if a == "mock_attr3" else a
+                    )
+                )
+                for a in (mock_cols if mock_cols else mock_bo2_as_dict)
+            },
+        ]
+        mock_result = [
+            # {a if a != "id" else "bo_id": v for a, v in r.items()}
+            MockPersistantBO2(
+                bo_id=r.get("id"), **{a: v for a, v in r.items() if a != "id"}
+            )
+            for r in mock_fetch_result
+        ]
+        mock_cursor = Mock(name="mock_cursor")
+        mock_cursor.fetchall = AsyncMock(return_value=mock_fetch_result)
         mock_sql = Mock(name="mock_sql")
         mock_sql.execute = AsyncMock(return_value=mock_cursor)
         mock_sql.select = Mock(return_value=mock_sql)
@@ -124,18 +226,30 @@ class Test_100_Persistant_Business_Object_classmethods(
             patch("business_objects.persistant_business_object.SQL", new=MockSQL),
             patch("business_objects.persistant_business_object.Filter") as MockFilter,
         ):
-            mock_conditions = "{mock conditions}"
-
-            result = await MockPersistantBO2.get_matching_ids(mock_conditions)
+            result = await MockPersistantBO2.get_matching_objects(
+                mock_conditions, mock_cols
+            )
         MockSQL.assert_called_once_with()
         mock_sql.__aenter__.assert_awaited_once_with()
         mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
-        mock_sql.select.assert_called_once_with(["id"])
+        mock_sql.select.assert_called_once_with(mock_cols if mock_cols else None)
         mock_sql.from_.assert_called_once_with(MOCK_TAB2)
+        MockFilter.assert_called_once_with(mock_conditions)
         mock_sql.where.assert_called_once_with(MockFilter())
         mock_sql.execute.assert_awaited_once_with()
         mock_cursor.fetchall.assert_awaited_once_with()
-        self.assertEqual(result, RESULT)
+        self.assertEqual(result, mock_result)
+        # this test will only work if __eq__() is implemented for BOBase as follows
+        # def __eq__(self, other: PersistentBusinessObject) -> bool:
+        #     return {k: v for k, v in self._data.items()} == {
+        #         k: v for k, v in other._data.items()
+        #     }
+
+    @unittest.skip("this test will only work if __eq__() is implemented for BOBase")
+    async def test_104_get_matching_objects(self):
+        await self._104_get_matching_objects()
+        await self._104_get_matching_objects([])
+        await self._104_get_matching_objects(["mock_attr1", "mock_attr3"])
 
 
 class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
