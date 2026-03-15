@@ -200,7 +200,7 @@ class Test_600_Value(unittest.TestCase):
         self._test_600("mick", "mack", "mack", name="mick")
 
     def test_608_none_value(self):
-        self._test_600("mick", None, "mick", "None")
+        self._test_600_non_string("mick", None, "mick", None)
 
     def test_609_integer_value(self):
         self._test_600_non_string("mick", 100, "mick", 100)

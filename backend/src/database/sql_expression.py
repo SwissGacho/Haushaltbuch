@@ -250,6 +250,10 @@ class Value(SQLExpression):
 
         elif len(args) == 2:
             name, value = args
+        elif len(args) > 2:
+            raise ValueError(
+                f"Too many positional arguments, expected at most 2, got {len(args)}"
+            )
 
         if value is _MISSING:
             raise ValueError("Value must be provided")
