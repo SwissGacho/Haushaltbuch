@@ -237,19 +237,25 @@ class Value(SQLExpression):
         the second as the value.
         """
 
+        _MISSING = object()
+
         name: str = str(kwargs.get("name", ""))
-        value: Any = kwargs.get("value", None)
+        value: Any = kwargs.get("value", _MISSING)
+
         if len(args) == 1:
-            if not value:
+            if value is _MISSING:
                 value = args[0]
             else:
                 name = args[0]
+
         elif len(args) == 2:
             name, value = args
+
+        if value is _MISSING:
+            raise ValueError("Value must be provided")
+
         if not name:
             name = "param"
-        if not value:
-            raise ValueError("Value must be provided")
         if not isinstance(name, str):
             raise ValueError("Name must be a string")
         # LOG.debug(f"Value({name=}, {value=})")
