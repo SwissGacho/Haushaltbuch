@@ -80,12 +80,14 @@ class Test_100_Persistant_Business_Object_classmethods(
         self.assertIsNone(none_type)
 
         test_date_str = "2023-08-15"
-        date_type = PersistentBusinessObject.convert_from_db(test_date_str, date, {})
+        date_type = PersistentBusinessObject.convert_from_db(
+            test_date_str, datetime.date, {}
+        )
         self.assertEqual(datetime.date.fromisoformat(test_date_str), date_type)
 
         test_date_time_str = "2023-08-15T14:30:00+00:00"
         date_time_type = PersistentBusinessObject.convert_from_db(
-            test_date_time_str, datetime, {}
+            test_date_time_str, datetime.datetime, {}
         )
 
         # We need to compare to the actual datetime.fromisoformat result, because the timezone conversion may vary
@@ -249,7 +251,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_cursor.fetchone.assert_awaited_once_with()
             self.assertIs(result, self.mock_bo)
             for attr in mock_bo2_as_dict:
-                if isinstance(result._data[attr], datetime):
+                if isinstance(result._data[attr], datetime.datetime):
                     self.assertEqual(
                         result._data[attr],
                         datetime.datetime.fromisoformat(self.FETCH_RESULT[attr])
@@ -475,7 +477,7 @@ class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
 
         # convert 'CET' datetime string
         res = MockPersistantBO2.convert_from_db(
-            value=mock_dt_cet.isoformat(), typ=datetime, subtyp={}
+            value=mock_dt_cet.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_cet, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
@@ -489,21 +491,21 @@ class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
 
         # convert 'EST' datetime string
         res = MockPersistantBO2.convert_from_db(
-            value=mock_dt_est.isoformat(), typ=datetime, subtyp={}
+            value=mock_dt_est.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_est, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert 'UTC' datetime string
         res = MockPersistantBO2.convert_from_db(
-            value=mock_dt_utc.isoformat(), typ=datetime, subtyp={}
+            value=mock_dt_utc.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_utc, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert naive datetime string (assume UTC)
         res = MockPersistantBO2.convert_from_db(
-            value=mock_dt_none.isoformat(), typ=datetime, subtyp={}
+            value=mock_dt_none.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_none.replace(tzinfo=datetime.UTC), res)
         self.assertEqual(datetime.UTC, res.tzinfo)
