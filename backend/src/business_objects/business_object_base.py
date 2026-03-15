@@ -4,12 +4,15 @@ Business objects are classes that support persistance in the data base
 """
 
 import asyncio
+from datetime import datetime
 import itertools
 from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
+import weakref
 
 
 from core.util import _classproperty
-from core.app_logging import getLogger, log_exit
+from core.app_logging import getLogger, log_exit, logging
+from core.app import App
 
 LOG = getLogger(__name__)
 
@@ -33,7 +36,7 @@ class BOBase(BOBaseBase):
     "Business Object baseclass"
 
     id = BOId(
-        BOColumnConstraint.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_WRITE_ONLY
+        BOColumnConstraint.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_READ_ONLY
     )
     last_updated = BODatetime(
         BOColumnConstraint.BOC_DEFAULT_CURR | BOColumnConstraint.BOC_ON_UPDATE_CURR,
@@ -43,14 +46,16 @@ class BOBase(BOBaseBase):
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, type["BOBase"]] = {}
 
-    _loaded_instances: dict[int, "BOBase"] = {}
-
     _creation_subscribers: dict[int, BOCallback] = {}
     _change_subscribers: dict[int, BOCallback] = {}
 
     _last_subscriber_id = itertools.count(1)
 
     def __new__(cls, *args, identity: int | None = None, **attributes):
+        if cls is BOBase:
+            raise TypeError(
+                "BOBase is an abstract class and cannot be instantiated directly"
+            )
         if identity is not None:
             if identity in cls._loaded_instances:
                 obj = cls._loaded_instances[identity]
@@ -63,6 +68,9 @@ class BOBase(BOBaseBase):
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
+        cls._loaded_instances: weakref.WeakValueDictionary[int, Self] = (
+            weakref.WeakValueDictionary()
+        )
         cls._creation_subscribers = {}
         cls._change_subscribers = {}
 
@@ -77,6 +85,7 @@ class BOBase(BOBaseBase):
         self._instance_subscriber_id = itertools.count(1)
         for attribute, value in attributes.items():
             self._data[attribute] = value
+        BOBase.subscriptions_report()
 
     def handle_callback_result(self, task: asyncio.Task):
         """Logs exceptions from background callback tasks."""
@@ -97,6 +106,7 @@ class BOBase(BOBaseBase):
     def register_instance(cls, instance: "BOBase"):
         """Register an instance of this class as being loaded from the database."""
         if instance.id is not None:
+            LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
             cls._loaded_instances[instance.id] = instance  # type: ignore
 
     def __str__(self) -> str:
@@ -157,6 +167,7 @@ class BOBase(BOBaseBase):
 
     @classmethod
     def _name(cls) -> str:
+        "Normalized name of the business object class"
         return cls.__name__.lower()
 
     # pylint: disable=no-self-argument
@@ -260,9 +271,12 @@ class BOBase(BOBaseBase):
             raise ValueError("Callback must be callable")
         # Should only subscribe to subclasses, not to BOBase itself
         if cls is BOBase:
-            raise ValueError("Cannot subscribe to changes of BOBase itself")
+            raise ValueError(
+                f"Cannot subscribe to changes of BOBase itself (attempted to subscribe to {cls})"
+            )
         subscriber_id = next(cls._last_subscriber_id)
         cls._change_subscribers[subscriber_id] = callback
+        BOBase.subscriptions_report()
         return subscriber_id
 
     @classmethod
@@ -274,6 +288,7 @@ class BOBase(BOBaseBase):
             )
             return
         del cls._change_subscribers[callback_id]
+        BOBase.subscriptions_report()
 
     def subscribe_to_instance(self, callback: BOCallback) -> int:
         """Register a callback to be called when this instance changes or is deleted."""
@@ -281,6 +296,7 @@ class BOBase(BOBaseBase):
             raise ValueError("Callback must be callable")
         subscriber_id: int = next(self._instance_subscriber_id)
         self._instance_subscribers[subscriber_id] = callback
+        BOBase.subscriptions_report()
         return subscriber_id
 
     def unsubscribe_from_instance(self, callback_id: int):
@@ -291,6 +307,7 @@ class BOBase(BOBaseBase):
             )
             return
         del self._instance_subscribers[callback_id]
+        BOBase.subscriptions_report()
 
     async def business_values_as_dict(self) -> dict[str, Any]:
         "dict of BO attribute values with attribute names as keys"
@@ -353,6 +370,112 @@ class BOBase(BOBaseBase):
                 LOG.exception(
                     f"Error scheduling callback {callback.__name__} for {changed_bo!r}"
                 )
+
+    # pylint: disable=no-member
+    @classmethod
+    def subscriptions_report(cls):
+        "Report current subscriptions to external file"
+
+        # pylint: disable=protected-access
+        def subs_repr(subs, bo_name) -> list[str]:
+            rslt: list[str] = []
+            for sub in subs.values():
+                s = ""
+                if hasattr(sub, "__self__") and hasattr(sub.__self__, "_obj"):
+                    s += f"{bo_name}({sub.__self__._obj.id}): "
+                s += f"{sub.__self__._connection.connection_id}"
+                rslt.append(s)
+            return rslt
+
+        try:
+            subs_rep_cfg = App.configuration.get("subscriptions_report", {})
+        except:
+            return
+        if not isinstance(subs_rep_cfg, dict):
+            return
+        stats_file = subs_rep_cfg.get("path")
+        if not stats_file or not isinstance(stats_file, str):
+            return
+        subs = {}
+        include = subs_rep_cfg.get("incl", [])
+        if isinstance(include, str):
+            include = [include]
+        exclude = subs_rep_cfg.get("excl", [])
+        if isinstance(exclude, str):
+            exclude = [exclude]
+        if not isinstance(include, list) or not isinstance(exclude, list):
+            return
+
+        for bo_name, bo_class in [
+            (name, cls)
+            for name, cls in cls._business_objects.items()
+            if name not in exclude and (not include or name in include)
+        ]:
+            subs[bo_name] = {
+                "instances": [f"count={len(bo_class._loaded_instances)}"],
+                "creation subscribers": subs_repr(
+                    bo_class._creation_subscribers, bo_name
+                ),
+                "change subscribers": subs_repr(bo_class._change_subscribers, bo_name),
+            }
+            for instance in bo_class._loaded_instances.values():
+                if len(instance._instance_subscribers) > 0:
+                    subs[bo_name]["instances"].append(
+                        subs_repr(instance._instance_subscribers, bo_name)
+                    )
+                else:
+                    subs[bo_name]["instances"].append(f"{instance.id}: no subscribers")
+        # LOG.debug(f"{subs=}")
+        try:
+            with open(stats_file, "w", encoding="utf-8") as f:
+                f.write(f"{datetime.now().isoformat()} - Active subscriptions: \n")
+                f.write("\n")
+                pad = LeftPadder.pad
+                f.write(" " * 23)
+                for bo in sorted(subs.keys()):
+                    f.write(pad(bo))
+                f.write("\n")
+                f.write("+".rjust(23))
+                for bo in sorted(subs.keys()):
+                    f.write(pad("=+"))
+                f.write("\n")
+                items = [i for i in list(subs.values())[0].keys()]
+                for item in items:
+                    l = 0
+                    while True:
+                        last = True
+                        f.write(f"{item.rjust(20)}: |" if l == 0 else "|".rjust(23))
+                        for bo in sorted(subs.keys()):
+                            if len(subs[bo][item]) > l:
+                                f.write(pad(str(subs[bo][item][l])))
+                            else:
+                                f.write(pad(" |"))
+                            last &= len(subs[bo][item]) <= l + 1
+                        if last:
+                            break
+                        l += 1
+                        f.write("\n")
+                    f.write("\n")
+                    f.write("+".rjust(23))
+                    for bo in sorted(subs.keys()):
+                        f.write(pad("-+"))
+                    f.write("\n")
+        except Exception:  # pylint: disable=broad-exception-caught
+            LOG.exception(f"Error writing subscription statistics to {stats_file}")
+
+
+class LeftPadder:
+    "Utility class to left-pad a string with spaces for reporting purposes"
+
+    max_length = 10
+
+    @classmethod
+    def pad(cls, s: str) -> str:
+        "Pad the string s with spaces on the left to align it in a column."
+        if len(s) == 2:
+            return f"{s[0]*(cls.max_length+2)}{s[1]}"
+        cls.max_length = max(cls.max_length, len(s))
+        return f" {s.rjust(cls.max_length)} |"
 
 
 log_exit(LOG)

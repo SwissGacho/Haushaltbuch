@@ -1,6 +1,7 @@
 """Mix-In class for objects that can send messages to a websocket connection."""
 
 from core.app_logging import getLogger, Logger, log_exit
+from server.ws_connection_base import WSConnectionBase
 
 LOG: Logger = getLogger(__name__)
 
@@ -8,10 +9,14 @@ LOG: Logger = getLogger(__name__)
 class WSMessageSender:
     """Mix-In class for objects that can send messages to a websocket connection."""
 
-    def __init__(self, connection, *args, **kwargs):
+    def __init__(self, connection: WSConnectionBase, *args, **kwargs):
         LOG.debug(f"WSMessageSender.__init__({connection=}, {args=}, {kwargs=})")
         self._connection = connection
-        self._connection._register_message_sender(self)
+        self._connection.register_message_sender(self)
+
+    def release_subscriptions(self):
+        """Release subscriptions held by this message sender and unregister from the connection."""
+        self.cleanup()
 
     def cleanup(self):
         """Override this to release any resources."""

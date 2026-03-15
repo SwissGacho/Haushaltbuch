@@ -1,8 +1,6 @@
-from ast import Eq
-from os import name
 import unittest
 import re
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock
 from unittest.mock import patch
 
 from database.sql_expression import (
@@ -14,7 +12,6 @@ from database.sql_expression import (
     And,
     Or,
     Eq,
-    Is,
     IsNull,
     SQLBetween,
     Value,
@@ -173,6 +170,14 @@ class Test_600_Value(unittest.TestCase):
         )
         self.assertEqual(sql.get_name(), n)
 
+    def _test_600_non_string(self, n, v, *args, **kwargs):
+        sql = Value(*args, **kwargs)
+        self.assertEqual(sql.get_query(km=self.SQLKeyManager), "mockmanaged")
+        self.SQLKeyManager.merge_params.assert_called_once_with(
+            query=f":{n}", params={f"{n}": v}
+        )
+        self.assertEqual(sql.get_name(), n)
+
     def test_601_2_args(self):
         self._test_600("mick", "mack", "mick", "mack")
 
@@ -193,6 +198,21 @@ class Test_600_Value(unittest.TestCase):
 
     def test_607_mixed_args(self):
         self._test_600("mick", "mack", "mack", name="mick")
+
+    def test_608_none_value(self):
+        self._test_600_non_string("mick", None, "mick", None)
+
+    def test_609_integer_value(self):
+        self._test_600_non_string("mick", 100, "mick", 100)
+
+    def test_610_zero_value(self):
+        self._test_600_non_string("mick", 0, "mick", 0)
+
+    def test_611_various_none_cases(self):
+        Value(value=None)
+        Value("x", None)
+        Value(None)
+        self.assertRaises(ValueError, Value)
 
 
 class Test_700_Row(unittest.TestCase):
