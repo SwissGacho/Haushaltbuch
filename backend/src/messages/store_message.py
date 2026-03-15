@@ -27,17 +27,18 @@ class StoreMessage(Message):
         affected_bo = bo_type(bo_id=bo_id)
 
         # If there's a payload, update the affected_bo with the new values
-        payload = self.message.get(MessageAttribute.WS_ATTR_PAYLOAD)
-        if payload is not None:
-            for key, value in payload.items():
-                if key in bo_type.attributes_as_dict().keys():
-                    setattr(affected_bo, key, value)
-        new_id = await affected_bo.store()
+        payload = self.message.get(MessageAttribute.WS_ATTR_PAYLOAD, {})
+        if not isinstance(payload, dict):
+            raise ValueError("Payload of an ObjectMessage must be a JSON object")
+        for key, value in payload.items():
+            if key in bo_type.attributes_as_dict().keys():
+                setattr(affected_bo, key, value)
+        await affected_bo.store()
 
         # Send a response message back to the frontend with the new id of the stored business object
         response_message = ObjectMessage(
             object_type=bo_type,
-            index=new_id,
+            index=affected_bo.id,
             payload=await affected_bo.business_values_as_dict(),
         )
         await connection.send_message(response_message)

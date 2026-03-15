@@ -67,7 +67,7 @@ mock_attr_desc = [
         constraint=BOColumnConstraint.BOC_PK_INC,
         constraint_values={},
         attribute_type=AttributeType.ATYPE_INT,
-        access_level=AttributeAccessLevel.AAL_WRITE_ONLY,
+        access_level=AttributeAccessLevel.AAL_READ_ONLY,
     ),
     AttributeDescription(
         name="last_updated",
