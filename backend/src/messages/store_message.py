@@ -7,6 +7,7 @@ LOG: Logger = getLogger(__name__)
 
 from business_objects.business_object_base import BOBase
 from messages.message import Message, MessageAttribute, MessageType
+from messages.bo_message import ObjectMessage
 
 
 class StoreMessage(Message):
@@ -22,19 +23,25 @@ class StoreMessage(Message):
         object_type_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
         bo_type = BOBase.get_business_object_by_name(str(object_type_name))
         bo_id = self.message.get(MessageAttribute.WS_ATTR_INDEX)
-        if bo_id is not None:
-            LOG.debug(f"Updating existing BO {bo_type=} {bo_id=}")
-            updated_bo = bo_type(bo_id=bo_id)
-            for key, value in self.message.get(
-                MessageAttribute.WS_ATTR_PAYLOAD, {}
-            ).items():
-                if key in bo_type.attributes_as_dict().keys():
-                    setattr(updated_bo, key, value)
-            await updated_bo.store()
-            return
-        else:
-            new_bo = await bo_type().store()
-            LOG.debug(f"New BO created from StoreMessage {new_bo=}")
+
+        affected_bo = bo_type(bo_id=bo_id)
+
+        # If there's a payload, update the affected_bo with the new values
+        payload = self.message.get(MessageAttribute.WS_ATTR_PAYLOAD, {})
+        if not isinstance(payload, dict):
+            raise ValueError("Payload of an ObjectMessage must be a JSON object")
+        for key, value in payload.items():
+            if key in bo_type.attributes_as_dict().keys():
+                setattr(affected_bo, key, value)
+        await affected_bo.store()
+
+        # Send a response message back to the frontend with the new id of the stored business object
+        response_message = ObjectMessage(
+            object_type=bo_type,
+            index=affected_bo.id,
+            payload=await affected_bo.business_values_as_dict(),
+        )
+        await connection.send_message(response_message)
 
 
 log_exit(LOG)

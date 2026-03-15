@@ -61,7 +61,9 @@ class PersistentBusinessObject(BOBase):
             and issubclass(typ, BaseFlag)
             and isinstance(value, str)
         ):
-            value = subtyp["flag_type"].flags(value)
+            value = subtyp["flag_type"].flags(
+                value
+            )  # TODO: Probably also check if subtype is valid and has 'flag_type' key
         return copy.deepcopy(value)
 
     @classmethod
@@ -157,7 +159,7 @@ class PersistentBusinessObject(BOBase):
         await super().store()
 
     async def business_values_as_dict(self) -> dict[str, Any]:
-        LOG.debug(f"{self}.business_values_as_dict: {self.id=}")
+        # LOG.debug(f"{self}.business_values_as_dict: {self.id=}")
         await self.fetch(self.id)
         return await super().business_values_as_dict()
 

@@ -60,6 +60,7 @@ class Test_100__ObjectSchema(unittest.TestCase):
                 continue
             self.assertEqual(
                 {
+                    "access_level": v.access_level,
                     "type": obj.attribute_type_representation(v.attribute_type),
                     "flags": {
                         k: (obj.constraint_values_representation(val))
