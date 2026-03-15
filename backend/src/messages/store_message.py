@@ -7,6 +7,7 @@ LOG: Logger = getLogger(__name__)
 
 from business_objects.business_object_base import BOBase
 from messages.message import Message, MessageAttribute, MessageType
+from messages.bo_message import ObjectMessage
 
 
 class StoreMessage(Message):
@@ -31,7 +32,15 @@ class StoreMessage(Message):
             for key, value in payload.items():
                 if key in bo_type.attributes_as_dict().keys():
                     setattr(affected_bo, key, value)
-        await affected_bo.store()
+        new_id = await affected_bo.store()
+
+        # Send a response message back to the frontend with the new id of the stored business object
+        response_message = ObjectMessage(
+            object_type=bo_type,
+            index=new_id,
+            payload=await affected_bo.business_values_as_dict(),
+        )
+        await connection.send_message(response_message)
 
 
 log_exit(LOG)
