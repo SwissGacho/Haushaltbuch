@@ -85,6 +85,7 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         float: "DOUBLE",
         str: "VARCHAR(100)",
         datetime.datetime: "DATETIME",
+        datetime.date: "DATE",
         dict: MYSQL_JSON_TYPE,
         list: MYSQL_JSON_TYPE,
         BOBaseBase: "INT",
