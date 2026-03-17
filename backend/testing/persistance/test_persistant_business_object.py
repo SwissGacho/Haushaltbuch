@@ -40,6 +40,12 @@ class MockPersistantBO2(PersistentBusinessObject):
         self.mock_attr2 = mock_attr2
         self.mock_attr3 = mock_attr3
 
+    def __eq__(self, other: PersistentBusinessObject) -> bool:
+        """This is only for testing purposes and assumes that the _data dict contains all relevant attributes of the BO"""
+        return {k: v for k, v in self._data.items()} == {
+            k: v for k, v in other._data.items()
+        }
+
 
 class MockAttrDesc:
     def __init__(self, name, data_type, constraint, constraint_values):
@@ -239,13 +245,7 @@ class Test_100_Persistant_Business_Object_classmethods(
         mock_sql.execute.assert_awaited_once_with()
         mock_cursor.fetchall.assert_awaited_once_with()
         self.assertEqual(result, mock_result)
-        # this test will only work if __eq__() is implemented for BOBase as follows
-        # def __eq__(self, other: PersistentBusinessObject) -> bool:
-        #     return {k: v for k, v in self._data.items()} == {
-        #         k: v for k, v in other._data.items()
-        #     }
 
-    @unittest.skip("this test will only work if __eq__() is implemented for BOBase")
     async def test_104_get_matching_objects(self):
         await self._104_get_matching_objects()
         await self._104_get_matching_objects([])
