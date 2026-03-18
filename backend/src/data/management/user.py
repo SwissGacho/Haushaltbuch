@@ -8,7 +8,7 @@ LOG = getLogger(__name__)
 
 from business_objects.business_attribute_base import BaseFlag
 from business_objects.persistant_business_object import PersistentBusinessObject
-from business_objects.bo_descriptors import BOStr, BOFlag
+from business_objects.bo_descriptors import BOStr, BOFlag, BODate
 
 
 class UserRole(BaseFlag):
@@ -24,6 +24,7 @@ class User(PersistentBusinessObject):
     name = BOStr()
     password = BOStr()
     role = BOFlag(UserRole)
+    birthday = BODate()
 
 
 log_exit(LOG)

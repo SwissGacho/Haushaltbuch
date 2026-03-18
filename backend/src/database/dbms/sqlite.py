@@ -46,6 +46,7 @@ class SQLiteSQLFactory(SQLFactory):
 
 SQLITE_JSON_TYPE = "JSON"
 SQLITE_BASEFLAG_TYPE = "FLAG"
+SQLITE_DATE_TYPE = "ISODATE"
 
 
 class SQLiteColumnDefinition(SQLColumnDefinition):
@@ -56,6 +57,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         float: "REAL",
         str: "TEXT",
         datetime.datetime: "TEXT",
+        datetime.date: SQLITE_DATE_TYPE,
         dict: SQLITE_JSON_TYPE,
         list: SQLITE_JSON_TYPE,
         BOBaseBase: "INTEGER",
@@ -88,8 +90,16 @@ def _adapt_flag(value: BaseFlag) -> str:
     return str(value)
 
 
+def _adapt_date_iso(value: datetime.date) -> str:
+    return value.isoformat()
+
+
 def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
+
+
+def _convert_isodate(value: bytes) -> datetime.date:
+    return datetime.date.fromisoformat(value.decode())
 
 
 if sqlite3:
@@ -97,7 +107,9 @@ if sqlite3:
     sqlite3.register_adapter(dict, _adapt_dict)
     sqlite3.register_adapter(list, _adapt_list)
     sqlite3.register_adapter(BaseFlag, _adapt_flag)
+    sqlite3.register_adapter(datetime.date, _adapt_date_iso)
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
+    sqlite3.register_converter(SQLITE_DATE_TYPE, _convert_isodate)
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):
