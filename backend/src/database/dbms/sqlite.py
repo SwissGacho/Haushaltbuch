@@ -46,6 +46,7 @@ class SQLiteSQLFactory(SQLFactory):
 
 SQLITE_JSON_TYPE = "JSON"
 SQLITE_BASEFLAG_TYPE = "FLAG"
+SQLITE_DATETIME_TYPE = "ISODATETIME"
 
 
 class SQLiteColumnDefinition(SQLColumnDefinition):
@@ -55,7 +56,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         int: "INTEGER",
         float: "REAL",
         str: "TEXT",
-        datetime: "TIMESTAMP",
+        datetime: SQLITE_DATETIME_TYPE,
         dict: SQLITE_JSON_TYPE,
         list: SQLITE_JSON_TYPE,
         BOBaseBase: "INTEGER",
@@ -100,7 +101,7 @@ def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
 
-def _convert_timestamp(value: bytes) -> datetime:
+def _convert_isodatetime(value: bytes) -> datetime:
     dt: datetime = datetime.fromisoformat(value.decode())
     # Interpret naive values (e.g. from CURRENT_TIMESTAMP) as UTC
     if dt.tzinfo is None:
@@ -115,7 +116,7 @@ if sqlite3:
     sqlite3.register_adapter(BaseFlag, _adapt_flag)
     sqlite3.register_adapter(datetime, _adapt_datetime_iso)
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
-    sqlite3.register_converter("TIMESTAMP", _convert_timestamp)
+    sqlite3.register_converter(SQLITE_DATETIME_TYPE, _convert_isodatetime)
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):
