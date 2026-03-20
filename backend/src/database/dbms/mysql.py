@@ -90,6 +90,7 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         int: "INT",
         float: "DOUBLE",
         str: "VARCHAR(100)",
+        datetime.date: "DATE",
         datetime.datetime: timestamp_datatype,
         dict: MYSQL_JSON_TYPE,
         list: MYSQL_JSON_TYPE,
