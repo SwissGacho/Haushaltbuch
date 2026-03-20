@@ -1,7 +1,7 @@
 """Connection to SQLit DB using aiosqlite"""
 
 from typing import Self, Any, Optional
-import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 import json
 import re
@@ -47,6 +47,7 @@ class SQLiteSQLFactory(SQLFactory):
 SQLITE_JSON_TYPE = "JSON"
 SQLITE_BASEFLAG_TYPE = "FLAG"
 SQLITE_DATE_TYPE = "ISODATE"
+SQLITE_DATETIME_TYPE = "ISODATETIME"
 
 
 class SQLiteColumnDefinition(SQLColumnDefinition):
@@ -56,8 +57,8 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         int: "INTEGER",
         float: "REAL",
         str: "TEXT",
-        datetime.datetime: "TEXT",
         datetime.date: SQLITE_DATE_TYPE,
+        datetime: SQLITE_DATETIME_TYPE,
         dict: SQLITE_JSON_TYPE,
         list: SQLITE_JSON_TYPE,
         BOBaseBase: "INTEGER",
@@ -72,6 +73,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         BOColumnConstraint.BOC_FK: "REFERENCES {relation}",
         BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
         BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        BOColumnConstraint.BOC_ON_UPDATE_CURR: "",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
@@ -93,13 +95,28 @@ def _adapt_flag(value: BaseFlag) -> str:
 def _adapt_date_iso(value: datetime.date) -> str:
     return value.isoformat()
 
+  
+def _adapt_datetime_iso(value: datetime) -> str:
+    """Adapt a datetime value to an ISO 8601 timestamp string."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.isoformat()
 
+  
 def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
-
+  
 def _convert_isodate(value: bytes) -> datetime.date:
     return datetime.date.fromisoformat(value.decode())
+  
+  
+def _convert_isodatetime(value: bytes) -> datetime:
+    dt: datetime = datetime.fromisoformat(value.decode())
+    # Interpret naive values (e.g. from CURRENT_TIMESTAMP) as UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 if sqlite3:
@@ -108,8 +125,11 @@ if sqlite3:
     sqlite3.register_adapter(list, _adapt_list)
     sqlite3.register_adapter(BaseFlag, _adapt_flag)
     sqlite3.register_adapter(datetime.date, _adapt_date_iso)
+    sqlite3.register_adapter(datetime.datetime, _adapt_datetime_iso)
+    
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
     sqlite3.register_converter(SQLITE_DATE_TYPE, _convert_isodate)
+    sqlite3.register_converter(SQLITE_DATETIME_TYPE, _convert_isodatetime)
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):

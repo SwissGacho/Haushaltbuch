@@ -77,6 +77,12 @@ def baseflag_datatype(data_type: type, **args) -> str:
     return f"SET ({flags})"
 
 
+def timestamp_datatype(data_type: type, constraints: BOColumnConstraint, **args) -> str:
+    if constraints & BOColumnConstraint.BOC_ON_UPDATE_CURR:
+        return "TIMESTAMP(6)"
+    return "DATETIME"
+
+
 class MySQLColumnDefinition(SQLColumnDefinition):
     """Definition of a column in a CREATE TABLE statement for MySQL/MariaDB"""
 
@@ -84,8 +90,8 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         int: "INT",
         float: "DOUBLE",
         str: "VARCHAR(100)",
-        datetime.datetime: "DATETIME",
         datetime.date: "DATE",
+        datetime.datetime: timestamp_datatype,
         dict: MYSQL_JSON_TYPE,
         list: MYSQL_JSON_TYPE,
         BOBaseBase: "INT",
@@ -99,7 +105,8 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         BOColumnConstraint.BOC_PK_INC: "AUTO_INCREMENT PRIMARY KEY",
         BOColumnConstraint.BOC_FK: "REFERENCES {relation} (id)",
         BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
-        BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP(6)",
+        BOColumnConstraint.BOC_ON_UPDATE_CURR: "ON UPDATE CURRENT_TIMESTAMP(6)",
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
@@ -116,17 +123,16 @@ class MySQLScript(SQLScript):
                                 CONCAT_WS(' ',
                                     columns.COLUMN_NAME,
                                     CASE WHEN SUBSTR(constraints.CHECK_CLAUSE, 1, 4) = 'json' THEN 'JSON'
-                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit' ) THEN UPPER(columns.COLUMN_TYPE)
+                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit', 'timestamp' ) THEN UPPER(columns.COLUMN_TYPE)
                                         WHEN columns.DATA_TYPE = 'set' THEN CONCAT('SET ', SUBSTR(columns.COLUMN_TYPE,4))
                                         ELSE UPPER(columns.DATA_TYPE) END,
                                     UPPER(CASE WHEN columns.IS_NULLABLE <> 'YES' AND columns.COLUMN_KEY <> 'PRI' THEN 'NOT NULL' 
                                         ELSE NULL END),
+                                    UPPER(CASE WHEN columns.COLUMN_DEFAULT IS NULL OR columns.COLUMN_DEFAULT = 'NULL' THEN NULL
+                                        ELSE CONCAT('default ', columns.COLUMN_DEFAULT) END),
                                     UPPER(CASE WHEN columns.EXTRA <> '' THEN columns.EXTRA ELSE NULL END),
                                     UPPER(CASE WHEN key_cols.CONSTRAINT_NAME = 'PRIMARY' THEN 'PRIMARY KEY' 
                                         ELSE NULL END),
-                                    UPPER(CASE WHEN columns.COLUMN_DEFAULT IS NULL OR columns.COLUMN_DEFAULT = 'NULL' THEN NULL
-                                        WHEN columns.COLUMN_DEFAULT = 'current_timestamp()' THEN 'default current_timestamp'
-                                        ELSE CONCAT('default', columns.COLUMN_DEFAULT) END),
                                     CASE WHEN key_cols.REFERENCED_TABLE_NAME IS NOT NULL
                                         THEN CONCAT('REFERENCES ', key_cols.REFERENCED_TABLE_NAME, ' (', key_cols.REFERENCED_COLUMN_NAME, ')')
                                         ELSE NULL END
@@ -211,13 +217,13 @@ class MySQLDB(DB):
 
         if asyncmy is None:
             raise ImportError("asyncmy module is not available.")
-
         self.connection_pool = await asyncmy.create_pool(
             host=self._cfg.get(Config.CONFIG_DBHOST, "localhost"),
             db=self._cfg.get(Config.CONFIG_DBDBNAME, "moneypilot"),
             port=self._cfg.get(Config.CONFIG_DBPORT, 3306),
             user=self._cfg.get(Config.CONFIG_DBUSER),
             password=self._cfg.get(Config.CONFIG_DBPW),
+            init_command="SET time_zone = '+00:00'",
             ssl=ssl_ctx,
             minsize=1,
             maxsize=50,

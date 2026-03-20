@@ -39,7 +39,7 @@ class BOBase(BOBaseBase):
         BOColumnConstraint.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_READ_ONLY
     )
     last_updated = BODatetime(
-        BOColumnConstraint.BOC_DEFAULT_CURR,
+        BOColumnConstraint.BOC_DEFAULT_CURR | BOColumnConstraint.BOC_ON_UPDATE_CURR,
         access_level=AttributeAccessLevel.AAL_READ_ONLY,
     )
     _table = None
