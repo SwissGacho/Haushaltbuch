@@ -21,6 +21,7 @@ from messages.message import MessageAttribute
 from messages.object_list import ObjectList
 from business_objects.business_object_base import BOBase
 from business_objects.transient_business_object import TransientBusinessObject
+from business_objects.persistant_business_object import PersistentBusinessObject
 from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 
@@ -154,11 +155,18 @@ class BOList(BOSubscription[T]):
 
     async def notify_subscription_subscribers(self):
         """Notify subscribers about the current state of the list."""
-        name_list = [cur.id for cur in await self._get_objects_()]
-        LOG.debug(
-            f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} "
-            f"with {len(name_list)} objects"
-        )
+        if self._bo_type is None or not issubclass(
+            self._bo_type, PersistentBusinessObject
+        ):
+            raise ValueError(
+                f"BOList.notify_subscription_subscribers: _bo_type is not a PersistentBusinessObject ({self._bo_type})"
+            )
+        bo_type = self._bo_type.__name__
+        name_list = [
+            {"id": cur.id, "display_name": cur.display_name}
+            for cur in await self._bo_type.get_matching_objects(attributes=["name"])
+        ]
+        LOG.debug(f"Updating subscribers of {bo_type} with {len(name_list)} objects")
         msg = ObjectList()
         msg.add(
             {

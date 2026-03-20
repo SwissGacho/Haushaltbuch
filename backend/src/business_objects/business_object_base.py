@@ -102,19 +102,26 @@ class BOBase(BOBaseBase):
             f"({', '.join([a+': '+str(v) for a,v in self._data.items()])})"
         )
 
-    @classmethod
-    def register_instance(cls, instance: "BOBase"):
-        """Register an instance of this class as being loaded from the database."""
-        if instance.id is not None:
-            LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
-            cls._loaded_instances[instance.id] = instance  # type: ignore
-
     def __str__(self) -> str:
         return (
             f"{self.__class__.__name__}({self.id})"
             if self.id
             else f"{self.__class__.__name__}(no id)"
         )
+
+    @property
+    def display_name(self) -> str:
+        """A human-readable name for this business object instance, used in the frontend."""
+        if hasattr(self, "name") and self.name is not None:
+            return str(self.name)
+        return self.__str__()
+
+    @classmethod
+    def register_instance(cls, instance: "BOBase"):
+        """Register an instance of this class as being loaded from the database."""
+        if instance.id is not None:
+            # LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
+            cls._loaded_instances[instance.id] = instance  # type: ignore
 
     @classmethod
     def add_attribute(
@@ -238,6 +245,13 @@ class BOBase(BOBaseBase):
     async def get_matching_ids(cls, conditions: dict | None = None) -> list[int]:
         """Get the ids of business objects matching the conditions"""
         raise NotImplementedError("get_matching_ids not implemented")
+
+    @classmethod
+    async def get_matching_objects(
+        cls, conditions: dict | None = None, attributes: list[str] | None = None
+    ) -> list["BOBase"]:
+        """Get the business objects matching the conditions"""
+        raise NotImplementedError("get_matching_objects not implemented")
 
     @classmethod
     def subscribe_to_creation(cls, callback: BOCallback):
