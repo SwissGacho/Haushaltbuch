@@ -72,7 +72,8 @@ mock_attr_desc = [
     AttributeDescription(
         name="last_updated",
         data_type=datetime.datetime,
-        constraint=BOColumnConstraint.BOC_DEFAULT_CURR,
+        constraint=BOColumnConstraint.BOC_DEFAULT_CURR
+        | BOColumnConstraint.BOC_ON_UPDATE_CURR,
         constraint_values={},
         attribute_type=AttributeType.ATYPE_DATETIME,
         access_level=AttributeAccessLevel.AAL_READ_ONLY,

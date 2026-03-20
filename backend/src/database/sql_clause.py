@@ -43,7 +43,9 @@ class SQLColumnDefinition(SQLManagedExecutable):
             )
         _data_type = self.__class__.type_map[data_type]
         self._data_type = (
-            _data_type(data_type, **args) if callable(_data_type) else _data_type
+            _data_type(data_type=data_type, constraints=constraints, **args)
+            if callable(_data_type)
+            else _data_type
         )
         self._constraint = constraints
         self._arguments = args
