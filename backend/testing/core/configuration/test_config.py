@@ -42,7 +42,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             mock_cmdline_cfg = {"Mock": "Config"} | mock_db_cfg
             mock_prs_cmdline.return_value = mock_cmdline_cfg
             mock_dbcfg.set_db_configuration = Mock()
-            mock_dbcfg.read_db_config_file = Mock()
+            mock_dbcfg.read_db_config_file = Mock(return_value={})
 
             self.config_obj.initialize_configuration()
 
@@ -59,7 +59,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             mock_cmdline_cfg = {"Mock": "Config"} | mock_db_cfg
             mock_prs_cmdline.return_value = mock_cmdline_cfg
             mock_dbcfg.set_db_configuration = Mock()
-            mock_dbcfg.read_db_config_file = Mock()
+            mock_dbcfg.read_db_config_file = Mock(return_value={})
 
             self.config_obj.initialize_configuration()
 

@@ -45,6 +45,7 @@ class BOColumnConstraint(Flag):
     BOC_DEFAULT = auto()
     BOC_CURRENT_TS = auto()
     BOC_DEFAULT_CURR = auto()
+    BOC_ON_UPDATE_CURR = auto()
 
 
 @dataclass(frozen=True)
@@ -169,8 +170,8 @@ class BOId(BOInt):
     def __set__(self, obj, value):
         if self.my_name in obj._data and obj._data[self.my_name] is not None:
             raise ValueError("Cannot set id of existing object")
-        obj.__class__.register_instance(obj)
         super().__set__(obj=obj, value=value)
+        obj.__class__.register_instance(obj)
 
 
 class BOStr(_PersistantAttr[str]):

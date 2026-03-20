@@ -77,6 +77,7 @@ class ObjectSchema(Message):
                 for k, v in attribute.constraint_values.items()
                 if v is not None
             },
+            "access_level": str(attribute.access_level.value),
         }
 
     def generate_payload(

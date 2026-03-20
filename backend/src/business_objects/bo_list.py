@@ -47,6 +47,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         # print(f"BOSubscription.__init__({bo_type=}, {connection=})")
         # LOG.debug(f"===============================================")
         LOG.debug(f"BOSubscription.__init__({bo_type=}, {id=}, {connection=})")
+
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
 
@@ -69,6 +70,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         self._bo_type: Type[T] = bo_type
         self._instance_subscriptions: dict[int, T] = {}
         self._initialize_subscriptions(id=id)
+        connection.unregister_other_senders(self)
         if notify_subscribers_on_init:
             asyncio.create_task(self.notify_subscription_subscribers())
 
@@ -80,7 +82,8 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
 
         bo_id = int(kwargs["id"])
         bo = self._bo_type(bo_id=bo_id)
-        self._subscription_id = bo.subscribe_to_all_changes(self._handle_event_)
+
+        self._subscription_id = bo.subscribe_to_instance(self._handle_event_)
         self._obj = bo
 
     async def _get_objects_(self) -> list[T]:
@@ -113,6 +116,8 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
             f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} "
             f"with {len(name_list)} objects"
         )
+        BOBase.subscriptions_report()
+
         await self.send_message(
             ObjectMessage(
                 object_type=self._bo_type,
@@ -135,7 +140,8 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         if self._obj is None:
             LOG.debug("BOSubscription.cleanup: Cannot cleanup, _obj is None")
             return
-        self._obj.unsubscribe_from_all_changes(self._subscription_id)
+        self._obj.unsubscribe_from_instance(self._subscription_id)
+        self._connection.unregister_message_sender(self)
 
 
 class BOList(BOSubscription[T]):
@@ -143,7 +149,6 @@ class BOList(BOSubscription[T]):
     the business object type and updates its own subscribers accordingly."""
 
     def _initialize_subscriptions(self, **kwargs):
-
         self._subscription_id = self._bo_type.subscribe_to_all_changes(
             self._handle_event_
         )
@@ -170,7 +175,9 @@ class BOList(BOSubscription[T]):
             }
         )
         # LOG.debug(f"BOList.update_subscribers {msg=}")
-        await self.send_message(msg)
+
+        # TODO: Why await? Or rather, why return the result of await, which is None?
+        return await self.send_message(msg)
 
     async def _get_objects_(self) -> list[T]:
         if self._bo_type is None:
@@ -191,6 +198,7 @@ class BOList(BOSubscription[T]):
             LOG.debug("BOList.cleanup: Cannot cleanup, _bo_type is None")
             return
         self._bo_type.unsubscribe_from_all_changes(self._subscription_id)
+        self._connection.unregister_message_sender(self)
 
 
 log_exit(LOG)
