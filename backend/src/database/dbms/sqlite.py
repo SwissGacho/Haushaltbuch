@@ -1,7 +1,7 @@
 """Connection to SQLit DB using aiosqlite"""
 
 from typing import Self, Any, Optional
-from datetime import datetime, UTC
+from datetime import datetime, date, UTC
 from pathlib import Path
 import json
 import re
@@ -57,7 +57,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         int: "INTEGER",
         float: "REAL",
         str: "TEXT",
-        datetime.date: SQLITE_DATE_TYPE,
+        date: SQLITE_DATE_TYPE,
         datetime: SQLITE_DATETIME_TYPE,
         dict: SQLITE_JSON_TYPE,
         list: SQLITE_JSON_TYPE,
@@ -92,25 +92,25 @@ def _adapt_flag(value: BaseFlag) -> str:
     return str(value)
 
 
-def _adapt_date_iso(value: datetime.date) -> str:
+def _adapt_date_iso(value: date) -> str:
     return value.isoformat()
 
-  
+
 def _adapt_datetime_iso(value: datetime) -> str:
     """Adapt a datetime value to an ISO 8601 timestamp string."""
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
     return value.isoformat()
 
-  
+
 def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
-  
-def _convert_isodate(value: bytes) -> datetime.date:
-    return datetime.date.fromisoformat(value.decode())
-  
-  
+
+def _convert_isodate(value: bytes) -> date:
+    return date.fromisoformat(value.decode())
+
+
 def _convert_isodatetime(value: bytes) -> datetime:
     dt: datetime = datetime.fromisoformat(value.decode())
     # Interpret naive values (e.g. from CURRENT_TIMESTAMP) as UTC
@@ -124,9 +124,9 @@ if sqlite3:
     sqlite3.register_adapter(dict, _adapt_dict)
     sqlite3.register_adapter(list, _adapt_list)
     sqlite3.register_adapter(BaseFlag, _adapt_flag)
-    sqlite3.register_adapter(datetime.date, _adapt_date_iso)
-    sqlite3.register_adapter(datetime.datetime, _adapt_datetime_iso)
-    
+    sqlite3.register_adapter(date, _adapt_date_iso)
+    sqlite3.register_adapter(datetime, _adapt_datetime_iso)
+
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
     sqlite3.register_converter(SQLITE_DATE_TYPE, _convert_isodate)
     sqlite3.register_converter(SQLITE_DATETIME_TYPE, _convert_isodatetime)
