@@ -38,6 +38,18 @@ class MockConnection:
 
 
 class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        # self.conPatcher.start()
+        self.patchers = {
+            patch("business_objects.bo_list.BOBase", MockBOBase),
+            # patch("server.ws_connection.WS_Connection", MockConnection),
+        }
+        for patcher in self.patchers:
+            patcher.start()
+
+    def tearDown(self):
+        for patcher in self.patchers:
+            patcher.stop()
 
     async def test_101_test_initialization(self):
         con = Mock()
@@ -92,16 +104,6 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
         )
         con.unregister_message_sender.assert_called_once()
 
-    def setUp(self) -> None:
-        self.patcher = patch("business_objects.bo_list.BOBase", MockBOBase)
-        # self.conPatcher = patch("server.ws_connection.WS_Connection", MockConnection)
-        # self.conPatcher.start()
-        self.patcher.start()
-
-    def tearDown(self):
-        # self.conPatcher.stop()
-        self.patcher.stop()
-
 
 class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
@@ -111,12 +113,10 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
                 "business_objects.bo_list.PersistentBusinessObject",
                 MockPersistentBusinessObject,
             ),
+            # patch("server.ws_connection.WS_Connection", MockConnection)
         }
         for patcher in self.patchers:
             patcher.start()
-
-        # self.conPatcher = patch("server.ws_connection.WS_Connection", MockConnection)
-        # self.conPatcher.start()
 
     def tearDown(self):
         for patcher in self.patchers:
