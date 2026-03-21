@@ -1,6 +1,6 @@
-""" Data classes package
-    On import this pakage import all data classes it contains.
-    Any classes having a name starting with '_' are ignored.
+"""Data classes package
+On import this pakage import all data classes it contains.
+Any classes having a name starting with '_' are ignored.
 """
 
 import importlib
@@ -12,6 +12,7 @@ LOG = getLogger(__name__)
 
 
 def import_business_objects():
+    "Import all business object modules to register their classes"
     base_path = pathlib.Path(__file__).parent
     rel_paths = [p.relative_to(base_path.parent) for p in base_path.rglob("*.py")]
     modules = [

@@ -1,0 +1,276 @@
+"""Connection to SQLit DB using aiosqlite"""
+
+from typing import Self, Any, Optional
+from datetime import datetime, date, UTC
+from pathlib import Path
+import json
+import re
+
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
+from core.exceptions import OperationalError
+from core.configuration.config import Config
+from database.dbms.db_base import DB, Connection, Cursor
+from database.sql import SQL
+from database.sql_statement import SQLTemplate, SQLScript
+from database.sql_clause import SQLColumnDefinition
+from database.sql_factory import SQLFactory
+from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
+from business_objects.business_attribute_base import BaseFlag
+
+# pylint: disable=invalid-name
+try:
+    import aiosqlite
+    import sqlite3
+except ModuleNotFoundError as err:
+    AIOSQLITE_IMPORT_ERROR = err
+    aiosqlite = None
+    sqlite3 = None
+else:
+    AIOSQLITE_IMPORT_ERROR = None
+
+
+class SQLiteSQLFactory(SQLFactory):
+    "SQL Factory for SQLite DB"
+
+    @classmethod
+    def get_sql_class(cls, sql_cls: type):
+        # LOG.debug(f"SQLiteSQLFactory.get_sql_class({sql_cls=})")
+        for sqlite_class in [SQLiteColumnDefinition, SQLiteScript]:
+            if sql_cls.__name__ in [b.__name__ for b in sqlite_class.__bases__]:
+                return sqlite_class
+        return super().get_sql_class(sql_cls)
+
+
+SQLITE_JSON_TYPE = "JSON"
+SQLITE_BASEFLAG_TYPE = "FLAG"
+SQLITE_DATE_TYPE = "ISODATE"
+SQLITE_DATETIME_TYPE = "ISODATETIME"
+
+
+class SQLiteColumnDefinition(SQLColumnDefinition):
+    "Column definition for SQLite DB"
+
+    type_map = {
+        int: "INTEGER",
+        float: "REAL",
+        str: "TEXT",
+        date: SQLITE_DATE_TYPE,
+        datetime: SQLITE_DATETIME_TYPE,
+        dict: SQLITE_JSON_TYPE,
+        list: SQLITE_JSON_TYPE,
+        BOBaseBase: "INTEGER",
+        BaseFlag: SQLITE_BASEFLAG_TYPE,
+    }
+    constraint_map = {
+        BOColumnConstraint.BOC_NONE: "",
+        BOColumnConstraint.BOC_NOT_NULL: "NOT NULL",
+        BOColumnConstraint.BOC_UNIQUE: "UNIQUE",
+        BOColumnConstraint.BOC_PK: "PRIMARY KEY",
+        BOColumnConstraint.BOC_PK_INC: "PRIMARY KEY AUTOINCREMENT",
+        BOColumnConstraint.BOC_FK: "REFERENCES {relation}",
+        BOColumnConstraint.BOC_DEFAULT: "DEFAULT",
+        BOColumnConstraint.BOC_DEFAULT_CURR: "DEFAULT CURRENT_TIMESTAMP",
+        BOColumnConstraint.BOC_ON_UPDATE_CURR: "",
+        # BOColumnFlag.BOC_INC: "not available ! @%?°",
+        # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
+    }
+
+
+def _adapt_dict(value: dict) -> str:
+    return json.dumps(value, separators=(",", ":"))
+
+
+def _adapt_list(value: list) -> str:
+    return json.dumps(value, separators=(",", ":"))
+
+
+def _adapt_flag(value: BaseFlag) -> str:
+    # LOG.debug(f"SQLite._adapt_flag({value=})")
+    return str(value)
+
+
+def _adapt_date_iso(value: date) -> str:
+    return value.isoformat()
+
+
+def _adapt_datetime_iso(value: datetime) -> str:
+    """Adapt a datetime value to an ISO 8601 timestamp string."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.isoformat()
+
+
+def _convert_json(value: bytes) -> dict | list:
+    return json.loads(value)
+
+
+def _convert_isodate(value: bytes) -> date:
+    return date.fromisoformat(value.decode())
+
+
+def _convert_isodatetime(value: bytes) -> datetime:
+    dt: datetime = datetime.fromisoformat(value.decode())
+    # Interpret naive values (e.g. from CURRENT_TIMESTAMP) as UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+if sqlite3:
+
+    sqlite3.register_adapter(dict, _adapt_dict)
+    sqlite3.register_adapter(list, _adapt_list)
+    sqlite3.register_adapter(BaseFlag, _adapt_flag)
+    sqlite3.register_adapter(date, _adapt_date_iso)
+    sqlite3.register_adapter(datetime, _adapt_datetime_iso)
+
+    sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
+    sqlite3.register_converter(SQLITE_DATE_TYPE, _convert_isodate)
+    sqlite3.register_converter(SQLITE_DATETIME_TYPE, _convert_isodatetime)
+
+    # Register adapter and converter for all existing Flag subclasses
+    for flag_type in list(BaseFlag.__subclasses__()):
+        # LOG.debug(f"Registering adapter and converter for {flag_type=}")
+        sqlite3.register_adapter(flag_type, _adapt_flag)
+
+    # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses
+    flag_original_init_subclass = BaseFlag.__init_subclass__
+
+    def _flag_init_selfregistering_subclass(cls):
+        if sqlite3 is None:
+            raise ImportError("sqlite3 module is not available.")
+        flag_original_init_subclass()
+        LOG.debug(f"Self-Registering adapter and converter for {cls=}")
+        sqlite3.register_adapter(cls, _adapt_flag)
+
+    BaseFlag.__init_subclass__ = classmethod(_flag_init_selfregistering_subclass)  # type: ignore
+
+
+class SQLiteScript(SQLScript):
+    "SQLScripts for SQLite DB"
+
+    sql_templates = {
+        SQLTemplate.TABLELIST: """ SELECT name as table_name FROM sqlite_master
+                                    WHERE type = 'table' and substr(name,1,7) <> 'sqlite_'
+                                """,
+        SQLTemplate.TABLESQL: """SELECT sql FROM sqlite_master
+                                WHERE type='table' AND name = :table
+                            """,
+        SQLTemplate.VIEWLIST: """ SELECT name as view_name FROM sqlite_master
+                                    WHERE type = 'view' and substr(name,1,7) <> 'sqlite_'
+                                """,
+    }
+
+
+class SQLiteDB(DB):
+    "SQLite Database"
+
+    def __init__(self, **cfg) -> None:
+        if AIOSQLITE_IMPORT_ERROR:
+            raise ModuleNotFoundError(f"Import error: {AIOSQLITE_IMPORT_ERROR}")
+        super().__init__(**cfg)
+
+    @property
+    def sql_factory(self):
+        return SQLiteSQLFactory
+
+    async def _get_table_info(self, table_name: str) -> dict[str, str]:
+        # LOG.debug(f"SQLiteDB._get_table_info({table_name=})")
+        async with SQL() as sql:
+            sql_text = (
+                await (
+                    await sql.script(SQLTemplate.TABLESQL, table=table_name).execute()
+                ).fetchone()
+            )["sql"]
+        match = re.search(r"\(([^\)]*)\)", sql_text)
+        info = (
+            {col.split(" ")[0]: col for col in [s.strip() for s in match[1].split(",")]}
+            if match
+            else {}
+        )
+        # LOG.debug(f"SQLiteDB._get_table_info({table_name=}) -> {info}")
+        return info
+
+    async def connect(self) -> "SQLiteConnection":
+        "Open a connection"
+        return await SQLiteConnection(db_obj=self, **self._cfg).connect()
+
+
+class SQLiteConnection(Connection):
+    "SQLite Connection"
+
+    async def connect(self) -> Self:
+        def row_factory(cursor, row):
+            fields = [column[0] for column in cursor.description]
+            return {key: value for key, value in zip(fields, row)}
+
+        if sqlite3 is None or aiosqlite is None:
+            raise ImportError("aiosqlite, sqlite3: modules not available.")
+        db_path = Path(self._cfg[Config.CONFIG_DBFILE])
+        if not db_path.parent.exists():
+            LOG.info(f"Create missing directory '{db_path.parent}' for SQLite DB.")
+            db_path.parent.mkdir(parents=True)
+        if not db_path.parent.is_dir():
+            raise FileExistsError(
+                f"Path containing SQLite DB exists and is not a directory: {db_path.parent}"
+            )
+        # LOG.debug(f"Connecting to SQLite DB: {db_path}")
+        self._connection: aiosqlite.Connection = (  # type: ignore[assignment]
+            await aiosqlite.connect(
+                database=db_path, detect_types=sqlite3.PARSE_DECLTYPES, autocommit=False
+            )
+        )
+        # LOG.debug(f"............................... {self._db._connections=}")
+        await (await self._connection.execute("PRAGMA foreign_keys = ON")).close()
+        self._connection.row_factory = row_factory
+        return self
+
+    async def execute(self, query: str, params=None) -> "SQLiteCursor":
+        "execute an SQL statement and return a cursor"
+        # LOG.debug(f"SQLiteConnection.execute({query=}, {params=})")
+        cur = SQLiteCursor(cur=await self._connection.cursor(), con=self)
+        await cur.execute(query, params=params)
+        return cur
+
+
+class SQLiteCursor(Cursor):
+    "SQLite Cursor"
+
+    def __init__(self, cur=None, con=None) -> None:
+        super().__init__(cur=cur, con=con)
+        self._rowcount: int = -1
+        self._last_query: str = ""
+        self._last_params: dict[str, Any] | tuple = {}
+
+    async def execute(self, query: str, params=None) -> Self:
+        if sqlite3 is None:
+            raise ImportError("sqlite3 module is not available.")
+        if self._cursor is None:
+            raise OperationalError("Cannot execute query on closed cursor.")
+        self._last_query = query
+        self._last_params = params or {}
+        try:
+            # LOG.debug(f"SQLiteCursor.execute({query=}, {params=})")
+            await self._cursor.execute(sql=query, parameters=params)
+            self._rowcount = self._cursor.rowcount
+        except sqlite3.OperationalError as exc:
+            raise OperationalError(f"{exc} during SQL execution of {query=}") from exc
+        return self
+
+    @property
+    async def rowcount(self) -> Optional[int]:
+        if self._connection is None or self._connection.connection is None:
+            raise OperationalError("Cannot get rowcount from closed connection.")
+        if self._rowcount == -1:
+            async with self._connection.connection.execute(
+                sql=f"SELECT COUNT(*) AS rowcount FROM ({self._last_query})",
+                parameters=self._last_params,
+            ) as sub_cur:
+                self._rowcount = (await sub_cur.fetchone())["rowcount"]
+        return self._rowcount
+
+
+log_exit(LOG)

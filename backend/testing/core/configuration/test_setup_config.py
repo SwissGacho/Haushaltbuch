@@ -166,7 +166,7 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
             mock_cfg_object.fetch.assert_not_called()
             mock_cfg_object.fetch.assert_not_awaited()
         else:
-            MockConfiguration.assert_called_once_with(id=mock_ids[0])
+            MockConfiguration.assert_called_once_with(bo_id=mock_ids[0])
             mock_cfg_object.fetch.assert_awaited_once_with()
             self.assertEqual(mock_update_dicts_recursively.call_count, 2)
             self.assertEqual(
@@ -259,7 +259,7 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
                 role=MockRole.ADMIN,
             )
         elif len(mock_ids) == 1:
-            MockUser.assert_called_once_with(id=mock_ids[0])
+            MockUser.assert_called_once_with(bo_id=mock_ids[0])
             mock_usr_object.fetch.assert_awaited_once_with()
             self.assertIn(MockRole.ADMIN, mock_usr_object.role)
             self.assertIn(MockRole.EXISTING, mock_usr_object.role)
@@ -295,7 +295,8 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         mock_get_cfg.assert_called_once_with(mock_cfg, SetupConfigKeys.ADM_USER)
         MockUser.get_matching_ids.assert_not_awaited()
         self.assertEqual(
-            str(mock_type_error.exception), "admin user must be dict not <class 'int'>"
+            str(mock_type_error.exception),
+            "initial user must be dict not <class 'int'>",
         )
 
     async def test_405_create_or_update_initial_user_more_ids(self):

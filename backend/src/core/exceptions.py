@@ -1,8 +1,16 @@
-""" module holding Exception definitions """
+"""module holding Exception definitions"""
 
 
 class OperationalError(Exception):
     "Error during DB operation"
+
+
+class CommitError(OperationalError):
+    "Error during commit operation"
+
+
+class RollBackRequested(Exception):
+    "Rollback requested by user"
 
 
 class DBSchemaError(Exception):
@@ -13,7 +21,11 @@ class DBRestart(Exception):
     "signal that the DB has been reconfigured"
 
 
-class ConnectionClosed(Exception):
+class WSConnectionError(Exception):
+    "a Web socket connection could not be established"
+
+
+class WSConnectionClosed(Exception):
     "a Web socket connection has been closed unexpectedly"
 
 
@@ -33,3 +45,7 @@ class InvalidSQLStatementException(Exception):
     """
     Exception raised when an invalid SQL statement is encountered.
     """
+
+
+class CannotStoreEmptyBO(Exception):
+    "Exception raised when trying to store a Business Object with no values."

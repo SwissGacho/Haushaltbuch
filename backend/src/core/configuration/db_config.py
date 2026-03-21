@@ -1,4 +1,4 @@
-""" Handle DB configuration """
+"""Handle DB configuration"""
 
 import os
 import platform
@@ -7,16 +7,18 @@ from pathlib import Path
 from typing import Optional
 from asyncio import Lock
 
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
 from core.const import APPNAME
 from core.app import App
 from core.base_objects import BaseObject, Config
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
 
 
 class DBConfig(BaseObject):
     "Handling of the DB configuration"
+
     _cfg_searchpath: Optional[list[str]] = None
     _db_locations: Optional[list[str]] = None
     db_configuration: Optional[dict] = None
@@ -78,7 +80,7 @@ class DBConfig(BaseObject):
     @classmethod
     def read_db_config_file(
         cls, cfg_searchpath: Optional[list[Path]] = None, dbcfg_filename: str = ""
-    ):
+    ) -> Optional[dict]:
         "Determine DB configuration from DB config file or commandline"
         # LOG.debug(f"DBConfig.read_db_config_file({cfg_searchpath=}, {dbcfg_filename=})")
         searchpath = cfg_searchpath or cls.cfg_searchpath() or []
@@ -99,7 +101,7 @@ class DBConfig(BaseObject):
                         db_config_from_cfg_file = json.load(cfg_file)
                     # LOG.debug(f"Found DB configuration: {db_config_from_cfg_file}")
                     cls.db_configuration = db_config_from_cfg_file
-                    return
+                    return db_config_from_cfg_file
                 except FileNotFoundError:
                     continue
             LOG.info(f"configuration file {dbcfg_file} not found.")
@@ -107,3 +109,6 @@ class DBConfig(BaseObject):
             LOG.warning(f"Unable to decode configuration from {dbcfg_file}: {exc}")
         except (IsADirectoryError, NotADirectoryError, PermissionError, OSError) as exc:
             LOG.warning(f"Unable to read configuration from {dbcfg_file}: {exc}")
+
+
+log_exit(LOG)

@@ -1,8 +1,13 @@
-""" Applications base classes and common objects. """
+"""Applications base classes and common objects."""
 
-from typing import TypeAlias, Union
+from abc import ABC, abstractmethod
+from typing import TypeAlias, Union, Self
 from enum import StrEnum
 import platform
+
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
 
 
 class BaseObject:
@@ -13,9 +18,14 @@ class BaseObject:
     def __init__(self, *args, **kwargs) -> None:
         pass
 
+    def json_encode(self) -> str:
+        "JSON representation of the object"
+        return str(self)
+
 
 class Status(StrEnum):
     "Values for global app status"
+
     STATUS_UNCONFIGURED = "unconfigured"
     STATUS_NO_DB = "noDB"
     STATUS_DB_CFG = "DBconfigured"
@@ -26,6 +36,12 @@ class Status(StrEnum):
     STATUS_MULTI_USER = "multiUser"
 
 
+class VersionInfo(StrEnum):
+    "Keys for version information"
+
+    VERSION = "version"
+
+
 class StatusBaseClass(BaseObject):
     "Status Baseclass"
 
@@ -34,9 +50,15 @@ class StatusBaseClass(BaseObject):
         "Current status of the app"
         return Status.STATUS_UNCONFIGURED
 
+    @property
+    def version(self) -> dict[VersionInfo, str]:
+        "Current version of the app"
+        return {VersionInfo.VERSION: "unknown"}
+
 
 class Config(StrEnum):
     "Configuration keys"
+
     CONFIG_APP = "app"
     CONFIG_USR_MODE = "userMode"
     CONFIG_APP_USRMODE = "/".join([CONFIG_APP, CONFIG_USR_MODE])
@@ -45,8 +67,13 @@ class Config(StrEnum):
     CONFIG_DB_DB = "/".join([CONFIG_DB, "db"])
     CONFIG_DBFILE = "file"
     CONFIG_DBHOST = "host"
-    CONFIG_DBUSER = "user"
+    CONFIG_DBPORT = "port"
+    CONFIG_DBDBNAME = "dbname"
+    CONFIG_DBUSER = "dbuser"
     CONFIG_DBPW = "password"
+    CONFIG_DBSSL = "ssl"
+    CONFIG_DBSSL_CERT = "ssl_cert"
+    CONFIG_DBSSL_KEY = "ssl_key"
     CONFIG_CFG_SEARCH_PATH = "config_search_path"
     CONFIG_SYSTEM = "system"
     CONFIG_DB_LOCATIONS = "db_paths"
@@ -75,20 +102,60 @@ class ConfigurationBaseClass(BaseObject):
         return {}
 
 
-class DBBaseClass(BaseObject):
+class DBBaseClass(BaseObject, ABC):
     "DB Baseclass"
 
     @property
+    @abstractmethod
     def sql_factory(self):
         "DB specific SQL factory"
         raise NotImplementedError("sqlFactory not defined on base class")
 
-    async def connect(self):
+    @abstractmethod
+    async def connect(self) -> "ConnectionBaseClass":
         "Open a connection and return the Connection instance"
+        raise ConnectionError("Called from DB base class.")
 
-    async def execute(self, query: str, params=None, close=False, commit=False):
+    @abstractmethod
+    async def execute(self, query, params, connection):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
+        raise NotImplementedError("execute not implemented in base class.")
 
+    @abstractmethod
     async def close(self):
         "close all activities"
+
+    @abstractmethod
+    async def check_table(self, obj) -> bool:
+        "check compatibility of a DB table with a business object"
+        raise NotImplementedError("check_table not implemented in base class.")
+
+
+class ConnectionBaseClass(BaseObject, ABC):
+    "Connection Baseclass"
+
+    @abstractmethod
+    async def connect(self) -> Self:
+        "Open a connection and return the Connection instance"
+        raise ConnectionError("Called from DB base class.")
+
+    @abstractmethod
+    async def begin(self):
+        "Begin a transaction"
+
+    @abstractmethod
+    async def commit(self):
+        "commit current transaction"
+
+    @abstractmethod
+    async def rollback(self):
+        "rollback current transaction"
+
+    @abstractmethod
+    async def close(self) -> None:
+        "close the connection"
+        raise ConnectionError("Called from DB base class.")
+
+
+log_exit(LOG)

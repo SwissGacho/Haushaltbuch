@@ -1,4 +1,4 @@
-""" Testsuite testing the importing of the aiosqlite library """
+"""Testsuite testing the importing of the aiosqlite library"""
 
 import sys, types
 import unittest
@@ -22,7 +22,7 @@ def setUpModule() -> None:
         if mod in sys.modules:
             del sys.modules[mod]
 
-    remove("database.sqlite")
+    remove("database.dbms.sqlite")
     remove("aiosqlite")
     remove("sqlite3")
 
@@ -31,22 +31,22 @@ class SQLiteImport(unittest.TestCase):
 
     def test_101_successful_import(self):
         with patch.dict("sys.modules", {"aiosqlite": types.ModuleType("aiosqlite")}):
-            import database.sqlite
+            import database.dbms.sqlite
 
-            self.assertIsNone(database.sqlite.AIOSQLITE_IMPORT_ERROR)
+            self.assertIsNone(database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR)
 
     def test_101_failed_aiosqlite_import(self):
         with patch.dict("sys.modules", {"aiosqlite": None}):
-            import database.sqlite
+            import database.dbms.sqlite
 
             self.assertIsInstance(
-                database.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError
+                database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError
             )
 
     def test_101_failed_sqlite3_import(self):
         with patch.dict("sys.modules", {"sqlite3": None}):
-            import database.sqlite
+            import database.dbms.sqlite
 
             self.assertIsInstance(
-                database.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError
+                database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError
             )

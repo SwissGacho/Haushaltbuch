@@ -1,20 +1,19 @@
-""" Manage connection to the database
-"""
+"""Manage connection to the database"""
 
 from contextlib import asynccontextmanager
+
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
 
 from core.app import App
 from core.util import get_config_item
 from core.status import Status
 from core.configuration.config import Config
 from core.configuration.db_config import DBConfig
-from core.app_logging import getLogger
-from database.sqlite import SQLiteDB
-from database.mysql import MySQLDB
+from database.dbms.sqlite import SQLiteDB
+from database.dbms.mysql import MySQLDB
 from database.schema_maintenance import check_db_schema
-
-
-LOG = getLogger(__name__)
 
 
 @asynccontextmanager
@@ -46,17 +45,17 @@ async def get_db():
                 )
             yield
             return
-    elif db_type == "MySQL":
-        LOG.info("Connect to MySQL DB")
+    elif db_type == "MySQL" or db_type == "MariaDB":
+        LOG.info(f"Connect to {db_type}")
         try:
             db = MySQLDB(**db_config)
         except ModuleNotFoundError as exc:
             App.status = Status.STATUS_DB_UNSUPPORTED
             LOG.error(f"{exc}")
-            if "aiomysql" in str(exc):
+            if "asyncmy" in str(exc):
                 LOG.error(
-                    "Library 'aiomysql' could not be imported. "
-                    "Please install using 'pip install aiomysql'"
+                    "Library 'asyncmy' could not be imported. "
+                    "Please install using 'pip install asyncmy'"
                 )
             yield
             return
@@ -70,11 +69,16 @@ async def get_db():
         await check_db_schema()
         LOG.debug("DB ready")
         yield db
-    except TypeError as exc:
+    except (TypeError, ValueError) as exc:
         LOG.error(f"DB connection failed: {exc}")
         App.status = Status.STATUS_NO_DB
         yield
         return
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        LOG.warning(f"DB connection failed: {exc}")
     finally:
         LOG.debug("DB disconnecting")
         await db.close()
+
+
+log_exit(LOG)

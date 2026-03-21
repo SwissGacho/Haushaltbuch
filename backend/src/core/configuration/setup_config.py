@@ -1,13 +1,14 @@
-""" Helper functions for the configuration of the setup procedure """
+"""Helper functions for the configuration of the setup procedure"""
 
 from enum import StrEnum
 from pathlib import Path
 import json
 import asyncio
 
-from data.management.user import User, UserRole
-from data.management.configuration import Configuration
-from database.sqlexpression import ColumnName
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
 from core.app import App
 from core.util import get_config_item, update_dicts_recursively
 from core.configuration.db_config import DBConfig
@@ -16,9 +17,9 @@ from core.const import SINGLE_USER_NAME
 from core.base_objects import Config
 from core.base_objects import BaseObject
 from core.exceptions import ConfigurationError, DataError
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
+from data.management.user import User, UserRole
+from data.management.configuration import Configuration
+from database.sql_expression import ColumnName
 
 WAIT_AVAILABLE_TASK = "wait_for_available"
 WAIT_FAILURE_TASK = "wait_for_failure"
@@ -26,6 +27,7 @@ WAIT_FAILURE_TASK = "wait_for_failure"
 
 class SetupConfigKeys(StrEnum):
     "Keys used by configuration setup"
+
     CONFIG = "configuration"
     CFG_APP = "configuration/app"
     DBCFG_CFG_FILE = "dbcfg_file"
@@ -37,6 +39,7 @@ class SetupConfigKeys(StrEnum):
 
 class SetupConfigValues(StrEnum):
     "Values used by configuration setup"
+
     SINGLE_USER = "single"
     MULTI_USER = "multi"
 
@@ -94,7 +97,7 @@ class ConfigSetup(BaseObject):
             LOG.error(f"Multiple ({len(rows_in_db)}) global configurations in DB")
             raise ConfigurationError("Multiple global configurations in DB")
         elif len(rows_in_db) == 1:
-            bo = await Configuration(id=rows_in_db[0]).fetch()
+            bo = await Configuration(bo_id=rows_in_db[0]).fetch()
             update_dicts_recursively(target=bo.configuration, source=configuration)
         else:
             bo = Configuration(configuration=configuration)
@@ -105,13 +108,14 @@ class ConfigSetup(BaseObject):
 
     @classmethod
     async def _create_or_update_initial_user(cls, setup_cfg: dict):
+        # LOG.debug(f"ConfigSetup._create_or_update_initial_user({setup_cfg=}")
         initial_user = (
             get_config_item(setup_cfg, SetupConfigKeys.ADM_USER)
             if App.status == Status.STATUS_MULTI_USER
             else {"name": SINGLE_USER_NAME, "password": None}
         )
         if not isinstance(initial_user, dict):
-            raise TypeError(f"admin user must be dict not {type(initial_user)}")
+            raise TypeError(f"initial user must be dict not {type(initial_user)}")
         rows_in_db = await User.get_matching_ids(
             {ColumnName("name"): initial_user["name"]}
         )
@@ -119,7 +123,7 @@ class ConfigSetup(BaseObject):
             LOG.error(f"{len(rows_in_db)} users named {initial_user['name']} in DB")
             raise DataError("Multiple users in DB")
         elif len(rows_in_db) == 1:
-            user: User = await User(id=rows_in_db[0]).fetch()
+            user: User = await User(bo_id=rows_in_db[0]).fetch()
             user.password = initial_user["password"]
             user.role |= UserRole.ADMIN
         else:
@@ -153,3 +157,6 @@ class ConfigSetup(BaseObject):
                 LOG.error("Start DB failed with new configuration.")
 
             await cls._create_or_update_initial_user(setup_cfg=setup_cfg)
+
+
+log_exit(LOG)

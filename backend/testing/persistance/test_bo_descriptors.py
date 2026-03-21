@@ -1,17 +1,23 @@
 """Test suite for business object attributes descriptors."""
 
+from ast import Attribute
 import datetime
-from enum import auto
-from re import M
+from enum import Flag, auto
+
 import unittest
 
-import persistance.bo_descriptors
+import business_objects.bo_descriptors
+from business_objects.bo_descriptors import AttributeAccessLevel
 
 
-class MockAttr(persistance.bo_descriptors._PersistantAttr):
+class MockAttr(business_objects.bo_descriptors._PersistantAttr):
     @classmethod
     def data_type(cls):
         return str
+
+    @classmethod
+    def attribute_type(cls) -> business_objects.bo_descriptors.AttributeType:
+        return business_objects.bo_descriptors.AttributeType.ATYPE_STR
 
     def validate(self, value):
         return value is None or isinstance(value, str)
@@ -26,11 +32,21 @@ class MockBO:
         self.mock_attr = attr
 
     @classmethod
-    def add_attribute(cls, attribute_name, data_type, constraint_flag, **flag_values):
+    def add_attribute(
+        cls,
+        attribute_name: str,
+        data_type: type,
+        constraint_flag,
+        attribute_type,
+        access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
+        **flag_values,
+    ):
         cls._add_attributes_args = (
             attribute_name,
             data_type,
             constraint_flag,
+            attribute_type,
+            access_level,
             flag_values,
         )
 
@@ -54,7 +70,9 @@ class Test_100__PersistantAttr(unittest.TestCase):
             (
                 "mock_attr",
                 str,
-                persistance.bo_descriptors.BOColumnFlag.BOC_NONE,
+                business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
+                business_objects.bo_descriptors.AttributeType.ATYPE_STR,
+                AttributeAccessLevel.AAL_READ_WRITE,
                 {},
             ),
         )
@@ -70,79 +88,126 @@ class Test_100__PersistantAttr(unittest.TestCase):
         self.assertEqual(mock_bo2.mock_attr, "value2")
 
 
-class MockRel(persistance.bo_descriptors.BOBaseBase):
+class MockRel(business_objects.bo_descriptors.BOBaseBase):
     pass
 
 
-class MockNotRel(persistance.bo_descriptors.BOBaseBase):
+class MockNotRel(business_objects.bo_descriptors.BOBaseBase):
     pass
 
 
-class MockFlag(persistance.bo_descriptors.BaseFlag):
+class MockFlag(business_objects.bo_descriptors.BaseFlag):
     FLAG_1 = auto()
     FLAG_2 = auto()
 
 
-class MockObj(persistance.bo_descriptors.BOBaseBase):
+class MockObj(business_objects.bo_descriptors.BOBaseBase):
     _attributes = {"MockObj": []}
     _data = {}
-    int_attr = persistance.bo_descriptors.BOInt(
-        persistance.bo_descriptors.BOColumnFlag.BOC_PK_INC
+    int_attr = business_objects.bo_descriptors.BOInt(
+        business_objects.bo_descriptors.BOColumnConstraint.BOC_PK_INC
     )
-    str_attr = persistance.bo_descriptors.BOStr(
-        persistance.bo_descriptors.BOColumnFlag.BOC_NOT_NULL
+    str_attr = business_objects.bo_descriptors.BOStr(
+        business_objects.bo_descriptors.BOColumnConstraint.BOC_NOT_NULL
     )
-    dt_attr = persistance.bo_descriptors.BODatetime(
-        persistance.bo_descriptors.BOColumnFlag.BOC_DEFAULT_CURR
+    dt_attr = business_objects.bo_descriptors.BODatetime(
+        business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT_CURR
     )
-    d_attr = persistance.bo_descriptors.BODate()
-    dict_attr = persistance.bo_descriptors.BODict(
-        persistance.bo_descriptors.BOColumnFlag.BOC_DEFAULT, default={"a": 1, "b": 2}
+    d_attr = business_objects.bo_descriptors.BODate()
+    dict_attr = business_objects.bo_descriptors.BODict(
+        business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT,
+        default={"a": 1, "b": 2},
     )
-    list_attr = persistance.bo_descriptors.BOList()
-    rel_attr = persistance.bo_descriptors.BORelation(MockRel)
-    flag_attr = persistance.bo_descriptors.BOFlag(flag_type=MockFlag)
+    list_attr = business_objects.bo_descriptors.BOList()
+    rel_attr = business_objects.bo_descriptors.BORelation(MockRel)
+    flag_attr = business_objects.bo_descriptors.BOFlag(flag_type=MockFlag)
 
     @classmethod
-    def add_attribute(cls, attribute_name, data_type, constraint_flag, **flag_values):
+    def add_attribute(
+        cls,
+        attribute_name,
+        data_type,
+        constraint_flag,
+        attribute_type,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
+        **flag_values,
+    ):
         cls._attributes["MockObj"].append(
-            (attribute_name, data_type, constraint_flag, flag_values)
+            (
+                attribute_name,
+                data_type,
+                constraint_flag,
+                attribute_type,
+                access_level,
+                flag_values,
+            )
         )
 
 
 expected_attributes = {
     "MockObj": [
-        ("int_attr", int, persistance.bo_descriptors.BOColumnFlag.BOC_PK_INC, {}),
-        ("str_attr", str, persistance.bo_descriptors.BOColumnFlag.BOC_NOT_NULL, {}),
+        (
+            "int_attr",
+            int,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_PK_INC,
+            business_objects.bo_descriptors.AttributeType.ATYPE_INT,
+            AttributeAccessLevel.AAL_READ_WRITE,
+            {},
+        ),
+        (
+            "str_attr",
+            str,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NOT_NULL,
+            business_objects.bo_descriptors.AttributeType.ATYPE_STR,
+            AttributeAccessLevel.AAL_READ_WRITE,
+            {},
+        ),
         (
             "dt_attr",
             datetime.datetime,
-            persistance.bo_descriptors.BOColumnFlag.BOC_DEFAULT_CURR,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT_CURR,
+            business_objects.bo_descriptors.AttributeType.ATYPE_DATETIME,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {},
         ),
         (
             "d_attr",
             datetime.date,
-            persistance.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
+            business_objects.bo_descriptors.AttributeType.ATYPE_DATE,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {},
         ),
         (
             "dict_attr",
             dict,
-            persistance.bo_descriptors.BOColumnFlag.BOC_DEFAULT,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT,
+            business_objects.bo_descriptors.AttributeType.ATYPE_DICT,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {"default": {"a": 1, "b": 2}},
         ),
-        ("list_attr", list, persistance.bo_descriptors.BOColumnFlag.BOC_NONE, {}),
+        (
+            "list_attr",
+            list,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
+            business_objects.bo_descriptors.AttributeType.ATYPE_LIST,
+            AttributeAccessLevel.AAL_READ_WRITE,
+            {},
+        ),
         (
             "rel_attr",
-            persistance.bo_descriptors.BOBaseBase,
-            persistance.bo_descriptors.BOColumnFlag.BOC_FK,
+            business_objects.bo_descriptors.BOBaseBase,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_FK,
+            business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {"relation": MockRel},
         ),
         (
             "flag_attr",
-            persistance.bo_descriptors.BaseFlag,
-            persistance.bo_descriptors.BOColumnFlag.BOC_NONE,
+            business_objects.bo_descriptors.BaseFlag,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
+            business_objects.bo_descriptors.AttributeType.ATYPE_FLAG,
+            AttributeAccessLevel.AAL_READ_WRITE,
             {"flag_type": MockFlag},
         ),
     ]
@@ -210,8 +275,8 @@ class Test_200_BOAttributes(unittest.TestCase):
         self.assertEqual(self.mock_obj.flag_attr, MockFlag.FLAG_1 | MockFlag.FLAG_2)
         self.assertEqual(str(self.mock_obj.flag_attr), "flag_1,flag_2")
 
-        self.mock_obj._data["flag_attr"] = "flag_1"
-        self.assertIsInstance(self.mock_obj._data["flag_attr"], str)
+        self.mock_obj._data["flag_attr"] = MockFlag.FLAG_1
+        self.assertIsInstance(self.mock_obj._data["flag_attr"], Flag)
         self.assertIsInstance(self.mock_obj.flag_attr, MockFlag)
         self.assertEqual(self.mock_obj.flag_attr, MockFlag.FLAG_1)
 

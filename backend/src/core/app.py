@@ -1,8 +1,7 @@
-""" Common constants
-"""
+"""Common constants"""
 
 from asyncio import Event
-from typing import Optional
+from typing import Type, Self, Optional
 
 # pylint: disable=wrong-import-position
 from core.app_logging import getLogger, log_exit
@@ -37,18 +36,18 @@ class App:
     _db: Optional[DBBaseClass] = None
 
     @classmethod
-    def initialize(cls, app_location: str):
+    def initialize(cls, app_location: str, app_version: Optional[str] = None):
         "Initialize global objects (Status, Config)"
         if cls._status_class is None:
             raise TypeError("Status class not initialized.")
         else:
-            cls._status = cls._status_class()
+            cls._status = cls._status_class(version=app_version)
         if cls._config_class is None:
             raise TypeError("Configuration class not initialized.")
         else:
             cls._config = cls._config_class(app_location)
         cls._config.initialize_configuration()
-        LOG.debug("app initialized")
+        # LOG.debug("app initialized")
 
     @classmethod
     async def db_ready(cls):
@@ -59,7 +58,9 @@ class App:
 
     # pylint: disable=no-self-argument
     @_classproperty
-    def status_object(cls) -> StatusBaseClass:
+    def status_object(
+        cls: Type[Self],  # type: ignore[reportGeneralTypeIssues]
+    ) -> StatusBaseClass:
         """The app's status object.
         This should only be used for calling status methods.
         """
@@ -69,11 +70,19 @@ class App:
 
     # pylint: disable=no-self-argument
     @_classproperty
-    def status(cls) -> Status:
+    def status(  # type: ignore [reportRedeclaration]
+        cls: Type[Self],  # type: ignore[reportGeneralTypeIssues]
+    ) -> Status:
         "Global status of the app"
         if cls._status is None:
             raise ReferenceError("Status and Configuration not initialized")
         return cls._status.status
+
+    @status.setter
+    def status(cls, value: Status):
+        if cls._status is None:
+            raise ReferenceError("Status and Configuration not initialized")
+        cls._status.status = value  # type: ignore
 
     @classmethod
     def config_object(cls) -> ConfigurationBaseClass:
@@ -86,7 +95,9 @@ class App:
 
     # pylint: disable=no-self-argument
     @_classproperty
-    def configuration(cls) -> ConfigDict:
+    def configuration(
+        cls: Type[Self],  # type: ignore[reportGeneralTypeIssues]
+    ) -> ConfigDict:
         "Global configuration of the app"
         if not cls._config:
             raise ReferenceError("Status and Configuration not initialized")
@@ -101,7 +112,9 @@ class App:
 
     # pylint: disable=no-self-argument
     @_classproperty
-    def db(cls) -> DBBaseClass:
+    def db(
+        cls: Type[Self],  # type: ignore[reportGeneralTypeIssues]
+    ) -> DBBaseClass:
         "Global DB object"
         if not cls._db:
             raise ReferenceError("DB not initialized")
