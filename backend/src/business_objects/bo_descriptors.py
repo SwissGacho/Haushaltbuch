@@ -4,7 +4,9 @@ from dataclasses import dataclass
 import json
 from enum import Flag, StrEnum, auto
 from datetime import date, datetime
-from typing import Any
+import sys
+import typing
+from typing import Any, Union
 
 from business_objects.business_attribute_base import BaseFlag
 from core.app_logging import getLogger
@@ -274,15 +276,15 @@ class BORelation(_PersistantAttr[BOBaseBase]):
 
     def __init__(
         self,
-        relation: type[BOBaseBase],
+        relation: type[BOBaseBase] | str,
         flag: BOColumnConstraint = BOColumnConstraint.BOC_FK,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
     ) -> None:
         flag |= BOColumnConstraint.BOC_FK
         # LOG.debug(f"{relation=}")
         self._relation = relation
-        if not issubclass(relation, BOBaseBase):
-            raise TypeError("BO relation should be derived from BOBase.")
+        if isinstance(relation, type) and not issubclass(relation, BOBaseBase):
+            raise TypeError(f"BO relation {relation} should be derived from BOBase.")
 
         super().__init__(flag, relation=relation, access_level=access_level)
 
@@ -292,6 +294,18 @@ class BORelation(_PersistantAttr[BOBaseBase]):
 
     def __set_name__(self, owner, name):
         self.my_name = name
+        if isinstance(self._relation, str) or self._relation is typing.Self:
+            if self._relation is typing.Self or self._relation == "Self":
+                resolved = owner
+            else:
+                # Allow to specify relation as string to circumvent circular import issues. Resolve the string to a class here.
+                resolved = getattr(sys.modules[owner.__module__], self._relation)
+            if not issubclass(resolved, BOBaseBase):
+                raise TypeError(
+                    f"BO relation {resolved} should be derived from BOBase."
+                )
+            self._relation = resolved
+            self._constraint_values["relation"] = resolved
         # LOG.debug(
         #     f"PersistantAttr.__set_name__({owner=}, {name=})"
         #     f" {self.__class__.data_type()=} {self._flag=} {self._flag_values=}"

@@ -23,7 +23,12 @@ COMPATIBLE_DB_SCHEMA_VERSIONS = [1]
 async def _create_all_tables(
     objects: list[type[PersistentBusinessObject]],
 ):
-    for bo in TopologicalSorter({b: b.references() for b in objects}).static_order():
+    dependency_graph = {
+        b: [r for r in b.references() if r is not b]
+        for b in objects
+        if isinstance(b, type) and issubclass(b, PersistentBusinessObject)
+    }
+    for bo in TopologicalSorter(dependency_graph).static_order():
         if not (isinstance(bo, type) and issubclass(bo, PersistentBusinessObject)):
             raise TypeError(
                 f"Business object {bo} is not a subclass of BOBase, cannot create table"
