@@ -348,7 +348,7 @@ class MySQLCursor(Cursor):
         if asyncmy is None:
             raise ImportError("asyncmy module is not available.")
         conv_sql, args = self.convert_params_named_2_format(
-            query, params or {}, dump_json=True
+            query, self.convert_params_bo_2_int(params or {}), dump_json=True
         )
 
         if self._cursor is None:
