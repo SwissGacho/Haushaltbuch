@@ -328,6 +328,21 @@ class BORelation(_PersistantAttr[BOBaseBase]):
             and isinstance(value, relation)
         )
 
+    def __set__(self, obj, value) -> None:
+        "Set value of attribute, converting from int (id) if needed"
+        relation = self._constraint_values.get("relation")
+        if isinstance(value, str):
+            try:
+                value = int(value)
+            except ValueError as exc:
+                LOG.warning(
+                    f"Cannot convert value '{value}' to int for relation {relation}: {exc}"
+                )
+        if isinstance(value, int) and isinstance(relation, type):
+            value = relation(bo_id=value)
+        # LOG.debug(f"Setting BORelation to {repr(value)} (relation={relation})")
+        super().__set__(obj=obj, value=value)
+
 
 class BOFlag(_PersistantAttr[Flag]):
 
