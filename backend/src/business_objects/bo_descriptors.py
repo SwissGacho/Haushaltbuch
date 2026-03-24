@@ -333,7 +333,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
         relation = self._constraint_values.get("relation")
         if isinstance(value, str):
             try:
-                value = int(value)
+                value = int(value) if value else None
             except ValueError as exc:
                 LOG.warning(
                     f"Cannot convert value '{value}' to int for relation {relation}: {exc}"
