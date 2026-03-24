@@ -16,6 +16,7 @@ from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
 from database.sql_expression import Eq, Filter, SQLExpression
 from database.sql_statement import CreateTable, NamedValueListList, Value
+from business_objects.bo_descriptors import BOBaseBase
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
 
@@ -39,7 +40,9 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def convert_from_db(cls, value, typ, subtyp):
         "convert a value of type 'typ' read from the DB"
-        # LOG.debug(f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=})")
+        # LOG.debug(
+        #     f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})"
+        # )
         if value is None:
             return None
         if typ == date and isinstance(value, str):
@@ -56,6 +59,13 @@ class PersistentBusinessObject(BOBase):
                 LOG.error(
                     f"PersistentBusinessObject.convert_from_db: JSONDecodeError: {exc}"
                 )
+        if typ == BOBaseBase and isinstance(value, int):
+            relation = subtyp.get("relation") if isinstance(subtyp, dict) else None
+            if isinstance(relation, type) and issubclass(relation, BOBase):
+                return relation(bo_id=value)
+            LOG.error(
+                f"PersistentBusinessObject.convert_from_db: Cannot convert {value} to class {relation}"
+            )
         if (
             isinstance(typ, type)
             and issubclass(typ, BaseFlag)
