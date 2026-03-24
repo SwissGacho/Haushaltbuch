@@ -267,7 +267,7 @@ class Value(SQLExpression):
         self._name: str = name
         # if not isinstance(value, (str, int, float)):
         #     raise ValueError("Value must be a string, int or float")
-        self._value: Any = value
+        self._value: Any = value if value is not None else "NULL"
 
     def get_name(self) -> str:
         "Name of the value"
