@@ -51,20 +51,22 @@ class BOBase(BOBaseBase):
 
     _last_subscriber_id = itertools.count(1)
 
-    def __new__(cls, *args, identity: int | None = None, **attributes):
+    def __new__(cls, *args, bo_id: int | None = None, **attributes):
         if cls is BOBase:
             raise TypeError(
                 "BOBase is an abstract class and cannot be instantiated directly"
             )
-        if identity is not None:
-            if identity in cls._loaded_instances:
-                obj = cls._loaded_instances[identity]
+        if bo_id is not None:
+            if bo_id in cls._loaded_instances:
+                obj = cls._loaded_instances[bo_id]
                 assert isinstance(
                     obj, cls
-                ), f"Loaded instance with id {identity} is not of type {cls.__name__}"
+                ), f"Loaded instance with id {bo_id} is not of type {cls.__name__}"
                 return obj
 
-        return super().__new__(cls)
+        instance = super().__new__(cls)
+        instance._initialized = False
+        return instance
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
@@ -76,7 +78,10 @@ class BOBase(BOBaseBase):
 
     # pylint: disable=redefined-builtin, unused-argument
     def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
-        # LOG.debug(f"BOBase({bo_id=},{attributes})")
+        # LOG.debug(f"{self.__class__.__name__}({bo_id=},{attributes})  -  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}")
+        if getattr(self, "_initialized", False):
+            # LOG.debug(f"BOBase __init__ called again for {self} with id {self.id}, skipping reinitialization")
+            return
         self._instance_subscribers: dict[int, BOCallback] = {}
         self._data = {}
         self._db_data = {}
@@ -85,6 +90,7 @@ class BOBase(BOBaseBase):
         self._instance_subscriber_id = itertools.count(1)
         for attribute, value in attributes.items():
             self._data[attribute] = value
+        self._initialized = True
         BOBase.subscriptions_report()
 
     def handle_callback_result(self, task: asyncio.Task):
