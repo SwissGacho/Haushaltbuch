@@ -109,6 +109,10 @@ class BOBase(BOBaseBase):
             else f"{self.__class__.__name__}(no id)"
         )
 
+    def json_encode(self) -> int | None:
+        "Return a JSON-serializable representation of the business object"
+        return self.id if self.id is not None else None
+
     @property
     def display_name(self) -> str:
         """A human-readable name for this business object instance, used in the frontend."""
