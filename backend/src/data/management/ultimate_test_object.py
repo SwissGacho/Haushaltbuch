@@ -1,7 +1,6 @@
 """Business Object with all possible attribute types for testing purposes"""
 
 from enum import auto
-from typing import Self
 
 from core.app_logging import getLogger, log_exit
 
@@ -14,6 +13,7 @@ from business_objects.bo_descriptors import (
     BODict,
     BOList,
     BORelation,
+    BOSelf,
     BOStr,
     BOFlag,
     BOInt,
@@ -46,7 +46,7 @@ class UltimateTestObject(PersistentBusinessObject):
     bo_dict = BODict()
     bo_list = BOList()
     bo_rel = BORelation(UltimateRelatedTestObject)
-    bo_rel_self = BORelation(Self)  # type: ignore[arg-type]
+    bo_rel_self = BORelation(BOSelf)
     bo_flag = BOFlag(UltimateFlag)
 
 

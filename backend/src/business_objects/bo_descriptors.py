@@ -5,7 +5,6 @@ import json
 from enum import Flag, StrEnum, auto
 from datetime import date, datetime
 import sys
-import typing
 from typing import Any, Union
 
 from business_objects.business_attribute_base import BaseFlag
@@ -268,6 +267,10 @@ class BOList(_PersistantAttr[list]):
         return isinstance(value, list)
 
 
+class BOSelf(BOBaseBase):
+    "Marker for self-relation in BORelation"
+
+
 class BORelation(_PersistantAttr[BOBaseBase]):
 
     @classmethod
@@ -276,13 +279,12 @@ class BORelation(_PersistantAttr[BOBaseBase]):
 
     def __init__(
         self,
-        relation: type[BOBaseBase] | str,
+        relation: type[BOBaseBase] | str | type[BOSelf],
         flag: BOColumnConstraint = BOColumnConstraint.BOC_FK,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
     ) -> None:
         flag |= BOColumnConstraint.BOC_FK
-        # LOG.debug(f"{relation=}")
-        self._relation = relation
+        self._relation: type[BOBaseBase] | str | type[BOSelf] = relation
         if isinstance(relation, type) and not issubclass(relation, BOBaseBase):
             raise TypeError(f"BO relation {relation} should be derived from BOBase.")
 
@@ -294,12 +296,16 @@ class BORelation(_PersistantAttr[BOBaseBase]):
 
     def __set_name__(self, owner, name):
         self.my_name = name
-        if isinstance(self._relation, str) or self._relation is typing.Self:
-            if self._relation is typing.Self or self._relation == "Self":
+        if not isinstance(self._relation, type) or not issubclass(
+            self._relation, BOBaseBase
+        ):
+            if self._relation is BOSelf or self._relation == "Self":
                 resolved = owner
-            else:
+            elif isinstance(self._relation, str):
                 # Allow to specify relation as string to circumvent circular import issues. Resolve the string to a class here.
                 resolved = getattr(sys.modules[owner.__module__], self._relation)
+            else:
+                resolved = type(None)
             if not issubclass(resolved, BOBaseBase):
                 raise TypeError(
                     f"BO relation {resolved} should be derived from BOBase."
