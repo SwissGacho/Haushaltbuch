@@ -38,6 +38,7 @@ class UltimateRelatedTestObject(PersistentBusinessObject):
 class UltimateTestObject(PersistentBusinessObject):
     "Business Object with all possible attribute types for testing purposes"
 
+    name = BOStr()
     bo_int = BOInt()
     bo_str = BOStr()
     bo_datetime = BODatetime()
