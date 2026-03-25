@@ -267,7 +267,7 @@ class BOList(_PersistantAttr[list]):
         return isinstance(value, list)
 
 
-class BOSelf(BOBaseBase):
+class BOSelf:
     "Marker for self-relation in BORelation"
 
 
@@ -285,7 +285,11 @@ class BORelation(_PersistantAttr[BOBaseBase]):
     ) -> None:
         flag |= BOColumnConstraint.BOC_FK
         self._relation: type[BOBaseBase] | str | type[BOSelf] = relation
-        if isinstance(relation, type) and not issubclass(relation, BOBaseBase):
+        if (
+            isinstance(relation, type)
+            and not issubclass(relation, BOBaseBase)
+            and relation is not BOSelf
+        ):
             raise TypeError(f"BO relation {relation} should be derived from BOBase.")
 
         super().__init__(flag, relation=relation, access_level=access_level)
@@ -302,7 +306,8 @@ class BORelation(_PersistantAttr[BOBaseBase]):
             if self._relation is BOSelf or self._relation == "Self":
                 resolved = owner
             elif isinstance(self._relation, str):
-                # Allow to specify relation as string to circumvent circular import issues. Resolve the string to a class here.
+                # Allow to specify relation as string to circumvent circular import issues.
+                # Resolve the string to a class here.
                 resolved = getattr(sys.modules[owner.__module__], self._relation)
             else:
                 resolved = type(None)
