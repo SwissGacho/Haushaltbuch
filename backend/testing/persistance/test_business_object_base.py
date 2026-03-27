@@ -39,21 +39,6 @@ class MockBO2(BOBase):
     mock_attr3 = BOList()
     mock_attr4 = BOFlag(MockFlag)
 
-    # def __init__(
-    #     self,
-    #     bo_id=None,
-    #     last_updated=None,
-    #     mock_attr1="mock attribute 1",
-    #     mock_attr2=None,
-    #     mock_attr3=[],
-    #     mock_attr4=None,
-    # ) -> None:
-    #     super().__init__(bo_id=bo_id)
-    # self.mock_attr1 = mock_attr1
-    # self.mock_attr2 = mock_attr2
-    # self.mock_attr3 = mock_attr3
-    # self.mock_attr4 = mock_attr4
-
 
 class MockBO3(MockBO2):
     mock_attr5 = BOStr()
