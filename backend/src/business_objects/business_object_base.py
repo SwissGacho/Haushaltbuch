@@ -81,6 +81,7 @@ class BOBase(BOBaseBase):
         # LOG.debug(f"{self.__class__.__name__}({bo_id=},{attributes})  -  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}")
         if getattr(self, "_initialized", False):
             # LOG.debug(f"BOBase __init__ called again for {self} with id {self.id}, skipping reinitialization")
+            self._init_attrs(attributes)
             return
         self._instance_subscribers: dict[int, BOCallback] = {}
         self._data = {}
@@ -88,10 +89,13 @@ class BOBase(BOBaseBase):
         self.id = bo_id
         self.last_updated = None
         self._instance_subscriber_id = itertools.count(1)
-        for attribute, value in attributes.items():
-            self._data[attribute] = value
+        self._init_attrs(attributes)
         self._initialized = True
         BOBase.subscriptions_report()
+
+    def _init_attrs(self, attributes: dict[str, Any]):
+        for attribute, value in attributes.items():
+            setattr(self, attribute, value)
 
     def handle_callback_result(self, task: asyncio.Task):
         """Logs exceptions from background callback tasks."""
