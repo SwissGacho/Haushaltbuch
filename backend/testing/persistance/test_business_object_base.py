@@ -1,7 +1,6 @@
 """Test suite for Business Objects Base"""
 
 import datetime
-from token import OP
 import unittest
 from unittest.mock import Mock, patch
 
