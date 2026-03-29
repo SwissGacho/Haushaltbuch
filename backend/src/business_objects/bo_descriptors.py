@@ -5,7 +5,7 @@ import json
 from enum import Flag, StrEnum, auto
 from datetime import date, datetime
 import sys
-from typing import Any, Union
+from typing import Any
 
 from business_objects.business_attribute_base import BaseFlag
 from core.app_logging import getLogger
