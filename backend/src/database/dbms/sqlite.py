@@ -18,6 +18,7 @@ from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
 from database.sql_factory import SQLFactory
 from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
+from business_objects.persistant_business_object import PersistentBusinessObject
 from business_objects.business_attribute_base import BaseFlag
 
 # pylint: disable=invalid-name
@@ -103,6 +104,10 @@ def _adapt_datetime_iso(value: datetime) -> str:
     return value.isoformat()
 
 
+def _adapt_relation(value: PersistentBusinessObject) -> int | None:
+    return value.id
+
+
 def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
@@ -130,6 +135,11 @@ if sqlite3:
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
     sqlite3.register_converter(SQLITE_DATE_TYPE, _convert_isodate)
     sqlite3.register_converter(SQLITE_DATETIME_TYPE, _convert_isodatetime)
+
+    # Register adapter and converter for all existing PersistentBusinessObject subclasses
+    for bo in list(PersistentBusinessObject.__subclasses__()):
+        # LOG.debug(f"Registering adapter and converter for {bo=}")
+        sqlite3.register_adapter(bo, _adapt_relation)
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):

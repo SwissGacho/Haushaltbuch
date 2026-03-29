@@ -25,6 +25,7 @@ MOCK_TAB2 = "mockbo2s"
 class MockFlag(BaseFlag):
     OPTION_A = 1
     OPTION_B = 2
+    OPTION_C = 3
 
 
 class MockBO1(BOBase):
@@ -36,20 +37,6 @@ class MockBO2(BOBase):
     mock_attr2 = BORelation(MockBO1)
     mock_attr3 = BOList()
     mock_attr4 = BOFlag(MockFlag)
-
-    def __init__(
-        self,
-        bo_id=None,
-        mock_attr1="mock attribute 1",
-        mock_attr2=None,
-        mock_attr3=[],
-        mock_attr4=None,
-    ) -> None:
-        super().__init__(bo_id=bo_id)
-        self.mock_attr1 = mock_attr1
-        self.mock_attr2 = mock_attr2
-        self.mock_attr3 = mock_attr3
-        self.mock_attr4 = mock_attr4
 
 
 class MockBO3(MockBO2):
@@ -129,6 +116,64 @@ mock_bo3_business_as_dict = {
 
 
 class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
+
+    def test_100_new_instance(self):
+        bo_instance_1 = MockBO1(bo_id=1)
+        self.assertIsInstance(bo_instance_1, MockBO1)
+        self.assertEqual(bo_instance_1.id, 1)
+
+        mock_db_data = {
+            "id": 99,
+            "last_updated": datetime.datetime(1111, 1, 1, 0, 0),
+            "mock_attr1": "db mock attribute 1",
+            "mock_attr2": bo_instance_1,
+            "mock_attr3": [1, 2, 3],
+            "mock_attr4": MockFlag.OPTION_B,
+        }
+        bo_instance = MockBO2(bo_id=99, mock_attr3=[0, 1])
+        self.assertIsInstance(bo_instance, MockBO2)
+        self.assertEqual(bo_instance.id, 99)
+        self.assertIsNone(bo_instance.mock_attr1)
+        self.assertIsNone(bo_instance.mock_attr2)
+        self.assertEqual(bo_instance.mock_attr3, [0, 1])
+        self.assertIsNone(bo_instance.mock_attr4)
+
+        bo_instance._db_data = mock_db_data
+        bo_instance.mock_attr1 = "new mock attribute 1"
+        bo_instance.mock_attr2 = bo_instance_1
+        bo_instance.mock_attr3 = [1, 2, 3]
+        bo_instance.mock_attr4 = MockFlag.OPTION_A
+        self.assertEqual(bo_instance.mock_attr1, "new mock attribute 1")
+        self.assertEqual(bo_instance.mock_attr2, bo_instance_1)
+        self.assertEqual(bo_instance.mock_attr3, [1, 2, 3])
+        self.assertEqual(bo_instance.mock_attr4, MockFlag.OPTION_A)
+
+        mock_new_data = {
+            "id": 99,
+            "last_updated": datetime.datetime(2222, 2, 2, 0, 0),
+            "mock_attr1": "new mock data 1",
+            "mock_attr2": bo_instance_1,
+            "mock_attr3": [11, 22, 33],
+            "mock_attr4": MockFlag.OPTION_C,
+        }
+        bo_new_instance = MockBO2(
+            **{"bo_id" if k == "id" else k: v for k, v in mock_new_data.items()}
+        )
+        self.assertIs(
+            bo_new_instance,
+            bo_instance,
+            msg="Creating a new instance with the same id should return the existing instance",
+        )
+        self.assertEqual(
+            bo_instance._data,
+            mock_new_data,
+            msg="_data should be updated with new values from instance creation",
+        )
+        self.assertEqual(
+            bo_instance._db_data,
+            mock_db_data,
+            msg="_db_data should not be overwritten by new instance creation",
+        )
 
     def test_101_register_instance(self):
         bo_instance = MockBO1()

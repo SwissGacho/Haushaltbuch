@@ -221,9 +221,14 @@ class Cursor:
         self._connection: Optional[Connection] = con
         self._rowcount = None
 
+    def convert_params_bo_2_int(self, params: dict[str, Any]) -> dict[str, Any]:
+        "Convert business objects in params to their id for query execution"
+        return {k: (v.id if isinstance(v, BOBase) else v) for k, v in params.items()}
+
     def convert_params_named_2_format(
         self, query, params, dump_json: bool = False
     ) -> tuple[str, tuple[Any, ...]]:
+        "Convert named parameters in query to format parameters for query execution"
         param_order = []
 
         def replacer(match):
