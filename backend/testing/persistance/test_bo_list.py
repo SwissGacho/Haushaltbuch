@@ -21,13 +21,37 @@ class MockConcreteBO(MockBOBase):
         return []
 
 
+class MockPersistentBusinessObject(MockBOBase):
+    pass
+
+
+class MockConcretePersistentBO(MockPersistentBusinessObject):
+    @classmethod
+    async def get_matching_objects(
+        cls, conditions: Optional[dict] = None, attributes: list[str] | None = None
+    ) -> list[MockBOBase]:
+        return []
+
+
 class MockConnection:
     pass
 
 
 class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        # self.conPatcher.start()
+        self.patchers = {
+            patch("business_objects.bo_list.BOBase", MockBOBase),
+            # patch("server.ws_connection.WS_Connection", MockConnection),
+        }
+        for patcher in self.patchers:
+            patcher.start()
 
-    async def test101_test_initialization(self):
+    def tearDown(self):
+        for patcher in self.patchers:
+            patcher.stop()
+
+    async def test_101_test_initialization(self):
         con = Mock()
         MockConcreteBO.subscribe_to_instance = Mock(return_value=456)
         con.unregister_other_senders = Mock()
@@ -38,13 +62,13 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
             boSubscription._handle_event_
         )
 
-    async def test102_get_objects(self):
+    async def test_102_get_objects(self):
         con = Mock()
         boSubscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=42)
         objects = await boSubscription._get_objects_()
         self.assertEqual([boSubscription._obj], objects)
 
-    async def test103_handle_event(self):
+    async def test_103_handle_event(self):
         con = Mock()
         with patch(
             "business_objects.bo_list.BOSubscription.notify_subscription_subscribers",
@@ -56,7 +80,7 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
             await boSubscription._handle_event_(boSubscription._obj)
             mock_notify.assert_awaited_once()
 
-    async def test104_notify_subscription_subscribers(self):
+    async def test_104_notify_subscription_subscribers(self):
         con = Mock()
         with patch(
             "business_objects.bo_list.BOSubscription.send_message",
@@ -68,7 +92,7 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
             await boSubscription.notify_subscription_subscribers()
             mock_send_message.assert_awaited_once()
 
-    async def test105_cleanup(self):
+    async def test_105_cleanup(self):
         MockConcreteBO.unsubscribe_from_instance = Mock()
         con = Mock()
         con.unregister_message_sender = Mock()
@@ -80,20 +104,25 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
         )
         con.unregister_message_sender.assert_called_once()
 
-    def setUp(self) -> None:
-        self.patcher = patch("business_objects.bo_list.BOBase", MockBOBase)
-        # self.conPatcher = patch("server.ws_connection.WS_Connection", MockConnection)
-        # self.conPatcher.start()
-        self.patcher.start()
-
-    def tearDown(self):
-        # self.conPatcher.stop()
-        self.patcher.stop()
-
 
 class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        self.patchers = {
+            patch("business_objects.bo_list.BOBase", MockBOBase),
+            patch(
+                "business_objects.bo_list.PersistentBusinessObject",
+                MockPersistentBusinessObject,
+            ),
+            # patch("server.ws_connection.WS_Connection", MockConnection)
+        }
+        for patcher in self.patchers:
+            patcher.start()
 
-    async def test201_initialization(self):
+    def tearDown(self):
+        for patcher in self.patchers:
+            patcher.stop()
+
+    async def test_201_initialization(self):
         MockConcreteBO.subscribe_to_all_changes = Mock(return_value=456)
         con = Mock()
         boList = BOList(bo_type=MockConcreteBO, connection=con)
@@ -102,16 +131,16 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
             boList._handle_event_
         )
 
-    async def test202_notify_subscription_subscribers(self):
+    async def test_202_notify_subscription_subscribers(self):
         con = Mock()
         with patch(
             "business_objects.bo_list.BOList.send_message", new_callable=AsyncMock
         ) as mock_send_message:
-            boList = BOList(bo_type=MockConcreteBO, connection=con)
+            boList = BOList(bo_type=MockConcretePersistentBO, connection=con)
             await boList.notify_subscription_subscribers()
             mock_send_message.assert_awaited_once()
 
-    async def test203_get_objects(self):
+    async def test_203_get_objects(self):
         con = Mock()
         mock_concrete_BO = MockConcreteBO()
         mock_concrete_BO.id = 42
@@ -133,10 +162,3 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
             boList._subscription_id
         )
         con.unregister_message_sender.assert_called_once()
-
-    def setUp(self) -> None:
-        patcher = patch("business_objects.bo_list.BOBase", MockBOBase)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        # self.conPatcher = patch("server.ws_connection.WS_Connection", MockConnection)
-        # self.conPatcher.start()
