@@ -157,6 +157,11 @@ if sqlite3:
 
     PersistentBusinessObject.__init_subclass__ = classmethod(_bo_init_selfregistering_subclass)  # type: ignore
 
+    # Register adapter and converter for all existing Flag subclasses
+    for flag_type in list(BaseFlag.__subclasses__()):
+        # LOG.debug(f"Registering adapter and converter for {flag_type=}")
+        sqlite3.register_adapter(flag_type, _adapt_flag)
+
     # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses
     flag_original_init_subclass = BaseFlag.__init_subclass__
 
