@@ -1,13 +1,13 @@
 """Test suite for business object attributes descriptors."""
 
-from ast import Attribute
 import datetime
 from enum import Flag, auto
 
 import unittest
+from unittest.mock import Mock, ANY
 
 import business_objects.bo_descriptors
-from business_objects.bo_descriptors import AttributeAccessLevel
+from business_objects.bo_descriptors import AttributeAccessLevel, BOSelf
 
 
 class MockAttr(business_objects.bo_descriptors._PersistantAttr):
@@ -120,6 +120,7 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
     )
     list_attr = business_objects.bo_descriptors.BOList()
     rel_attr = business_objects.bo_descriptors.BORelation(MockRel)
+    rel_self_attr = business_objects.bo_descriptors.BORelation(BOSelf)
     flag_attr = business_objects.bo_descriptors.BOFlag(flag_type=MockFlag)
 
     @classmethod
@@ -203,6 +204,14 @@ expected_attributes = {
             {"relation": MockRel},
         ),
         (
+            "rel_self_attr",
+            business_objects.bo_descriptors.BOBaseBase,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_FK,
+            business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
+            AttributeAccessLevel.AAL_READ_WRITE,
+            {"relation": ANY},
+        ),
+        (
             "flag_attr",
             business_objects.bo_descriptors.BaseFlag,
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
@@ -221,6 +230,15 @@ class Test_200_BOAttributes(unittest.TestCase):
     def test_201_attributes(self):
         self.maxDiff = None
         self.assertEqual(self.mock_obj._attributes, expected_attributes)
+        ix_of_rel_self_attr = 7
+        self.assertEqual(
+            self.mock_obj._attributes["MockObj"][ix_of_rel_self_attr][0],
+            "rel_self_attr",
+        )
+        self.assertEqual(
+            self.mock_obj._attributes["MockObj"][ix_of_rel_self_attr][5]["relation"],
+            MockObj,
+        )
 
     def test_202_validate_set_get(self):
         self.mock_obj.int_attr = 11
@@ -229,8 +247,6 @@ class Test_200_BOAttributes(unittest.TestCase):
         self.mock_obj.d_attr = "2020-02-20"
         self.mock_obj.list_attr = [1, 2, 3]
         self.mock_obj.dict_attr = {"dict": 99}
-        other_obj = MockRel()
-        self.mock_obj.rel_attr = other_obj
         self.mock_obj.flag_attr = MockFlag(1)
 
         self.assertEqual(self.mock_obj.int_attr, 11)
@@ -243,8 +259,22 @@ class Test_200_BOAttributes(unittest.TestCase):
         )
         self.assertEqual(self.mock_obj.list_attr, [1, 2, 3])
         self.assertEqual(self.mock_obj.dict_attr, {"dict": 99})
-        self.assertEqual(self.mock_obj.rel_attr, other_obj)
         self.assertEqual(self.mock_obj.flag_attr, MockFlag.FLAG_1)
+
+        mock_init = Mock(name="MockRel.__init__", return_value=None)
+        MockRel.__init__ = mock_init
+        other_obj = MockRel()
+        self.mock_obj.rel_attr = other_obj
+        self.assertEqual(self.mock_obj.rel_attr, other_obj)
+        mock_init.assert_called_once_with()
+
+        mock_init.reset_mock()
+        self.mock_obj.rel_attr = 12
+        mock_init.assert_called_once_with(bo_id=12)
+
+        mock_init.reset_mock()
+        self.mock_obj.rel_attr = "22"
+        mock_init.assert_called_once_with(bo_id=22)
 
     def test_203_validate_fails(self):
         with self.assertRaises(ValueError, msg="BOInt"):

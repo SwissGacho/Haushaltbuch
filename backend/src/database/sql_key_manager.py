@@ -46,7 +46,8 @@ class SQLKeyManager:
         return new_key
 
     def _create_param(self, proposed_key: str, value) -> str:
-        if self.params.get(proposed_key) == value:
+        _UNSET = object()
+        if self.params.get(proposed_key, _UNSET) == value:
             return proposed_key
         for key in self._aliases.get(proposed_key, set()):
             if self.params[key] == value:

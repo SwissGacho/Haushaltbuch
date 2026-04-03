@@ -51,20 +51,22 @@ class BOBase(BOBaseBase):
 
     _last_subscriber_id = itertools.count(1)
 
-    def __new__(cls, *args, identity: int | None = None, **attributes):
+    def __new__(cls, *args, bo_id: int | None = None, **attributes):
         if cls is BOBase:
             raise TypeError(
                 "BOBase is an abstract class and cannot be instantiated directly"
             )
-        if identity is not None:
-            if identity in cls._loaded_instances:
-                obj = cls._loaded_instances[identity]
+        if bo_id is not None:
+            if bo_id in cls._loaded_instances:
+                obj = cls._loaded_instances[bo_id]
                 assert isinstance(
                     obj, cls
-                ), f"Loaded instance with id {identity} is not of type {cls.__name__}"
+                ), f"Loaded instance with id {bo_id} is not of type {cls.__name__}"
                 return obj
 
-        return super().__new__(cls)
+        instance = super().__new__(cls)
+        instance._initialized = False
+        return instance
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
@@ -76,16 +78,24 @@ class BOBase(BOBaseBase):
 
     # pylint: disable=redefined-builtin, unused-argument
     def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
-        # LOG.debug(f"BOBase({bo_id=},{attributes})")
+        # LOG.debug(f"{self.__class__.__name__}({bo_id=},{attributes})  -  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}")
+        if getattr(self, "_initialized", False):
+            # LOG.debug(f"BOBase __init__ called again for {self} with id {self.id}, skipping reinitialization")
+            self._init_attrs(attributes)
+            return
         self._instance_subscribers: dict[int, BOCallback] = {}
         self._data = {}
         self._db_data = {}
         self.id = bo_id
         self.last_updated = None
         self._instance_subscriber_id = itertools.count(1)
-        for attribute, value in attributes.items():
-            self._data[attribute] = value
+        self._init_attrs(attributes)
+        self._initialized = True
         BOBase.subscriptions_report()
+
+    def _init_attrs(self, attributes: dict[str, Any]):
+        for attribute, value in attributes.items():
+            setattr(self, attribute, value)
 
     def handle_callback_result(self, task: asyncio.Task):
         """Logs exceptions from background callback tasks."""
@@ -108,6 +118,10 @@ class BOBase(BOBaseBase):
             if self.id
             else f"{self.__class__.__name__}(no id)"
         )
+
+    def json_encode(self) -> int | None:
+        "Return a JSON-serializable representation of the business object"
+        return self.id if self.id is not None else None
 
     @property
     def display_name(self) -> str:
