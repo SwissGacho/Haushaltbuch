@@ -82,10 +82,18 @@ def json_encode(obj: Any) -> Any:
     return str(obj) if isinstance(obj, (datetime, date, pathlib.Path)) else obj
 
 
-def _serialize(msg_dict: dict) -> dict:
+async def _load_value(val):
+    "load content for business objects"
+    if hasattr(val, "fetch") and callable(getattr(val, "fetch")):
+        await val.fetch()
+    return val
+
+
+async def _serialize(msg_dict: dict) -> dict:
     "serialize a message dictionary replacing keys by str(key)"
     return {
-        str(k): _serialize(v) if isinstance(v, dict) else v for k, v in msg_dict.items()
+        str(k): await _serialize(v) if isinstance(v, dict) else await _load_value(v)
+        for k, v in msg_dict.items()
     }
 
 
@@ -161,10 +169,10 @@ class Message(BaseObject):
         "Add items to the message root that will be serialized and sent via websocket"
         self.message |= attrs
 
-    def serialize(self):
+    async def serialize(self):
         "Serialize to JSON"
         # LOG.debug(f"Message.serialize: message={self.message}")
-        return dumps(_serialize(self.message), default=json_encode)
+        return dumps(await _serialize(self.message), default=json_encode)
 
     async def handle_message(self, connection):
         "Handle unknown message type"
