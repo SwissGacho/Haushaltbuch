@@ -241,7 +241,11 @@ class Test_100_Persistant_Business_Object_classmethods(
                     else (
                         MockPersistantBO1(bo_id=2)
                         if a == "mock_attr2"
-                        else [1, 11] if a == "mock_attr3" else a
+                        else (
+                            [1, 11]
+                            if a == "mock_attr3"
+                            else "12341231 123456" if a == "last_updated" else a
+                        )
                     )
                 )
                 for a in (mock_cols if mock_cols else mock_bo2_as_dict)
@@ -253,7 +257,11 @@ class Test_100_Persistant_Business_Object_classmethods(
                     else (
                         MockPersistantBO1(bo_id=8)
                         if a == "mock_attr2"
-                        else [99, 99] if a == "mock_attr3" else a
+                        else (
+                            [99, 99]
+                            if a == "mock_attr3"
+                            else "12341231 123456" if a == "last_updated" else a
+                        )
                     )
                 )
                 for a in (mock_cols if mock_cols else mock_bo2_as_dict)
