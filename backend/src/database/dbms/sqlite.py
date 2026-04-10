@@ -149,9 +149,12 @@ if sqlite3:
     _setup_bo_subclasses(PersistentBusinessObject)
 
     # Adapt PersistentBusinessObject.__init_subclass__ to register adapter for new subclasses
+    bo_original_init_subclass = PersistentBusinessObject.__init_subclass__
+
     def _bo_init_selfregistering_subclass(cls):
         if sqlite3 is None:
             raise ImportError("sqlite3 module is not available.")
+        bo_original_init_subclass()
         LOG.debug(f"Self-Registering SQLite adapter for class {cls.__name__}")
         sqlite3.register_adapter(cls, _adapt_relation)
 
