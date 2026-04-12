@@ -29,7 +29,8 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         self.connection._send = AsyncMock(name="_send")
         mock_message = Mock(name="message")
         mock_message.add = Mock()
-        mock_message.serialize = Mock()
+        mock_serialized = "mockSerializedMessage"
+        mock_message.serialize = AsyncMock(return_value=mock_serialized)
         if status is None:
             arg = {}
         else:
@@ -44,7 +45,7 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
             )
         else:
             mock_message.add.assert_not_called()
-        self.connection._send.assert_awaited_once_with(mock_message.serialize())
+        self.connection._send.assert_awaited_once_with(mock_serialized)
 
     async def test_102a_send_message_without_status(self):
         await self._102_send_message()

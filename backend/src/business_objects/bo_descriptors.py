@@ -351,6 +351,9 @@ class BORelation(_PersistantAttr[BOBaseBase]):
                 )
         if isinstance(value, int) and isinstance(relation, type):
             value = relation(bo_id=value)
+        if isinstance(value, dict):
+            if value.get("bo_type") == relation._name() and "id" in value:
+                value = relation(bo_id=value["id"])
         # LOG.debug(f"Setting BORelation to {repr(value)} (relation={relation})")
         super().__set__(obj=obj, value=value)
 

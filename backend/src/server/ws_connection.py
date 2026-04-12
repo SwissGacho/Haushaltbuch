@@ -106,7 +106,7 @@ class WSConnection(WSConnectionBase):
             message.add({MessageAttribute.WS_ATTR_STATUS: App.status})
         if not message.get_str(MessageAttribute.WS_ATTR_TOKEN):
             message.add({MessageAttribute.WS_ATTR_TOKEN: self._token})
-        await self._send(message.serialize())
+        await self._send(await message.serialize())
 
     async def send_message_to_component(self, comp, msg):
         """
