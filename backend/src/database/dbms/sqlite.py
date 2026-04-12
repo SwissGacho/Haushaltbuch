@@ -136,10 +136,29 @@ if sqlite3:
     sqlite3.register_converter(SQLITE_DATE_TYPE, _convert_isodate)
     sqlite3.register_converter(SQLITE_DATETIME_TYPE, _convert_isodatetime)
 
-    # Register adapter and converter for all existing PersistentBusinessObject subclasses
-    for bo in list(PersistentBusinessObject.__subclasses__()):
-        # LOG.debug(f"Registering adapter and converter for {bo=}")
-        sqlite3.register_adapter(bo, _adapt_relation)
+    # Register adapter for all existing PersistentBusinessObject subclasses recursively
+    def _setup_bo_subclasses(cls):
+        if sqlite3 is None:
+            raise ImportError("sqlite3 module is not available.")
+        LOG.debug(f"Registering SQLite adapter for class {cls.__name__}")
+        sqlite3.register_adapter(cls, _adapt_relation)
+        # cls.__init_subclass__ = classmethod(_bo_init_selfregistering_subclass)
+        for subcls in cls.__subclasses__():
+            _setup_bo_subclasses(subcls)
+
+    _setup_bo_subclasses(PersistentBusinessObject)
+
+    # Adapt PersistentBusinessObject.__init_subclass__ to register adapter for new subclasses
+    bo_original_init_subclass = PersistentBusinessObject.__init_subclass__
+
+    def _bo_init_selfregistering_subclass(cls):
+        if sqlite3 is None:
+            raise ImportError("sqlite3 module is not available.")
+        bo_original_init_subclass()
+        LOG.debug(f"Self-Registering SQLite adapter for class {cls.__name__}")
+        sqlite3.register_adapter(cls, _adapt_relation)
+
+    PersistentBusinessObject.__init_subclass__ = classmethod(_bo_init_selfregistering_subclass)  # type: ignore
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):
@@ -153,7 +172,7 @@ if sqlite3:
         if sqlite3 is None:
             raise ImportError("sqlite3 module is not available.")
         flag_original_init_subclass()
-        LOG.debug(f"Self-Registering adapter and converter for {cls=}")
+        LOG.debug(f"Self-Registering adapter and converter for class {cls.__name__}")
         sqlite3.register_adapter(cls, _adapt_flag)
 
     BaseFlag.__init_subclass__ = classmethod(_flag_init_selfregistering_subclass)  # type: ignore
