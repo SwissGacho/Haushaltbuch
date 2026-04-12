@@ -47,4 +47,10 @@ class UltimateTestObject(PersistentBusinessObject):
     bo_flag = BOFlag(UltimateFlag)
 
 
+class UltimateDerivedTestObject(UltimateTestObject):
+    "Derived Business Object for testing purposes"
+
+    extra_str = BOStr()
+
+
 log_exit(LOG)
