@@ -148,7 +148,7 @@ class BOList(BOSubscription[T]):
     """Represents a list of business objects of a certain type. The list subscribes to events of
     the business object type and updates its own subscribers accordingly."""
 
-    def __init__(self, conditions: Optional[dict] = None, **kwargs) -> None:
+    def __init__(self, conditions: dict | None = None, **kwargs) -> None:
         self._conditions = conditions
         super().__init__(**kwargs)
 
