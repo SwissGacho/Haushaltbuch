@@ -139,6 +139,7 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
+        # LOG.debug(f"PersistentBusinessObject.get_matching_objects({conditions=}, {attributes=}) -> {result=}")
         return [
             cls(bo_id=obj.get("id"), **{k: v for k, v in obj.items() if k != "id"})
             for obj in result

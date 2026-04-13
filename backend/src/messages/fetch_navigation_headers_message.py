@@ -22,18 +22,17 @@ class FetchNavigationHeadersMessage(Message):
 
     async def handle_message(self, connection: WSConnectionBase):
         "Handle a FetchListMessage"
-
         parent_object_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
-        parent_object: type[BOBase] | None = None
         object_names: list[str] = []
 
         # If headers were request for a specific object, get the relations of that object
-        if parent_object is not None:
-            parent_object = BOBase.get_business_object_by_name(parent_object_name)
+        if parent_object_name:
+            parent_object: type[BOBase] = BOBase.get_business_object_by_name(
+                parent_object_name
+            )
             object_names = [
-                attribute.name
-                for attribute in parent_object.attribute_descriptions()
-                if attribute.data_type == BORelation
+                f"{referer.__name__.lower()}.{attribute.name}"
+                for referer, attribute in parent_object.referenced_by()
             ]
 
         # If no object was specified, return the headers of the root tree
