@@ -19,7 +19,7 @@ async def check_login(login_message: dict) -> User:
         if App.status == Status.STATUS_MULTI_USER
         else SINGLE_USER_NAME
     )
-    LOG.debug(f"check_login() for {username}")
+    # LOG.debug(f"check_login() for {username}")
     matching_users = await User.get_matching_ids({ColumnName("name"): username})
     matching_count = len(matching_users)
     if matching_count > 1:
@@ -27,9 +27,9 @@ async def check_login(login_message: dict) -> User:
     if matching_count < 1:
         raise PermissionError(f"User '{username}' not found.")
     user = await User(bo_id=matching_users[0]).fetch()
-    LOG.debug(f"check_login() -> {repr(user)}")
-    LOG.debug(f"{type(user.role)=}; {user.role if user.role else 'No role'}")
-    LOG.debug(f"{user._data=}")  # pylint: disable=protected-access
+    # LOG.debug(f"check_login() -> {repr(user)}")
+    # LOG.debug(f"    {type(user.role)=}; {user.role if user.role else 'No role'}")
+    # LOG.debug(f"    {user._data=}")  # pylint: disable=protected-access
     return user
 
 

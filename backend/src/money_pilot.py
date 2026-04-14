@@ -38,7 +38,7 @@ async def main():
     LOG.info(
         f"Starting Money Pilot backend application - Version: {App.status_object.version}"
     )
-    LOG.debug(f"{App.status=}")
+    # LOG.debug(f"{App.status=}")
     kb_task: Optional[asyncio.Task] = None
     if sys.platform == "win32":
         # Start keyboard interrupt watcher in background thread

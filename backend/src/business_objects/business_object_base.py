@@ -298,7 +298,7 @@ class BOBase(BOBaseBase):
     def subscribe_to_all_changes(cls, callback: BOCallback) -> int:
         """Register a callback to be called when any instance of this class changes.
         Return a unique id that can be used to unsubscribe."""
-        LOG.debug(f"Subscribing callback {callback} to all changes on {cls}")
+        # LOG.debug(f"Subscribing callback {callback} to all changes on {cls}")
         if not callable(callback):
             raise ValueError("Callback must be callable")
         # Should only subscribe to subclasses, not to BOBase itself
@@ -370,7 +370,7 @@ class BOBase(BOBaseBase):
 
     def notify_instance_subscribers(self):
         """Notify all subscribers of this instance about a change."""
-        LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
+        # LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
         if not self.id:
             return
         BOBase.notify_bo_subscribers(self._instance_subscribers, self)
@@ -378,9 +378,7 @@ class BOBase(BOBaseBase):
     @classmethod
     def notify_change_subscribers(cls, changed_bo: "BOBase"):
         """Notify all subscribers of this class about a change in an instance."""
-        LOG.debug(
-            f"Notifying {len(cls._change_subscribers)} change subscribers for {changed_bo}"
-        )
+        # LOG.debug(f"Notifying {len(cls._change_subscribers)} change subscribers for {changed_bo}")
         cls.notify_bo_subscribers(cls._change_subscribers, changed_bo)
 
     @classmethod
@@ -388,9 +386,7 @@ class BOBase(BOBaseBase):
         cls, subscriptions: dict[int, BOCallback], changed_bo: "BOBase"
     ):
         """Notify all subscribers about a change in a business object."""
-        LOG.debug(
-            f"Notifying {len(subscriptions)} subscribers for {changed_bo} with {changed_bo.id=}"
-        )
+        # LOG.debug(f"Notifying {len(subscriptions)} subscribers for {changed_bo} with {changed_bo.id=}")
         for callback in subscriptions.values():
             try:
                 task = asyncio.create_task(

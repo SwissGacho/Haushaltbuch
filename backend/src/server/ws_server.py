@@ -26,16 +26,14 @@ class WSHandler:
         local_LOG = getLogger(  # pylint: disable=invalid-name
             f"{WSHandler.__module__}(sock #{sock_nbr})"
         )
-        local_LOG.debug("connection opened")
+        # local_LOG.debug("connection opened")
         connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
             if await connection.start_connection():
                 local_LOG = getLogger(  # pylint: disable=invalid-name
                     f"{WSHandler.__module__}({connection.connection_id})"
                 )
-                local_LOG.debug(
-                    f"connection started from socket connection #{sock_nbr}"
-                )
+                # local_LOG.debug(f"connection started from socket connection #{sock_nbr}")
                 async for ws_message in websocket:
                     local_LOG.debug(f"Client posted: {ws_message=}")
                     try:
