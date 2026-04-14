@@ -198,7 +198,7 @@ class PersistentBusinessObject(BOBase):
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
         values_to_store: NamedValueListList = [
-            [(k, v)] for k, v in self._data.items() if k != "id" and v is not None
+            (k, v) for k, v in self._data.items() if k != "id" and v is not None
         ]
         if not values_to_store:
             raise CannotStoreEmptyBO(f"Cannot store {self._data=} as it has no values")
