@@ -1,7 +1,10 @@
 """Application specific logging"""
 
+import json
 import logging
+import re
 from logging import Logger
+from typing import Any
 from core.const import APPNAME
 
 # Control logging of module entry and exit
@@ -58,6 +61,31 @@ class ColorFormatter(logging.Formatter):
 root_handler = logging.StreamHandler()
 root_handler.setFormatter(ColorFormatter())
 root_logger.addHandler(root_handler)
+
+_REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
+
+
+def redact(value: Any) -> Any:
+    "Return a log-safe copy with sensitive values redacted."
+    if isinstance(value, dict):
+        return {
+            key: (
+                "***redacted***" if _REDACT_PATTERN.search(str(key)) else redact(item)
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [redact(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact(item) for item in value)
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return value
+        if isinstance(parsed, (dict, list, tuple)):
+            return json.dumps(redact(parsed))
+    return value
 
 
 def getLogger(  # pylint: disable=invalid-name
