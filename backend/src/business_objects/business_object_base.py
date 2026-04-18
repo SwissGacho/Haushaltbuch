@@ -255,6 +255,21 @@ class BOBase(BOBaseBase):
         ]
 
     @classmethod
+    def referenced_by(cls) -> list[tuple[type[BOBaseBase], AttributeDescription]]:
+        "list of business objects attribute descriptions referencing this class"
+        referencing_attributes = []
+        for bo_cls in cls._business_objects.values():
+            for attr_desc in bo_cls.attribute_descriptions():
+                if (
+                    attr_desc.data_type == BOBaseBase
+                    and attr_desc.constraint == BOColumnConstraint.BOC_FK
+                    and attr_desc.constraint_values.get("relation") == cls
+                ):
+                    referencing_attributes.append((bo_cls, attr_desc))
+        # LOG.debug(f"{cls.__name__} is referenced by: {referencing_attributes}")
+        return referencing_attributes
+
+    @classmethod
     async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
         raise NotImplementedError("count_rows not implemented")

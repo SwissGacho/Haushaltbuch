@@ -49,6 +49,7 @@ class MessageAttribute(StrEnum):
     # Fetch
     WS_ATTR_OBJECT = "object"
     WS_ATTR_INDEX = "index"
+    WS_ATTR_CONDITIONS = "conditions"
 
     # Hello
     WS_ATTR_SEARCH_PATH = "search_path"
