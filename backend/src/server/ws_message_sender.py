@@ -10,7 +10,7 @@ class WSMessageSender:
     """Mix-In class for objects that can send messages to a websocket connection."""
 
     def __init__(self, connection: WSConnectionBase, *args, **kwargs):
-        LOG.debug(f"WSMessageSender.__init__({connection=}, {args=}, {kwargs=})")
+        # LOG.debug(f"WSMessageSender.__init__({connection=}, {args=}, {kwargs=})")
         self._connection = connection
         self._connection.register_message_sender(self)
 
@@ -30,8 +30,8 @@ class WSMessageSender:
 
     async def send_message(self, message):
         """Send a message to the websocket connection."""
-        LOG.debug(f"WSMessageSender.send_message({message=})")
-        LOG.debug(f"     {self._connection=}")
+        # LOG.debug(f"WSMessageSender.send_message({message=})")
+        # LOG.debug(f"     {self._connection=}")
         await self._connection.send_message(message)
 
 

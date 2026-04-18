@@ -140,7 +140,7 @@ if sqlite3:
     def _setup_bo_subclasses(cls):
         if sqlite3 is None:
             raise ImportError("sqlite3 module is not available.")
-        LOG.debug(f"Registering SQLite adapter for class {cls.__name__}")
+        # LOG.debug(f"Registering SQLite adapter for class {cls.__name__}")
         sqlite3.register_adapter(cls, _adapt_relation)
         # cls.__init_subclass__ = classmethod(_bo_init_selfregistering_subclass)
         for subcls in cls.__subclasses__():
