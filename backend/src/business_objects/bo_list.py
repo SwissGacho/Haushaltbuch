@@ -144,6 +144,10 @@ class BOList(BOSubscription[T]):
     """Represents a list of business objects of a certain type. The list subscribes to events of
     the business object type and updates its own subscribers accordingly."""
 
+    def __init__(self, conditions: dict | None = None, **kwargs) -> None:
+        self._conditions = conditions
+        super().__init__(**kwargs)
+
     def _initialize_subscriptions(self, **kwargs):
         self._subscription_id = self._bo_type.subscribe_to_all_changes(
             self._handle_event_
@@ -160,7 +164,9 @@ class BOList(BOSubscription[T]):
         bo_type = self._bo_type.__name__
         name_list = [
             {"id": cur.id, "display_name": cur.display_name}
-            for cur in await self._bo_type.get_matching_objects(attributes=["name"])
+            for cur in await self._bo_type.get_matching_objects(
+                attributes=["name"], conditions=self._conditions
+            )
         ]
         # LOG.debug(f"Updating subscribers of {bo_type} with {len(name_list)} objects")
         msg = ObjectList()
@@ -180,7 +186,8 @@ class BOList(BOSubscription[T]):
             # LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
             return []
         rslt = [
-            self._bo_type(bo_id=cur) for cur in await self._bo_type.get_matching_ids()
+            self._bo_type(bo_id=cur)
+            for cur in await self._bo_type.get_matching_ids(conditions=self._conditions)
         ]
         return rslt
 

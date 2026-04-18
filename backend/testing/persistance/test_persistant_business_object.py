@@ -438,7 +438,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_tx.__aexit__.assert_awaited_once_with(None, None, None)
             self.mock_sql.insert.assert_called_once_with(MOCK_TAB2)
             self.mock_sql.rows.assert_called_once_with(
-                [[(a, mock_attrs[a])] for a in mock_bo2_as_dict if a in mock_attrs]
+                [(a, mock_attrs[a]) for a in mock_bo2_as_dict if a in mock_attrs]
             )
             self.mock_sql.returning.assert_called_once_with("id")
             self.mock_sql.execute.assert_awaited_once_with()

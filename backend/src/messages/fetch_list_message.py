@@ -18,12 +18,14 @@ class FetchListMessage(Message):
 
     async def handle_message(self, connection):
         object_type_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
+        conditions = self.message.get(MessageAttribute.WS_ATTR_CONDITIONS)
 
         # Maybe the connection should have a method that creates a BOList?
         BOList(
             bo_type=str(object_type_name),
             connection=connection,
             notify_subscribers_on_init=True,
+            conditions=conditions,
         )
 
 
