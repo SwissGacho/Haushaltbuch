@@ -40,7 +40,7 @@ class WSHandler:
                         message = Message(json_message=ws_message)
                     except TypeError:
                         local_LOG.warning(  # pylint: disable=logging-not-lazy
-                            "message handler failed to create Message object"
+                            "message handler failed to create Message object "
                             f"from json: {redact(ws_message)}"
                         )
                         raise
