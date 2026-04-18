@@ -74,17 +74,6 @@ def redact(value: Any) -> Any:
             )
             for key, item in value.items()
         }
-    if isinstance(value, list):
-        return [redact(item) for item in value]
-    if isinstance(value, tuple):
-        return tuple(redact(item) for item in value)
-    if isinstance(value, str):
-        try:
-            parsed = json.loads(value)
-        except (TypeError, ValueError, json.JSONDecodeError):
-            return value
-        if isinstance(parsed, (dict, list, tuple)):
-            return json.dumps(redact(parsed))
     return value
 
 
