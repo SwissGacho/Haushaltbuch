@@ -14,7 +14,7 @@ LOG = getLogger(__name__)
 from core.configuration.cmd_line import parse_commandline
 from core.configuration.db_config import DBConfig
 from core.const import SINGLE_USER_NAME
-from core.util import get_config_item
+from core.util import get_config_item, update_dicts_recursively
 from core.configuration.setup_config import SetupConfigValues
 from core.app import App
 from core.status import Status
@@ -54,7 +54,11 @@ class AppConfiguration(ConfigurationBaseClass):
                 {Config.CONFIG_DB: cmdline_cfg[Config.CONFIG_DB]}
             )
         else:
-            self._cmdline_configuration.update(DBConfig.read_db_config_file() or {})
+            update_dicts_recursively(
+                self._cmdline_configuration,
+                DBConfig.read_db_config_file() or {},
+                source_overrides_target=False,
+            )
 
     async def get_configuration_from_db(self):
         "Fetch configuration from database"
@@ -121,7 +125,8 @@ class AppConfiguration(ConfigurationBaseClass):
             global_cfg_dict = self._global_configuration.configuration_dict
         else:
             global_cfg_dict = {}
-        cfg = global_cfg_dict | (self._cmdline_configuration or {})
+        cfg = global_cfg_dict
+        update_dicts_recursively(cfg, self._cmdline_configuration or {})
         # LOG.debug(f"AppConfiguration.configuration() -> {cfg}")
         return cfg
 

@@ -103,18 +103,23 @@ def get_config_item(cfg: dict | None, key: str):
 
 
 def update_dicts_recursively(
-    target: Optional[Union[ConfigDict, BODict]], source: Union[ConfigDict, BODict]
+    target: Optional[Union[ConfigDict, BODict]],
+    source: Union[ConfigDict, BODict],
+    source_overrides_target: bool = True,
 ):
-    "Merge source into target"
+    """Merge source into target.
+    If source_overrides_target is True, source values will override target values,
+    otherwise only missing keys in target will be updated."""
     if target is None:
         return
     if not (isinstance(target, dict) and isinstance(source, dict)):
         raise TypeError("Configurations must be mappings.")
     for key, value in source.items():
         if isinstance(tgt_dict := target.get(key), dict) and isinstance(value, dict):
-            update_dicts_recursively(tgt_dict, value)
+            update_dicts_recursively(tgt_dict, value, source_overrides_target)
         else:
-            target[key] = value
+            if source_overrides_target or key not in target:
+                target[key] = value
 
 
 log_exit(LOG)

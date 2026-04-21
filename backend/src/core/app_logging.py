@@ -9,16 +9,8 @@ from core.const import APPNAME
 
 # Control logging of module entry and exit
 _LOG_MODULE_ENTRY = False
-_LOG_MODULE_EXIT = False
+_LOG_MODULE_EXIT = _LOG_MODULE_ENTRY
 
-
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-app_logger = logging.getLogger(APPNAME)
-app_logger.setLevel(logging.DEBUG)
-
-root_logger.debug("root logger initialized.")
-app_logger.debug("app logger initialized.")
 
 # 🏴‍☠️ ANSI runes for color
 RESET = "\033[0m"
@@ -58,9 +50,17 @@ class ColorFormatter(logging.Formatter):
         return self.base_formatter.format(record)
 
 
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+app_logger = logging.getLogger(APPNAME)
+app_logger.setLevel(logging.DEBUG)
+
 root_handler = logging.StreamHandler()
 root_handler.setFormatter(ColorFormatter())
 root_logger.addHandler(root_handler)
+
+root_logger.debug("root logger initialized.")
+app_logger.debug("app logger initialized.")
 
 _REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
 
@@ -94,3 +94,11 @@ def log_exit(logger):
     "Log end of execution of the module code"
     if _LOG_MODULE_EXIT:
         logger.debug("Exit module")
+
+
+def reconfigure_logging(level=logging.INFO):
+    "Configure logging level for the application"
+    from core.app import App
+    from core.base_objects import Config
+
+    logger = getLogger(APPNAME)

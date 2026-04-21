@@ -12,7 +12,7 @@ from asyncio import (
 )
 from typing import Optional
 
-from core.app_logging import getLogger
+from core.app_logging import getLogger, reconfigure_logging
 
 LOG = getLogger(__name__)
 
@@ -35,6 +35,7 @@ def wait_for_keyboard_interrupt():
 
 async def main():
     "connect DB and start servers"
+    # pylint: no-member
     LOG.info(
         f"Starting Money Pilot backend application - Version: {App.status_object.version}"
     )
@@ -68,6 +69,7 @@ async def main():
                     else:
                         # LOG.debug("DB NOT available.")
                         App.db_failure.set()
+                    reconfigure_logging()
                     LOG.info(f"App running. (Status: {App.status})")
                     tasks = [
                         aio_create_task(
