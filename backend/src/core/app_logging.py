@@ -1,6 +1,5 @@
 """Application specific logging"""
 
-import json
 import logging
 import re
 from logging import Logger
@@ -39,15 +38,20 @@ class ColorFormatter(logging.Formatter):
 
     def __init__(self):
         base_format = (
-            "%(asctime)s  %(name)-55s:%(lineno)4d - %(levelname)-5s - %(message)s"
+            "%(asctime)s  %(name)-65s:%(lineno)4d - %(levelname)-5s - %(message)s"
         )
         super().__init__(base_format)
-        self.base_formatter = logging.Formatter(base_format)
+
+    def formatTime(self, record, datefmt=None):
+        import datetime
+
+        ct = datetime.datetime.fromtimestamp(record.created)
+        return ct.strftime("%H:%M:%S.%f")
 
     def format(self, record):
         color = self.COLORS.get(record.levelno, "")
         record.levelname = f"{color}{record.levelname:<5s}{RESET}"
-        return self.base_formatter.format(record)
+        return super().format(record)
 
 
 root_logger = logging.getLogger()
