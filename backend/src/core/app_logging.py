@@ -7,8 +7,8 @@ import json
 
 import logging
 import logging.config
-from logging import Logger
-from typing import Any
+from logging import Logger, DEBUG, INFO, WARNING, ERROR, CRITICAL
+from typing import Any, MutableMapping
 from core.const import APPNAME, CONFIG_DBCFG_FILE
 from core.configuration.cmd_line import CommandLine
 from core.util_base import get_config_item
@@ -25,6 +25,7 @@ BOLD = "\033[1m"
 
 # Foreground colors
 FG_RED = "\033[31m"
+FG_GREEN = "\033[32m"
 FG_YELLOW = "\033[33m"
 FG_CYAN = "\033[36m"
 FG_WHITE = "\033[97m"
@@ -33,25 +34,42 @@ FG_WHITE = "\033[97m"
 BG_RED = "\033[41m"
 
 
+_PREFIX_PATTERN = re.compile(r"^(\[[^\]]+\])(\s*)")
+
+
 class ColorFormatter(logging.Formatter):
     """A formatter so vivid it burns the Kraken’s eyes!"""
 
     COLORS = {
-        logging.DEBUG: FG_CYAN,
-        logging.INFO: FG_WHITE,
-        logging.WARNING: FG_YELLOW,
-        logging.ERROR: BG_RED + FG_WHITE + BOLD,
-        logging.CRITICAL: BG_RED + FG_WHITE + BOLD,
+        DEBUG: FG_CYAN,
+        INFO: FG_WHITE,
+        WARNING: FG_YELLOW,
+        ERROR: BG_RED + FG_WHITE + BOLD,
+        CRITICAL: BG_RED + FG_WHITE + BOLD,
     }
 
     def formatTime(self, record, datefmt=None):
         ct = datetime.datetime.fromtimestamp(record.created)
         return ct.strftime("%H:%M:%S.%f")
 
+    @staticmethod
+    def _highlight_prefix(message: str) -> str:
+        return _PREFIX_PATTERN.sub(rf"{FG_GREEN}\1{RESET}\2", message, count=1)
+
     def format(self, record):
+        original_msg = record.msg
+        original_args = record.args
+        original_levelname = record.levelname
         color = self.COLORS.get(record.levelno, "")
-        record.levelname = f"{color}{record.levelname:<5s}{RESET}"
-        return super().format(record)
+        try:
+            record.levelname = f"{color}{record.levelname:<5s}{RESET}"
+            record.msg = self._highlight_prefix(record.getMessage())
+            record.args = ()
+            return super().format(record)
+        finally:
+            record.msg = original_msg
+            record.args = original_args
+            record.levelname = original_levelname
 
 
 _REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
@@ -80,6 +98,35 @@ def getLogger(  # pylint: disable=invalid-name
     if _LOG_MODULE_ENTRY:
         logger.debug("Enter module")
     return logger
+
+
+class ContextLogger(logging.LoggerAdapter):
+    """Keep logger names stable while attaching runtime context to messages."""
+
+    def __init__(self, logger: Logger, extra: dict[str, Any] | None = None) -> None:
+        super().__init__(logger, extra or {})
+
+    def bind(self, **extra: Any) -> "ContextLogger":
+        "Return a new adapter with merged context."
+        return ContextLogger(self.logger, dict(self.extra or {}) | extra)
+
+    def process(self, msg: str, kwargs: MutableMapping[str, Any]):
+        context = {
+            key: value
+            for key, value in dict(self.extra or {}).items()
+            if value is not None and value != ""
+        }
+        if context:
+            prefix = " ".join(f"{key}={value}" for key, value in context.items())
+            msg = f"[{prefix}] {msg}"
+        return msg, kwargs
+
+
+def get_context_logger(logger: Logger | ContextLogger, **extra: Any) -> ContextLogger:
+    "Return a logger adapter carrying runtime context without creating new logger names."
+    if isinstance(logger, ContextLogger):
+        return logger.bind(**extra)
+    return ContextLogger(logger, extra)
 
 
 def log_exit(logger):

@@ -1,8 +1,16 @@
 """Handle a websocket connection"""
 
 import websockets
+import json
 
-from core.app_logging import getLogger, Logger, log_exit
+from core.app_logging import (
+    get_context_logger,
+    getLogger,
+    Logger,
+    log_exit,
+    DEBUG,
+    redact,
+)
 
 LOG: Logger = getLogger(__name__)
 
@@ -25,15 +33,14 @@ class WSConnection(WSConnectionBase):
 
     def __init__(self, websocket, sock_nbr) -> None:
         self._socket = websocket
+        self._socket_nbr = sock_nbr
         self._session = None
         self._conn_nbr = sock_nbr
         self._comp = None
         self.is_primary = False
         self._token = WSToken()
         self.subscribers: list[WSMessageSender] = []
-        self.LOG = getLogger(  # pylint: disable=invalid-name
-            f"{WSConnection.__module__}({self.connection_id})"
-        )
+        self.LOG = get_context_logger(LOG, connection=self.connection_id)
         self._register_connection()
 
     def _register_connection(self, key: str | None = None) -> None:
@@ -41,11 +48,9 @@ class WSConnection(WSConnectionBase):
             self._comp = key
         # remove existing entry
         self._unregister_connection()
-        # self.LOG.debug(
-        #     f"WS_Connection._register_connection({key=}): adding '{key or self.connection_id}'"
-        # )
+        # self.LOG.debug(f"WS_Connection._register_connection({key=}): adding '{key or self.connection_id}'")
         WSConnection.connections |= {(key or self.connection_id): self}
-        # self.LOG.debug(f"{WS_Connection.connections=}")
+        # self.LOG.debug(f"{WSConnection.connections=}")
 
     def register_message_sender(self, sender: WSMessageSender):
         "register a message sender to this connection"
@@ -78,7 +83,7 @@ class WSConnection(WSConnectionBase):
         "identifying string (for logging)"
         myself = self._comp or str(self._conn_nbr)
         if self._session:
-            return f"{self._session.session_id},conn {myself}"
+            return f"{self._socket_nbr},{self._session.session_id},conn {myself}"
         else:
             return myself
 
@@ -91,11 +96,14 @@ class WSConnection(WSConnectionBase):
     def session(self, ses):
         self._session = ses
         self._conn_nbr = ses.add_connection(self)
-        self.LOG = getLogger(f"{WSConnection.__module__}({self.connection_id})")
+        self.LOG = get_context_logger(LOG, connection=self.connection_id)
 
     async def _send(self, payload):
         await self._socket.send(payload)
-        self.LOG.debug(f"sent message: {payload}")
+        if self.LOG.isEnabledFor(DEBUG):
+            self.LOG.debug("WSConnection._send(): sent message:")
+            for line in json.dumps(redact(json.loads(payload)), indent=4).splitlines():
+                LOG.debug(f"    {line}")
 
     async def send_message(self, message: Message, status=False):
         "Send a message to the client using current connection"
@@ -125,7 +133,15 @@ class WSConnection(WSConnectionBase):
         await self.send_message(HelloMessage(token=self._token, status=App.status))
         try:
             while json_message := await self._socket.recv():
-                # self.LOG.debug(f"WS_Connection.start_connection(): reply to hello is {json_message}")
+                if self.LOG.isEnabledFor(DEBUG):
+                    # self.LOG.debug(f"sent message: {payload}")
+                    self.LOG.debug(
+                        "WS_Connection.start_connection(): reply to hello is:"
+                    )
+                    for line in json.dumps(
+                        redact(json.loads(json_message)), indent=4
+                    ).splitlines():
+                        LOG.debug(f"    {line}")
                 msg = Message(json_message=json_message)
                 if isinstance(msg, LoginMessage):
                     self._register_connection(

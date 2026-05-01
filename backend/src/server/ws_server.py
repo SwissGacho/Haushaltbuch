@@ -1,11 +1,19 @@
 """Setup a websocket server and handle connection call"""
 
 import os
+import json
 import socket
 from contextlib import asynccontextmanager
 import websockets.asyncio.server as websockets
 
-from core.app_logging import getLogger, log_exit, Logger, redact
+from core.app_logging import (
+    get_context_logger,
+    getLogger,
+    log_exit,
+    Logger,
+    redact,
+    DEBUG,
+)
 
 LOG: Logger = getLogger(__name__)
 
@@ -23,19 +31,20 @@ class WSHandler:
         "Handle a ws connection"
         sock_nbr = WSHandler.counter
         WSHandler.counter += 1
-        local_LOG = getLogger(  # pylint: disable=invalid-name
-            f"{WSHandler.__module__}(sock #{sock_nbr})"
-        )
-        # local_LOG.debug("connection opened")
+        local_LOG = get_context_logger(LOG, socket=f"sock #{sock_nbr}")
+        local_LOG.debug("connection opened")
         connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
             if await connection.start_connection():
-                local_LOG = getLogger(  # pylint: disable=invalid-name
-                    f"{WSHandler.__module__}({connection.connection_id})"
-                )
-                # local_LOG.debug(f"connection started from socket connection #{sock_nbr}")
+                local_LOG = get_context_logger(LOG, connection=connection.connection_id)
+                local_LOG.debug("Connection started.")
                 async for ws_message in websocket:
-                    local_LOG.debug(f"Client posted: ws_message={redact(ws_message)}")
+                    if local_LOG.isEnabledFor(DEBUG):
+                        local_LOG.debug("WSHandler.handler(): client posted:")
+                        for line in json.dumps(
+                            redact(json.loads(ws_message)), indent=4
+                        ).splitlines():
+                            LOG.debug(f"    {line}")
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:
