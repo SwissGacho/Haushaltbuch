@@ -36,7 +36,7 @@ def wait_for_keyboard_interrupt():
 
 async def main():
     "connect DB and start servers"
-    # pylint: no-member
+    # pylint: disable=no-member
     LOG.info(
         f"Starting Money Pilot backend application - Version: {App.status_object.version}"
     )
