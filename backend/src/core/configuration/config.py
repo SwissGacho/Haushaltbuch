@@ -8,16 +8,18 @@
 
 from typing import Optional
 from core.app_logging import getLogger, log_exit
+from core.util_base import update_dicts_recursively
 
 LOG = getLogger(__name__)
 
-from core.configuration.cmd_line import parse_commandline
+from core.configuration.cmd_line import CommandLine
 from core.configuration.db_config import DBConfig
 from core.const import SINGLE_USER_NAME
-from core.util import get_config_item, update_dicts_recursively
+from core.util_base import get_config_item
 from core.configuration.setup_config import SetupConfigValues
 from core.app import App
 from core.status import Status
+from core.reconfigure_logging import reconfigure_logging
 from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config, ConfigDict
 from data.management.configuration import Configuration
@@ -47,7 +49,7 @@ class AppConfiguration(ConfigurationBaseClass):
         """
         # LOG.debug("AppConfiguration.initialize_configuration()")
         self._cmdline_configuration = {}
-        cmdline_cfg = parse_commandline(Config.CONFIG_DBCFG_FILE)
+        cmdline_cfg = CommandLine.get_commandline_config()
         self._cmdline_configuration.update(cmdline_cfg)
         if Config.CONFIG_DB in cmdline_cfg:
             DBConfig.set_db_configuration(
@@ -59,6 +61,7 @@ class AppConfiguration(ConfigurationBaseClass):
                 DBConfig.read_db_config_file() or {},
                 source_overrides_target=False,
             )
+        reconfigure_logging()
 
     async def get_configuration_from_db(self):
         "Fetch configuration from database"

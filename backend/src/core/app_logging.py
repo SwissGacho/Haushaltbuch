@@ -1,10 +1,18 @@
 """Application specific logging"""
 
-import logging
+import datetime
+from enum import StrEnum
 import re
+import json
+
+import logging
+import logging.config
 from logging import Logger
 from typing import Any
-from core.const import APPNAME
+from core.const import APPNAME, CONFIG_DBCFG_FILE
+from core.configuration.cmd_line import CommandLine
+from core.util_base import get_config_item
+
 
 # Control logging of module entry and exit
 _LOG_MODULE_ENTRY = False
@@ -36,15 +44,7 @@ class ColorFormatter(logging.Formatter):
         logging.CRITICAL: BG_RED + FG_WHITE + BOLD,
     }
 
-    def __init__(self):
-        base_format = (
-            "%(asctime)s  %(name)-65s:%(lineno)4d - %(levelname)-5s - %(message)s"
-        )
-        super().__init__(base_format)
-
     def formatTime(self, record, datefmt=None):
-        import datetime
-
         ct = datetime.datetime.fromtimestamp(record.created)
         return ct.strftime("%H:%M:%S.%f")
 
@@ -53,18 +53,6 @@ class ColorFormatter(logging.Formatter):
         record.levelname = f"{color}{record.levelname:<5s}{RESET}"
         return super().format(record)
 
-
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-app_logger = logging.getLogger(APPNAME)
-app_logger.setLevel(logging.DEBUG)
-
-root_handler = logging.StreamHandler()
-root_handler.setFormatter(ColorFormatter())
-root_logger.addHandler(root_handler)
-
-root_logger.debug("root logger initialized.")
-app_logger.debug("app logger initialized.")
 
 _REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
 
@@ -100,9 +88,164 @@ def log_exit(logger):
         logger.debug("Exit module")
 
 
-def reconfigure_logging(level=logging.INFO):
-    "Configure logging level for the application"
-    from core.app import App
-    from core.base_objects import Config
+logging_dict = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "color": {
+            "()": ColorFormatter,
+            "format": "%(asctime)s  %(name)-65s:%(lineno)4d - %(levelname)-5s - %(message)s",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "color",
+        }
+    },
+    "root": {
+        "level": "WARNING",
+        "handlers": ["console"],
+    },
+    "loggers": {
+        APPNAME: {
+            "level": "INFO",
+            "propagate": True,
+        }
+    },
+}
 
-    logger = getLogger(APPNAME)
+
+class LogConfig(StrEnum):
+    CONFIG_LOGGING = "logging"
+    CONFIG_LOG_DEFAULT = "default"
+    CONFIG_LOG_LEVEL = "level"
+
+
+def app_loggers() -> set[logging.Logger]:
+    "Get all loggers in the app"
+    return {
+        logger
+        for name, logger in logging.Logger.manager.loggerDict.items()
+        if name == APPNAME or name.startswith(APPNAME + ".")
+        if isinstance(logger, logging.Logger)
+    }
+
+
+def all_loggers(parent=logging.getLogger()) -> set[logging.Logger]:
+    "Get all loggers"
+    loggers = {parent} | {
+        l
+        for l in logging.Logger.manager.loggerDict.values()
+        if isinstance(l, logging.Logger)
+    }
+    return loggers
+
+
+def app_logger_names() -> list[str]:
+    "Get names of all loggers in the app"
+    return sorted({l.name for l in app_loggers()})
+
+
+def _get_log_config_keyes(cfg):
+    def _get_keys(d):
+        if not d:
+            return []
+        return [
+            k + "/" + subkey
+            for k, v in d.items()
+            if isinstance(v, dict)
+            for subkey in _get_keys(v)
+        ] + [k for k, v in d.items() if isinstance(v, str)]
+
+    def _flatten(lst):
+        return [
+            item
+            for element in lst
+            for item in (_flatten(element) if isinstance(element, list) else [element])
+        ]
+
+    return [
+        k
+        for k in _flatten(_get_keys(get_config_item(cfg, LogConfig.CONFIG_LOGGING)))
+        if k not in (LogConfig.CONFIG_LOG_DEFAULT)
+    ]
+
+
+def _get_log_config_level(cfg, key: str) -> str:
+    "Get log level from config"
+    val = get_config_item(cfg, key)
+    if not val:
+        return ""
+    if not isinstance(val, str):
+        # LOG.warning(f"Log level for '{key}' is not a string: {val}")
+        return ""
+    return val.upper()
+
+
+def disabled(rec):
+    "Filter function to disable logging from a logger"
+    return False
+
+
+def configure_logging(log_cfg: dict = None):
+
+    global_default_level = _get_log_config_level(
+        log_cfg, LogConfig.CONFIG_LOGGING + "/" + LogConfig.CONFIG_LOG_DEFAULT
+    )
+
+    if global_default_level:
+        logging_dict["root"]["level"] = global_default_level
+    for logger_item in _get_log_config_keyes(log_cfg):
+        if logger_item.split("/")[-1] == LogConfig.CONFIG_LOG_LEVEL:
+            logger = "/".join(logger_item.split("/")[:-1])
+        else:
+            logger = logger_item
+        level = _get_log_config_level(
+            log_cfg, LogConfig.CONFIG_LOGGING + "/" + logger_item
+        )
+        if level.upper() in ["DISABLED", "DISABLE", "OFF"]:
+            logging_dict["loggers"][logger.replace("/", ".")] = {"filters": [disabled]}
+        else:
+            logging_dict["loggers"][logger.replace("/", ".")] = {
+                "level": level,
+                "propagate": True,
+            }
+
+    try:
+        logging.config.dictConfig(logging_dict)
+    except (ValueError, TypeError, AttributeError, ImportError) as e:
+        print(f"ERROR configuring logging: {e}")
+
+    log = logging.getLogger(APPNAME + "." + __name__)
+    if log.isEnabledFor(logging.DEBUG):
+        log.debug(
+            f"Logging configured with config:\n{json.dumps(log_cfg.get(LogConfig.CONFIG_LOGGING,{}), indent=4)}"
+        )
+        log.debug("Logging is now reconfigured:")
+        for l in sorted(
+            [
+                f"   {l.name:<65}: {logging.getLevelName(l.level):>8} {', '.join(f.__name__ for f in l.filters)}"
+                for l in [
+                    l
+                    for l in (
+                        all_loggers()
+                        | {
+                            logging.getLogger(),
+                        }
+                    )
+                    if l.level > logging.NOTSET or l.filters
+                ]
+            ]
+        ):
+            log.debug(l)
+    log.debug(
+        f'Main loggers: {", ".join([l.name for l in logging.getLogger().getChildren()])}'
+    )
+
+
+# parse commandline for logging config overrides
+parsed_commandline = CommandLine.parse_commandline(dbcfg_file_key=CONFIG_DBCFG_FILE)
+configure_logging(parsed_commandline)
+
+log_exit(logging.getLogger(APPNAME + "." + __name__))

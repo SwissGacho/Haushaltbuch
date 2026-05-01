@@ -12,7 +12,7 @@ from asyncio import (
 )
 from typing import Optional
 
-from core.app_logging import getLogger, reconfigure_logging
+from core.app_logging import getLogger
 
 LOG = getLogger(__name__)
 
@@ -21,6 +21,7 @@ from core.app import App
 from core.status import Status
 from core.configuration.db_config import DBConfig
 from core.util import check_environment
+from core.reconfigure_logging import reconfigure_logging
 from database.db_manager import get_db
 from server.ws_server import get_websocket
 

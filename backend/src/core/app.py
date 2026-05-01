@@ -3,8 +3,7 @@
 from asyncio import Event
 from typing import Type, Self, Optional
 
-# pylint: disable=wrong-import-position
-from core.app_logging import getLogger, log_exit, reconfigure_logging
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
@@ -47,7 +46,6 @@ class App:
         else:
             cls._config = cls._config_class(app_location)
         cls._config.initialize_configuration()
-        reconfigure_logging()
         # LOG.debug("app initialized")
 
     @classmethod

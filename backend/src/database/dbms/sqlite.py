@@ -282,7 +282,7 @@ class SQLiteCursor(Cursor):
         self._last_query = query
         self._last_params = params or {}
         try:
-            # LOG.debug(f"SQLiteCursor.execute({query=}, {params=})")
+            LOG.debug(f"SQLiteCursor.execute({query=}, {params=})")
             await self._cursor.execute(sql=query, parameters=params)
             self._rowcount = self._cursor.rowcount
         except sqlite3.OperationalError as exc:

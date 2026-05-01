@@ -11,7 +11,7 @@ LOG = getLogger(__name__)
 
 from core.configuration.config import Config, DBConfig
 from core.exceptions import ConfigurationError, OperationalError
-from core.util import get_config_item
+from core.util_base import get_config_item
 from database.dbms.db_base import DB, Connection, Cursor, DBCursorProtocol
 from database.sql_factory import SQLFactory
 from database.sql import SQL
