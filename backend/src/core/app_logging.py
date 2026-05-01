@@ -220,7 +220,7 @@ def configure_logging(log_cfg: dict = None):
     log = logging.getLogger(APPNAME + "." + __name__)
     if log.isEnabledFor(logging.DEBUG):
         log.debug(
-            f"Logging configured with config:\n{json.dumps(log_cfg.get(LogConfig.CONFIG_LOGGING,{}), indent=4)}"
+            f"Logging configured with config:\n{json.dumps((log_cfg or {}).get(LogConfig.CONFIG_LOGGING, {}), indent=4)}"
         )
         log.debug("Logging is now reconfigured:")
         for l in sorted(
