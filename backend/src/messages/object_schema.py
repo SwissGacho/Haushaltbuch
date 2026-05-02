@@ -78,6 +78,7 @@ class ObjectSchema(Message):
                 if v is not None
             },
             "access_level": str(attribute.access_level.value),
+            "semantic_role": str(attribute.semantic_role.value),
         }
 
     def generate_payload(

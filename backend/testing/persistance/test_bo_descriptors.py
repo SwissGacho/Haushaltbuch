@@ -8,6 +8,7 @@ from unittest.mock import Mock, ANY
 
 import business_objects.bo_descriptors
 from business_objects.bo_descriptors import AttributeAccessLevel, BOSelf
+from business_objects.bo_semantic_role import BOSemanticRole
 
 
 class MockAttr(business_objects.bo_descriptors._PersistantAttr):
@@ -39,6 +40,7 @@ class MockBO:
         constraint_flag,
         attribute_type,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
+        semantic_role: BOSemanticRole = BOSemanticRole.RAW,
         **flag_values,
     ):
         cls._add_attributes_args = (
@@ -47,11 +49,13 @@ class MockBO:
             constraint_flag,
             attribute_type,
             access_level,
+            semantic_role,
             flag_values,
         )
 
 
 class Test_100__PersistantAttr(unittest.TestCase):
+
     def test_101_initialization(self):
         self.assertEqual(MockBO("mick").mock_attr, "mick")
         print(f"{MockBO.__dict__['mock_attr'].__dict__=}")
@@ -73,6 +77,7 @@ class Test_100__PersistantAttr(unittest.TestCase):
                 business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
                 business_objects.bo_descriptors.AttributeType.ATYPE_STR,
                 AttributeAccessLevel.AAL_READ_WRITE,
+                BOSemanticRole.RAW,
                 {},
             ),
         )
@@ -131,6 +136,7 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
         constraint_flag,
         attribute_type,
         access_level=AttributeAccessLevel.AAL_READ_WRITE,
+        semantic_role=BOSemanticRole.RAW,
         **flag_values,
     ):
         cls._attributes["MockObj"].append(
@@ -140,6 +146,7 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
                 constraint_flag,
                 attribute_type,
                 access_level,
+                semantic_role,
                 flag_values,
             )
         )
@@ -153,6 +160,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_PK_INC,
             business_objects.bo_descriptors.AttributeType.ATYPE_INT,
             AttributeAccessLevel.AAL_READ_WRITE,
+            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -161,6 +169,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NOT_NULL,
             business_objects.bo_descriptors.AttributeType.ATYPE_STR,
             AttributeAccessLevel.AAL_READ_WRITE,
+            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -169,6 +178,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT_CURR,
             business_objects.bo_descriptors.AttributeType.ATYPE_DATETIME,
             AttributeAccessLevel.AAL_READ_WRITE,
+            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -177,6 +187,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_DATE,
             AttributeAccessLevel.AAL_READ_WRITE,
+            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -185,6 +196,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT,
             business_objects.bo_descriptors.AttributeType.ATYPE_DICT,
             AttributeAccessLevel.AAL_READ_WRITE,
+            BOSemanticRole.RAW,
             {"default": {"a": 1, "b": 2}},
         ),
         (
@@ -193,6 +205,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_LIST,
             AttributeAccessLevel.AAL_READ_WRITE,
+            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -201,6 +214,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_FK,
             business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
             AttributeAccessLevel.AAL_READ_WRITE,
+            BOSemanticRole.RAW,
             {"relation": MockRel},
         ),
         (
@@ -209,6 +223,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_FK,
             business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
             AttributeAccessLevel.AAL_READ_WRITE,
+            BOSemanticRole.RAW,
             {"relation": ANY},
         ),
         (
@@ -217,6 +232,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_FLAG,
             AttributeAccessLevel.AAL_READ_WRITE,
+            BOSemanticRole.RAW,
             {"flag_type": MockFlag},
         ),
     ]
@@ -229,6 +245,7 @@ class Test_200_BOAttributes(unittest.TestCase):
 
     def test_201_attributes(self):
         self.maxDiff = None
+
         self.assertEqual(self.mock_obj._attributes, expected_attributes)
         ix_of_rel_self_attr = 7
         self.assertEqual(
@@ -236,7 +253,7 @@ class Test_200_BOAttributes(unittest.TestCase):
             "rel_self_attr",
         )
         self.assertEqual(
-            self.mock_obj._attributes["MockObj"][ix_of_rel_self_attr][5]["relation"],
+            self.mock_obj._attributes["MockObj"][ix_of_rel_self_attr][6]["relation"],
             MockObj,
         )
 

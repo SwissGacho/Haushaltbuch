@@ -7,6 +7,7 @@ from datetime import date, datetime
 import sys
 from typing import Any
 
+from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_attribute_base import BaseFlag
 from core.app_logging import getLogger
 
@@ -59,6 +60,7 @@ class AttributeDescription:
     constraint_values: dict[str, Any]
     attribute_type: AttributeType
     access_level: AttributeAccessLevel
+    semantic_role: BOSemanticRole = BOSemanticRole.RAW
 
 
 class BOBaseBase:
@@ -72,6 +74,7 @@ class BOBaseBase:
         constraint_flag: BOColumnConstraint,
         attribute_type: AttributeType,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
+        semantic_role: BOSemanticRole = BOSemanticRole.RAW,
         **flag_values,
     ):
         "Register an attribute in the business object descriptor"
@@ -96,11 +99,13 @@ class _PersistantAttr[T]:
         self,
         constraint: BOColumnConstraint = BOColumnConstraint.BOC_NONE,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
+        semantic_role: BOSemanticRole | None = None,
         **constraint_values,
     ) -> None:
         self._constraint = constraint
         self._constraint_values = constraint_values
         self.my_name = None
+        self._semantic_role = semantic_role or BOSemanticRole.RAW
         self.access_level: AttributeAccessLevel = access_level
 
     @classmethod
@@ -113,6 +118,11 @@ class _PersistantAttr[T]:
     def data_type(cls):
         "Datatype of attribute"
         raise NotImplementedError
+
+    @property
+    def semantic_role(self) -> BOSemanticRole:
+        "Semantic role of attribute for frontend"
+        return self._semantic_role
 
     def __set_name__(self, owner, name):
         self.my_name = name
@@ -127,6 +137,7 @@ class _PersistantAttr[T]:
             self._constraint or BOColumnConstraint.BOC_NONE,
             attribute_type=self.__class__.attribute_type(),
             access_level=self.access_level,
+            semantic_role=self.semantic_role,
             **(self._constraint_values or {}),
         )
 
