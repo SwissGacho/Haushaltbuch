@@ -138,7 +138,7 @@ class Test_Main(unittest.IsolatedAsyncioTestCase):
             mock_reconf_log.call_count, 2, "expect 'reconfigure_logging()' called twice"
         )
         self.assertEqual(mock_reconf_log.call_args_list, [call(), call()])
-        self.assertEqual(len(logs.output), 4, "expect 3 INFO LOG messages")
+        self.assertEqual(len(logs.output), 4, "expect 4 INFO LOG messages")
         self.assertEqual(
             msg_count("INFO:.*Starting .* - Version: mock development", logs.output), 1
         )
