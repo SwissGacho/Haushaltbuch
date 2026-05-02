@@ -138,9 +138,16 @@ class WSConnection(WSConnectionBase):
                     self.LOG.debug(
                         "WS_Connection.start_connection(): reply to hello is:"
                     )
-                    for line in json.dumps(
-                        redact(json.loads(json_message)), indent=4
-                    ).splitlines():
+                    try:
+                        debug_message = json.dumps(
+                            redact(json.loads(json_message)), indent=4
+                        )
+                    except Exception:
+                        try:
+                            debug_message = str(redact(json_message))
+                        except Exception:
+                            debug_message = json_message
+                    for line in debug_message.splitlines():
                         LOG.debug(f"    {line}")
                 msg = Message(json_message=json_message)
                 if isinstance(msg, LoginMessage):
