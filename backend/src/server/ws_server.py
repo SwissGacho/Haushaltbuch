@@ -41,9 +41,13 @@ class WSHandler:
                 async for ws_message in websocket:
                     if local_LOG.isEnabledFor(DEBUG):
                         local_LOG.debug("WSHandler.handler(): client posted:")
-                        for line in json.dumps(
-                            redact(json.loads(ws_message)), indent=4
-                        ).splitlines():
+                        try:
+                            debug_message = json.dumps(
+                                redact(json.loads(ws_message)), indent=4
+                            )
+                        except json.JSONDecodeError:
+                            debug_message = redact(ws_message)
+                        for line in debug_message.splitlines():
                             LOG.debug(f"    {line}")
                     try:
                         message = Message(json_message=ws_message)
