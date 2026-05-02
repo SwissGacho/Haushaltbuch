@@ -32,7 +32,7 @@ async def get_db():
         return
     # LOG.debug(f"DB configuration: {db_config=}, {db_type=}")
     if db_type == "SQLite":
-        LOG.debug("Connect to SQLite")
+        # LOG.debug("Connect to SQLite")
         try:
             db = SQLiteDB(**db_config)
         except ModuleNotFoundError as exc:

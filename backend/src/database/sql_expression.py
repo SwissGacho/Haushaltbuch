@@ -166,9 +166,9 @@ class Filter(And):
     """
 
     def __init__(self, filters: dict[SQLExpression, SQLExpression]):
-        def _expression(value: Any) -> SQLExpression:
+        def _expression(value: Any, exp: bool = False) -> SQLExpression:
             if isinstance(value, str):
-                return SQLString(value)
+                return SQLString(value) if exp else ColumnName(value)
             if isinstance(value, SQLExpression):
                 return value
             return SQLExpression(value)
@@ -178,7 +178,7 @@ class Filter(And):
                 (
                     IsNull(_expression(var))
                     if val is None
-                    else Eq(_expression(var), _expression(val))
+                    else Eq(_expression(var), _expression(val, exp=True))
                 )
                 for var, val in filters.items()
             ]

@@ -63,9 +63,7 @@ class Session:
             if (ses.token == ses_token or conn_token in ses.conn_tokens) and (
                 session_user is None or ses.user == session_user
             ):
-                ses.LOG.debug(
-                    f"got session by {'session'if ses.token == ses_token else 'connection'} token"
-                )
+                # ses.LOG.debug(f"got session by {'session'if ses.token == ses_token else 'connection'} token")
                 return ses
         local_LOG.debug("no session found for given tokens")
         return None

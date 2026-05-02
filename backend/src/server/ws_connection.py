@@ -50,7 +50,7 @@ class WSConnection(WSConnectionBase):
     def register_message_sender(self, sender: WSMessageSender):
         "register a message sender to this connection"
         self.subscribers.append(sender)
-        self.LOG.debug(f"Registered {sender} as message sender")
+        # self.LOG.debug(f"Registered {sender} as message sender")
 
     def _unregister_connection(self):
         for key in [k for k, v in WSConnection.connections.items() if v is self]:
@@ -63,7 +63,7 @@ class WSConnection(WSConnectionBase):
         "unregister a message sender from this connection"
         try:
             self.subscribers.remove(sender)
-            self.LOG.debug(f"Unregistered {sender} as message sender")
+            # self.LOG.debug(f"Unregistered {sender} as message sender")
         except ValueError:
             self.LOG.warning(f"Sender {sender} not found in subscribers list")
 
@@ -99,9 +99,7 @@ class WSConnection(WSConnectionBase):
 
     async def send_message(self, message: Message, status=False):
         "Send a message to the client using current connection"
-        LOG.debug(
-            f"WS_Connection.send_message({message.__class__.__name__}, {status=})"
-        )
+        # LOG.debug(f"WS_Connection.send_message({message.__class__.__name__}, {status=})")
         if status:
             message.add({MessageAttribute.WS_ATTR_STATUS: App.status})
         if not message.get_str(MessageAttribute.WS_ATTR_TOKEN):
@@ -123,13 +121,11 @@ class WSConnection(WSConnectionBase):
 
     async def start_connection(self):
         "say hello and expect Login"
-        self.LOG.debug("start login handshake, say hello")
+        # self.LOG.debug("start login handshake, say hello")
         await self.send_message(HelloMessage(token=self._token, status=App.status))
         try:
             while json_message := await self._socket.recv():
-                self.LOG.debug(
-                    f"WS_Connection.start_connection(): reply to hello is {json_message}"
-                )
+                # self.LOG.debug(f"WS_Connection.start_connection(): reply to hello is {json_message}")
                 msg = Message(json_message=json_message)
                 if isinstance(msg, LoginMessage):
                     self._register_connection(
@@ -157,7 +153,7 @@ class WSConnection(WSConnectionBase):
             self.LOG.error(f"Start connection failed in handler ({exc})")
             raise WSConnectionError("Connection start failed") from exc
         else:
-            self.LOG.debug("connection started")
+            # self.LOG.debug("connection started")
             return True
 
     async def abort_connection(
@@ -169,8 +165,8 @@ class WSConnection(WSConnectionBase):
 
     def connection_closed(self):
         "call when connection has been closed"
-        LOG.debug(f"WS_Connection.connection_closed({self.connection_id=})")
-        LOG.debug(f"Current subscribers: {self.subscribers=}")
+        # LOG.debug(f"WS_Connection.connection_closed({self.connection_id=})")
+        # LOG.debug(f"Current subscribers: {self.subscribers=}")
         for sender in self.subscribers:
             sender.handle_connection_closed()
         self._unregister_connection()

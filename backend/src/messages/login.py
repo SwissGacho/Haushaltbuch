@@ -61,9 +61,7 @@ class LoginMessage(Message):
                     ),
                 )
             )
-            LOG.debug(
-                f"login{' to primary session' if connection.is_primary else ''} successful"
-            )
+            # LOG.debug(f"login{' to primary session' if connection.is_primary else ''} successful")
         except PermissionError:
             await connection.abort_connection(reason="Access denied")
         except ValueError as exc:

@@ -44,17 +44,13 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
     ) -> None:
         # Initialize _subscription_id and self._bo_type, as it is used in cleanup if __init__ fails
         self._subscription_id: int | None = None
-        # print(f"BOSubscription.__init__({bo_type=}, {connection=})")
-        # LOG.debug(f"===============================================")
-        LOG.debug(f"BOSubscription.__init__({bo_type=}, {id=}, {connection=})")
+        # LOG.debug(f"BOSubscription.__init__({bo_type=}, {id=}, {connection=})")
 
         TransientBusinessObject.__init__(self)
         WSMessageSender.__init__(self, connection=connection)
 
         if isinstance(bo_type, str):
-            LOG.debug(
-                f"BOSubscription.__init__: Resolving bo_type from string {bo_type}"
-            )
+            # LOG.debug(f"BOSubscription.__init__: Resolving bo_type from string {bo_type}")
             try:
                 bo_type = cast(
                     Type[T], BOBase.get_business_object_by_name(str(bo_type))
@@ -112,10 +108,10 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
     async def notify_subscription_subscribers(self):
         """Notify subscribers about the current state of the list."""
         name_list = [cur.id for cur in await self._get_objects_()]
-        LOG.debug(
-            f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} "
-            f"with {len(name_list)} objects"
-        )
+        # LOG.debug(
+        #     f"Updating subscribers of {(self._bo_type.__name__ if self._bo_type else 'Undefined')} "
+        #     f"with {len(name_list)} objects"
+        # )
         BOBase.subscriptions_report()
 
         await self.send_message(
@@ -127,7 +123,7 @@ class BOSubscription(Generic[T], TransientBusinessObject, WSMessageSender):
         )
 
     def cleanup(self):
-        LOG.debug(f"BOSubscription.cleanup({self._connection})")
+        # LOG.debug(f"BOSubscription.cleanup({self._connection})")
         # LOG.debug(f"{self._subscription_id=}, {self._bo_type=}")
         if self._subscription_id is None:
             LOG.debug(
@@ -148,6 +144,10 @@ class BOList(BOSubscription[T]):
     """Represents a list of business objects of a certain type. The list subscribes to events of
     the business object type and updates its own subscribers accordingly."""
 
+    def __init__(self, conditions: dict | None = None, **kwargs) -> None:
+        self._conditions = conditions
+        super().__init__(**kwargs)
+
     def _initialize_subscriptions(self, **kwargs):
         self._subscription_id = self._bo_type.subscribe_to_all_changes(
             self._handle_event_
@@ -164,9 +164,11 @@ class BOList(BOSubscription[T]):
         bo_type = self._bo_type.__name__
         name_list = [
             {"id": cur.id, "display_name": cur.display_name}
-            for cur in await self._bo_type.get_matching_objects(attributes=["name"])
+            for cur in await self._bo_type.get_matching_objects(
+                attributes=["name"], conditions=self._conditions
+            )
         ]
-        LOG.debug(f"Updating subscribers of {bo_type} with {len(name_list)} objects")
+        # LOG.debug(f"Updating subscribers of {bo_type} with {len(name_list)} objects")
         msg = ObjectList()
         msg.add(
             {
@@ -181,21 +183,22 @@ class BOList(BOSubscription[T]):
 
     async def _get_objects_(self) -> list[T]:
         if self._bo_type is None:
-            LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
+            # LOG.debug("BOList._get_objects_: _bo_type is None, no objects to return")
             return []
         rslt = [
-            self._bo_type(bo_id=cur) for cur in await self._bo_type.get_matching_ids()
+            self._bo_type(bo_id=cur)
+            for cur in await self._bo_type.get_matching_ids(conditions=self._conditions)
         ]
         return rslt
 
     def cleanup(self):
-        LOG.debug(f"BOList.cleanup({self._connection})")
+        # LOG.debug(f"BOList.cleanup({self._connection})")
         # LOG.debug(f"{self._subscription_id=}, {self._bo_type=}")
         if self._subscription_id is None:
-            LOG.debug("BOList.cleanup: Nothing to cleanup, _subscription_id is None")
+            # LOG.debug("BOList.cleanup: Nothing to cleanup, _subscription_id is None")
             return
         if self._bo_type is None:
-            LOG.debug("BOList.cleanup: Cannot cleanup, _bo_type is None")
+            # LOG.debug("BOList.cleanup: Cannot cleanup, _bo_type is None")
             return
         self._bo_type.unsubscribe_from_all_changes(self._subscription_id)
         self._connection.unregister_message_sender(self)
