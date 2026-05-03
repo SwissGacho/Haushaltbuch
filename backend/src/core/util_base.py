@@ -18,7 +18,7 @@ def update_dicts_recursively(
             update_dicts_recursively(tgt_dict, value, source_overrides_target)
         else:
             if source_overrides_target or key not in target:
-                target[key] = value
+                target[key] = value.copy() if isinstance(value, dict) else value
 
 
 def get_config_item(cfg: dict | None, key: str):

@@ -2,6 +2,7 @@
 
 import os
 import json
+import pprint
 import socket
 from contextlib import asynccontextmanager
 import websockets.asyncio.server as websockets
@@ -42,8 +43,11 @@ class WSHandler:
                     if local_LOG.isEnabledFor(DEBUG):
                         local_LOG.debug("WSHandler.handler(): client posted:")
                         try:
-                            debug_message = json.dumps(
-                                redact(json.loads(ws_message)), indent=4
+                            debug_message = pprint.pformat(
+                                redact(json.loads(ws_message)),
+                                indent=4,
+                                width=120,
+                                compact=True,
                             )
                         except json.JSONDecodeError:
                             debug_message = redact(ws_message)

@@ -1,7 +1,10 @@
 """Handle a websocket connection"""
 
+from calendar import c
+
 import websockets
 import json
+import pprint
 
 from core.app_logging import (
     get_context_logger,
@@ -109,7 +112,9 @@ class WSConnection(WSConnectionBase):
                     debug_payload = json.loads(payload)
                 else:
                     debug_payload = payload
-                debug_output = json.dumps(redact(debug_payload), indent=4)
+                debug_output = pprint.pformat(
+                    redact(debug_payload), indent=4, width=120, compact=True
+                )
             except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
                 debug_output = str(redact(payload))
             for line in debug_output.splitlines():
@@ -150,7 +155,10 @@ class WSConnection(WSConnectionBase):
                     )
                     try:
                         debug_message = json.dumps(
-                            redact(json.loads(json_message)), indent=4
+                            redact(pprint.pformat(json_message)),
+                            indent=4,
+                            width=120,
+                            compact=True,
                         )
                     except Exception:
                         try:
