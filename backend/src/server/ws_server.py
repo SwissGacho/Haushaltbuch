@@ -14,6 +14,7 @@ from core.app_logging import (
     Logger,
     redact,
     DEBUG,
+    VERBOSE_DEBUG,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -40,7 +41,7 @@ class WSHandler:
                 local_LOG = get_context_logger(LOG, connection=connection.connection_id)
                 local_LOG.debug("Connection started.")
                 async for ws_message in websocket:
-                    if local_LOG.isEnabledFor(DEBUG):
+                    if local_LOG.isEnabledFor(VERBOSE_DEBUG):
                         local_LOG.debug("WSHandler.handler(): client posted:")
                         try:
                             debug_message = pprint.pformat(
@@ -52,7 +53,14 @@ class WSHandler:
                         except json.JSONDecodeError:
                             debug_message = redact(ws_message)
                         for line in debug_message.splitlines():
-                            LOG.debug(f"    {line}")
+                            LOG.log(VERBOSE_DEBUG, f"    {line}")
+                    elif local_LOG.isEnabledFor(DEBUG):
+                        debug_message = redact(ws_message)
+                        if len(str(debug_message)) > 80:
+                            debug_message = f"{str(debug_message)[:80]}... (total {len(str(debug_message))} chars)"
+                        local_LOG.debug(
+                            f"WSHandler.handler(): client posted: {debug_message}"
+                        )
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:

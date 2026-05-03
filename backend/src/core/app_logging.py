@@ -13,10 +13,13 @@ from core.const import APPNAME, CONFIG_DBCFG_FILE
 from core.configuration.cmd_line import CommandLine
 from core.util_base import get_config_item
 
-
 # Control logging of module entry and exit
 _LOG_MODULE_ENTRY = False
 _LOG_MODULE_EXIT = _LOG_MODULE_ENTRY
+
+# Verbose debug logging level
+VERBOSE_DEBUG = 5
+logging.addLevelName(VERBOSE_DEBUG, "VERBOSE_DEBUG")
 
 
 # 🏴‍☠️ ANSI runes for color
@@ -27,6 +30,8 @@ BOLD = "\033[1m"
 FG_RED = "\033[31m"
 FG_GREEN = "\033[32m"
 FG_YELLOW = "\033[33m"
+FG_BLUE = "\033[34m"
+FG_MAGENTA = "\033[35m"
 FG_CYAN = "\033[36m"
 FG_WHITE = "\033[97m"
 
@@ -41,6 +46,7 @@ class ColorFormatter(logging.Formatter):
     """A formatter so vivid it burns the Kraken’s eyes!"""
 
     COLORS = {
+        VERBOSE_DEBUG: FG_MAGENTA,
         DEBUG: FG_CYAN,
         INFO: FG_WHITE,
         WARNING: FG_YELLOW,
@@ -236,7 +242,7 @@ def disabled(rec):
 
 
 def configure_logging(log_cfg: dict = None):
-
+    """Configure logging from config dict"""
     global_default_level = _get_log_config_level(
         log_cfg, LogConfig.CONFIG_LOGGING + "/" + LogConfig.CONFIG_LOG_DEFAULT
     )

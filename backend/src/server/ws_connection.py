@@ -1,6 +1,7 @@
 """Handle a websocket connection"""
 
 from calendar import c
+from doctest import debug
 
 import websockets
 import json
@@ -12,6 +13,7 @@ from core.app_logging import (
     Logger,
     log_exit,
     DEBUG,
+    VERBOSE_DEBUG,
     redact,
 )
 
@@ -103,7 +105,7 @@ class WSConnection(WSConnectionBase):
 
     async def _send(self, payload):
         await self._socket.send(payload)
-        if self.LOG.isEnabledFor(DEBUG):
+        if self.LOG.isEnabledFor(VERBOSE_DEBUG):
             self.LOG.debug("WSConnection._send(): sent message:")
             try:
                 if isinstance(payload, (bytes, bytearray)):
@@ -118,7 +120,12 @@ class WSConnection(WSConnectionBase):
             except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
                 debug_output = str(redact(payload))
             for line in debug_output.splitlines():
-                LOG.debug(f"    {line}")
+                LOG.log(VERBOSE_DEBUG, f"    {line}")
+        elif self.LOG.isEnabledFor(DEBUG):
+            debug_payload = redact(payload)
+            if len(str(debug_payload)) > 80:
+                debug_payload = f"{str(debug_payload)[:80]}... (total {len(str(debug_payload))} chars)"
+            self.LOG.debug(f"WSConnection._send(): sent message: {debug_payload}")
 
     async def send_message(self, message: Message, status=False):
         "Send a message to the client using current connection"
@@ -148,7 +155,7 @@ class WSConnection(WSConnectionBase):
         await self.send_message(HelloMessage(token=self._token, status=App.status))
         try:
             while json_message := await self._socket.recv():
-                if self.LOG.isEnabledFor(DEBUG):
+                if self.LOG.isEnabledFor(VERBOSE_DEBUG):
                     # self.LOG.debug(f"sent message: {payload}")
                     self.LOG.debug(
                         "WS_Connection.start_connection(): reply to hello is:"
@@ -166,7 +173,14 @@ class WSConnection(WSConnectionBase):
                         except Exception:
                             debug_message = json_message
                     for line in debug_message.splitlines():
-                        LOG.debug(f"    {line}")
+                        LOG.log(VERBOSE_DEBUG, f"    {line}")
+                elif self.LOG.isEnabledFor(DEBUG):
+                    debug_message = redact(json_message)
+                    if len(str(debug_message)) > 80:
+                        debug_message = f"{str(debug_message)[:80]}... (total {len(str(debug_message))} chars)"
+                    self.LOG.debug(
+                        f"WS_Connection.start_connection(): reply to hello is: {debug_message}"
+                    )
                 msg = Message(json_message=json_message)
                 if isinstance(msg, LoginMessage):
                     self._register_connection(
