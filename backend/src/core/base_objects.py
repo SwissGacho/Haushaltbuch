@@ -80,9 +80,6 @@ class Config(StrEnum):
     CONFIG_DB_LOCATIONS = "db_paths"
     CONFIG_ADMINUSER = "adminuser"
 
-    CONFIG_LOGGING = "logging"
-    CONFIG_LOG_GLOBAL = "global"
-    CONFIG_LOG_APP = "default"
 
 
 ConfigSubDict: TypeAlias = Union[dict[str, "ConfigSubDict"], str]

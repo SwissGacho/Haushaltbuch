@@ -102,7 +102,17 @@ class WSConnection(WSConnectionBase):
         await self._socket.send(payload)
         if self.LOG.isEnabledFor(DEBUG):
             self.LOG.debug("WSConnection._send(): sent message:")
-            for line in json.dumps(redact(json.loads(payload)), indent=4).splitlines():
+            try:
+                if isinstance(payload, (bytes, bytearray)):
+                    debug_payload = json.loads(payload.decode())
+                elif isinstance(payload, str):
+                    debug_payload = json.loads(payload)
+                else:
+                    debug_payload = payload
+                debug_output = json.dumps(redact(debug_payload), indent=4)
+            except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+                debug_output = str(redact(payload))
+            for line in debug_output.splitlines():
                 LOG.debug(f"    {line}")
 
     async def send_message(self, message: Message, status=False):
