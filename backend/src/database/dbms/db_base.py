@@ -4,7 +4,7 @@ from typing import Any, Self, Optional, Protocol, AsyncContextManager
 import re
 import json
 
-from core.app_logging import getLogger, log_exit, redact
+from core.app_logging import getLogger, log_exit, redact, DEBUG
 
 LOG = getLogger(__name__)
 
@@ -21,7 +21,8 @@ class DB(DBBaseClass):
 
     def __init__(self, **cfg) -> None:
         self._cfg = cfg
-        LOG.debug(f"DB.__init__: cfg={redact(cfg)}")
+        if LOG.isEnabledFor(DEBUG):
+            LOG.debug(f"DB.__init__: cfg={redact(cfg)}")
         self.db_connections = set()
 
     @property

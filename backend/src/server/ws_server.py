@@ -13,6 +13,7 @@ from core.app_logging import (
     log_exit,
     Logger,
     redact,
+    WARNING,
     DEBUG,
     VERBOSE_DEBUG,
 )
@@ -57,17 +58,21 @@ class WSHandler:
                     elif local_LOG.isEnabledFor(DEBUG):
                         debug_message = redact(ws_message)
                         if len(str(debug_message)) > 80:
-                            debug_message = f"{str(debug_message)[:80]}... (total {len(str(debug_message))} chars)"
+                            debug_message = (
+                                f"{str(debug_message)[:80]}... "
+                                + f"(total {len(str(debug_message))} chars)"
+                            )
                         local_LOG.debug(
                             f"WSHandler.handler(): client posted: {debug_message}"
                         )
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:
-                        local_LOG.warning(  # pylint: disable=logging-not-lazy
-                            "message handler failed to create Message object "
-                            f"from json: {redact(ws_message)}"
-                        )
+                        if local_LOG.isEnabledFor(WARNING):
+                            local_LOG.warning(
+                                "message handler failed to create Message object "
+                                f"from json: {redact(ws_message)}"
+                            )
                         raise
                     await connection.handle_message(message=message)
         except Exception as exc:

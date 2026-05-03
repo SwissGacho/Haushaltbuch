@@ -52,7 +52,7 @@ class LoginMessage(Message):
                 WelcomeMessage(
                     token=token,
                     ses_token=session.token,
-                    version_info=(
+                    version_info=(  # pylint: disable=no-member
                         App.status_object.version if connection.is_primary else None
                     ),
                 )

@@ -90,6 +90,11 @@ def redact(value: Any) -> Any:
             )
             for key, item in value.items()
         }
+    if isinstance(value, str) and value.startswith("{"):
+        try:
+            return json.dumps(redact(json.loads(value)))
+        except json.JSONDecodeError:
+            pass
     return value
 
 
@@ -241,7 +246,7 @@ def disabled(rec):
     return False
 
 
-def configure_logging(log_cfg: dict = None):
+def configure_logging(log_cfg: dict | None = None):
     """Configure logging from config dict"""
     global_default_level = _get_log_config_level(
         log_cfg, LogConfig.CONFIG_LOGGING + "/" + LogConfig.CONFIG_LOG_DEFAULT
@@ -271,14 +276,15 @@ def configure_logging(log_cfg: dict = None):
         print(f"ERROR configuring logging: {e}")
 
     log = logging.getLogger(APPNAME + "." + __name__)
-    if log.isEnabledFor(logging.DEBUG):
+    if log.isEnabledFor(DEBUG):
         log.debug(
             f"Logging configured with config:\n{json.dumps((log_cfg or {}).get(LogConfig.CONFIG_LOGGING, {}), indent=4)}"
         )
         log.debug("Logging is now reconfigured:")
         for l in sorted(
             [
-                f"   {l.name:<65}: {logging.getLevelName(l.level):>8} {', '.join(f.__name__ for f in l.filters)}"
+                f"   {l.name:<65}: {logging.getLevelName(l.level):>8} "
+                + f"{', '.join(getattr(f, '__name__', type(f).__name__) for f in l.filters)}"
                 for l in [
                     l
                     for l in (

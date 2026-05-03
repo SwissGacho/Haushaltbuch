@@ -1,8 +1,5 @@
 """Handle a websocket connection"""
 
-from calendar import c
-from doctest import debug
-
 import websockets
 import json
 import pprint
