@@ -17,8 +17,8 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         )
         # Avoid expected error logs cluttering test output when exercising
         # negative handshake scenarios.
-        self.connection.LOG = Mock(name="WSConnection.LOG")
-        self.connection.LOG.isEnabledFor.return_value = False
+        self.connection.conn_logger = Mock(name="WSConnection.LOG")
+        self.connection.conn_logger.isEnabledFor.return_value = False
         self.connection._token = "mockToken"
         self.MockApp = Mock(return_value="MockStatus")
         return super().setUp()

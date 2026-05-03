@@ -24,7 +24,7 @@ class WSConnectionBase:
         raise NotImplementedError()
 
     @property
-    def connection_id(self):
+    def connection_context(self):
         """get connection identifier"""
         raise NotImplementedError()
 

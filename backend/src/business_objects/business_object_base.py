@@ -29,7 +29,6 @@ from business_objects.bo_descriptors import (
     BODatetime,
 )
 
-
 BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 
 
@@ -429,7 +428,7 @@ class BOBase(BOBaseBase):
                 s = ""
                 if hasattr(sub, "__self__") and hasattr(sub.__self__, "_obj"):
                     s += f"{bo_name}({sub.__self__._obj.id}): "
-                s += f"{sub.__self__._connection.connection_id}"
+                s += f"{sub.__self__._connection.connection_context.get('comp',sub.__self__._connection.connection_context.get('socket','unknown'))}"
                 rslt.append(s)
             return rslt
 

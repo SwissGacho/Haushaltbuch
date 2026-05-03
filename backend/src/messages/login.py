@@ -47,7 +47,7 @@ class LoginMessage(Message):
                     f"Failed to create session for login with message {self.message}"
                 )
             connection.session = session
-            local_LOG = get_context_logger(LOG, connection=connection.connection_id)
+            local_LOG = get_context_logger(LOG, **connection.connection_context)
             await connection.send_message(
                 WelcomeMessage(
                     token=token,

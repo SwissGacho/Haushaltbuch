@@ -38,7 +38,7 @@ class WSHandler:
         connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
             if await connection.start_connection():
-                local_LOG = get_context_logger(LOG, connection=connection.connection_id)
+                local_LOG = get_context_logger(LOG, **connection.connection_context)
                 local_LOG.debug("Connection started.")
                 async for ws_message in websocket:
                     if local_LOG.isEnabledFor(VERBOSE_DEBUG):

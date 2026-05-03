@@ -49,7 +49,7 @@ class Session:
     ):
         "find session by session or any connection token"
         local_LOG = (
-            get_context_logger(LOG, connection=connection.connection_id)
+            get_context_logger(LOG, **connection.connection_context)
             if connection
             else LOG
         )

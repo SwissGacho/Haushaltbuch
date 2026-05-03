@@ -123,7 +123,7 @@ class ContextLogger(logging.LoggerAdapter):
             if value is not None and value != ""
         }
         if context:
-            prefix = " ".join(f"{key}={value}" for key, value in context.items())
+            prefix = ";".join(f"{key}={value}" for key, value in context.items())
             msg = f"[{prefix}] {msg}"
         return msg, kwargs
 

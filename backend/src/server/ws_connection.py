@@ -45,7 +45,7 @@ class WSConnection(WSConnectionBase):
         self.is_primary = False
         self._token = WSToken()
         self.subscribers: list[WSMessageSender] = []
-        self.LOG = get_context_logger(LOG, connection=self.connection_id)
+        self.conn_logger = get_context_logger(LOG, **self.connection_context)
         self._register_connection()
 
     def _register_connection(self, key: str | None = None) -> None:
@@ -53,18 +53,18 @@ class WSConnection(WSConnectionBase):
             self._comp = key
         # remove existing entry
         self._unregister_connection()
-        # self.LOG.debug(f"WS_Connection._register_connection({key=}): adding '{key or self.connection_id}'")
-        WSConnection.connections |= {(key or self.connection_id): self}
-        # self.LOG.debug(f"{WSConnection.connections=}")
+        # self.conn_logger.debug(f"WS_Connection._register_connection({key=}): adding '{key or self._socket_nbr}'")
+        WSConnection.connections |= {(key or self._socket_nbr): self}
+        # self.conn_logger.debug(f"{WSConnection.connections=}")
 
     def register_message_sender(self, sender: WSMessageSender):
         "register a message sender to this connection"
         self.subscribers.append(sender)
-        # self.LOG.debug(f"Registered {sender} as message sender")
+        # self.conn_logger.debug(f"Registered {sender} as message sender")
 
     def _unregister_connection(self):
         for key in [k for k, v in WSConnection.connections.items() if v is self]:
-            # self.LOG.debug(
+            # self.conn_logger.debug(
             #     f"WS_Connection._unregister_connection(): del connection {key}"
             # )
             del WSConnection.connections[key]
@@ -73,9 +73,9 @@ class WSConnection(WSConnectionBase):
         "unregister a message sender from this connection"
         try:
             self.subscribers.remove(sender)
-            # self.LOG.debug(f"Unregistered {sender} as message sender")
+            # self.conn_logger.debug(f"Unregistered {sender} as message sender")
         except ValueError:
-            self.LOG.warning(f"Sender {sender} not found in subscribers list")
+            self.conn_logger.warning(f"Sender {sender} not found in subscribers list")
 
     def unregister_other_senders(self, sender_to_keep: WSMessageSender):
         """Unregister all message senders except the specified one from this connection."""
@@ -84,13 +84,14 @@ class WSConnection(WSConnectionBase):
                 sender.release_subscriptions()
 
     @property
-    def connection_id(self):
+    def connection_context(self):
         "identifying string (for logging)"
-        myself = self._comp or str(self._conn_nbr)
+        descr = {"socket": self._socket_nbr}
         if self._session:
-            return f"{self._socket_nbr},{self._session.session_id},conn {myself}"
-        else:
-            return myself
+            descr["session"] = self._session.session_id
+        if self._comp:
+            descr["comp"] = self._comp
+        return descr
 
     @property
     def session(self):
@@ -101,12 +102,12 @@ class WSConnection(WSConnectionBase):
     def session(self, ses):
         self._session = ses
         self._conn_nbr = ses.add_connection(self)
-        self.LOG = get_context_logger(LOG, connection=self.connection_id)
+        self.conn_logger = get_context_logger(LOG, **self.connection_context)
 
     async def _send(self, payload):
         await self._socket.send(payload)
-        if self.LOG.isEnabledFor(VERBOSE_DEBUG):
-            self.LOG.debug("WSConnection._send(): sent message:")
+        if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
+            self.conn_logger.debug("WSConnection._send(): sent message:")
             try:
                 if isinstance(payload, (bytes, bytearray)):
                     debug_payload = json.loads(payload.decode())
@@ -121,11 +122,13 @@ class WSConnection(WSConnectionBase):
                 debug_output = str(redact(payload))
             for line in debug_output.splitlines():
                 LOG.log(VERBOSE_DEBUG, f"    {line}")
-        elif self.LOG.isEnabledFor(DEBUG):
+        elif self.conn_logger.isEnabledFor(DEBUG):
             debug_payload = redact(payload)
             if len(str(debug_payload)) > 80:
                 debug_payload = f"{str(debug_payload)[:80]}... (total {len(str(debug_payload))} chars)"
-            self.LOG.debug(f"WSConnection._send(): sent message: {debug_payload}")
+            self.conn_logger.debug(
+                f"WSConnection._send(): sent message: {debug_payload}"
+            )
 
     async def send_message(self, message: Message, status=False):
         "Send a message to the client using current connection"
@@ -141,7 +144,7 @@ class WSConnection(WSConnectionBase):
         Send a message to component(s) on a specified connection or
         list of connections (if 'comp=="*" send to all component connections).
         """
-        self.LOG.debug(f"Send {msg} to {comp}")
+        self.conn_logger.debug(f"Send {msg} to {comp}")
         if comp == "*":
             conns = WSConnection.connections.values()
         else:
@@ -151,13 +154,13 @@ class WSConnection(WSConnectionBase):
 
     async def start_connection(self):
         "say hello and expect Login"
-        # self.LOG.debug("start login handshake, say hello")
+        # self.conn_logger.debug("start login handshake, say hello")
         await self.send_message(HelloMessage(token=self._token, status=App.status))
         try:
             while json_message := await self._socket.recv():
-                if self.LOG.isEnabledFor(VERBOSE_DEBUG):
-                    # self.LOG.debug(f"sent message: {payload}")
-                    self.LOG.debug(
+                if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
+                    # self.conn_logger.debug(f"sent message: {payload}")
+                    self.conn_logger.debug(
                         "WS_Connection.start_connection(): reply to hello is:"
                     )
                     try:
@@ -174,11 +177,11 @@ class WSConnection(WSConnectionBase):
                             debug_message = json_message
                     for line in debug_message.splitlines():
                         LOG.log(VERBOSE_DEBUG, f"    {line}")
-                elif self.LOG.isEnabledFor(DEBUG):
+                elif self.conn_logger.isEnabledFor(DEBUG):
                     debug_message = redact(json_message)
                     if len(str(debug_message)) > 80:
                         debug_message = f"{str(debug_message)[:80]}... (total {len(str(debug_message))} chars)"
-                    self.LOG.debug(
+                    self.conn_logger.debug(
                         f"WS_Connection.start_connection(): reply to hello is: {debug_message}"
                     )
                 msg = Message(json_message=json_message)
@@ -194,21 +197,21 @@ class WSConnection(WSConnectionBase):
                 if isinstance(msg, (FetchSetupMessage, StoreSetupMessage, EchoMessage)):
                     await self.handle_message(msg)
                     continue
-                self.LOG.error(
+                self.conn_logger.error(
                     f"WS_Connection.start_connection(): unhandled {msg.__class__.__name__}"
                 )
                 await self.abort_connection("Login expected")
         except websockets.exceptions.ConnectionClosed as exc:
-            self.LOG.debug(f"Connection closed by socket: {exc}")
+            self.conn_logger.debug(f"Connection closed by socket: {exc}")
             return False
         except core.exceptions.WSConnectionClosed as exc:
-            self.LOG.debug(f"Connection closed by handler: {exc}")
+            self.conn_logger.debug(f"Connection closed by handler: {exc}")
             return False
         except Exception as exc:
-            self.LOG.error(f"Start connection failed in handler ({exc})")
+            self.conn_logger.error(f"Start connection failed in handler ({exc})")
             raise WSConnectionError("Connection start failed") from exc
         else:
-            # self.LOG.debug("connection started")
+            # self.conn_logger.debug("connection started")
             return True
 
     async def abort_connection(
@@ -220,7 +223,7 @@ class WSConnection(WSConnectionBase):
 
     def connection_closed(self):
         "call when connection has been closed"
-        # LOG.debug(f"WS_Connection.connection_closed({self.connection_id=})")
+        # LOG.debug(f"WS_Connection.connection_closed({self._socket_nbr=})")
         # LOG.debug(f"Current subscribers: {self.subscribers=}")
         for sender in self.subscribers:
             sender.handle_connection_closed()
@@ -228,12 +231,12 @@ class WSConnection(WSConnectionBase):
 
     async def handle_message(self, message: Message):
         "accept a message from the client and trigger according actions"
-        # self.LOG.debug(f"handle {message=} {message.message=} {message.token=}")
+        # self.conn_logger.debug(f"handle {message=} {message.message=} {message.token=}")
         if message.token == self._token:
-            # self.LOG.debug(f"Received message")
+            # self.conn_logger.debug(f"Received message")
             await message.handle_message(self)
         else:
-            self.LOG.warning(f"Received invalid token {message.token}")
+            self.conn_logger.warning(f"Received invalid token {message.token}")
             await self.abort_connection(reason="Invalid Token", token=message.token)
 
 
