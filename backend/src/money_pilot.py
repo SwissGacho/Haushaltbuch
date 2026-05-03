@@ -21,6 +21,7 @@ from core.app import App
 from core.status import Status
 from core.configuration.db_config import DBConfig
 from core.util import check_environment
+from core.reconfigure_logging import reconfigure_logging
 from database.db_manager import get_db
 from server.ws_server import get_websocket
 
@@ -35,6 +36,7 @@ def wait_for_keyboard_interrupt():
 
 async def main():
     "connect DB and start servers"
+    # pylint: disable=no-member
     LOG.info(
         f"Starting Money Pilot backend application - Version: {App.status_object.version}"
     )
@@ -68,6 +70,7 @@ async def main():
                     else:
                         # LOG.debug("DB NOT available.")
                         App.db_failure.set()
+                    reconfigure_logging()
                     LOG.info(f"App running. (Status: {App.status})")
                     tasks = [
                         aio_create_task(

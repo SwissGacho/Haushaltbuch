@@ -99,6 +99,7 @@ class Test_Main(unittest.IsolatedAsyncioTestCase):
             patch("money_pilot.App", MockApp),
             patch("money_pilot.get_db", mock_get_db),
             patch("money_pilot.get_websocket", mock_get_websocket),
+            patch("money_pilot.reconfigure_logging") as mock_reconf_log,
             self.assertLogs(level=logging.INFO) as logs,
             self.assertRaises(KeyboardInterrupt, msg="expect KeyboardInterrupt"),
         ):
@@ -133,7 +134,11 @@ class Test_Main(unittest.IsolatedAsyncioTestCase):
             call.db_request_restart.wait(),
         ]
         self.assertEqual(MockApp.mock_calls, expected_mock_calls)
-        self.assertEqual(len(logs.output), 4, "expect 3 INFO LOG messages")
+        self.assertEqual(
+            mock_reconf_log.call_count, 2, "expect 'reconfigure_logging()' called twice"
+        )
+        self.assertEqual(mock_reconf_log.call_args_list, [call(), call()])
+        self.assertEqual(len(logs.output), 4, "expect 4 INFO LOG messages")
         self.assertEqual(
             msg_count("INFO:.*Starting .* - Version: mock development", logs.output), 1
         )

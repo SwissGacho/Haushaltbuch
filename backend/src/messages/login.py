@@ -3,7 +3,7 @@
 from typing import Optional
 
 from core.app import App
-from core.app_logging import getLogger, log_exit, Logger
+from core.app_logging import get_context_logger, getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
 
@@ -30,9 +30,7 @@ class LoginMessage(Message):
 
     async def handle_message(self, connection):
         "handle login message"
-        LOG = getLogger(  # pylint: disable=invalid-name,redefined-outer-name
-            f"{LoginMessage.__module__})"
-        )
+        local_LOG = LOG
         token = WSToken(self.get_str(MessageAttribute.WS_ATTR_TOKEN))
         try:
             ses_token = self.get_str(MessageAttribute.WS_ATTR_SES_TOKEN)
@@ -49,9 +47,7 @@ class LoginMessage(Message):
                     f"Failed to create session for login with message {self.message}"
                 )
             connection.session = session
-            LOG = getLogger(  # pylint: disable=invalid-name
-                f"{LoginMessage.__module__}({connection.connection_id})"
-            )
+            local_LOG = get_context_logger(LOG, connection=connection.connection_id)
             await connection.send_message(
                 WelcomeMessage(
                     token=token,
@@ -61,7 +57,9 @@ class LoginMessage(Message):
                     ),
                 )
             )
-            # LOG.debug(f"login{' to primary session' if connection.is_primary else ''} successful")
+            local_LOG.debug(
+                f"login{' to primary session' if connection.is_primary else ''} successful"
+            )
         except PermissionError:
             await connection.abort_connection(reason="Access denied")
         except ValueError as exc:

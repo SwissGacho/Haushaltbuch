@@ -15,6 +15,10 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         self.connection = WSConnection(
             websocket=AsyncMock(name="mockSocket"), sock_nbr=99
         )
+        # Avoid expected error logs cluttering test output when exercising
+        # negative handshake scenarios.
+        self.connection.LOG = Mock(name="WSConnection.LOG")
+        self.connection.LOG.isEnabledFor.return_value = False
         self.connection._token = "mockToken"
         self.MockApp = Mock(return_value="MockStatus")
         return super().setUp()

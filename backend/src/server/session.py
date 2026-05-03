@@ -5,7 +5,7 @@ A session is created by a WS connection without session token.
 from typing import Self, Optional
 from data.management.user import User
 
-from core.app_logging import getLogger, log_exit, Logger
+from core.app_logging import get_context_logger, getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
 
@@ -28,9 +28,7 @@ class Session:
     ) -> None:
         Session._all_sessions.append(self)
         self._session_nbr = len(Session._all_sessions)
-        self.LOG = getLogger(  # pylint: disable=invalid-name
-            f"{Session.__module__}({self.session_id})"
-        )
+        self.LOG = get_context_logger(LOG, session=self.session_id)
         self.connections = [connection]
         self.token = WSToken()
         self.user: User = user
@@ -50,8 +48,8 @@ class Session:
         connection=None,
     ):
         "find session by session or any connection token"
-        local_LOG: Logger = (  # pylint: disable=invalid-name
-            getLogger(f"{Session.__module__}({connection.connection_id})")
+        local_LOG = (
+            get_context_logger(LOG, connection=connection.connection_id)
             if connection
             else LOG
         )

@@ -1,4 +1,5 @@
 """Test suite for general configuration features."""
+# pyright: reportPrivateUsage=false
 
 import platform
 
@@ -6,7 +7,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from core.const import SINGLE_USER_NAME
-from core.base_objects import Config
+from core.base_objects import Config, ConfigDict
 from core.configuration.setup_config import SetupConfigValues
 from core.exceptions import ConfigurationError
 from core.status import Status
@@ -23,24 +24,26 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
     def test_101__init__(self):
         self.assertEqual(self.config_obj.app_location, self.mock_location)
         self.assertEqual(self.config_obj.system, platform.system())
-        self.assertIsNone(self.config_obj._cmdline_configuration)
-        self.assertIsNone(self.config_obj._global_configuration)
-        self.assertIsNone(self.config_obj._user_configuration)
+        self.assertIsNone(getattr(self.config_obj, "_cmdline_configuration"))
+        self.assertIsNone(getattr(self.config_obj, "_global_configuration"))
+        self.assertIsNone(getattr(self.config_obj, "_user_configuration"))
 
     def test_201_cmdline_configuration(self):
         self.assertEqual(self.config_obj.cmdline_configuration(), {})
-        mock_cfg = {"mock": "Config"}
-        self.config_obj._cmdline_configuration = mock_cfg
+        mock_cfg: ConfigDict = {"mock": "Config"}
+        setattr(self.config_obj, "_cmdline_configuration", mock_cfg)
         self.assertEqual(self.config_obj.cmdline_configuration(), mock_cfg)
 
     def test_301_initialize_configuration_with_db_cfg(self):
         with (
-            patch("core.configuration.config.parse_commandline") as mock_prs_cmdline,
+            patch("core.configuration.config.CommandLine") as MockCmdLine,
             patch("core.configuration.config.DBConfig") as mock_dbcfg,
+            patch("core.configuration.config.reconfigure_logging") as mock_reconf_log,
         ):
+            MockCmdLine.get_commandline_config = Mock(name="get_commandline_config")
             mock_db_cfg = {Config.CONFIG_DB: "MockDBCfg"}
             mock_cmdline_cfg = {"Mock": "Config"} | mock_db_cfg
-            mock_prs_cmdline.return_value = mock_cmdline_cfg
+            MockCmdLine.get_commandline_config.return_value = mock_cmdline_cfg
             mock_dbcfg.set_db_configuration = Mock()
             mock_dbcfg.read_db_config_file = Mock(return_value={})
 
@@ -49,15 +52,18 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(self.config_obj.cmdline_configuration(), mock_cmdline_cfg)
             mock_dbcfg.set_db_configuration.assert_called_once_with(mock_db_cfg)
             mock_dbcfg.read_db_config_file.assert_not_called()
+            mock_reconf_log.assert_called_once_with()
 
     def test_302_initialize_configuration_no_db_cfg(self):
         with (
-            patch("core.configuration.config.parse_commandline") as mock_prs_cmdline,
+            patch("core.configuration.config.CommandLine") as MockCmdLine,
             patch("core.configuration.config.DBConfig") as mock_dbcfg,
+            patch("core.configuration.config.reconfigure_logging") as mock_reconf_log,
         ):
+            MockCmdLine.get_commandline_config = Mock(name="get_commandline_config")
             mock_db_cfg = {"NoCfgDb": "MockDBCfg"}
             mock_cmdline_cfg = {"Mock": "Config"} | mock_db_cfg
-            mock_prs_cmdline.return_value = mock_cmdline_cfg
+            MockCmdLine.get_commandline_config.return_value = mock_cmdline_cfg
             mock_dbcfg.set_db_configuration = Mock()
             mock_dbcfg.read_db_config_file = Mock(return_value={})
 
@@ -66,10 +72,14 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(self.config_obj.cmdline_configuration(), mock_cmdline_cfg)
             mock_dbcfg.set_db_configuration.assert_not_called()
             mock_dbcfg.read_db_config_file.assert_called_once_with()
+            mock_reconf_log.assert_called_once_with()
 
     async def _400_get_configuration_from_db(
-        self, u_mode, stat, mock_ids=[1], no_sngl_usr=False
+        self, u_mode, stat, mock_ids=None, no_sngl_usr=False
     ):
+        if mock_ids is None:
+            mock_ids = [1]
+
         with (
             patch("core.configuration.config.Configuration") as MockConfiguration,
             patch("core.configuration.config.ColumnName") as MockColNam,
@@ -105,7 +115,10 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
                 {mock_col: None}
             )
             mock_configuration.fetch.assert_awaited_once_with(id=mock_ids[0])
-            self.assertEqual(self.config_obj._global_configuration, mock_configuration)
+            self.assertEqual(
+                getattr(self.config_obj, "_global_configuration"),
+                mock_configuration,
+            )
             mock_get_config_item.assert_called_once_with(
                 mock_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
             )
@@ -155,13 +168,13 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
 
     def _500_configuration(self, glbl, cmdln):
         if glbl:
-            self.config_obj._global_configuration = Mock()
-            self.config_obj._global_configuration.configuration_dict = glbl
+            setattr(self.config_obj, "_global_configuration", Mock())
+            getattr(self.config_obj, "_global_configuration").configuration_dict = glbl
             expct = glbl
         else:
-            self.config_obj._global_configuration = None
+            setattr(self.config_obj, "_global_configuration", None)
             expct = {}
-        self.config_obj._cmdline_configuration = cmdln
+        setattr(self.config_obj, "_cmdline_configuration", cmdln)
 
         result = self.config_obj.configuration()
         if cmdln:
