@@ -6,6 +6,7 @@
 # - user configurable attributes can be maintained by the frontend
 """
 
+import copy
 from typing import Optional
 from core.app_logging import getLogger, log_exit
 from core.util_base import update_dicts_recursively
@@ -128,7 +129,7 @@ class AppConfiguration(ConfigurationBaseClass):
             global_cfg_dict = self._global_configuration.configuration_dict
         else:
             global_cfg_dict = {}
-        update_dicts_recursively(cfg := {}, global_cfg_dict)  # simulate recursive copy
+        cfg = copy.deepcopy(global_cfg_dict)
         update_dicts_recursively(cfg, self._cmdline_configuration or {})
         # LOG.debug(f"AppConfiguration.configuration() -> {cfg}")
         return cfg
