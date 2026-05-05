@@ -162,7 +162,8 @@ class WSConnection(WSConnectionBase):
                     )
                     try:
                         debug_message = pprint.pformat(
-                            redact(json_message),
+                            redact(json.loads(json_message)),
+                            indent=4,
                             width=120,
                             compact=True,
                         )
