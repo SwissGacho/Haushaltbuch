@@ -226,7 +226,7 @@ def _get_log_config_keyes(cfg):
     return [
         k
         for k in _flatten(_get_keys(get_config_item(cfg, LogConfig.CONFIG_LOGGING)))
-        if k not in (LogConfig.CONFIG_LOG_DEFAULT)
+        if k != LogConfig.CONFIG_LOG_DEFAULT
     ]
 
 
