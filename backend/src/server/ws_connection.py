@@ -161,9 +161,8 @@ class WSConnection(WSConnectionBase):
                         "WS_Connection.start_connection(): reply to hello is:"
                     )
                     try:
-                        debug_message = json.dumps(
-                            redact(pprint.pformat(json_message)),
-                            indent=4,
+                        debug_message = pprint.pformat(
+                            redact(json_message),
                             width=120,
                             compact=True,
                         )
