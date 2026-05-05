@@ -10,7 +10,9 @@ from server.ws_server import WSHandler
 
 
 class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
-    async def _200_handle_messages(self, start_conn=True, messages=[]):
+    async def _200_handle_messages(self, start_conn=True, messages=None):
+        if messages is None:
+            messages = []
         handler = WSHandler()
         mock_connection = Mock(name="WSConnection")
         mock_connection.start_connection = AsyncMock(return_value=start_conn)
