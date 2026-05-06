@@ -10,9 +10,8 @@ from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 import weakref
 
 
-from .bo_semantic_role import BOSemanticRole
 from core.util import _classproperty
-from core.app_logging import getLogger, log_exit, logging
+from core.app_logging import getLogger, log_exit
 from core.app import App
 
 LOG = getLogger(__name__)
@@ -28,7 +27,6 @@ from business_objects.bo_descriptors import (
     BOId,
     BODatetime,
 )
-
 
 BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 
@@ -150,7 +148,6 @@ class BOBase(BOBaseBase):
         constraint_flag: BOColumnConstraint,
         attribute_type: AttributeType,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
-        semantic_role: BOSemanticRole = BOSemanticRole.RAW,
         **flag_values,
     ):
         if not cls._attributes.get(cls.__name__):
@@ -168,7 +165,6 @@ class BOBase(BOBaseBase):
                 constraint_values=flag_values,
                 access_level=access_level,
                 attribute_type=attribute_type,
-                semantic_role=semantic_role,
             )
         )
 

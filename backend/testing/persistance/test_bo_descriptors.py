@@ -40,7 +40,6 @@ class MockBO:
         constraint_flag,
         attribute_type,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
-        semantic_role: BOSemanticRole = BOSemanticRole.RAW,
         **flag_values,
     ):
         cls._add_attributes_args = (
@@ -49,7 +48,6 @@ class MockBO:
             constraint_flag,
             attribute_type,
             access_level,
-            semantic_role,
             flag_values,
         )
 
@@ -160,7 +158,6 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_PK_INC,
             business_objects.bo_descriptors.AttributeType.ATYPE_INT,
             AttributeAccessLevel.AAL_READ_WRITE,
-            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -169,7 +166,6 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NOT_NULL,
             business_objects.bo_descriptors.AttributeType.ATYPE_STR,
             AttributeAccessLevel.AAL_READ_WRITE,
-            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -178,7 +174,6 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT_CURR,
             business_objects.bo_descriptors.AttributeType.ATYPE_DATETIME,
             AttributeAccessLevel.AAL_READ_WRITE,
-            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -187,7 +182,6 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_DATE,
             AttributeAccessLevel.AAL_READ_WRITE,
-            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -196,7 +190,6 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT,
             business_objects.bo_descriptors.AttributeType.ATYPE_DICT,
             AttributeAccessLevel.AAL_READ_WRITE,
-            BOSemanticRole.RAW,
             {"default": {"a": 1, "b": 2}},
         ),
         (
@@ -205,7 +198,6 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_LIST,
             AttributeAccessLevel.AAL_READ_WRITE,
-            BOSemanticRole.RAW,
             {},
         ),
         (
@@ -214,7 +206,6 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_FK,
             business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
             AttributeAccessLevel.AAL_READ_WRITE,
-            BOSemanticRole.RAW,
             {"relation": MockRel},
         ),
         (
@@ -223,7 +214,6 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_FK,
             business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
             AttributeAccessLevel.AAL_READ_WRITE,
-            BOSemanticRole.RAW,
             {"relation": ANY},
         ),
         (
@@ -232,7 +222,6 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_FLAG,
             AttributeAccessLevel.AAL_READ_WRITE,
-            BOSemanticRole.RAW,
             {"flag_type": MockFlag},
         ),
     ]

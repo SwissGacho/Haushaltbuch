@@ -4,6 +4,7 @@ import datetime
 import unittest
 from unittest.mock import Mock, patch
 
+from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import AttributeDescription, BOBase
 from business_objects.business_attribute_base import BaseFlag
 from business_objects.bo_descriptors import (
@@ -16,7 +17,6 @@ from business_objects.bo_descriptors import (
     BOColumnConstraint,
     BOBaseBase,
 )
-
 
 MOCK_TAB1 = "mock_table"
 MOCK_TAB2 = "mockbo2s"
@@ -52,7 +52,7 @@ mock_attr_desc = [
         name="id",
         data_type=int,
         constraint=BOColumnConstraint.BOC_PK_INC,
-        constraint_values={},
+        constraint_values={"semantic_role": BOSemanticRole.RAW},
         attribute_type=AttributeType.ATYPE_INT,
         access_level=AttributeAccessLevel.AAL_READ_ONLY,
     ),
@@ -61,7 +61,7 @@ mock_attr_desc = [
         data_type=datetime.datetime,
         constraint=BOColumnConstraint.BOC_DEFAULT_CURR
         | BOColumnConstraint.BOC_ON_UPDATE_CURR,
-        constraint_values={},
+        constraint_values={"semantic_role": BOSemanticRole.RAW},
         attribute_type=AttributeType.ATYPE_DATETIME,
         access_level=AttributeAccessLevel.AAL_READ_ONLY,
     ),
@@ -69,7 +69,7 @@ mock_attr_desc = [
         name="mock_attr1",
         data_type=str,
         constraint=BOColumnConstraint.BOC_NONE,
-        constraint_values={},
+        constraint_values={"semantic_role": BOSemanticRole.RAW},
         attribute_type=AttributeType.ATYPE_STR,
         access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
@@ -77,7 +77,7 @@ mock_attr_desc = [
         name="mock_attr2",
         data_type=BOBaseBase,
         constraint=BOColumnConstraint.BOC_FK,
-        constraint_values={"relation": MockBO1},
+        constraint_values={"semantic_role": BOSemanticRole.RAW, "relation": MockBO1},
         attribute_type=AttributeType.ATYPE_RELATION,
         access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
@@ -85,7 +85,7 @@ mock_attr_desc = [
         name="mock_attr3",
         data_type=list,
         constraint=BOColumnConstraint.BOC_NONE,
-        constraint_values={},
+        constraint_values={"semantic_role": BOSemanticRole.RAW},
         attribute_type=AttributeType.ATYPE_LIST,
         access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
@@ -93,7 +93,7 @@ mock_attr_desc = [
         name="mock_attr4",
         data_type=BaseFlag,
         constraint=BOColumnConstraint.BOC_NONE,
-        constraint_values={"flag_type": MockFlag},
+        constraint_values={"semantic_role": BOSemanticRole.RAW, "flag_type": MockFlag},
         attribute_type=AttributeType.ATYPE_FLAG,
         access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
@@ -101,7 +101,7 @@ mock_attr_desc = [
         name="mock_attr5",
         data_type=str,
         constraint=BOColumnConstraint.BOC_NONE,
-        constraint_values={},
+        constraint_values={"semantic_role": BOSemanticRole.RAW},
         attribute_type=AttributeType.ATYPE_STR,
         access_level=AttributeAccessLevel.AAL_READ_WRITE,
     ),
@@ -235,6 +235,8 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
 
     def test_108_attribute_descriptions(self):
         bo3_attr_desc = MockBO3.attribute_descriptions()
+        for desc in bo3_attr_desc:
+            print(desc)
         self.assertEqual(bo3_attr_desc, mock_attr_desc)
 
     def test_109_primary_key(self):
