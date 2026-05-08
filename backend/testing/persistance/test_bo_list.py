@@ -4,7 +4,8 @@ from typing import Optional
 import unittest
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
-from business_objects.bo_list import BOSubscription, BOList
+from business_objects.bo_subscription import BOSubscription
+from business_objects.bo_list import BOList
 from business_objects.business_object_base import BOBase
 
 

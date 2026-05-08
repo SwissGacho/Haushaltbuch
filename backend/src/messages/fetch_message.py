@@ -3,7 +3,7 @@
 from core.app_logging import getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
-from business_objects.bo_list import BOSubscription
+from business_objects.bo_subscription import BOSubscription
 from messages.message import Message, MessageType, MessageAttribute
 from server.ws_connection_base import WSConnectionBase
 
