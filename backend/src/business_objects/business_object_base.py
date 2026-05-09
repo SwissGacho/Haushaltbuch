@@ -12,7 +12,7 @@ import weakref
 
 from .bo_semantic_role import BOSemanticRole
 from core.util import _classproperty
-from core.app_logging import getLogger, log_exit, logging
+from core.app_logging import getLogger, log_exit
 from core.app import App
 
 LOG = getLogger(__name__)
@@ -127,12 +127,24 @@ class BOBase(BOBaseBase):
             "display_name": self.display_name,
         }
 
+    @classmethod
+    def display_name_components(cls) -> list[str]:
+        """Return a list of attribute names that should be used to construct the display name."""
+        return [
+            cur.name
+            for cur in cls.attribute_descriptions()
+            if cur.constraint_values.get("semantic_role") == BOSemanticRole.BONAME
+        ]
+
     @property
     def display_name(self) -> str:
         """A human-readable name for this business object instance, used in the frontend."""
-        if hasattr(self, "name") and self.name is not None:
-            return str(self.name)
-        return self.__str__()
+        bo_names = [
+            str(getattr(self, attr))
+            for attr in self.__class__.display_name_components()
+            if getattr(self, attr) is not None
+        ]
+        return ", ".join(bo_names) if bo_names else str(self)
 
     @classmethod
     def register_instance(cls, instance: "BOBase"):
@@ -149,7 +161,6 @@ class BOBase(BOBaseBase):
         constraint_flag: BOColumnConstraint,
         attribute_type: AttributeType,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
-        semantic_role: BOSemanticRole = BOSemanticRole.RAW,
         **flag_values,
     ):
         if not cls._attributes.get(cls.__name__):
@@ -167,7 +178,6 @@ class BOBase(BOBaseBase):
                 constraint_values=flag_values,
                 access_level=access_level,
                 attribute_type=attribute_type,
-                semantic_role=semantic_role,
             )
         )
 
@@ -250,7 +260,7 @@ class BOBase(BOBaseBase):
     @classmethod
     def references(cls) -> list[str | type[BOBaseBase] | None]:
         "list of business objects referenced by this class"
-        return [
+        return [  # type: ignore[return-value]
             a.constraint_values.get("relation")
             for a in cls.attribute_descriptions()
             if a.data_type == BOBaseBase and a.constraint == BOColumnConstraint.BOC_FK

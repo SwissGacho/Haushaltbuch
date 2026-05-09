@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 import json
-from enum import Flag, StrEnum, auto
+from enum import EnumType, Flag, StrEnum, auto
 from datetime import date, datetime
 import sys
 from typing import Any
@@ -28,6 +28,7 @@ class AttributeType(StrEnum):
 
 
 class AttributeAccessLevel(StrEnum):
+    """Access level of a business object attribute for the frontend."""
 
     AAL_WRITE_ONLY = "write_only"
     AAL_READ_ONLY = "read_only"
@@ -35,7 +36,7 @@ class AttributeAccessLevel(StrEnum):
 
 
 class BOColumnConstraint(Flag):
-    "Column flag of a BO attribute"
+    """Column flag of a BO attribute"""
 
     BOC_NONE = 0
     BOC_NOT_NULL = auto()
@@ -57,14 +58,16 @@ class AttributeDescription:
     name: str
     data_type: type
     constraint: BOColumnConstraint
-    constraint_values: dict[str, Any]
+    constraint_values: "dict[str, BOSemanticRole | type[BOBaseBase] | EnumType]"
     attribute_type: AttributeType
     access_level: AttributeAccessLevel
-    semantic_role: BOSemanticRole = BOSemanticRole.RAW
 
 
 class BOBaseBase:
     "Base for BOBase to circumvent circular import"
+
+    def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
+        pass
 
     @classmethod
     def add_attribute(
@@ -74,7 +77,6 @@ class BOBaseBase:
         constraint_flag: BOColumnConstraint,
         attribute_type: AttributeType,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
-        semantic_role: BOSemanticRole = BOSemanticRole.RAW,
         **flag_values,
     ):
         "Register an attribute in the business object descriptor"
@@ -99,13 +101,13 @@ class _PersistantAttr[T]:
         self,
         constraint: BOColumnConstraint = BOColumnConstraint.BOC_NONE,
         access_level: AttributeAccessLevel = AttributeAccessLevel.AAL_READ_WRITE,
-        semantic_role: BOSemanticRole | None = None,
         **constraint_values,
     ) -> None:
+        if "semantic_role" not in constraint_values:
+            constraint_values["semantic_role"] = BOSemanticRole.RAW
         self._constraint = constraint
         self._constraint_values = constraint_values
         self.my_name = None
-        self._semantic_role = semantic_role or BOSemanticRole.RAW
         self.access_level: AttributeAccessLevel = access_level
 
     @classmethod
@@ -122,7 +124,7 @@ class _PersistantAttr[T]:
     @property
     def semantic_role(self) -> BOSemanticRole:
         "Semantic role of attribute for frontend"
-        return self._semantic_role
+        return self._constraint_values.get("semantic_role", BOSemanticRole.RAW)
 
     def __set_name__(self, owner, name):
         self.my_name = name
@@ -137,7 +139,6 @@ class _PersistantAttr[T]:
             self._constraint or BOColumnConstraint.BOC_NONE,
             attribute_type=self.__class__.attribute_type(),
             access_level=self.access_level,
-            semantic_role=self.semantic_role,
             **(self._constraint_values or {}),
         )
 
@@ -353,6 +354,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
     def __set__(self, obj, value) -> None:
         "Set value of attribute, converting from int (id) if needed"
         relation = self._constraint_values.get("relation")
+        assert isinstance(relation, type) and issubclass(relation, BOBaseBase)
         if isinstance(value, str):
             try:
                 value = int(value) if value else None
@@ -363,8 +365,13 @@ class BORelation(_PersistantAttr[BOBaseBase]):
         if isinstance(value, int) and isinstance(relation, type):
             value = relation(bo_id=value)
         if isinstance(value, dict):
-            if value.get("bo_type") == relation._name() and "id" in value:
-                value = relation(bo_id=value["id"])
+            if (
+                relation
+                and isinstance(relation, type)
+                and issubclass(relation, BOBaseBase)
+            ):
+                if value.get("bo_type") == relation._name() and "id" in value:
+                    value = relation(bo_id=value["id"])
         # LOG.debug(f"Setting BORelation to {repr(value)} (relation={relation})")
         super().__set__(obj=obj, value=value)
 

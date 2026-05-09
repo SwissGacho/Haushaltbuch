@@ -3,9 +3,9 @@
 import datetime
 import json
 import unittest
-from unittest import mock
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
+from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import BOBase
 from business_objects.persistant_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import (
@@ -58,21 +58,33 @@ class MockAttrDesc:
 
 
 mock_attr_desc = [
-    MockAttrDesc("id", int, BOColumnConstraint.BOC_PK_INC, {}),
+    MockAttrDesc(
+        "id", int, BOColumnConstraint.BOC_PK_INC, {"semantic_role": BOSemanticRole.RAW}
+    ),
     MockAttrDesc(
         "last_updated",
         datetime.datetime,
         BOColumnConstraint.BOC_DEFAULT_CURR | BOColumnConstraint.BOC_ON_UPDATE_CURR,
-        {},
+        {"semantic_role": BOSemanticRole.RAW},
     ),
-    MockAttrDesc("mock_attr1", str, BOColumnConstraint.BOC_NONE, {}),
+    MockAttrDesc(
+        "mock_attr1",
+        str,
+        BOColumnConstraint.BOC_NONE,
+        {"semantic_role": BOSemanticRole.RAW},
+    ),
     MockAttrDesc(
         "mock_attr2",
         BOBaseBase,
         BOColumnConstraint.BOC_FK,
-        {"relation": MockPersistantBO1},
+        {"semantic_role": BOSemanticRole.RAW, "relation": MockPersistantBO1},
     ),
-    MockAttrDesc("mock_attr3", list, BOColumnConstraint.BOC_NONE, {}),
+    MockAttrDesc(
+        "mock_attr3",
+        list,
+        BOColumnConstraint.BOC_NONE,
+        {"semantic_role": BOSemanticRole.RAW},
+    ),
 ]
 
 mock_bo2_as_dict = {a.name: a.data_type for a in mock_attr_desc}

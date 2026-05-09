@@ -66,7 +66,6 @@ class Test_100__ObjectSchema(unittest.TestCase):
                         k: (obj.constraint_values_representation(val))
                         for k, val in v.constraint_values.items()
                     },
-                    "semantic_role": v.semantic_role,
                 },
                 payload[v.name],
             )

@@ -8,11 +8,11 @@ from business_objects.bo_descriptors import (
     AttributeType,
     BOBaseBase,
 )
+from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import AttributeDescription
 from server.ws_token import WSToken
 from messages.message import Message, MessageType, MessageAttribute
 from core.app_logging import getLogger, log_exit
-
 
 LOG: Logger = getLogger(__name__)
 
@@ -42,7 +42,7 @@ class ObjectSchema(Message):
         return MessageType.WS_TYPE_OBJECT_SCHEMA
 
     def constraint_values_representation(
-        self, constraint_value: str | type[BOBaseBase] | EnumType
+        self, constraint_value: str | type[BOBaseBase] | EnumType | BOSemanticRole
     ) -> dict[str, str | list[str]]:
         """Specifies the possible values of a given flag. str for simple flags, dict for enums and relations"""
         if constraint_value is None:
@@ -57,6 +57,8 @@ class ObjectSchema(Message):
             constraint_value, BOBaseBase
         ):
             return {"relation": constraint_value.bo_type_name()}
+        if isinstance(constraint_value, BOSemanticRole):
+            return {"semantic_role": str(constraint_value.value)}
         LOG.error(f"Unknown flag type: {constraint_value=}, {type(constraint_value)=}")
         return {"constraint_value": str(constraint_value)}
 
@@ -78,7 +80,6 @@ class ObjectSchema(Message):
                 if v is not None
             },
             "access_level": str(attribute.access_level.value),
-            "semantic_role": str(attribute.semantic_role.value),
         }
 
     def generate_payload(
