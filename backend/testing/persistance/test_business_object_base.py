@@ -235,8 +235,6 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
 
     def test_108_attribute_descriptions(self):
         bo3_attr_desc = MockBO3.attribute_descriptions()
-        for desc in bo3_attr_desc:
-            print(desc)
         self.assertEqual(bo3_attr_desc, mock_attr_desc)
 
     def test_109_primary_key(self):
