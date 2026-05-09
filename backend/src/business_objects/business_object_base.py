@@ -142,6 +142,7 @@ class BOBase(BOBaseBase):
         bo_names = [
             str(getattr(self, attr))
             for attr in self.__class__.display_name_components()
+            if getattr(self, attr) is not None
         ]
         return ", ".join(bo_names) if bo_names else str(self)
 
