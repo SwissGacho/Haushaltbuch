@@ -25,7 +25,6 @@ from business_objects.persistant_business_object import PersistentBusinessObject
 from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 
-
 T = TypeVar("T", bound=BOBase)
 
 
@@ -162,10 +161,11 @@ class BOList(BOSubscription[T]):
                 f"BOList.notify_subscription_subscribers: _bo_type is not a PersistentBusinessObject ({self._bo_type})"
             )
         bo_type = self._bo_type.__name__
+        name_components = self._bo_type.display_name_components()
         name_list = [
             {"id": cur.id, "display_name": cur.display_name}
             for cur in await self._bo_type.get_matching_objects(
-                attributes=["name"], conditions=self._conditions
+                attributes=name_components, conditions=self._conditions
             )
         ]
         # LOG.debug(f"Updating subscribers of {bo_type} with {len(name_list)} objects")

@@ -127,13 +127,21 @@ class BOBase(BOBaseBase):
             "display_name": self.display_name,
         }
 
+    @classmethod
+    def display_name_components(cls) -> list[str]:
+        """Return a list of attribute names that should be used to construct the display name."""
+        return [
+            cur.name
+            for cur in cls.attribute_descriptions()
+            if cur.constraint_values.get("semantic_role") == BOSemanticRole.BONAME
+        ]
+
     @property
     def display_name(self) -> str:
         """A human-readable name for this business object instance, used in the frontend."""
         bo_names = [
-            str(getattr(self, cur.name))
-            for cur in self.attribute_descriptions()
-            if cur.constraint_values.get("semantic_role") == BOSemanticRole.BONAME
+            str(getattr(self, attr))
+            for attr in self.__class__.display_name_components()
         ]
         return ", ".join(bo_names) if bo_names else str(self)
 
