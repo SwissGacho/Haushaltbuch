@@ -260,7 +260,7 @@ class BOBase(BOBaseBase):
     @classmethod
     def references(cls) -> list[str | type[BOBaseBase] | None]:
         "list of business objects referenced by this class"
-        return [
+        return [  # type: ignore[return-value]
             a.constraint_values.get("relation")
             for a in cls.attribute_descriptions()
             if a.data_type == BOBaseBase and a.constraint == BOColumnConstraint.BOC_FK
