@@ -8,6 +8,7 @@ import platform
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
+from core.const import CONFIG_DBCFG_FILE
 
 
 class BaseObject:
@@ -62,7 +63,7 @@ class Config(StrEnum):
     CONFIG_APP = "app"
     CONFIG_USR_MODE = "userMode"
     CONFIG_APP_USRMODE = "/".join([CONFIG_APP, CONFIG_USR_MODE])
-    CONFIG_DBCFG_FILE = "dbcfg_file"
+    CONFIG_DBCFG_FILE = CONFIG_DBCFG_FILE
     CONFIG_DB = "db_cfg"
     CONFIG_DB_DB = "/".join([CONFIG_DB, "db"])
     CONFIG_DBFILE = "file"
@@ -78,6 +79,7 @@ class Config(StrEnum):
     CONFIG_SYSTEM = "system"
     CONFIG_DB_LOCATIONS = "db_paths"
     CONFIG_ADMINUSER = "adminuser"
+
 
 
 ConfigSubDict: TypeAlias = Union[dict[str, "ConfigSubDict"], str]

@@ -1,9 +1,10 @@
-""" Test suite for common utility functions"""
+"""Test suite for common utility functions"""
 
 import unittest
 from unittest.mock import Mock
 
 import core.util
+import core.util_base
 
 
 class MockClass:
@@ -71,12 +72,14 @@ class Test200Util(unittest.TestCase):
                 "lvl2b": {"lvl3": "val3"},
             },
         }
-        self.assertEqual(core.util.get_config_item(mock_dict, "lvl1a"), "val1")
-        self.assertEqual(core.util.get_config_item(mock_dict, "lvl1b/lvl2a"), "val2")
+        self.assertEqual(core.util_base.get_config_item(mock_dict, "lvl1a"), "val1")
         self.assertEqual(
-            core.util.get_config_item(mock_dict, "lvl1b/lvl2b/lvl3"), "val3"
+            core.util_base.get_config_item(mock_dict, "lvl1b/lvl2a"), "val2"
         )
-        self.assertIsNone(core.util.get_config_item({}, "mick/mock"))
+        self.assertEqual(
+            core.util_base.get_config_item(mock_dict, "lvl1b/lvl2b/lvl3"), "val3"
+        )
+        self.assertIsNone(core.util_base.get_config_item({}, "mick/mock"))
 
     def test_201_update_dicts_recursively(self):
         mock_tgt = {
@@ -93,13 +96,13 @@ class Test200Util(unittest.TestCase):
             "lvl1b": {"lvl2a": "valt2", "lvl2b": {"lvl3": "val3"}, "lvl2c": "valt2c"},
             "lvl1c": "new1",
         }
-        core.util.update_dicts_recursively(target=mock_tgt, source=mock_src)
+        core.util_base.update_dicts_recursively(target=mock_tgt, source=mock_src)
         self.assertEqual(mock_tgt, expct)
 
     def test_202_update_dicts_recursively_no_dict(self):
         with self.assertRaises(TypeError):
-            core.util.update_dicts_recursively(target="val", source={})
+            core.util_base.update_dicts_recursively(target="val", source={})
         with self.assertRaises(TypeError):
-            core.util.update_dicts_recursively(target={}, source=None)
+            core.util_base.update_dicts_recursively(target={}, source=None)
         # no exception:
-        core.util.update_dicts_recursively(target={}, source={})
+        core.util_base.update_dicts_recursively(target={}, source={})

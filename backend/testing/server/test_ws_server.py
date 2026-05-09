@@ -5,17 +5,22 @@ from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
 from server.ws_server import WSHandler
 
-
 # class Test_000_WS_Server(unittest.IsolatedAsyncioTestCase):
 #     async def test_001_get_websocket(self):
 
 
 class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
-    async def _200_handle_messages(self, start_conn=True, messages=[]):
+    async def _200_handle_messages(self, start_conn=True, messages=None):
+        if messages is None:
+            messages = []
         handler = WSHandler()
-        mock_connection = Mock()
+        mock_connection = Mock(name="WSConnection")
         mock_connection.start_connection = AsyncMock(return_value=start_conn)
         mock_connection.handle_message = AsyncMock()
+        mock_connection.connection_context = {
+            "comp": "mock_component",
+            "socket": "mock_socket",
+        }
         mock_socket = MagicMock()
         mock_socket.__aiter__.return_value = messages
         mock_path = Mock

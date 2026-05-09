@@ -7,7 +7,7 @@ from core.app_logging import getLogger, log_exit
 LOG = getLogger(__name__)
 
 from core.app import App
-from core.util import get_config_item
+from core.util_base import get_config_item
 from core.status import Status
 from core.configuration.config import Config
 from core.configuration.db_config import DBConfig

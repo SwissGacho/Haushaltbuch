@@ -6,11 +6,12 @@ import json
 import asyncio
 
 from core.app_logging import getLogger, log_exit
+from core.util_base import update_dicts_recursively
 
 LOG = getLogger(__name__)
 
 from core.app import App
-from core.util import get_config_item, update_dicts_recursively
+from core.util_base import get_config_item
 from core.configuration.db_config import DBConfig
 from core.status import Status
 from core.const import SINGLE_USER_NAME
