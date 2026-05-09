@@ -10,6 +10,7 @@ from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 import weakref
 
 
+from .bo_semantic_role import BOSemanticRole
 from core.util import _classproperty
 from core.app_logging import getLogger, log_exit
 from core.app import App
@@ -129,9 +130,12 @@ class BOBase(BOBaseBase):
     @property
     def display_name(self) -> str:
         """A human-readable name for this business object instance, used in the frontend."""
-        if hasattr(self, "name") and self.name is not None:
-            return str(self.name)
-        return self.__str__()
+        bo_names = [
+            str(getattr(self, cur.name))
+            for cur in self.attribute_descriptions()
+            if cur.constraint_values.get("semantic_role") == BOSemanticRole.BONAME
+        ]
+        return ", ".join(bo_names) if bo_names else str(self)
 
     @classmethod
     def register_instance(cls, instance: "BOBase"):
