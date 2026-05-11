@@ -5,9 +5,10 @@ application's data model."""
 
 import copy
 import json
+import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit, DEBUG, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
@@ -139,11 +140,33 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
-        # LOG.debug(f"PersistentBusinessObject.get_matching_objects({conditions=}, {attributes=}) -> {result=}")
-        return [
-            cls(bo_id=obj.get("id"), **{k: v for k, v in obj.items() if k != "id"})
-            for obj in result
-        ]
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"PersistentBusinessObject.get_matching_objects({conditions=}, {attributes=}) -> result:",
+            )
+            for line in pprint.pformat(
+                result, indent=4, width=120, compact=True
+            ).splitlines():
+                LOG.log(VERBOSE_DEBUG, f"  {line}")
+        descriptions = {d.name: d for d in cls.attribute_descriptions()}
+        objects: list[BOBase] = []
+        for obj in result:
+            converted: dict[str, Any] = {}
+            for key, value in obj.items():
+                if key == "id":
+                    continue
+                description = descriptions.get(key)
+                if description is None:
+                    converted[key] = value
+                    continue
+                converted[key] = cls.convert_from_db(
+                    value,
+                    description.data_type,
+                    description.constraint_values,
+                )
+            objects.append(cls(bo_id=obj.get("id"), **converted))
+        return objects
 
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
@@ -242,3 +265,6 @@ class PersistentBusinessObject(BOBase):
                     await update.execute()
             finally:
                 await self.fetch()
+
+
+log_exit(LOG)
