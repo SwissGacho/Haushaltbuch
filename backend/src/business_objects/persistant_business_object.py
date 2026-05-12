@@ -8,7 +8,7 @@ import json
 import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
-from core.app_logging import getLogger, log_exit, DEBUG, VERBOSE_DEBUG
+from core.app_logging import getLogger, log_exit, DEBUG, VERBOSE_DEBUG, redact
 
 LOG = getLogger(__name__)
 
@@ -146,7 +146,7 @@ class PersistentBusinessObject(BOBase):
                 f"PersistentBusinessObject.get_matching_objects({conditions=}, {attributes=}) -> result:",
             )
             for line in pprint.pformat(
-                result, indent=4, width=120, compact=True
+                redact(result), indent=4, width=120, compact=True
             ).splitlines():
                 LOG.log(VERBOSE_DEBUG, f"  {line}")
         descriptions = {d.name: d for d in cls.attribute_descriptions()}
