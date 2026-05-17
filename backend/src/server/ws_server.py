@@ -4,8 +4,9 @@ import os
 import json
 import pprint
 import socket
+import websockets
+import websockets.asyncio.server as websockets_server
 from contextlib import asynccontextmanager
-import websockets.asyncio.server as websockets
 
 from core.app_logging import (
     get_context_logger,
@@ -75,6 +76,8 @@ class WSHandler:
                             )
                         raise
                     await connection.handle_message(message=message)
+        except websockets.exceptions.ConnectionClosed as exc:
+            local_LOG.debug(f"Connection closed by peer: {exc}")
         except Exception as exc:
             local_LOG.error(f"Connection aborted by exception {exc}")
             raise
@@ -90,7 +93,7 @@ async def get_websocket():
     localhost = [socket.gethostname(), "localhost"]
     bind_address = os.getenv("WS_BIND_ADDRESS") or localhost
     LOG.info(f"Starting WebSocket server on {bind_address}:{WEBSOCKET_PORT}")
-    ws_server = await websockets.serve(
+    ws_server = await websockets_server.serve(
         handler=ws_handler.handler,
         host=bind_address,  # type: ignore[arg-type]
         port=WEBSOCKET_PORT,
