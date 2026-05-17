@@ -143,7 +143,7 @@ class PersistentBusinessObject(BOBase):
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(
                 VERBOSE_DEBUG,
-                f"PersistentBusinessObject.get_matching_objects({conditions=}, {attributes=}) -> result:",
+                f"PersistentBusinessObject.get_matching_objects(conditions={redact(conditions)}, {attributes=}) -> result:",
             )
             for line in pprint.pformat(
                 redact(result), indent=4, width=120, compact=True
