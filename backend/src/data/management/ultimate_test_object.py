@@ -33,7 +33,7 @@ class UltimateFlag(BaseFlag):
 class UltimateRelatedTestObject(PersistentBusinessObject):
     "Related Business Object for testing purposes"
 
-    name = BOStr()
+    name = BOStr(semantic_role=BOSemanticRole.BONAME)
 
 
 class UltimateTestObject(PersistentBusinessObject):

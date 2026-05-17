@@ -2,6 +2,7 @@
 
 from enum import auto
 
+from business_objects.bo_semantic_role import BOSemanticRole
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
@@ -21,7 +22,7 @@ class UserRole(BaseFlag):
 class User(PersistentBusinessObject):
     "Persistant user object"
 
-    name = BOStr()
+    name = BOStr(semantic_role=BOSemanticRole.BONAME)
     password = BOStr()
     role = BOFlag(UserRole)
 
