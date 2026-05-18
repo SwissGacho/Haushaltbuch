@@ -8,7 +8,7 @@ import json
 import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
-from core.app_logging import getLogger, log_exit, redact, VERBOSE_DEBUG
+from core.app_logging import getLogger, log_exit, DEBUG, VERBOSE_DEBUG, redact
 
 LOG = getLogger(__name__)
 
@@ -141,18 +141,32 @@ class PersistentBusinessObject(BOBase):
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
         LOG.debug(
-            f"PersistentBusinessObject.get_matching_objects({conditions=}, {attributes=}) "
+            f"PersistentBusinessObject.get_matching_objects(conditions={redact(conditions), {attributes=}) "
             f"-> {len(result)} objects"
         )
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             for line in pprint.pformat(
                 redact(result), indent=4, width=120, compact=True
             ).splitlines():
-                LOG.log(VERBOSE_DEBUG, line)
-        return [
-            cls(bo_id=obj.get("id"), **{k: v for k, v in obj.items() if k != "id"})
-            for obj in result
-        ]
+                LOG.log(VERBOSE_DEBUG, f"  {line}")
+        descriptions = {d.name: d for d in cls.attribute_descriptions()}
+        objects: list[BOBase] = []
+        for obj in result:
+            converted: dict[str, Any] = {}
+            for key, value in obj.items():
+                if key == "id":
+                    continue
+                description = descriptions.get(key)
+                if description is None:
+                    converted[key] = value
+                    continue
+                converted[key] = cls.convert_from_db(
+                    value,
+                    description.data_type,
+                    description.constraint_values,
+                )
+            objects.append(cls(bo_id=obj.get("id"), **converted))
+        return objects
 
     async def fetch(self, id=None, newest=None):
         """Fetch the content for a business object instance from the DB.
