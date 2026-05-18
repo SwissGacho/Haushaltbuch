@@ -141,7 +141,7 @@ class PersistentBusinessObject(BOBase):
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
         LOG.debug(
-            f"PersistentBusinessObject.get_matching_objects(conditions={redact(conditions), {attributes=}) "
+            f"PersistentBusinessObject.get_matching_objects(conditions={redact(conditions)}, {attributes=}) "
             f"-> {len(result)} objects"
         )
         if LOG.isEnabledFor(VERBOSE_DEBUG):
