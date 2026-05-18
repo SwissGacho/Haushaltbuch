@@ -18,12 +18,14 @@ class FetchMessage(Message):
     async def handle_message(self, connection: WSConnectionBase):
         "handle a fetch message"
         object_type_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
+        conditions = self.message.get(MessageAttribute.WS_ATTR_CONDITIONS)
 
         if object_type_name and isinstance(object_type_name, str):
             BOSubscription(
                 bo_type=object_type_name,
                 connection=connection,
-                id=self.message.get(MessageAttribute.WS_ATTR_INDEX),
+                index=self.message.get(MessageAttribute.WS_ATTR_INDEX),
+                conditions=conditions,
                 notify_subscribers_on_init=True,
             )
         else:

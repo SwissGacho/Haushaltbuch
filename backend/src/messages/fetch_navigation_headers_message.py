@@ -3,8 +3,8 @@
 from core.app_logging import getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
-from business_objects.bo_descriptors import BORelation
 from business_objects.business_object_base import BOBase
+from business_objects.persistant_business_object import PersistentBusinessObject
 from messages.message import Message, MessageAttribute, MessageType
 from server.ws_connection_base import WSConnectionBase
 
@@ -38,9 +38,11 @@ class FetchNavigationHeadersMessage(Message):
         # If no object was specified, return the headers of the root tree
         #  - for now these are all business objects
         else:
-            object_names = list(
-                BOBase.all_business_objects.keys()  # pylint:disable=no-member
-            )
+            object_names = [
+                k
+                for k, o in BOBase.all_business_objects.items()  # pylint:disable=no-member
+                if issubclass(o, PersistentBusinessObject)
+            ]
         msg = NavigationHeadersMessage(
             token=self.message.get(MessageAttribute.WS_ATTR_TOKEN)
         )

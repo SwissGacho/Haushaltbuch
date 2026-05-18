@@ -5,9 +5,10 @@ application's data model."""
 
 import copy
 import json
+import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit, redact, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
@@ -139,7 +140,15 @@ class PersistentBusinessObject(BOBase):
             if conditions:
                 select.where(Filter(conditions))
             result = await (await select.execute()).fetchall()
-        # LOG.debug(f"PersistentBusinessObject.get_matching_objects({conditions=}, {attributes=}) -> {result=}")
+        LOG.debug(
+            f"PersistentBusinessObject.get_matching_objects({conditions=}, {attributes=}) "
+            f"-> {len(result)} objects"
+        )
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            for line in pprint.pformat(
+                redact(result), indent=4, width=120, compact=True
+            ).splitlines():
+                LOG.log(VERBOSE_DEBUG, line)
         return [
             cls(bo_id=obj.get("id"), **{k: v for k, v in obj.items() if k != "id"})
             for obj in result
@@ -242,3 +251,6 @@ class PersistentBusinessObject(BOBase):
                     await update.execute()
             finally:
                 await self.fetch()
+
+
+log_exit(LOG)

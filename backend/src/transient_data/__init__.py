@@ -11,8 +11,8 @@ from core.app_logging import getLogger, log_exit
 LOG = getLogger(__name__)
 
 
-def import_business_objects():
-    "Import all business object modules to register their classes"
+def import_transient_business_objects():
+    "Import all transient business object modules to register their classes"
     base_path = pathlib.Path(__file__).parent
     rel_paths = [p.relative_to(base_path.parent) for p in base_path.rglob("*.py")]
     modules = [
@@ -30,5 +30,5 @@ def import_business_objects():
                 module_class.register_bo_class()
 
 
-import_business_objects()
+import_transient_business_objects()
 log_exit(LOG)

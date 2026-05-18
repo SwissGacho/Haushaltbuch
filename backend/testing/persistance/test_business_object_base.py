@@ -201,9 +201,9 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             else:
                 self.assertNotEqual(attr.name, "new_attr")
 
-    def test_103_register_persistant_class(self):
+    def test_103_register_bo_class(self):
         self.assertNotIn("mockbo2", BOBase._business_objects)
-        MockBO2.register_persistant_class()
+        MockBO2.register_bo_class()
         self.assertIn("mockbo2", BOBase._business_objects)
 
     def test_104_all_business_objects(self):
@@ -211,7 +211,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bos, MockBO2.all_business_objects)
 
     def test_105_get_business_object_by_name(self):
-        MockBO2.register_persistant_class()
+        MockBO2.register_bo_class()
         bo_class = BOBase.get_business_object_by_name("mockbo2")
         self.assertEqual(bo_class, MockBO2)
         with self.assertRaises(ValueError):
@@ -373,7 +373,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             )
 
     def test_118_get_business_object_by_name(self):
-        MockBO2.register_persistant_class()
+        MockBO2.register_bo_class()
         self.assertEqual(BOBase.get_business_object_by_name("mockbo2"), MockBO2)
         with self.assertRaises(ValueError):
             BOBase.get_business_object_by_name("non_existent_bo")

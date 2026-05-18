@@ -4,7 +4,7 @@ from core.app_logging import getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
 
-from business_objects.bo_list import BOList
+from transient_data.bo_list import BOList
 from messages.message import Message, MessageAttribute, MessageType
 
 

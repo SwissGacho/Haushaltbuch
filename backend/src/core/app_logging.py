@@ -83,6 +83,8 @@ _REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
 
 def redact(value: Any) -> Any:
     "Return a log-safe copy with sensitive values redacted."
+    if isinstance(value, list):
+        return [redact(item) for item in value]
     if isinstance(value, dict):
         return {
             key: (

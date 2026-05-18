@@ -5,7 +5,7 @@ import unittest
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
 from business_objects.bo_subscription import BOSubscription
-from business_objects.bo_list import BOList
+from transient_data.bo_list import BOList
 from business_objects.business_object_base import BOBase
 
 
@@ -56,7 +56,7 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
         con = Mock()
         MockConcreteBO.subscribe_to_instance = Mock(return_value=456)
         con.unregister_other_senders = Mock()
-        boSubscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=1)
+        boSubscription = BOSubscription(bo_type=MockConcreteBO, connection=con, index=1)
         con.unregister_other_senders.assert_called_once_with(boSubscription)
         self.assertEqual(boSubscription._bo_type, MockConcreteBO)
         MockConcreteBO.subscribe_to_instance.assert_called_once_with(
@@ -65,7 +65,9 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
 
     async def test_102_get_objects(self):
         con = Mock()
-        boSubscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=42)
+        boSubscription = BOSubscription(
+            bo_type=MockConcreteBO, connection=con, index=42
+        )
         objects = await boSubscription._get_objects_()
         self.assertEqual([boSubscription._obj], objects)
 
@@ -76,7 +78,7 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
             new_callable=AsyncMock,
         ) as mock_notify:
             boSubscription = BOSubscription(
-                bo_type=MockConcreteBO, connection=con, id=42
+                bo_type=MockConcreteBO, connection=con, index=42
             )
             await boSubscription._handle_event_(boSubscription._obj)
             mock_notify.assert_awaited_once()
@@ -88,7 +90,7 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
             new_callable=AsyncMock,
         ) as mock_send_message:
             boSubscription = BOSubscription(
-                bo_type=MockConcreteBO, connection=con, id=42
+                bo_type=MockConcreteBO, connection=con, index=42
             )
             await boSubscription.notify_subscription_subscribers()
             mock_send_message.assert_awaited_once()
@@ -97,7 +99,9 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
         MockConcreteBO.unsubscribe_from_instance = Mock()
         con = Mock()
         con.unregister_message_sender = Mock()
-        bo_subscription = BOSubscription(bo_type=MockConcreteBO, connection=con, id=42)
+        bo_subscription = BOSubscription(
+            bo_type=MockConcreteBO, connection=con, index=42
+        )
         subscription_id = bo_subscription._subscription_id
         bo_subscription.cleanup()
         MockConcreteBO.unsubscribe_from_instance.assert_called_once_with(
