@@ -7,11 +7,12 @@ from datetime import date, datetime
 import sys
 from typing import Any
 
-from business_objects.bo_semantic_role import BOSemanticRole
-from business_objects.business_attribute_base import BaseFlag
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
+
+from business_objects.bo_semantic_role import BOSemanticRole
+from business_objects.business_attribute_base import BaseFlag
 
 
 class AttributeType(StrEnum):
@@ -410,3 +411,6 @@ class BOFlag(_PersistantAttr[Flag]):
             value = self._constraint_values["flag_type"].flags(value)
         # LOG.debug(f"   converted BOFlag to {value}")
         super().__set__(obj=obj, value=value)
+
+
+log_exit(LOG)
