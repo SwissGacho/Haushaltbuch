@@ -32,9 +32,7 @@ class MessageType(StrEnum):
     WS_TYPE_OBJECT_SETUP = "ObjectSetup"
     WS_TYPE_STORE_SETUP = "StoreSetup"
     WS_TYPE_FETCH_NAVIGATION_HEADERS = "FetchNavigationHeaders"
-    WS_TYPE_FETCH_LIST = "FetchList"
     WS_TYPE_NAVIGATION_HEADERS = "NavigationHeaders"
-    WS_TYPE_OBJECT_LIST = "ObjectList"
     WS_TYPE_FETCH_SCHEMA = "FetchSchema"
 
 

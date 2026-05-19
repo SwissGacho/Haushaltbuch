@@ -17,11 +17,7 @@ LOG = getLogger(__name__)
 # from server.ws_connection import WS_Connection
 
 from business_objects.business_object_base import BOBase, BOCallback
-from business_objects.bo_subscription import BOSubscription
-from business_objects.persistant_business_object import PersistentBusinessObject
 from business_objects.transient_business_object import TransientBusinessObject
-from messages.message import MessageAttribute
-from messages.object_list import ObjectList
 
 T = TypeVar("T", bound=BOBase)
 

@@ -21,7 +21,7 @@ class FetchNavigationHeadersMessage(Message):
         return MessageType.WS_TYPE_FETCH_NAVIGATION_HEADERS
 
     async def handle_message(self, connection: WSConnectionBase):
-        "Handle a FetchListMessage"
+        "Handle a FetchNavigationHeadersMessage"
         parent_object_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
         object_names: list[str] = []
 
