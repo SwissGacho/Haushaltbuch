@@ -8,22 +8,18 @@
 """
 
 import pprint
-from typing import TypeVar, Any
+from typing import Any
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
-# from server.ws_connection import WS_Connection
-
 from business_objects.business_object_base import BOBase, BOCallback
 from business_objects.transient_business_object import TransientBusinessObject
 
-T = TypeVar("T", bound=BOBase)
-
 
 class BOList(TransientBusinessObject):
-    """Represents a list of business objects of a certain type. The list subscribes to events of
+    """Represents a list of business object instances of a certain type. The list subscribes to events of
     the business object type and updates its own subscribers accordingly."""
 
     def __init__(self, index: str, conditions: dict | None = None, **kwargs) -> None:
