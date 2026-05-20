@@ -31,8 +31,6 @@ class MessageType(StrEnum):
     WS_TYPE_FETCH_SETUP = "FetchSetup"
     WS_TYPE_OBJECT_SETUP = "ObjectSetup"
     WS_TYPE_STORE_SETUP = "StoreSetup"
-    WS_TYPE_FETCH_NAVIGATION_HEADERS = "FetchNavigationHeaders"
-    WS_TYPE_NAVIGATION_HEADERS = "NavigationHeaders"
     WS_TYPE_FETCH_SCHEMA = "FetchSchema"
 
 
@@ -69,9 +67,6 @@ class MessageAttribute(StrEnum):
     WS_ATTR_LOGLEVEL = "log_level"
     WS_ATTR_MESSAGE = "message"
     WS_ATTR_CALLER = "caller"
-
-    # Navigation Headers
-    WS_ATTR_NAVIGATION_HEADERS = "navigation_headers"
 
 
 def json_encode(obj: Any) -> Any:
