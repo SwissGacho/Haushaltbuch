@@ -83,6 +83,8 @@ _REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
 
 def redact(value: Any) -> Any:
     "Return a log-safe copy with sensitive values redacted."
+    if isinstance(value, list):
+        return [redact(item) for item in value]
     if isinstance(value, dict):
         return {
             key: (
@@ -98,6 +100,30 @@ def redact(value: Any) -> Any:
     return value
 
 
+entered_modules = [__name__.split(".")[-1]]
+
+
+def log_entry(logger, module_name: str):
+    "Log entry into execution of the module code"
+    if _LOG_MODULE_ENTRY:
+        if module_name != "__main__":
+            entered_modules.append(module_name)
+        logger.debug(
+            f"Enter module {module_name:>35}, entered modules: {', '.join(entered_modules)}"
+        )
+
+
+def log_exit(logger):
+    "Log end of execution of the module code"
+    if _LOG_MODULE_EXIT:
+        module_name = logger.name.split(".")[-1]
+        if module_name in entered_modules:
+            entered_modules.remove(module_name)
+        logger.debug(
+            f"Exit module  {module_name:>35}, entered modules: {', '.join(entered_modules)}"
+        )
+
+
 def getLogger(  # pylint: disable=invalid-name
     name: str, level=logging.NOTSET  # pylint: disable=unused-argument
 ) -> Logger:
@@ -107,7 +133,7 @@ def getLogger(  # pylint: disable=invalid-name
     )
 
     if _LOG_MODULE_ENTRY:
-        logger.debug("Enter module")
+        log_entry(logger, name.split(".")[-1])
     return logger
 
 
@@ -138,12 +164,6 @@ def get_context_logger(logger: Logger | ContextLogger, **extra: Any) -> ContextL
     if isinstance(logger, ContextLogger):
         return logger.bind(**extra)
     return ContextLogger(logger, extra)
-
-
-def log_exit(logger):
-    "Log end of execution of the module code"
-    if _LOG_MODULE_EXIT:
-        logger.debug("Exit module")
 
 
 logging_dict = {

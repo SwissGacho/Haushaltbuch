@@ -45,6 +45,9 @@ class WSConnection(WSConnectionBase):
         self.conn_logger = get_context_logger(LOG, **self.connection_context)
         self._register_connection()
 
+    def __str__(self) -> str:
+        return f"WSConnection({self._comp})"
+
     def _register_connection(self, key: str | None = None) -> None:
         if key:
             self._comp = key
