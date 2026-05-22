@@ -17,7 +17,7 @@ from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
 from database.sql_expression import Eq, Filter, SQLExpression
 from database.sql_statement import CreateTable, NamedValueListList, Value
-from business_objects.bo_descriptors import BOBaseBase
+from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
 
@@ -25,6 +25,21 @@ from business_objects.business_attribute_base import BaseFlag
 class PersistentBusinessObject(BOBase):
     """Base class for persistent Business Objects.
     Every subclass will be registered in a table in the database."""
+
+    @classmethod
+    def navigation_header(
+        cls, ref: AttributeDescription | str | None = None
+    ) -> dict[str, str] | None:
+        """Return a navigation header for this business object class.
+        'ref' can be used to specify a reference name if this BO is referenced by another BO.
+        Return None if this BO should not be included in the navigation."""
+        ref_name = ref.name if isinstance(ref, AttributeDescription) else ref
+        if ref_name:
+            return {
+                "name": f"{cls.__name__.lower()}.{ref_name}",
+                "display_name": f"{cls.__name__} ({ref_name})",
+            }
+        return {"name": cls.__name__.lower(), "display_name": cls.__name__}
 
     # pylint: disable=no-self-argument
     @_classproperty

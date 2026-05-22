@@ -1,5 +1,5 @@
 """Data classes package
-On import this pakage import all data classes it contains.
+On import this package imports all data classes it contains.
 Any classes having a name starting with '_' are ignored.
 """
 

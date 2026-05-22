@@ -14,7 +14,7 @@ LOG = getLogger(__name__)
 from core.const import APPNAME
 from core.app import App
 from core.base_objects import BaseObject, Config
-from transient_data.config_file import ConfigFile
+import transient_data
 
 
 class DBConfig(BaseObject):

@@ -83,6 +83,15 @@ class BOBaseBase:
         "Register an attribute in the business object descriptor"
 
     @classmethod
+    def navigation_header(
+        cls, ref: AttributeDescription | str | None = None
+    ) -> dict[str, str] | None:
+        """Return a navigation header for this business object class.
+        'ref' can be used to specify a reference name if this BO is referenced by another BO.
+        Return None if this BO should not be included in the navigation."""
+        raise NotImplementedError
+
+    @classmethod
     def attribute_descriptions(cls) -> list[AttributeDescription]:
         "list of attribute descriptions"
         raise NotImplementedError

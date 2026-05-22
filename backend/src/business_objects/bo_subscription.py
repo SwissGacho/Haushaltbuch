@@ -71,13 +71,15 @@ class BOSubscription(Generic[T], WSMessageSender):
     def _initialize_subscriptions(self, **kwargs):
         if "index" not in kwargs:
             raise ValueError("BOSubscription requires an 'index' argument")
+        self._index = kwargs["index"]
         if issubclass(self._bo_type, PersistentBusinessObject):
-            if not isinstance(kwargs["index"], int):
+            if not isinstance(self._index, int):
                 raise ValueError(
                     "BOSubscription requires an 'index' argument of type int"
                 )
 
-            bo_id = int(kwargs["index"])
+            bo_id = int(self._index)
+            kwargs.pop("index")
         else:
             bo_id = None
         bo: T = self._bo_type(bo_id=bo_id, **kwargs)
@@ -95,7 +97,7 @@ class BOSubscription(Generic[T], WSMessageSender):
                 "BOSubscription._get_objects_: _obj not set, no objects to return"
             )
             return []
-        return [self._obj]
+        return [self._obj] if self._obj is not None else []
 
     async def _handle_event_(self, _: BOBase):
         """Should be called when the underlying information of the list changes.
@@ -109,6 +111,11 @@ class BOSubscription(Generic[T], WSMessageSender):
 
     async def notify_subscription_subscribers(self):
         """Notify subscribers about the current state of the list."""
+        if self._obj is None:
+            LOG.debug(
+                "BOSubscription.notify_subscription_subscribers: _obj is None, nothing to notify"
+            )
+            return
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             name_list = [cur.id for cur in await self._get_objects_()]
             LOG.log(
@@ -121,7 +128,7 @@ class BOSubscription(Generic[T], WSMessageSender):
         await self.send_message(
             ObjectMessage(
                 object_type=self._bo_type,
-                index=self._obj.id,
+                index=self._index if self._index is not None else self._obj.id,
                 payload=await self._obj.business_values_as_dict(),
             )
         )

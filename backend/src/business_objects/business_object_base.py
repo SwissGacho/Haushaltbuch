@@ -128,6 +128,15 @@ class BOBase(BOBaseBase):
         }
 
     @classmethod
+    def navigation_header(
+        cls, ref: AttributeDescription | str | None = None
+    ) -> dict[str, str] | None:
+        """Return a navigation header for this business object class.
+        'ref' can be used to specify a reference name if this BO is referenced by another BO.
+        Return None if this BO should not be included in the navigation."""
+        return None
+
+    @classmethod
     def display_name_components(cls) -> list[str]:
         """Return a list of attribute names that should be used to construct the display name."""
         return [
@@ -336,7 +345,7 @@ class BOBase(BOBaseBase):
         cls._change_subscribers[subscriber_id] = callback
         LOG.log(
             VERBOSE_DEBUG,
-            f"BOBase.subscribe_to_all_changes: Subscribed callback '{callback.__name__}' "
+            f"BOBase.subscribe_to_all_changes: Subscribed callback '{repr(callback)}' "
             f"with id {subscriber_id} to all changes on {cls.__name__}",
         )
         BOBase.subscriptions_report()
@@ -365,7 +374,7 @@ class BOBase(BOBaseBase):
         subscriber_id: int = next(self._instance_subscriber_id)
         LOG.log(
             VERBOSE_DEBUG,
-            f"BOBase.subscribe_to_instance: Subscribing callback '{callback.__name__}' "
+            f"BOBase.subscribe_to_instance: Subscribing callback '{repr(callback)}' "
             f"with id {subscriber_id} to instance {str(self)} with id {self.id}",
         )
         self._instance_subscribers[subscriber_id] = callback

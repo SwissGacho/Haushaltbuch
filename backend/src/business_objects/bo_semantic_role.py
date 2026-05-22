@@ -1,7 +1,6 @@
 """BOSemanticRole enumeration, which represents the semantic roles of business objects for the frontend."""
 
 from enum import StrEnum, auto
-from math import log
 
 from core.app_logging import getLogger, log_exit
 
