@@ -109,7 +109,7 @@ class BOBase(BOBaseBase):
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__} "
-            f"({', '.join([a+': '+str(v) for a,v in self._data.items()])})"
+            f"({', '.join([a+': '+str(v) for a,v in self._data.items()if v is not None])})"
         )
 
     def __str__(self) -> str:

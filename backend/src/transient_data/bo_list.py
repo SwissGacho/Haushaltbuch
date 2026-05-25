@@ -63,7 +63,7 @@ class BOList(TransientBusinessObject):
         LOG.debug(
             f"{str(self)}.business_values_as_dict: bo={self._bo_type}, conditions={self._conditions}"
         )
-        name_components = self._bo_type.display_name_components()
+        name_components = self._bo_type.display_name_components() or ["name"]
         matching_objects = await self._bo_type.get_matching_objects(
             attributes=name_components, conditions=self._conditions
         )
