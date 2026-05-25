@@ -100,7 +100,7 @@ def redact(value: Any) -> Any:
     return value
 
 
-entered_modules = [__name__.split(".")[-1]]
+entered_modules = [__name__]
 
 
 def log_entry(logger, module_name: str):
@@ -116,7 +116,12 @@ def log_entry(logger, module_name: str):
 def log_exit(logger):
     "Log end of execution of the module code"
     if _LOG_MODULE_EXIT:
-        module_name = logger.name.split(".")[-1]
+        module_name = logger.name
+        prefix = f"{APPNAME}."
+        if module_name.startswith(prefix):
+            module_name = module_name[len(prefix) :]
+        elif module_name == APPNAME:
+            module_name = "__main__"
         if module_name in entered_modules:
             entered_modules.remove(module_name)
         logger.debug(
