@@ -67,7 +67,10 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(callback_id, 1)
         self.assertEqual(bo_list._subscription_id, 99)
-        MockConcreteBO.subscribe_to_all_changes.assert_called_once_with(callback)
+        MockConcreteBO.subscribe_to_all_changes.assert_called_once()
+        registered_callback = MockConcreteBO.subscribe_to_all_changes.call_args.args[0]
+        self.assertTrue(callable(registered_callback))
+        self.assertIsNot(registered_callback, callback)
 
     async def test_204_unsubscribe_from_instance(self):
         con = Mock()
