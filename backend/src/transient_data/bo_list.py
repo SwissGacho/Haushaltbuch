@@ -36,7 +36,7 @@ class BOList(TransientBusinessObject):
     def subscribe_to_instance(self, callback: BOCallback) -> int:
         LOG.debug(
             f"{str(self)}.subscribe_to_instance: Subscribing to {self._bo_type.__name__} "
-            f"with{' conditions ' + str(self._conditions) if self._conditions else 'out conditions'}"
+            f"{'with conditions ' + str(self._conditions) if self._conditions else 'without conditions'}"
         )
         instance_subscription_id = super().subscribe_to_instance(callback)
         if self._subscription_id is None:

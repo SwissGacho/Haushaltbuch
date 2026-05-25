@@ -41,8 +41,6 @@ class BOSubscription(Generic[T], WSMessageSender):
             f"BOSubscription.__init__({bo_type=}, {index=}, connection={str(connection)})"
         )
 
-        WSMessageSender.__init__(self, connection=connection)
-
         if isinstance(bo_type, str):
             # LOG.debug(f"BOSubscription.__init__: Resolving bo_type from string {bo_type}")
             try:
@@ -60,7 +58,17 @@ class BOSubscription(Generic[T], WSMessageSender):
         self._bo_type: Type[T] = bo_type
         self._instance_subscriptions: dict[int, T] = {}
         self._obj: T | None = None
-        self._initialize_subscriptions(index=index, **kwargs)
+
+        WSMessageSender.__init__(self, connection=connection)
+
+        try:
+            self._initialize_subscriptions(index=index, **kwargs)
+        except Exception as e:
+            connection.unregister_message_sender(self)
+            LOG.error(
+                f"BOSubscription.__init__: Failed to initialize subscriptions: {e}"
+            )
+            raise
         connection.unregister_other_senders(self)
         if notify_subscribers_on_init:
             asyncio.create_task(self.notify_subscription_subscribers())
