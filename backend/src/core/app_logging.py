@@ -109,7 +109,8 @@ def log_entry(logger, module_name: str):
         if module_name != "__main__":
             entered_modules.append(module_name)
         logger.debug(
-            f"Enter module {module_name:>35}, entered modules: {', '.join(entered_modules)}"
+            f"Enter module {module_name.split('.')[-1]:>35}, "
+            f"entered modules: {', '.join([m.split('.')[-1] for m in entered_modules])}"
         )
 
 
@@ -125,7 +126,8 @@ def log_exit(logger):
         if module_name in entered_modules:
             entered_modules.remove(module_name)
         logger.debug(
-            f"Exit module  {module_name:>35}, entered modules: {', '.join(entered_modules)}"
+            f"Exit module  {module_name.split('.')[-1]:>35}, "
+            f"entered modules: {', '.join([m.split('.')[-1] for m in entered_modules])}"
         )
 
 
@@ -138,7 +140,7 @@ def getLogger(  # pylint: disable=invalid-name
     )
 
     if _LOG_MODULE_ENTRY:
-        log_entry(logger, name.split(".")[-1])
+        log_entry(logger, name)
     return logger
 
 
