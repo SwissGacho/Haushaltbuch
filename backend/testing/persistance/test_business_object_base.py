@@ -2,7 +2,7 @@
 
 import datetime
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import AttributeDescription, BOBase
@@ -261,8 +261,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(second_unsubscribe)
 
     def test_113_subscribe_to_all_changes(self):
-        callback = Mock()
-        callback.__name__ = "callback"
+        callback = AsyncMock()
         subscriber_id = MockBO2.subscribe_to_all_changes(callback)
         self.assertEqual(
             MockBO2._change_subscribers[subscriber_id],
@@ -270,8 +269,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_114_unsubscribe_from_all_changes(self):
-        callback = Mock()
-        callback.__name__ = "callback"
+        callback = AsyncMock()
         subscriber_id = MockBO2.subscribe_to_all_changes(callback)
         MockBO2.unsubscribe_from_all_changes(subscriber_id)
         self.assertNotIn(subscriber_id, MockBO2._change_subscribers)
@@ -281,8 +279,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
     def test_115_subscribe_to_instance(self):
         bo_instance = MockBO2()
         bo_instance.id = 1
-        callback = Mock()
-        callback.__name__ = "callback"
+        callback = AsyncMock()
         subscriber_id = bo_instance.subscribe_to_instance(callback)
         self.assertEqual(
             bo_instance._instance_subscribers[subscriber_id],
@@ -292,8 +289,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
     def test_116_unsubscribe_from_instance(self):
         bo_instance = MockBO2()
         bo_instance.id = 1
-        callback = Mock()
-        callback.__name__ = "callback"
+        callback = AsyncMock()
         subscriber_id = bo_instance.subscribe_to_instance(callback)
         bo_instance.unsubscribe_from_instance(subscriber_id)
         self.assertNotIn(subscriber_id, bo_instance._instance_subscribers)

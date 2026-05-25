@@ -5,7 +5,7 @@
 """
 
 import pprint
-from typing import TypeVar, Any
+from typing import Any
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 

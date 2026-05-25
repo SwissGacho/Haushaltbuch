@@ -5,7 +5,8 @@ subscribes to change events of one concrete business object instance and
 forwards updates to connected clients via WebSocket messages.
 """
 
-from typing import TypeVar
+from typing import TypeVar, Generic, Type, cast
+import asyncio
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
@@ -16,10 +17,6 @@ from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 from business_objects.business_object_base import BOBase
 from business_objects.persistant_business_object import PersistentBusinessObject
-
-
-import asyncio
-from typing import Generic, Type, cast
 
 T = TypeVar("T", bound=BOBase)
 

@@ -39,12 +39,13 @@ class BOList(TransientBusinessObject):
             f"with{' conditions ' + str(self._conditions) if self._conditions else 'out conditions'}"
         )
         instance_subscription_id = super().subscribe_to_instance(callback)
-        self._subscription_id = self._bo_type.subscribe_to_all_changes(callback)
+        if self._subscription_id is None:
+            self._subscription_id = self._bo_type.subscribe_to_all_changes(callback)
         LOG.log(
             VERBOSE_DEBUG,
             f"{str(self)}.subscribe_to_instance: Subscribed to {self._bo_type.__name__}: "
-            f"instance subscription id {instance_subscription_id}; "
-            f"change subscription id {self._subscription_id}",
+            f"instance subscription id = {instance_subscription_id}; "
+            f"change subscription id = {self._subscription_id}",
         )
         return instance_subscription_id
 
@@ -52,7 +53,7 @@ class BOList(TransientBusinessObject):
         LOG.log(
             VERBOSE_DEBUG,
             f"{str(self)}.unsubscribe_from_instance: Unsubscribing from {self._bo_type.__name__} "
-            f"with instance subscription id {callback_id}",
+            f"with instance subscription id = {callback_id}",
         )
         if self._subscription_id is not None:
             self._bo_type.unsubscribe_from_all_changes(self._subscription_id)
