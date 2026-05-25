@@ -9,16 +9,12 @@ import itertools
 from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 import weakref
 
-
-from .bo_semantic_role import BOSemanticRole
-from core.util import _classproperty
-from core.app_logging import getLogger, log_exit
-from core.app import App
+from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
-# pylint: disable=wrong-import-position
-
+from core.util import _classproperty
+from core.app import App
 from business_objects.bo_descriptors import (
     AttributeAccessLevel,
     AttributeDescription,
@@ -28,6 +24,7 @@ from business_objects.bo_descriptors import (
     BOId,
     BODatetime,
 )
+from business_objects.bo_semantic_role import BOSemanticRole
 
 BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 
@@ -78,7 +75,10 @@ class BOBase(BOBaseBase):
 
     # pylint: disable=redefined-builtin, unused-argument
     def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
-        # LOG.debug(f"{self.__class__.__name__}({bo_id=},{attributes})  -  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}")
+        LOG.debug(
+            f"{self.__class__.__name__}.__init__({bo_id=},{attributes})  "
+            f"-  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}"
+        )
         if getattr(self, "_initialized", False):
             # LOG.debug(f"BOBase __init__ called again for {self} with id {self.id}, skipping reinitialization")
             self._init_attrs(attributes)
@@ -128,6 +128,15 @@ class BOBase(BOBaseBase):
         }
 
     @classmethod
+    def navigation_header(
+        cls, ref: AttributeDescription | str | None = None
+    ) -> dict[str, str] | None:
+        """Return a navigation header for this business object class.
+        'ref' can be used to specify a reference name if this BO is referenced by another BO.
+        Return None if this BO should not be included in the navigation."""
+        return None
+
+    @classmethod
     def display_name_components(cls) -> list[str]:
         """Return a list of attribute names that should be used to construct the display name."""
         return [
@@ -150,7 +159,7 @@ class BOBase(BOBaseBase):
     def register_instance(cls, instance: "BOBase"):
         """Register an instance of this class as being loaded from the database."""
         if instance.id is not None:
-            # LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
+            LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
             cls._loaded_instances[instance.id] = instance  # type: ignore
 
     @classmethod
@@ -182,7 +191,7 @@ class BOBase(BOBaseBase):
         )
 
     @classmethod
-    def register_persistant_class(cls):
+    def register_bo_class(cls):
         "Register the Business Object."
         BOBase._business_objects |= {cls._name(): cls}
         LOG.debug(f"registered class '{cls.__name__}' as {cls._name()}")
@@ -325,7 +334,6 @@ class BOBase(BOBaseBase):
     def subscribe_to_all_changes(cls, callback: BOCallback) -> int:
         """Register a callback to be called when any instance of this class changes.
         Return a unique id that can be used to unsubscribe."""
-        # LOG.debug(f"Subscribing callback {callback} to all changes on {cls}")
         if not callable(callback):
             raise ValueError("Callback must be callable")
         # Should only subscribe to subclasses, not to BOBase itself
@@ -335,6 +343,11 @@ class BOBase(BOBaseBase):
             )
         subscriber_id = next(cls._last_subscriber_id)
         cls._change_subscribers[subscriber_id] = callback
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"BOBase.subscribe_to_all_changes: Subscribed callback '{repr(callback)}' "
+            f"with id {subscriber_id} to all changes on {cls.__name__}",
+        )
         BOBase.subscriptions_report()
         return subscriber_id
 
@@ -346,6 +359,11 @@ class BOBase(BOBaseBase):
                 f"Callback id {callback_id} not in change subscribers: {cls._change_subscribers}"
             )
             return
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"BOBase.unsubscribe_from_all_changes: Unsubscribing callback with id {callback_id} "
+            f"from all changes on {cls.__name__}",
+        )
         del cls._change_subscribers[callback_id]
         BOBase.subscriptions_report()
 
@@ -354,6 +372,11 @@ class BOBase(BOBaseBase):
         if not callable(callback):
             raise ValueError("Callback must be callable")
         subscriber_id: int = next(self._instance_subscriber_id)
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"BOBase.subscribe_to_instance: Subscribing callback '{repr(callback)}' "
+            f"with id {subscriber_id} to instance {str(self)} with id {self.id}",
+        )
         self._instance_subscribers[subscriber_id] = callback
         BOBase.subscriptions_report()
         return subscriber_id
@@ -365,6 +388,11 @@ class BOBase(BOBaseBase):
                 f"BOBase.unsubscribe_from_instance_by_id: no subscribers with id {callback_id}"
             )
             return
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"BOBase.unsubscribe_from_instance: Unsubscribing callback "
+            f"with id {callback_id} from instance {str(self)}",
+        )
         del self._instance_subscribers[callback_id]
         BOBase.subscriptions_report()
 
@@ -437,7 +465,7 @@ class BOBase(BOBaseBase):
             for sub in subs.values():
                 s = ""
                 if hasattr(sub, "__self__") and hasattr(sub.__self__, "_obj"):
-                    s += f"{bo_name}({sub.__self__._obj.id}): "
+                    s += f"{str(sub.__self__._obj)}: "
                 s += f"{sub.__self__._connection.connection_context.get('comp',sub.__self__._connection.connection_context.get('socket','unknown'))}"
                 rslt.append(s)
             return rslt
@@ -479,7 +507,9 @@ class BOBase(BOBaseBase):
                         subs_repr(instance._instance_subscribers, bo_name)
                     )
                 else:
-                    subs[bo_name]["instances"].append(f"{instance.id}: no subscribers")
+                    subs[bo_name]["instances"].append(
+                        f"{str(instance)}: no subscribers"
+                    )
         # LOG.debug(f"{subs=}")
         try:
             with open(stats_file, "w", encoding="utf-8") as f:

@@ -2,7 +2,7 @@
 
 import datetime
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import AttributeDescription, BOBase
@@ -201,9 +201,9 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             else:
                 self.assertNotEqual(attr.name, "new_attr")
 
-    def test_103_register_persistant_class(self):
+    def test_103_register_bo_class(self):
         self.assertNotIn("mockbo2", BOBase._business_objects)
-        MockBO2.register_persistant_class()
+        MockBO2.register_bo_class()
         self.assertIn("mockbo2", BOBase._business_objects)
 
     def test_104_all_business_objects(self):
@@ -211,7 +211,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bos, MockBO2.all_business_objects)
 
     def test_105_get_business_object_by_name(self):
-        MockBO2.register_persistant_class()
+        MockBO2.register_bo_class()
         bo_class = BOBase.get_business_object_by_name("mockbo2")
         self.assertEqual(bo_class, MockBO2)
         with self.assertRaises(ValueError):
@@ -261,7 +261,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(second_unsubscribe)
 
     def test_113_subscribe_to_all_changes(self):
-        callback = Mock()
+        callback = AsyncMock()
         subscriber_id = MockBO2.subscribe_to_all_changes(callback)
         self.assertEqual(
             MockBO2._change_subscribers[subscriber_id],
@@ -269,7 +269,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_114_unsubscribe_from_all_changes(self):
-        callback = Mock()
+        callback = AsyncMock()
         subscriber_id = MockBO2.subscribe_to_all_changes(callback)
         MockBO2.unsubscribe_from_all_changes(subscriber_id)
         self.assertNotIn(subscriber_id, MockBO2._change_subscribers)
@@ -279,7 +279,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
     def test_115_subscribe_to_instance(self):
         bo_instance = MockBO2()
         bo_instance.id = 1
-        callback = Mock()
+        callback = AsyncMock()
         subscriber_id = bo_instance.subscribe_to_instance(callback)
         self.assertEqual(
             bo_instance._instance_subscribers[subscriber_id],
@@ -289,7 +289,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
     def test_116_unsubscribe_from_instance(self):
         bo_instance = MockBO2()
         bo_instance.id = 1
-        callback = Mock()
+        callback = AsyncMock()
         subscriber_id = bo_instance.subscribe_to_instance(callback)
         bo_instance.unsubscribe_from_instance(subscriber_id)
         self.assertNotIn(subscriber_id, bo_instance._instance_subscribers)
@@ -373,7 +373,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             )
 
     def test_118_get_business_object_by_name(self):
-        MockBO2.register_persistant_class()
+        MockBO2.register_bo_class()
         self.assertEqual(BOBase.get_business_object_by_name("mockbo2"), MockBO2)
         with self.assertRaises(ValueError):
             BOBase.get_business_object_by_name("non_existent_bo")

@@ -7,11 +7,12 @@ from datetime import date, datetime
 import sys
 from typing import Any
 
-from business_objects.bo_semantic_role import BOSemanticRole
-from business_objects.business_attribute_base import BaseFlag
-from core.app_logging import getLogger
+from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
+
+from business_objects.bo_semantic_role import BOSemanticRole
+from business_objects.business_attribute_base import BaseFlag
 
 
 class AttributeType(StrEnum):
@@ -80,6 +81,15 @@ class BOBaseBase:
         **flag_values,
     ):
         "Register an attribute in the business object descriptor"
+
+    @classmethod
+    def navigation_header(
+        cls, ref: AttributeDescription | str | None = None
+    ) -> dict[str, str] | None:
+        """Return a navigation header for this business object class.
+        'ref' can be used to specify a reference name if this BO is referenced by another BO.
+        Return None if this BO should not be included in the navigation."""
+        raise NotImplementedError
 
     @classmethod
     def attribute_descriptions(cls) -> list[AttributeDescription]:
@@ -410,3 +420,6 @@ class BOFlag(_PersistantAttr[Flag]):
             value = self._constraint_values["flag_type"].flags(value)
         # LOG.debug(f"   converted BOFlag to {value}")
         super().__set__(obj=obj, value=value)
+
+
+log_exit(LOG)

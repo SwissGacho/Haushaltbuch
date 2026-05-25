@@ -47,22 +47,22 @@ class Test_100_Data_Package(unittest.TestCase):
             mock_path.parent = mock_base_path
             Mock_Path.return_value = mock_path
 
-            mock_reg_cls_1 = Mock(name="mock_register_persistant_class")
+            mock_reg_cls_1 = Mock(name="mock_register_bo_class")
             mock_class1 = type(
                 "MockClass1",
                 (object,),
                 {
                     "__module__": MOCK_PKG1_MOD1,
-                    "register_persistant_class": mock_reg_cls_1,
+                    "register_bo_class": mock_reg_cls_1,
                 },
             )
-            mock_reg_cls_2 = Mock(name="mock_register_persistant_class")
+            mock_reg_cls_2 = Mock(name="mock_register_bo_class")
             mock_class2 = type(
                 "MockClass2",
                 (object,),
                 {
                     "__module__": MOCK_PKG2_MOD2,
-                    "no_register_persistant_class": mock_reg_cls_2,
+                    "no_register_bo_class": mock_reg_cls_2,
                 },
             )
             mock_module1 = Mock(name="mock_module1")
