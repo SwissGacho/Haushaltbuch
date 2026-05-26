@@ -1,7 +1,7 @@
 import unittest
 
 from messages.object_schema import ObjectSchema
-from data.management.user import User
+from data_persistent.management.user import User
 from business_objects.business_attribute_base import BaseFlag
 from business_objects.business_object_base import BOBase
 from business_objects.bo_descriptors import (

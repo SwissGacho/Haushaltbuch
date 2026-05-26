@@ -1,4 +1,5 @@
 """Test suite for general configuration features."""
+
 # pyright: reportPrivateUsage=false
 
 import platform
@@ -12,7 +13,7 @@ from core.configuration.setup_config import SetupConfigValues
 from core.exceptions import ConfigurationError
 from core.status import Status
 import core.configuration.config
-from data.management.user import UserRole
+from data_persistent.management.user import UserRole
 
 
 class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
