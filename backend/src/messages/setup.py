@@ -1,17 +1,17 @@
 """Messages used during application setup"""
 
 from enum import StrEnum
+from core.app_logging import getLogger, log_exit
+
+LOG = getLogger(__name__)
+
+from core.app import App
+from core.configuration.db_config import DBConfig
+from core.configuration.setup_config import ConfigSetup
 from messages.fetch_message import FetchMessage
 from messages.store_message import StoreMessage
 from messages.message import MessageType, MessageAttribute
 from messages.bo_message import ObjectMessage, DataObjectTypes
-from core.app import App
-from core.configuration.db_config import DBConfig
-from core.configuration.setup_config import ConfigSetup
-
-from core.app_logging import getLogger
-
-LOG = getLogger(__name__)
 
 
 class _SetupPayloadKeys(StrEnum):
@@ -73,3 +73,6 @@ class StoreSetupMessage(StoreMessage):
         await ConfigSetup.setup_configuration(
             self.get_dict(MessageAttribute.WS_ATTR_PAYLOAD) or {}
         )
+
+
+log_exit(LOG)
