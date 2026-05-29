@@ -8,7 +8,7 @@ from unittest.mock import Mock, MagicMock, patch, call
 class Test_100_Data_Package(unittest.TestCase):
     def setUp(self):
         # Remove the package/module from sys.modules if it is already imported
-        for mod in ["data"]:
+        for mod in ["data_persistent", "data_transient"]:
             if mod in sys.modules:
                 print(f"{sys.modules[mod]=}")
                 del sys.modules[mod]
@@ -74,10 +74,10 @@ class Test_100_Data_Package(unittest.TestCase):
             mock_import_module.side_effect = [mock_module1, mock_module2]
             mock_import_module.reset_mock()
 
-            import data
+            import data_persistent
+            import data_transient
 
-            Mock_Path.assert_called_once()
-            self.assertRegex(Mock_Path.call_args.args[0], r"\\data\\__init__\.py$")
+            self.assertEqual(Mock_Path.call_count, 2)
             mock_base_path.rglob.assert_called_with("*.py")
             self.assertEqual(
                 mock_abs_path.relative_to.call_count,
