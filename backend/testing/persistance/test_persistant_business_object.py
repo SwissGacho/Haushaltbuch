@@ -3,10 +3,9 @@
 import datetime
 import json
 import unittest
-from unittest import mock
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
-from business_objects.business_object_base import BOBase
+from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.persistant_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import (
     BOStr,
@@ -58,21 +57,33 @@ class MockAttrDesc:
 
 
 mock_attr_desc = [
-    MockAttrDesc("id", int, BOColumnConstraint.BOC_PK_INC, {}),
+    MockAttrDesc(
+        "id", int, BOColumnConstraint.BOC_PK_INC, {"semantic_role": BOSemanticRole.RAW}
+    ),
     MockAttrDesc(
         "last_updated",
         datetime.datetime,
         BOColumnConstraint.BOC_DEFAULT_CURR | BOColumnConstraint.BOC_ON_UPDATE_CURR,
-        {},
+        {"semantic_role": BOSemanticRole.RAW},
     ),
-    MockAttrDesc("mock_attr1", str, BOColumnConstraint.BOC_NONE, {}),
+    MockAttrDesc(
+        "mock_attr1",
+        str,
+        BOColumnConstraint.BOC_NONE,
+        {"semantic_role": BOSemanticRole.RAW},
+    ),
     MockAttrDesc(
         "mock_attr2",
         BOBaseBase,
         BOColumnConstraint.BOC_FK,
-        {"relation": MockPersistantBO1},
+        {"relation": MockPersistantBO1, "semantic_role": BOSemanticRole.RAW},
     ),
-    MockAttrDesc("mock_attr3", list, BOColumnConstraint.BOC_NONE, {}),
+    MockAttrDesc(
+        "mock_attr3",
+        list,
+        BOColumnConstraint.BOC_NONE,
+        {"semantic_role": BOSemanticRole.RAW},
+    ),
 ]
 
 mock_bo2_as_dict = {a.name: a.data_type for a in mock_attr_desc}
@@ -160,6 +171,7 @@ class Test_100_Persistant_Business_Object_classmethods(
             )
             for a in mock_attr_desc
         ]
+        print(f"{mock_sql.column.call_args_list=}, {exp_arglist=}")
         self.assertEqual(mock_sql.column.call_args_list, exp_arglist)
         mock_sql.execute.assert_awaited_once_with()
 
@@ -438,7 +450,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_tx.__aexit__.assert_awaited_once_with(None, None, None)
             self.mock_sql.insert.assert_called_once_with(MOCK_TAB2)
             self.mock_sql.rows.assert_called_once_with(
-                [[(a, mock_attrs[a])] for a in mock_bo2_as_dict if a in mock_attrs]
+                [(a, mock_attrs[a]) for a in mock_bo2_as_dict if a in mock_attrs]
             )
             self.mock_sql.returning.assert_called_once_with("id")
             self.mock_sql.execute.assert_awaited_once_with()

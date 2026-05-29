@@ -8,7 +8,7 @@ import json
 import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
-from core.app_logging import getLogger, log_exit, DEBUG, VERBOSE_DEBUG, redact
+from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG, redact
 
 LOG = getLogger(__name__)
 
