@@ -3,9 +3,9 @@
 import datetime
 import json
 import unittest
+from unittest import mock
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
-from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import BOBase
 from business_objects.persistant_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import (
@@ -58,33 +58,21 @@ class MockAttrDesc:
 
 
 mock_attr_desc = [
-    MockAttrDesc(
-        "id", int, BOColumnConstraint.BOC_PK_INC, {"semantic_role": BOSemanticRole.RAW}
-    ),
+    MockAttrDesc("id", int, BOColumnConstraint.BOC_PK_INC, {}),
     MockAttrDesc(
         "last_updated",
         datetime.datetime,
         BOColumnConstraint.BOC_DEFAULT_CURR | BOColumnConstraint.BOC_ON_UPDATE_CURR,
-        {"semantic_role": BOSemanticRole.RAW},
+        {},
     ),
-    MockAttrDesc(
-        "mock_attr1",
-        str,
-        BOColumnConstraint.BOC_NONE,
-        {"semantic_role": BOSemanticRole.RAW},
-    ),
+    MockAttrDesc("mock_attr1", str, BOColumnConstraint.BOC_NONE, {}),
     MockAttrDesc(
         "mock_attr2",
         BOBaseBase,
         BOColumnConstraint.BOC_FK,
-        {"semantic_role": BOSemanticRole.RAW, "relation": MockPersistantBO1},
+        {"relation": MockPersistantBO1},
     ),
-    MockAttrDesc(
-        "mock_attr3",
-        list,
-        BOColumnConstraint.BOC_NONE,
-        {"semantic_role": BOSemanticRole.RAW},
-    ),
+    MockAttrDesc("mock_attr3", list, BOColumnConstraint.BOC_NONE, {}),
 ]
 
 mock_bo2_as_dict = {a.name: a.data_type for a in mock_attr_desc}
@@ -293,9 +281,6 @@ class Test_100_Persistant_Business_Object_classmethods(
         mock_sql.select = Mock(return_value=mock_sql)
         mock_sql.from_ = Mock(return_value=mock_sql)
         mock_sql.where = Mock(return_value=mock_sql)
-        mock_convert_from_db = Mock(
-            name="convert_from_db", side_effect=lambda value, typ, subtyp: value
-        )
 
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
         mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
@@ -304,10 +289,6 @@ class Test_100_Persistant_Business_Object_classmethods(
         with (
             patch("business_objects.persistant_business_object.SQL", new=MockSQL),
             patch("business_objects.persistant_business_object.Filter") as MockFilter,
-            patch(
-                "business_objects.persistant_business_object.PersistentBusinessObject.convert_from_db",
-                new=mock_convert_from_db,
-            ),
         ):
             result = await MockPersistantBO2.get_matching_objects(
                 mock_conditions, mock_cols
@@ -321,16 +302,6 @@ class Test_100_Persistant_Business_Object_classmethods(
         mock_sql.where.assert_called_once_with(MockFilter())
         mock_sql.execute.assert_awaited_once_with()
         mock_cursor.fetchall.assert_awaited_once_with()
-        convert_args = [
-            call(value, mock_bo2_as_dict[key], mock_bo2_constr_vals[key])
-            for row in mock_fetch_result
-            for key, value in row.items()
-            if key != "id"
-        ]
-        self.assertEqual(
-            mock_convert_from_db.call_count, len(convert_args), "attributes converted"
-        )
-        self.assertEqual(mock_convert_from_db.call_args_list, convert_args)
         self.assertEqual(result, mock_result)
 
     async def test_104_get_matching_objects(self):
@@ -467,7 +438,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_tx.__aexit__.assert_awaited_once_with(None, None, None)
             self.mock_sql.insert.assert_called_once_with(MOCK_TAB2)
             self.mock_sql.rows.assert_called_once_with(
-                [(a, mock_attrs[a]) for a in mock_bo2_as_dict if a in mock_attrs]
+                [[(a, mock_attrs[a])] for a in mock_bo2_as_dict if a in mock_attrs]
             )
             self.mock_sql.returning.assert_called_once_with("id")
             self.mock_sql.execute.assert_awaited_once_with()
