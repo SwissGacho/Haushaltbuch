@@ -4,8 +4,8 @@ from dataclasses import dataclass
 import json
 from enum import EnumType, Flag, StrEnum, auto
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 import sys
-from typing import Any
 
 from core.app_logging import getLogger, log_exit
 
@@ -13,6 +13,7 @@ LOG = getLogger(__name__)
 
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_attribute_base import BaseFlag
+from business_objects.business_rules import validate_money_decimal
 
 
 class AttributeType(StrEnum):
@@ -21,6 +22,7 @@ class AttributeType(StrEnum):
     ATYPE_INT = "int"
     ATYPE_STR = "str"
     ATYPE_DATE = "date"
+    ATYPE_DECIMAL = "decimal"
     ATYPE_DATETIME = "datetime"
     ATYPE_DICT = "dict"
     ATYPE_LIST = "list"
@@ -187,6 +189,35 @@ class BOInt(_PersistantAttr[int]):
 
     def validate(self, value):
         return super().validate(value) or isinstance(value, int)
+
+
+class BODecimal(_PersistantAttr[Decimal]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_DECIMAL
+
+    @classmethod
+    def data_type(cls):
+        return Decimal
+
+    def __set__(self, obj, value) -> None:
+        if isinstance(value, (int, str)):
+            try:
+                value = Decimal(str(value))
+            except (InvalidOperation, ValueError) as exc:
+                raise ValueError(
+                    f"'{value}' invalid to set attribute {self.my_name} of type {self.__class__.__name__}"
+                ) from exc
+        elif isinstance(value, float):
+            value = Decimal(str(value))
+
+        return super().__set__(obj=obj, value=value)
+
+    def validate(self, value):
+        if isinstance(value, Decimal):
+            validate_money_decimal(value)
+        return super().validate(value) or isinstance(value, Decimal)
 
 
 class BOId(BOInt):

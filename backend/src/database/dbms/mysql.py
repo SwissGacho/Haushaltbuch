@@ -1,5 +1,6 @@
 """Connection to MySQL DB using asyncmy"""
 
+from decimal import Decimal
 import ssl
 import datetime
 from typing import Optional, Self
@@ -12,14 +13,20 @@ LOG = getLogger(__name__)
 from core.configuration.config import Config, DBConfig
 from core.exceptions import ConfigurationError, OperationalError
 from core.util_base import get_config_item
-from database.dbms.db_base import DB, Connection, Cursor, DBCursorProtocol
+from core.const import MAX_DECIMAL_TOTAL_DIGITS
+from database.dbms.db_base import (
+    DB,
+    Connection,
+    Cursor,
+    DBCursorProtocol,
+)
 from database.sql_factory import SQLFactory
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript, Insert, Update
 from database.sql_clause import SQLColumnDefinition
 from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
 from business_objects.business_attribute_base import BaseFlag
-
+from business_objects.business_rules import configured_money_scale_digits
 
 try:
     import asyncmy
@@ -83,6 +90,14 @@ def timestamp_datatype(data_type: type, constraints: BOColumnConstraint, **args)
     return "DATETIME"
 
 
+def decimal_datatype(data_type: type, **_args) -> str:
+    if data_type is not Decimal:
+        raise ValueError(f"decimal_datatype called with invalid type {data_type}")
+    digits = configured_money_scale_digits()
+
+    return f"DECIMAL({MAX_DECIMAL_TOTAL_DIGITS},{digits})"
+
+
 class MySQLColumnDefinition(SQLColumnDefinition):
     """Definition of a column in a CREATE TABLE statement for MySQL/MariaDB"""
 
@@ -96,6 +111,7 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         list: MYSQL_JSON_TYPE,
         BOBaseBase: "INT",
         BaseFlag: baseflag_datatype,
+        Decimal: decimal_datatype,
     }
     constraint_map = {
         BOColumnConstraint.BOC_NONE: "",
@@ -123,7 +139,7 @@ class MySQLScript(SQLScript):
                                 CONCAT_WS(' ',
                                     columns.COLUMN_NAME,
                                     CASE WHEN SUBSTR(constraints.CHECK_CLAUSE, 1, 4) = 'json' THEN 'JSON'
-                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit', 'timestamp' ) THEN UPPER(columns.COLUMN_TYPE)
+                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit', 'timestamp', 'decimal' ) THEN UPPER(columns.COLUMN_TYPE)
                                         WHEN columns.DATA_TYPE = 'set' THEN CONCAT('SET ', SUBSTR(columns.COLUMN_TYPE,4))
                                         ELSE UPPER(columns.DATA_TYPE) END,
                                     UPPER(CASE WHEN columns.IS_NULLABLE <> 'YES' AND columns.COLUMN_KEY <> 'PRI' THEN 'NOT NULL' 
@@ -190,6 +206,9 @@ class MySQLDB(DB):
         super().__init__(**cfg)
         self.connection_pool: Optional["Pool"] = None
 
+    def __str__(self) -> str:
+        return f"MySQLDB(host={self._cfg.get(Config.CONFIG_DBHOST)}, db={self._cfg.get(Config.CONFIG_DBDBNAME)}, user={self._cfg.get(Config.CONFIG_DBUSER)})"
+
     async def create_pool(self) -> None:
         """Create connection pool if not exists"""
         if self.connection_pool is not None:
@@ -254,7 +273,7 @@ class MySQLDB(DB):
     async def close(self):
         "Close the connection pool"
         if self.connection_pool:
-            LOG.debug("MySQLDB.close(): Closing connection pool")
+            LOG.debug(f"MySQLDB.close(): Closing connection pool [{self}]")
             # pylint: disable=protected-access
             LOG.debug(
                 f"   {self.connection_pool.freesize} free, {len(self.connection_pool._used)} used, "
@@ -282,7 +301,7 @@ class MySQLConnection(Connection):
             db_version = (
                 await (await sql.script(SQLTemplate.DBVERSION).execute()).fetchone()
             )["version"]
-            LOG.info(f"Connected to DB version {db_version}")
+            LOG.info(f"Connected to DB version {db_version} / [{self._db}]")
         if get_config_item(DBConfig.db_configuration, Config.CONFIG_DB_DB) == "MariaDB":
             if not "MariaDB" in db_version:
                 raise ConfigurationError(
@@ -299,7 +318,7 @@ class MySQLConnection(Connection):
 
     async def connect(self) -> Self:
         "Get connection from pool"
-        # LOG.debug("MySQLConnection.connect()")
+        LOG.debug("MySQLConnection.connect()")
         if asyncmy is None:
             raise ImportError("asyncmy module is not available.")
 

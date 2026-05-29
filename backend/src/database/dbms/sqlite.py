@@ -1,5 +1,6 @@
 """Connection to SQLit DB using aiosqlite"""
 
+from decimal import Decimal
 from typing import Self, Any, Optional
 from datetime import datetime, date, UTC
 from pathlib import Path
@@ -12,6 +13,7 @@ LOG = getLogger(__name__)
 
 from core.exceptions import OperationalError
 from core.configuration.config import Config
+from core.const import MAX_DECIMAL_TOTAL_DIGITS
 from database.dbms.db_base import DB, Connection, Cursor
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript
@@ -20,6 +22,11 @@ from database.sql_factory import SQLFactory
 from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
 from business_objects.persistant_business_object import PersistentBusinessObject
 from business_objects.business_attribute_base import BaseFlag
+from business_objects.business_rules import (
+    configured_money_max_scaled_value,
+    configured_money_scale_digits,
+    configured_money_scale_multiplier,
+)
 
 # pylint: disable=invalid-name
 try:
@@ -49,6 +56,8 @@ SQLITE_JSON_TYPE = "JSON"
 SQLITE_BASEFLAG_TYPE = "FLAG"
 SQLITE_DATE_TYPE = "ISODATE"
 SQLITE_DATETIME_TYPE = "ISODATETIME"
+SQLITE_DECIMAL_TYPE = "DECIMAL"
+MAX_DECIMAL_SCALED_VALUE = configured_money_max_scaled_value()
 
 
 class SQLiteColumnDefinition(SQLColumnDefinition):
@@ -64,6 +73,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         list: SQLITE_JSON_TYPE,
         BOBaseBase: "INTEGER",
         BaseFlag: SQLITE_BASEFLAG_TYPE,
+        Decimal: SQLITE_DECIMAL_TYPE,
     }
     constraint_map = {
         BOColumnConstraint.BOC_NONE: "",
@@ -78,6 +88,19 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
+
+
+def _adapt_decimal(value: Decimal) -> int:
+    digits = configured_money_scale_digits()
+    scale = configured_money_scale_multiplier()
+
+    quantizer = Decimal(1).scaleb(-digits)
+    scaled = int(value.quantize(quantizer) * scale)
+    if abs(scaled) > MAX_DECIMAL_SCALED_VALUE:
+        raise OverflowError(
+            f"Decimal value out of supported range for total precision {MAX_DECIMAL_TOTAL_DIGITS}: {value}"
+        )
+    return scaled
 
 
 def _adapt_dict(value: dict) -> str:
@@ -112,6 +135,10 @@ def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
 
+def _convert_decimal(value: bytes) -> Decimal:
+    return Decimal(int(value)) / Decimal(configured_money_scale_multiplier())
+
+
 def _convert_isodate(value: bytes) -> date:
     return date.fromisoformat(value.decode())
 
@@ -131,10 +158,12 @@ if sqlite3:
     sqlite3.register_adapter(BaseFlag, _adapt_flag)
     sqlite3.register_adapter(date, _adapt_date_iso)
     sqlite3.register_adapter(datetime, _adapt_datetime_iso)
+    sqlite3.register_adapter(Decimal, _adapt_decimal)
 
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
     sqlite3.register_converter(SQLITE_DATE_TYPE, _convert_isodate)
     sqlite3.register_converter(SQLITE_DATETIME_TYPE, _convert_isodatetime)
+    sqlite3.register_converter(SQLITE_DECIMAL_TYPE, _convert_decimal)
 
     # Register adapter for all existing PersistentBusinessObject subclasses recursively
     def _setup_bo_subclasses(cls):

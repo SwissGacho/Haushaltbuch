@@ -83,24 +83,24 @@ class DBConfig(BaseObject):
         cls, cfg_searchpath: Optional[list[Path]] = None, dbcfg_filename: str = ""
     ) -> Optional[dict]:
         "Determine DB configuration from DB config file or commandline"
-        # LOG.debug(f"DBConfig.read_db_config_file({cfg_searchpath=}, {dbcfg_filename=})")
+        LOG.debug(f"DBConfig.read_db_config_file({cfg_searchpath=}, {dbcfg_filename=})")
         searchpath = cfg_searchpath or cls.cfg_searchpath() or []
         cmdline_dbcfg_filename = App.get_config_item(Config.CONFIG_DBCFG_FILE, "")
         if not isinstance(cmdline_dbcfg_filename, (Path, str)):
             raise TypeError("DB configuration filename from commandline")
         dbcfg_file = Path(dbcfg_filename or cmdline_dbcfg_filename)
-        # LOG.debug(f"DBConfig.read_db_config_file: {dbcfg_file=}")
+        LOG.debug(f"DBConfig.read_db_config_file: {dbcfg_file=}")
         try:
             for filename in (
                 [dbcfg_file]
                 if dbcfg_file.is_absolute()
                 else [Path(path, dbcfg_file) for path in searchpath]
             ):
-                # LOG.debug(f"Searching file: {str(filename)}")
+                LOG.debug(f"Searching file: {str(filename)}")
                 try:
                     with open(filename, encoding="utf-8") as cfg_file:
                         db_config_from_cfg_file = json.load(cfg_file)
-                    # LOG.debug(f"Found DB configuration: {db_config_from_cfg_file}")
+                    LOG.debug(f"Found DB configuration: {db_config_from_cfg_file}")
                     cls.db_configuration = db_config_from_cfg_file
                     return db_config_from_cfg_file
                 except FileNotFoundError:
