@@ -1,7 +1,9 @@
 """This message is sent by the frontend when
 a business object should be persisted in the database."""
 
-from core.app_logging import getLogger, log_exit, Logger
+import pprint
+
+from core.app_logging import getLogger, log_exit, Logger, redact, VERBOSE_DEBUG
 
 LOG: Logger = getLogger(__name__)
 
@@ -19,7 +21,14 @@ class StoreMessage(Message):
 
     async def handle_message(self, connection):
         "Handle a StoreMessage"
-        LOG.debug(f"StoreMessage.handle_message {self.message=}")
+        LOG.debug(
+            f"StoreMessage.handle_message: type={self.message.get(MessageAttribute.WS_ATTR_TYPE)}"
+        )
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            for line in pprint.pformat(
+                redact(self.message), indent=4, width=120, compact=True
+            ).splitlines():
+                LOG.log(VERBOSE_DEBUG, f" - {line}")
         object_type_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
         bo_type = BOBase.get_business_object_by_name(str(object_type_name))
         bo_id = self.message.get(MessageAttribute.WS_ATTR_INDEX)

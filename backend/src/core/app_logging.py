@@ -4,6 +4,8 @@ import datetime
 from enum import StrEnum
 import re
 import json
+import pprint
+import copy
 
 import logging
 import logging.config
@@ -173,7 +175,7 @@ def get_context_logger(logger: Logger | ContextLogger, **extra: Any) -> ContextL
     return ContextLogger(logger, extra)
 
 
-logging_dict = {
+default_logging_dict = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
@@ -275,10 +277,11 @@ def disabled(rec):
 
 def configure_logging(log_cfg: dict | None = None):
     """Configure logging from config dict"""
+    log = logging.getLogger(APPNAME + "." + __name__)
     global_default_level = _get_log_config_level(
         log_cfg, LogConfig.CONFIG_LOGGING + "/" + LogConfig.CONFIG_LOG_DEFAULT
     )
-
+    logging_dict = copy.deepcopy(default_logging_dict)
     if global_default_level:
         logging_dict["root"]["level"] = global_default_level
     for logger_item in _get_log_config_keyes(log_cfg):
@@ -291,6 +294,18 @@ def configure_logging(log_cfg: dict | None = None):
         )
         if level.upper() in ["DISABLED", "DISABLE", "OFF"]:
             logging_dict["loggers"][logger.replace("/", ".")] = {"filters": [disabled]}
+        elif level.upper() not in [
+            "VERBOSE_DEBUG",
+            "DEBUG",
+            "INFO",
+            "WARNING",
+            "ERROR",
+            "CRITICAL",
+            "NOTSET",
+        ]:
+            log.error(
+                f"ERROR: Invalid log level '{level}' for logger '{logger}', ignoring"
+            )
         else:
             logging_dict["loggers"][logger.replace("/", ".")] = {
                 "level": level,
@@ -300,14 +315,24 @@ def configure_logging(log_cfg: dict | None = None):
     try:
         logging.config.dictConfig(logging_dict)
     except (ValueError, TypeError, AttributeError, ImportError) as e:
-        print(f"ERROR configuring logging: {e}")
-
-    log = logging.getLogger(APPNAME + "." + __name__)
+        log.error(f"ERROR configuring logging: {e}")
+    if log.isEnabledFor(VERBOSE_DEBUG):
+        log.log(VERBOSE_DEBUG, f"Logging dictConfig:")
+        for line in pprint.pformat(
+            logging_dict, indent=4, width=120, compact=True
+        ).splitlines():
+            log.log(VERBOSE_DEBUG, f" - {line}")
     if log.isEnabledFor(DEBUG):
-        log.debug(
-            f"Logging configured with config:\n{json.dumps((log_cfg or {}).get(LogConfig.CONFIG_LOGGING, {}), indent=4)}"
-        )
-        log.debug("Logging is now reconfigured:")
+        if log.isEnabledFor(VERBOSE_DEBUG):
+            log.log(VERBOSE_DEBUG, f"Logging configured with config:")
+            for line in pprint.pformat(
+                (log_cfg or {}).get(LogConfig.CONFIG_LOGGING, {}),
+                indent=4,
+                width=120,
+                compact=True,
+            ).splitlines():
+                log.log(VERBOSE_DEBUG, f" - {line}")
+        log.debug("Logging is now (re)configured:")
         for l in sorted(
             [
                 f"   {l.name:<65}: {logging.getLevelName(l.level):>8} "

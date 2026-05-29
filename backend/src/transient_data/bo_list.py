@@ -33,6 +33,9 @@ class BOList(TransientBusinessObject):
         self._subscription_id: int | None = None
         super().__init__(**kwargs)
 
+    async def _on_change(self, _: BOBase) -> None:
+        self.notify_instance_subscribers()
+
     def subscribe_to_instance(self, callback: BOCallback) -> int:
         LOG.debug(
             f"{str(self)}.subscribe_to_instance: Subscribing to {self._bo_type.__name__} "
@@ -41,13 +44,9 @@ class BOList(TransientBusinessObject):
         instance_subscription_id = super().subscribe_to_instance(callback)
 
         if self._subscription_id is None:
-
-            async def _on_change(_: BOBase) -> None:
-                self.notify_instance_subscribers()
-
-            # Keep a reference to the callback to avoid accidental GC and for introspection.
-            self._change_callback = _on_change  # type: ignore[attr-defined]
-            self._subscription_id = self._bo_type.subscribe_to_all_changes(_on_change)
+            self._subscription_id = self._bo_type.subscribe_to_all_changes(
+                self._on_change
+            )
 
         LOG.log(
             VERBOSE_DEBUG,

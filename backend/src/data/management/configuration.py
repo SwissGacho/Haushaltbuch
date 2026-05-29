@@ -1,8 +1,6 @@
 """Store app configuration"""
 
-import re
-from tkinter import N
-
+from typing import Any
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
@@ -34,7 +32,7 @@ class Configuration(PersistentBusinessObject):
         return None
 
     @property
-    def configuration_dict(self):
+    def configuration_dict(self) -> dict[str, Any]:
         "Configuration as a dict"
         if not isinstance(self.configuration, dict):
             return {}

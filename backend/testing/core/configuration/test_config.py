@@ -1,4 +1,5 @@
 """Test suite for general configuration features."""
+
 # pyright: reportPrivateUsage=false
 
 import platform
@@ -37,7 +38,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
     def test_301_initialize_configuration_with_db_cfg(self):
         with (
             patch("core.configuration.config.CommandLine") as MockCmdLine,
-            patch("core.configuration.config.DBConfig") as mock_dbcfg,
+            patch("core.configuration.config.FileConfig") as mock_dbcfg,
             patch("core.configuration.config.reconfigure_logging") as mock_reconf_log,
         ):
             MockCmdLine.get_commandline_config = Mock(name="get_commandline_config")
@@ -45,19 +46,19 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             mock_cmdline_cfg = {"Mock": "Config"} | mock_db_cfg
             MockCmdLine.get_commandline_config.return_value = mock_cmdline_cfg
             mock_dbcfg.set_db_configuration = Mock()
-            mock_dbcfg.read_db_config_file = Mock(return_value={})
+            mock_dbcfg.read_file_config_file = Mock(return_value={})
 
             self.config_obj.initialize_configuration()
 
             self.assertEqual(self.config_obj.cmdline_configuration(), mock_cmdline_cfg)
             mock_dbcfg.set_db_configuration.assert_called_once_with(mock_db_cfg)
-            mock_dbcfg.read_db_config_file.assert_not_called()
+            mock_dbcfg.read_file_config_file.assert_not_called()
             mock_reconf_log.assert_called_once_with()
 
     def test_302_initialize_configuration_no_db_cfg(self):
         with (
             patch("core.configuration.config.CommandLine") as MockCmdLine,
-            patch("core.configuration.config.DBConfig") as mock_dbcfg,
+            patch("core.configuration.config.FileConfig") as mock_dbcfg,
             patch("core.configuration.config.reconfigure_logging") as mock_reconf_log,
         ):
             MockCmdLine.get_commandline_config = Mock(name="get_commandline_config")
@@ -65,13 +66,13 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             mock_cmdline_cfg = {"Mock": "Config"} | mock_db_cfg
             MockCmdLine.get_commandline_config.return_value = mock_cmdline_cfg
             mock_dbcfg.set_db_configuration = Mock()
-            mock_dbcfg.read_db_config_file = Mock(return_value={})
+            mock_dbcfg.read_file_config_file = Mock(return_value={})
 
             self.config_obj.initialize_configuration()
 
             self.assertEqual(self.config_obj.cmdline_configuration(), mock_cmdline_cfg)
             mock_dbcfg.set_db_configuration.assert_not_called()
-            mock_dbcfg.read_db_config_file.assert_called_once_with()
+            mock_dbcfg.read_file_config_file.assert_called_once_with()
             mock_reconf_log.assert_called_once_with()
 
     async def _400_get_configuration_from_db(

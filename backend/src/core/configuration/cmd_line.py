@@ -70,7 +70,7 @@ class CommandLine:
         if unknown and not _is_test_runner_context():
             parser.error(f"unrecognized arguments: {' '.join(unknown)}")
 
-        cls.parsed_commandline = {dbcfg_file_key: args.dbcfg_file}
+        cls.parsed_commandline = {dbcfg_file_key: str(args.dbcfg_file)}
         for arg in args.cfg:
             if "=" not in arg:
                 continue
@@ -80,4 +80,10 @@ class CommandLine:
 
     @classmethod
     def get_commandline_config(cls) -> dict[str, Any]:
+        """Get the commandline configuration as a dictionary."""
         return cls.parsed_commandline
+
+    @classmethod
+    def set_commandline_config(cls, config: dict[str, Any]):
+        """Set the commandline configuration as a dictionary."""
+        cls.parsed_commandline = config

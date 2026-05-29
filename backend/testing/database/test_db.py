@@ -1,11 +1,11 @@
-""" Test suite for the DB context manager """
+"""Test suite for the DB context manager"""
 
 import logging
 import unittest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
 from contextlib import _AsyncGeneratorContextManager
-from ...src.core.configuration.db_config import DBConfig
+from ...src.core.configuration.file_config import FileConfig
 from core.status import Status
 from core.configuration.config import Config
 import database.db_manager
@@ -15,7 +15,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.MockApp = Mock(name="MockApp")
         self.MockApp.status = Status.STATUS_DB_CFG
-        self.MockDBConfig = Mock(name="DBConfig")
+        self.MockFileConfig = Mock(name="FileConfig")
         self.mockdbpackage = Mock()
         self.mock_db = AsyncMock(name="db")
         self.MockSQLiteDB = Mock(name="DB", return_value=self.mock_db)
@@ -24,7 +24,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         self.patch = patch.multiple(
             "database.db_manager",
             App=self.MockApp,
-            DBConfig=self.MockDBConfig,
+            FileConfig=self.MockFileConfig,
             SQLiteDB=self.MockSQLiteDB,
             MySQLDB=self.MockMySQLDB,
             check_db_schema=self.mock_check_db_schema,
@@ -48,7 +48,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             self.mock_db.close.assert_not_called()
 
     async def test_001_get_db_invalid_db_config(self):
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: {"invalid": "Config"}}
+        self.MockFileConfig.db_configuration = {Config.CONFIG_DB: {"invalid": "Config"}}
 
         with self.patch:
             ctx_mgr = database.db_manager.get_db()
@@ -70,7 +70,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             "db": "SQLite",
             "file": self.mock_db_filename,
         }
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: self.db_config}
+        self.MockFileConfig.db_configuration = {Config.CONFIG_DB: self.db_config}
         with self.patch:
             # test creation of context manager
             ctx_mgr = database.db_manager.get_db()
@@ -98,7 +98,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             "db": "SQLite",
             "file": self.mock_db_filename,
         }
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: self.db_config}
+        self.MockFileConfig.db_configuration = {Config.CONFIG_DB: self.db_config}
         self.MockSQLiteDB.side_effect = ModuleNotFoundError(
             "No module named 'aiosqlite'"
         )
@@ -135,7 +135,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             Config.CONFIG_DBUSER: "mockUser",
             Config.CONFIG_DBPW: "mockPW",
         }
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: self.mock_db_config}
+        self.MockFileConfig.db_configuration = {Config.CONFIG_DB: self.mock_db_config}
         with self.patch:
             # test creation of context manager
             ctx_mgr = database.db_manager.get_db()
@@ -166,7 +166,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             Config.CONFIG_DBUSER: "mockUser",
             Config.CONFIG_DBPW: "mockPW",
         }
-        self.MockDBConfig.db_configuration = {Config.CONFIG_DB: self.mock_db_config}
+        self.MockFileConfig.db_configuration = {Config.CONFIG_DB: self.mock_db_config}
         self.MockMySQLDB.side_effect = ModuleNotFoundError("No module named 'aiomysql'")
         with self.patch:
             # test creation of context manager

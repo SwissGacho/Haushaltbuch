@@ -215,6 +215,7 @@ class PersistentBusinessObject(BOBase):
                     description.constraint_values,
                 )
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
+        self.register_instance(self)
         return self
 
     async def store(self):
@@ -279,7 +280,10 @@ class PersistentBusinessObject(BOBase):
                 if changes:
                     await update.execute()
             finally:
-                await self.fetch()
+                fetch = (
+                    txaction.sql().select().from_(self.table).where(Eq("id", self.id))
+                )
+                await fetch.execute()
 
 
 log_exit(LOG)
