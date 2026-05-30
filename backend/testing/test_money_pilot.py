@@ -56,7 +56,8 @@ class Test_Main(unittest.IsolatedAsyncioTestCase):
             name="aio2thread", return_value=AsyncMock(name="kb_watcher")
         )
         MockApp = Mock(name="App")
-        MockApp.configuration.get = Mock(name="configuration.get")
+        # MockApp.configuration.get = Mock(name="configuration.get")
+        MockApp.configuration = {}
         MockApp.status_object.version = "mock development"
         MockApp.db_ready = AsyncMock(name="db_ready")
         # MockApp.db_request_restart.wait = AsyncMock(

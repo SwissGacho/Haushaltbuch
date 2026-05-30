@@ -547,7 +547,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             id = self.mock_bo.id
 
             if exception:
-                self.mock_sql.execute.side_effect = [Exception]
+                self.mock_sql.execute.side_effect = [Exception, None]
                 with self.assertRaises(Exception):
                     await self.mock_bo._update_self()
             else:
@@ -556,8 +556,12 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.MockSQLTx.assert_called_once_with()
             self.mock_tx.__aenter__.assert_awaited_once_with()
             self.mock_sql.update.assert_called_once_with(MOCK_TAB2)
-            MockEq.assert_called_once_with("id", id)
-            self.mock_sql.where.assert_called_once_with(MockEq())
+            self.assertEqual(MockEq.call_count, 2)
+            self.assertEqual(MockEq.call_args_list, [call("id", 55), call("id", 55)])
+            self.assertEqual(self.mock_sql.where.call_count, 2)
+            self.assertEqual(
+                self.mock_sql.where.call_args_list, [call(MockEq()), call(MockEq())]
+            )
             self.mock_bo.attribute_descriptions.assert_called_once_with()
             self.assertEqual(
                 PersistentBusinessObject.convert_from_db.call_count,  # type: ignore
@@ -575,12 +579,12 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             if not last_updated_present:
                 mock_datetime.now.assert_called_once_with()
                 mock_dt.astimezone.assert_called_once_with(datetime.UTC)
-            self.mock_sql.execute.assert_awaited_once_with()
+            self.assertEqual(self.mock_sql.execute.call_count, 2)
+            self.assertEqual(self.mock_sql.execute.call_args_list, [call(), call()])
             if exception:
                 self.mock_tx.__aexit__.assert_awaited_once_with(Exception, ANY, ANY)
             else:
                 self.mock_tx.__aexit__.assert_awaited_once_with(None, None, None)
-            self.mock_bo.fetch.assert_awaited_once()
 
     async def test_205a_update_self(self):
         with self.assertRaises(AssertionError) as exp:

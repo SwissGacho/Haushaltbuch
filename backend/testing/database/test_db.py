@@ -15,7 +15,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.MockApp = Mock(name="MockApp")
         self.MockApp.status = Status.STATUS_DB_CFG
-        self.MockFileConfig = Mock(name="FileConfig")
+        self.MockApp.configuration = Mock(name="FileConfig")
         self.mockdbpackage = Mock()
         self.mock_db = AsyncMock(name="db")
         self.MockSQLiteDB = Mock(name="DB", return_value=self.mock_db)
@@ -24,7 +24,6 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         self.patch = patch.multiple(
             "database.db_manager",
             App=self.MockApp,
-            FileConfig=self.MockFileConfig,
             SQLiteDB=self.MockSQLiteDB,
             MySQLDB=self.MockMySQLDB,
             check_db_schema=self.mock_check_db_schema,
@@ -48,7 +47,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             self.mock_db.close.assert_not_called()
 
     async def test_001_get_db_invalid_db_config(self):
-        self.MockFileConfig.db_configuration = {Config.CONFIG_DB: {"invalid": "Config"}}
+        self.MockApp.configuration = {Config.CONFIG_DB: {"invalid": "Config"}}
 
         with self.patch:
             ctx_mgr = database.db_manager.get_db()
@@ -70,7 +69,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             "db": "SQLite",
             "file": self.mock_db_filename,
         }
-        self.MockFileConfig.db_configuration = {Config.CONFIG_DB: self.db_config}
+        self.MockApp.configuration = {Config.CONFIG_DB: self.db_config}
         with self.patch:
             # test creation of context manager
             ctx_mgr = database.db_manager.get_db()
@@ -98,7 +97,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             "db": "SQLite",
             "file": self.mock_db_filename,
         }
-        self.MockFileConfig.db_configuration = {Config.CONFIG_DB: self.db_config}
+        self.MockApp.configuration = {Config.CONFIG_DB: self.db_config}
         self.MockSQLiteDB.side_effect = ModuleNotFoundError(
             "No module named 'aiosqlite'"
         )
