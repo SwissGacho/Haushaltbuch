@@ -121,9 +121,6 @@ class Test_300_SQLExpression(unittest.TestCase):
             normalize_sql(query),
             "(mockmanaged AND complex AND (NOT (A = b)) AND (mockmanaged OR (D IS NULL)))",
         )
-        print(
-            f"{query=} {self.SQLKeyManager.merge_params.call_count=}, {self.SQLKeyManager.merge_params.call_args_list=}"
-        )
         self.assertEqual(self.SQLKeyManager.merge_params.call_count, 2)
         self.SQLKeyManager.merge_params.assert_any_call(
             query=":param", params={"param": 1}

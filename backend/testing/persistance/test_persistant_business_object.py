@@ -7,7 +7,7 @@ from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import BOBase
-from business_objects.persistant_business_object import PersistentBusinessObject
+from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import (
     BOStr,
     BOList,
@@ -128,7 +128,7 @@ class Test_100_Persistant_Business_Object_classmethods(
         self.assertEqual(str(test_list), str(list_type))
 
         with patch(
-            "business_objects.persistant_business_object.BaseFlag"
+            "business_objects.persistent_business_object.BaseFlag"
         ) as MockBaseFlag:
 
             class MockFlag(MockBaseFlag):  # type: ignore
@@ -152,7 +152,7 @@ class Test_100_Persistant_Business_Object_classmethods(
         MockSQLTx = Mock(name="MockSQL", return_value=mock_tx)
 
         with patch(
-            "business_objects.persistant_business_object.SQLTransaction",
+            "business_objects.persistent_business_object.SQLTransaction",
             new=MockSQLTx,
         ):
             await MockPersistantBO2.sql_create_table()
@@ -190,8 +190,8 @@ class Test_100_Persistant_Business_Object_classmethods(
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
 
         with (
-            patch("business_objects.persistant_business_object.SQL", new=MockSQL),
-            patch("business_objects.persistant_business_object.Filter") as MockFilter,
+            patch("business_objects.persistent_business_object.SQL", new=MockSQL),
+            patch("business_objects.persistent_business_object.Filter") as MockFilter,
         ):
             result = await MockPersistantBO2.count_rows(mock_conditions)
         MockSQL.assert_called_once_with()
@@ -221,8 +221,8 @@ class Test_100_Persistant_Business_Object_classmethods(
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
 
         with (
-            patch("business_objects.persistant_business_object.SQL", new=MockSQL),
-            patch("business_objects.persistant_business_object.Filter") as MockFilter,
+            patch("business_objects.persistent_business_object.SQL", new=MockSQL),
+            patch("business_objects.persistent_business_object.Filter") as MockFilter,
         ):
             result = await MockPersistantBO2.get_matching_ids(mock_conditions)
         MockSQL.assert_called_once_with()
@@ -302,10 +302,10 @@ class Test_100_Persistant_Business_Object_classmethods(
         mock_sql.__aexit__ = AsyncMock(return_value=None)
 
         with (
-            patch("business_objects.persistant_business_object.SQL", new=MockSQL),
-            patch("business_objects.persistant_business_object.Filter") as MockFilter,
+            patch("business_objects.persistent_business_object.SQL", new=MockSQL),
+            patch("business_objects.persistent_business_object.Filter") as MockFilter,
             patch(
-                "business_objects.persistant_business_object.PersistentBusinessObject.convert_from_db",
+                "business_objects.persistent_business_object.PersistentBusinessObject.convert_from_db",
                 new=mock_convert_from_db,
             ),
         ):
@@ -374,7 +374,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.MockSQLTx = Mock(name="MockSQL", return_value=self.mock_tx)
 
     async def test_201_fetch_none(self):
-        with patch("business_objects.persistant_business_object.SQL", new=self.MockSQL):
+        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
             self.mock_bo.id = None
             result = await self.mock_bo.fetch()
             self.MockSQL.assert_not_called()
@@ -382,9 +382,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def _202_fetch(self, patch_exp, exp_params, newest=DEFAULT):
         with (
-            patch("business_objects.persistant_business_object.SQL", new=self.MockSQL),
+            patch("business_objects.persistent_business_object.SQL", new=self.MockSQL),
             patch(
-                "business_objects.persistant_business_object." + patch_exp
+                "business_objects.persistent_business_object." + patch_exp
             ) as MockExp,
         ):
             if newest == DEFAULT:
@@ -456,11 +456,11 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         mock_attrs |= {"mock_attr1": mock_attr1, "mock_attr3": mock_attr3}
         with (
             patch(
-                "business_objects.persistant_business_object.SQLTransaction",
+                "business_objects.persistent_business_object.SQLTransaction",
                 new=self.MockSQLTx,
             ),
             patch(
-                "business_objects.persistant_business_object.PersistentBusinessObject._fetch_self"
+                "business_objects.persistent_business_object.PersistentBusinessObject._fetch_self"
             ) as mock_fetch_self,
         ):
             mock_bo = MockPersistantBO2(**mock_attrs)
@@ -501,20 +501,20 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         )
         with (
             patch(
-                "business_objects.persistant_business_object.SQLTransaction",
+                "business_objects.persistent_business_object.SQLTransaction",
                 new=self.MockSQLTx,
             ),
-            patch("business_objects.persistant_business_object.Value") as MockValue,
-            patch("business_objects.persistant_business_object.Eq") as MockEq,
+            patch("business_objects.persistent_business_object.Value") as MockValue,
+            patch("business_objects.persistent_business_object.Eq") as MockEq,
             patch(
-                "business_objects.persistant_business_object.PersistentBusinessObject.convert_from_db",
+                "business_objects.persistent_business_object.PersistentBusinessObject.convert_from_db",
                 new=mock_convert_from_db,
             ),
             patch(
-                "business_objects.persistant_business_object.PersistentBusinessObject._fetch_self"
+                "business_objects.persistent_business_object.PersistentBusinessObject._fetch_self"
             ) as mock_fetch_self,
             patch(
-                "business_objects.persistant_business_object.datetime"
+                "business_objects.persistent_business_object.datetime"
             ) as mock_datetime,
         ):
             convert_args = [
@@ -565,7 +565,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.MockSQLTx.assert_called_once_with()
             self.mock_tx.__aenter__.assert_awaited_once_with()
             self.mock_sql.update.assert_called_once_with(MOCK_TAB2)
-            MockEq.assert_called_once_with("id", 55)
+            MockEq.assert_called_once_with("id", id)
             self.mock_sql.where.assert_called_once_with(MockEq())
             self.mock_bo.attribute_descriptions.assert_called_once_with()
             self.assertEqual(

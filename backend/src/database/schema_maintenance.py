@@ -8,13 +8,12 @@ LOG = getLogger(__name__)
 
 import core.app
 from core.exceptions import DBSchemaError, DataError, OperationalError
-from business_objects.persistant_business_object import PersistentBusinessObject
+from business_objects.persistent_business_object import PersistentBusinessObject
 import database
 import database.dbms.db_base
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
 from data.management.db_schema import DBSchema
-
 
 CURRENT_DB_SCHEMA_VERSION = 1
 COMPATIBLE_DB_SCHEMA_VERSIONS = [1]

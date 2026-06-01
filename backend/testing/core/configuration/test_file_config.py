@@ -71,8 +71,6 @@ class TestFileConfig(unittest.TestCase):
 
             FileConfig._create_cfg_searchpaths()
 
-            print(f"{FileConfig._cfg_searchpath=}")
-
             expct_srch = (
                 [
                     MOCK_PRNT + mock_loc,

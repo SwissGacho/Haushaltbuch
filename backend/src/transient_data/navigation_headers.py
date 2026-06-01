@@ -13,7 +13,7 @@ LOG = getLogger(__name__)
 
 from business_objects.business_object_base import BOBase
 from business_objects.transient_business_object import TransientBusinessObject
-from business_objects.persistant_business_object import PersistentBusinessObject
+from business_objects.persistent_business_object import PersistentBusinessObject
 
 
 class NavigationHeaders(TransientBusinessObject):
@@ -43,8 +43,7 @@ class NavigationHeaders(TransientBusinessObject):
         else:
             navigation_list = [
                 o.navigation_header()
-                for k, o in BOBase.all_business_objects.items()
-                # if issubclass(o, PersistentBusinessObject)
+                for o in BOBase.all_business_objects.values()  # pylint: disable=no-member
             ]
         navigation_list = [item for item in navigation_list if item is not None]
         if LOG.isEnabledFor(VERBOSE_DEBUG):

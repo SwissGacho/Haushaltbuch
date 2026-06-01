@@ -217,8 +217,8 @@ class PersistentBusinessObject(BOBase):
                     description.data_type,
                     description.constraint_values,
                 )
+            self.register_instance(self)
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
-        self.register_instance(self)
 
     async def store(self):
         """Store the business object in the database.

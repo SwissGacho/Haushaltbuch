@@ -207,7 +207,6 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             update_dicts_recursively(expct, copy.deepcopy(cmdln))
 
         result = self.config_obj.configuration()
-        print(f"\n******************Result: {result},   Expected: {expct}")
 
         self.assertEqual(result, expct)
 

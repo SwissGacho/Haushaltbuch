@@ -20,7 +20,6 @@ from core.exceptions import DBSchemaError, ConfigurationError
 from core.app import App
 from core.base_objects import Config
 from core.status import Status
-from core.configuration.file_config import FileConfig
 from core.util import check_environment
 from core.reconfigure_logging import reconfigure_logging
 from database.db_manager import get_db
