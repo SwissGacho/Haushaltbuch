@@ -51,7 +51,6 @@ class BOBase(BOBaseBase):
     def __new__(cls, *args, bo_id: int | None = None, **attributes):
         LOG.log(
             VERBOSE_DEBUG,
-            "++++++++++++++++++++++++++++++++++++++++++++++++++++"
             f"BOBase.__new__({cls.__name__}, {args=}, {bo_id=}, {attributes})",
         )
         if cls is BOBase:

@@ -93,12 +93,19 @@ class FileConfig(BaseObject):
         if not isinstance(cmdline_filecfg_filename, (Path, str)):
             raise TypeError("Invalid file configuration filename from commandline")
         filecfg_file = Path(filecfg_filename or cmdline_filecfg_filename)
-        LOG.debug(f"FileConfig.read_file_config_file: {filecfg_file=}")
+        LOG.debug(
+            f"FileConfig.read_file_config_file: {filecfg_file=} "
+            f"({'absolute' if filecfg_file.is_absolute() else 'relative'}) "
+            f"{len(searchpath)=}"
+        )
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            for pth in searchpath:
+                LOG.log(VERBOSE_DEBUG, f" - {pth}")
         try:
             for filename in (
                 [filecfg_file]
                 if filecfg_file.is_absolute()
-                else [Path(path, filecfg_file) for path in searchpath]
+                else ([Path(path, filecfg_file) for path in searchpath])
             ):
                 LOG.log(VERBOSE_DEBUG, f"Searching file: {str(filename)}")
                 try:
@@ -109,10 +116,10 @@ class FileConfig(BaseObject):
                         f"File configuration file found: {cls.file_config_file_path}"
                     )
                     if LOG.isEnabledFor(VERBOSE_DEBUG):
-                        for line in pprint.pformat(
+                        for pth in pprint.pformat(
                             redact(cfg_from_cfg_file), indent=4, width=120, compact=True
                         ).splitlines():
-                            LOG.log(VERBOSE_DEBUG, f" - {line}")
+                            LOG.log(VERBOSE_DEBUG, f" - {pth}")
                     return cfg_from_cfg_file
                 except FileNotFoundError:
                     continue

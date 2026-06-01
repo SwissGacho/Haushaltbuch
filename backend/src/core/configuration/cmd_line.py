@@ -53,7 +53,7 @@ class CommandLine:
         "Parse the commandline for configuration overrides"
         parser = argparse.ArgumentParser(prog=APPNAME, description=APPDESC)
         parser.add_argument(
-            "-d",
+            "-c",
             "--configuration-file",
             dest=CONFIG_FILECFG_FILE,
             type=Path,
