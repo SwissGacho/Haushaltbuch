@@ -1,4 +1,4 @@
-"""Handle DB configuration"""
+"""Handle File configuration"""
 
 import os
 import platform
@@ -20,16 +20,16 @@ from core.base_objects import BaseObject, Config
 
 
 class FileConfig(BaseObject):
-    "Handling of the DB configuration"
+    "Handling of the configuration read from the config file."
 
     _cfg_searchpath: Optional[list[str]] = None
     _db_locations: Optional[list[str]] = None
-    db_config_file_path: Optional[Path] = None
+    file_config_file_path: Optional[Path] = None
     db_config_lock = Lock()
 
     @classmethod
     def _create_cfg_searchpaths(cls):
-        "Possible locations for DB-configuration and SQLite-DB-file"
+        "Possible locations for file-configuration and SQLite-DB-file"
 
         def _append(l: list[str], p: str | Path):
             s = str(p)
@@ -63,7 +63,7 @@ class FileConfig(BaseObject):
 
     @classmethod
     def cfg_searchpath(cls) -> list[str]:
-        "Searchpath for DB configuration file"
+        "Searchpath for file configuration file"
         if not cls._cfg_searchpath:
             cls._create_cfg_searchpaths()
         return cls._cfg_searchpath or []
@@ -77,35 +77,37 @@ class FileConfig(BaseObject):
 
     @classmethod
     def file_config_file(cls) -> Optional[Path]:
-        "The path of the DB configuration file, if found"
-        return cls.db_config_file_path
+        "The path of the file configuration file, if found"
+        return cls.file_config_file_path
 
     @classmethod
     def read_file_config_file(
-        cls, cfg_searchpath: Optional[list[Path]] = None, dbcfg_filename: str = ""
+        cls, cfg_searchpath: Optional[list[Path]] = None, filecfg_filename: str = ""
     ) -> Optional[dict]:
-        "Determine DB configuration from DB config file or commandline"
+        "Determine configuration from config file or commandline"
         LOG.debug(
-            f"FileConfig.read_file_config_file({cfg_searchpath=}, {dbcfg_filename=})"
+            f"FileConfig.read_file_config_file({cfg_searchpath=}, {filecfg_filename=})"
         )
         searchpath = cfg_searchpath or cls.cfg_searchpath() or []
-        cmdline_dbcfg_filename = App.get_config_item(Config.CONFIG_DBCFG_FILE, "")
-        if not isinstance(cmdline_dbcfg_filename, (Path, str)):
-            raise TypeError("DB configuration filename from commandline")
-        dbcfg_file = Path(dbcfg_filename or cmdline_dbcfg_filename)
-        LOG.debug(f"FileConfig.read_file_config_file: {dbcfg_file=}")
+        cmdline_filecfg_filename = App.get_config_item(Config.CONFIG_FILECFG_FILE, "")
+        if not isinstance(cmdline_filecfg_filename, (Path, str)):
+            raise TypeError("Invalid file configuration filename from commandline")
+        filecfg_file = Path(filecfg_filename or cmdline_filecfg_filename)
+        LOG.debug(f"FileConfig.read_file_config_file: {filecfg_file=}")
         try:
             for filename in (
-                [dbcfg_file]
-                if dbcfg_file.is_absolute()
-                else [Path(path, dbcfg_file) for path in searchpath]
+                [filecfg_file]
+                if filecfg_file.is_absolute()
+                else [Path(path, filecfg_file) for path in searchpath]
             ):
                 LOG.log(VERBOSE_DEBUG, f"Searching file: {str(filename)}")
                 try:
                     with open(filename, encoding="utf-8") as cfg_file:
                         cfg_from_cfg_file = json.load(cfg_file)
-                    cls.db_config_file_path = filename
-                    LOG.debug(f"DB configuration file found: {cls.db_config_file_path}")
+                    cls.file_config_file_path = filename
+                    LOG.debug(
+                        f"File configuration file found: {cls.file_config_file_path}"
+                    )
                     if LOG.isEnabledFor(VERBOSE_DEBUG):
                         for line in pprint.pformat(
                             redact(cfg_from_cfg_file), indent=4, width=120, compact=True
@@ -114,26 +116,28 @@ class FileConfig(BaseObject):
                     return cfg_from_cfg_file
                 except FileNotFoundError:
                     continue
-            LOG.info(f"configuration file {dbcfg_file} not found.")
+            LOG.info(f"configuration file {filecfg_file} not found.")
         except json.JSONDecodeError as exc:
-            LOG.warning(f"Unable to decode configuration from {dbcfg_file}: {exc}")
+            LOG.warning(f"Unable to decode configuration from {filecfg_file}: {exc}")
         except (IsADirectoryError, NotADirectoryError, PermissionError, OSError) as exc:
-            LOG.warning(f"Unable to read configuration from {dbcfg_file}: {exc}")
+            LOG.warning(f"Unable to read configuration from {filecfg_file}: {exc}")
 
     @classmethod
     def write_file_config_file(cls, config: dict) -> bool:
-        "Write the given configuration to the DB configuration file"
-        if not cls.db_config_file_path:
-            LOG.error("No DB configuration file path set. Cannot write configuration.")
+        "Write the given configuration to the file configuration file"
+        if not cls.file_config_file_path:
+            LOG.error(
+                "No file configuration file path set. Cannot write configuration."
+            )
             return False
         try:
-            with open(cls.db_config_file_path, "w", encoding="utf-8") as cfg_file:
+            with open(cls.file_config_file_path, "w", encoding="utf-8") as cfg_file:
                 json.dump(config, cfg_file, indent=4)
-            LOG.debug(f"DB configuration written to {cls.db_config_file_path}")
+            LOG.debug(f"File configuration written to {cls.file_config_file_path}")
             return True
         except (IsADirectoryError, NotADirectoryError, PermissionError, OSError) as exc:
             LOG.warning(
-                f"Unable to write configuration to {cls.db_config_file_path}: {exc}"
+                f"Unable to write configuration to {cls.file_config_file_path}: {exc}"
             )
             return False
 

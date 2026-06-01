@@ -2,8 +2,6 @@
 This is a proxy for the configuration read from the DB and the config file and allows their modifications.
 """
 
-import re
-
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)

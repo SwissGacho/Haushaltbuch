@@ -11,7 +11,7 @@ import logging
 import logging.config
 from logging import Logger, DEBUG, INFO, WARNING, ERROR, CRITICAL
 from typing import Any, MutableMapping
-from core.const import APPNAME, CONFIG_DBCFG_FILE
+from core.const import APPNAME, CONFIG_FILECFG_FILE
 from core.configuration.cmd_line import CommandLine
 from core.util_base import get_config_item
 
@@ -356,7 +356,7 @@ def configure_logging(log_cfg: dict | None = None):
 
 
 # parse commandline for logging config overrides
-parsed_commandline = CommandLine.parse_commandline(dbcfg_file_key=CONFIG_DBCFG_FILE)
+parsed_commandline = CommandLine.parse_commandline(filecfg_file_key=CONFIG_FILECFG_FILE)
 configure_logging(parsed_commandline)
 
 log_exit(logging.getLogger(APPNAME + "." + __name__))

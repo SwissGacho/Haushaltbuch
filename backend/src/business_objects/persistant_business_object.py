@@ -196,18 +196,21 @@ class PersistentBusinessObject(BOBase):
             LOG.debug(f"fetching {self} without id or newest")
             return self
         # LOG.debug(f"fetching {self} with {id=}, {newest=}")
-
         async with SQL() as sql:
-            select = sql.select([], True).from_(self.table)
-            if id is not None:
-                select.where(Eq("id", id))
-            elif newest:
-                select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-            # LOG.debug(f"BOBase.fetch: {select=} // {select.get_sql()=}")
-            self._db_data = await (await select.execute()).fetchone()
+            await self._fetch_self(sql, id=id, newest=newest)
+        return self
+
+    async def _fetch_self(self, sql: SQL, id=None, newest=None):
+        select = sql.select([], True).from_(self.table)
+        if id is not None:
+            select.where(Eq("id", id))
+        elif newest:
+            select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
+        # LOG.debug(f"BOBase._fetch_self: {select=} // {select.get_sql()=}")
+        self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
-            # LOG.debug(f"PersistentBusinessObject.fetch: {self._db_data=}")
+            # LOG.debug(f"PersistentBusinessObject._fetch_self: {self._db_data=}")
             for description in self.attribute_descriptions():
                 self._data[description.name] = PersistentBusinessObject.convert_from_db(
                     self._db_data.get(description.name),
@@ -216,7 +219,6 @@ class PersistentBusinessObject(BOBase):
                 )
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
         self.register_instance(self)
-        return self
 
     async def store(self):
         """Store the business object in the database.
@@ -241,9 +243,6 @@ class PersistentBusinessObject(BOBase):
         ]
         if not values_to_store:
             raise CannotStoreEmptyBO(f"Cannot store {self._data=} as it has no values")
-        for k, v in self._data.items():
-            if k != "id" and v is None:
-                LOG.debug(f"{k=}: {v}")
         LOG.debug(f"Inserting new {self} into DB")
         async with SQLTransaction() as txaction:
             self.id = (
@@ -256,6 +255,8 @@ class PersistentBusinessObject(BOBase):
                     ).execute()
                 ).fetchone()
             ).get("id")
+            # read the new row back to get any default values set by the DB
+            await self._fetch_self(txaction.sql(), id=self.id)
 
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
@@ -280,10 +281,8 @@ class PersistentBusinessObject(BOBase):
                 if changes:
                     await update.execute()
             finally:
-                fetch = (
-                    txaction.sql().select().from_(self.table).where(Eq("id", self.id))
-                )
-                await fetch.execute()
+                # read the row back to get any changes made by the DB (e.g. triggers)
+                await self._fetch_self(txaction.sql(), id=self.id)
 
 
 log_exit(LOG)

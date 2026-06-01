@@ -8,8 +8,8 @@ APPDESC = f"""'{APPNAME}' helps you keeping control over the money you have avai
 FILE_CONFIG_BOID = -1
 CMDLINE_CONFIG_BOID = -2
 
-DBCFG_FILE_NAME = "configuration.json"
-CONFIG_DBCFG_FILE = "dbcfg_file"
+FILECFG_FILE_NAME = "configuration.json"
+CONFIG_FILECFG_FILE = "filecfg_file"
 
 WEBSOCKET_PORT = 8765
 

@@ -15,7 +15,6 @@ from core.util_base import update_dicts_recursively
 
 LOG = getLogger(__name__)
 
-from core.configuration.cmd_line import CommandLine
 from core.configuration.file_config import FileConfig
 from core.const import SINGLE_USER_NAME
 from core.util_base import get_config_item
@@ -24,7 +23,7 @@ from core.app import App
 from core.status import Status
 from core.reconfigure_logging import reconfigure_logging
 from core.exceptions import ConfigurationError
-from core.base_objects import ConfigurationBaseClass, Config, ConfigDict
+from core.base_objects import ConfigurationBaseClass, Config
 from business_objects.business_object_base import BOBase
 from data.management.configuration import Configuration
 from data.management.user import User, UserRole
@@ -41,12 +40,6 @@ class AppConfiguration(ConfigurationBaseClass):
         self._cmdline_configuration: Optional[CmdlineConfiguration] = None
         self._file_configuration: Optional[FileConfiguration] = None
         self._global_configuration: Optional[Configuration] = None
-
-    def cmdline_configuration(self) -> ConfigDict:
-        "Config parsed from commandline"
-        if self._cmdline_configuration:
-            return self._cmdline_configuration.configuration or {}
-        return {}
 
     async def config_change_handler(self, _: BOBase):
         """Handle events from the configuration business objects.

@@ -39,7 +39,7 @@ class FileConfiguration(TransientBusinessObject):
         kwargs["bo_id"] = FILE_CONFIG_BOID
         super().__init__(**kwargs)
         self.configuration = FileConfig.read_file_config_file()
-        self.file_path = str(FileConfig.db_config_file_path) or ""
+        self.file_path = str(FileConfig.file_config_file_path or "")
 
     @property
     def display_name(self) -> str:
@@ -49,9 +49,9 @@ class FileConfiguration(TransientBusinessObject):
     async def store(self):
         """User changed the config file configuration. Adapt the configuration for this run."""
         LOG.debug("FileConfiguration.store(): Storing configuration file.")
-        if self.file_path != str(FileConfig.db_config_file_path):
+        if self.file_path != str(FileConfig.file_config_file_path):
             LOG.warning(
-                f"FileConfiguration.store: File path changed from {FileConfig.db_config_file_path} to {self.file_path}. "
+                f"FileConfiguration.store: File path changed from {FileConfig.file_config_file_path} to {self.file_path}. "
                 f"However, changing the config file path is not supported. Ignoring the new file path."
             )
         if LOG.isEnabledFor(VERBOSE_DEBUG):
