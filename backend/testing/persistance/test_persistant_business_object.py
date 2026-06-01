@@ -454,9 +454,14 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self, mock_attr1="micki mock", mock_attr3=[], **mock_attrs
     ):
         mock_attrs |= {"mock_attr1": mock_attr1, "mock_attr3": mock_attr3}
-        with patch(
-            "business_objects.persistant_business_object.SQLTransaction",
-            new=self.MockSQLTx,
+        with (
+            patch(
+                "business_objects.persistant_business_object.SQLTransaction",
+                new=self.MockSQLTx,
+            ),
+            patch(
+                "business_objects.persistant_business_object.PersistentBusinessObject._fetch_self"
+            ) as mock_fetch_self,
         ):
             mock_bo = MockPersistantBO2(**mock_attrs)
 
@@ -473,6 +478,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_sql.execute.assert_awaited_once_with()
             self.mock_cursor.fetchone.assert_awaited_once_with()
             self.assertEqual(mock_bo.id, self.FETCH_RESULT["id"])
+            mock_fetch_self.assert_awaited_once_with(self.mock_sql, id=mock_bo.id)
 
     async def test_204a_insert_self(self):
         with self.assertRaises(AssertionError):
@@ -504,6 +510,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 "business_objects.persistant_business_object.PersistentBusinessObject.convert_from_db",
                 new=mock_convert_from_db,
             ),
+            patch(
+                "business_objects.persistant_business_object.PersistentBusinessObject._fetch_self"
+            ) as mock_fetch_self,
             patch(
                 "business_objects.persistant_business_object.datetime"
             ) as mock_datetime,
@@ -556,12 +565,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.MockSQLTx.assert_called_once_with()
             self.mock_tx.__aenter__.assert_awaited_once_with()
             self.mock_sql.update.assert_called_once_with(MOCK_TAB2)
-            self.assertEqual(MockEq.call_count, 2)
-            self.assertEqual(MockEq.call_args_list, [call("id", 55), call("id", 55)])
-            self.assertEqual(self.mock_sql.where.call_count, 2)
-            self.assertEqual(
-                self.mock_sql.where.call_args_list, [call(MockEq()), call(MockEq())]
-            )
+            MockEq.assert_called_once_with("id", 55)
+            self.mock_sql.where.assert_called_once_with(MockEq())
             self.mock_bo.attribute_descriptions.assert_called_once_with()
             self.assertEqual(
                 PersistentBusinessObject.convert_from_db.call_count,  # type: ignore
@@ -579,8 +584,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             if not last_updated_present:
                 mock_datetime.now.assert_called_once_with()
                 mock_dt.astimezone.assert_called_once_with(datetime.UTC)
-            self.assertEqual(self.mock_sql.execute.call_count, 2)
-            self.assertEqual(self.mock_sql.execute.call_args_list, [call(), call()])
+            self.mock_sql.execute.assert_awaited_once_with()
+            mock_fetch_self.assert_awaited_once_with(self.mock_sql, id=id)
             if exception:
                 self.mock_tx.__aexit__.assert_awaited_once_with(Exception, ANY, ANY)
             else:

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 from asyncio import Lock
 
-from core.app_logging import getLogger, log_exit, redact, VERBOSE_DEBUG
+from core.app_logging import getLogger, log_exit, redact, DEBUG, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
@@ -93,11 +93,12 @@ class FileConfig(BaseObject):
         if not isinstance(cmdline_filecfg_filename, (Path, str)):
             raise TypeError("Invalid file configuration filename from commandline")
         filecfg_file = Path(filecfg_filename or cmdline_filecfg_filename)
-        LOG.debug(
-            f"FileConfig.read_file_config_file: {filecfg_file=} "
-            f"({'absolute' if filecfg_file.is_absolute() else 'relative'}) "
-            f"{len(searchpath)=}"
-        )
+        if LOG.isEnabledFor(DEBUG):
+            LOG.debug(
+                f"FileConfig.read_file_config_file: {filecfg_file=} "
+                f"({'absolute' if filecfg_file.is_absolute() else 'relative'}) "
+                f"{len(searchpath)=}"
+            )
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             for pth in searchpath:
                 LOG.log(VERBOSE_DEBUG, f" - {pth}")
