@@ -15,7 +15,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.MockApp = Mock(name="MockApp")
         self.MockApp.status = Status.STATUS_DB_CFG
-        self.MockApp.configuration = Mock(name="FileConfig")
+        self.MockApp.configuration = Mock(name="AppConfig")
         self.mockdbpackage = Mock()
         self.mock_db = AsyncMock(name="db")
         self.MockSQLiteDB = Mock(name="DB", return_value=self.mock_db)

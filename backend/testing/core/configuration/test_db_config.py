@@ -1,7 +1,8 @@
-"""Test suite for DB related configuration."""
+"""Test suite for file related configuration."""
 
 import sys
 import asyncio
+from pathlib import Path
 
 import unittest
 from unittest.mock import Mock, patch, mock_open, ANY, DEFAULT
@@ -19,7 +20,7 @@ MOCK_JOINED = "/joined/"
 class MockPath:
     def __init__(self, p, p2="") -> None:
         self.path = str(p)
-        if p2:
+        if str(p2):
             self.path += "/+/" + str(p2)
         self.parent = MOCK_PRNT + str(p)
 
@@ -46,7 +47,7 @@ class TestFileConfig(unittest.TestCase):
         MockPath.is_absolute.reset_mock()
         FileConfig._cfg_searchpath = None
         FileConfig._db_locations = None
-        FileConfig.db_configuration = None
+        FileConfig.file_config_file_path = None
         return super().setUp()
 
     def _200_create_cfg_searchpaths(self, win=True, mock_loc="mock_location"):
@@ -144,20 +145,20 @@ class TestFileConfig(unittest.TestCase):
         mock_crt_paths.assert_called_once_with()
         self.assertEqual(result, [])
 
-    def test_501_set_db_configuration(self):
-        mock_config = {"Mick": "Mack"}
-        FileConfig.set_db_configuration(mock_config)
-        self.assertEqual(FileConfig.db_configuration, mock_config)
+    def test_501_file_config_file(self):
+        mock_path = Path("mock_path_to_config_file")
+        FileConfig.file_config_file_path = mock_path
+        result = FileConfig.file_config_file()
+        self.assertEqual(result, mock_path)
 
-    def _600_read_db_config_file(
+    def _600_read_file_config_file(
         self,
         cfg_s_pth=[MockPath("mopa1"), MockPath("mopa2")],
         cls_cfg_s_pth=[MockPath("moclspa1"), MockPath("moclspa2")],
-        db_cfg_fn="",
+        file_cfg_fn="",
         cmd_fn="",
         not_found_count=1,
     ):
-        mock_cfg_file = "Mock-CONFIG_DBCFG_FILE"
         mock_cfg_from_file = {"mock": "CFG from file"}
         with (
             patch(
@@ -172,17 +173,17 @@ class TestFileConfig(unittest.TestCase):
             patch("json.load") as mock_json_load,
         ):
             mock_srch_path.return_value = cls_cfg_s_pth
-            MockApp.get_config_item = Mock(return_value=cmd_fn)
-            db_cfg_abs = (db_cfg_fn or cmd_fn or "")[-3:] == "abs"
-            MockPath.is_absolute.return_value = db_cfg_abs
-            path_len = 1 if db_cfg_abs else len(cfg_s_pth or cls_cfg_s_pth)
+            MockApp.get_config_item = Mock(name="get_config_item", return_value=cmd_fn)
+            file_cfg_abs = (file_cfg_fn or cmd_fn or "")[-3:] == "abs"
+            MockPath.is_absolute.return_value = file_cfg_abs
+            path_len = 1 if file_cfg_abs else len(cfg_s_pth or cls_cfg_s_pth)
             side_effect = [FileNotFoundError] * not_found_count
             side_effect.append(DEFAULT)
             mock_file_open.side_effect = side_effect
             mock_json_load.return_value = mock_cfg_from_file
 
-            FileConfig.read_file_config_file(
-                cfg_searchpath=cfg_s_pth, dbcfg_filename=db_cfg_fn
+            result = FileConfig.read_file_config_file(
+                cfg_searchpath=cfg_s_pth, filecfg_filename=file_cfg_fn
             )
 
             if not cfg_s_pth:
@@ -190,7 +191,7 @@ class TestFileConfig(unittest.TestCase):
             else:
                 mock_srch_path.assert_not_called()
             MockApp.get_config_item.assert_called_once_with(
-                Config.CONFIG_DBCFG_FILE, ""
+                Config.CONFIG_FILECFG_FILE, ""
             )
             MockPath.is_absolute.assert_called_once_with()
             self.assertEqual(
@@ -201,19 +202,31 @@ class TestFileConfig(unittest.TestCase):
             self.assertTrue(isinstance(par1, MockPath))
             if path_len > not_found_count:
                 mock_json_load.assert_called_once_with(mock_file_open.return_value)
-                self.assertEqual(FileConfig.db_configuration, mock_cfg_from_file)
+                found_fn = (
+                    (file_cfg_fn or cmd_fn)
+                    if file_cfg_abs
+                    else MockPath(
+                        (cfg_s_pth or cls_cfg_s_pth)[not_found_count],
+                        file_cfg_fn or cmd_fn,
+                    )
+                )
+                self.assertEqual(str(FileConfig.file_config_file_path), str(found_fn))
+                self.assertEqual(result, mock_cfg_from_file)
             else:
                 mock_json_load.assert_not_called()
                 self.assertIsNone(
-                    FileConfig.db_configuration,
+                    FileConfig.file_config_file_path,
                     msg="Configuration should not be set",
                 )
+                self.assertIsNone(
+                    result, msg="Result should be None if config file not found"
+                )
 
-    def test_601_read_db_config_file(self):
-        self._600_read_db_config_file()
+    def test_601_read_file_config_file(self):
+        self._600_read_file_config_file()
 
-    def test_602_read_db_config_file_serchpath(self):
-        self._600_read_db_config_file(
+    def test_602_read_file_config_file_serchpath(self):
+        self._600_read_file_config_file(
             cfg_s_pth=[
                 MockPath("mopa1"),
                 MockPath("mopa2"),
@@ -223,8 +236,8 @@ class TestFileConfig(unittest.TestCase):
             not_found_count=2,
         )
 
-    def test_603_read_db_config_file_class_searchpath(self):
-        self._600_read_db_config_file(
+    def test_603_read_file_config_file_class_searchpath(self):
+        self._600_read_file_config_file(
             cfg_s_pth=None,
             cls_cfg_s_pth=[
                 MockPath("mopa1"),
@@ -235,38 +248,38 @@ class TestFileConfig(unittest.TestCase):
             not_found_count=3,
         )
 
-    def test_604_read_db_config_file_not_found(self):
-        self._600_read_db_config_file(
+    def test_604_read_file_config_file_not_found(self):
+        self._600_read_file_config_file(
             not_found_count=5,
         )
 
-    def test_605_read_db_config_file_cfgfile(self):
-        self._600_read_db_config_file(
-            db_cfg_fn="mock_filename",
+    def test_605_read_file_config_file_cfgfile(self):
+        self._600_read_file_config_file(
+            file_cfg_fn="mock_filename",
             not_found_count=1,
         )
 
-    def test_606_read_db_config_file_abs_cfgfile(self):
-        self._600_read_db_config_file(
-            db_cfg_fn="/absolute/mock_filename.abs",
+    def test_606_read_file_config_file_abs_cfgfile(self):
+        self._600_read_file_config_file(
+            file_cfg_fn="/absolute/mock_filename.abs",
             not_found_count=0,
         )
 
-    def test_607_read_db_config_file_cmdln_file(self):
-        self._600_read_db_config_file(
+    def test_607_read_file_config_file_cmdln_file(self):
+        self._600_read_file_config_file(
             cmd_fn="mock_filename_from_cmdline",
             not_found_count=1,
         )
 
-    def test_608_read_db_config_file_abs_cmdln_file(self):
-        self._600_read_db_config_file(
+    def test_608_read_file_config_file_abs_cmdln_file(self):
+        self._600_read_file_config_file(
             cmd_fn="/absolute/mock_filename_from_cmdline.abs",
             not_found_count=0,
         )
 
-    def test_609_read_db_config_file_invalid_cmdln_file(self):
+    def test_609_read_file_config_file_invalid_cmdln_file(self):
         with self.assertRaises(TypeError):
-            self._600_read_db_config_file(
+            self._600_read_file_config_file(
                 cmd_fn=None,
                 not_found_count=1,
             )

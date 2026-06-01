@@ -221,8 +221,11 @@ class Test_003_MySQLConnection(unittest.IsolatedAsyncioTestCase):
         self.con = database.dbms.mysql.MySQLConnection(
             self.mock_db, self.mock_pool, **self.db_cfg
         )
+        self.MockApp = Mock(name="MockApp")
+        self.MockApp.configuration = Mock(name="AppConfig")
+
         self.patchers = {
-            # patch("database.dbms.mysql."),
+            patch("database.dbms.mysql.App", self.MockApp),
         }
         for patcher in self.patchers:
             patcher.start()
