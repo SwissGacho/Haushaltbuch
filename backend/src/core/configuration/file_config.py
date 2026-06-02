@@ -93,6 +93,7 @@ class FileConfig(BaseObject):
         if not isinstance(cmdline_filecfg_filename, (Path, str)):
             raise TypeError("Invalid file configuration filename from commandline")
         filecfg_file = Path(filecfg_filename or cmdline_filecfg_filename)
+        cls.file_config_file_path = None
         if LOG.isEnabledFor(DEBUG):
             LOG.debug(
                 f"FileConfig.read_file_config_file: {filecfg_file=} "
