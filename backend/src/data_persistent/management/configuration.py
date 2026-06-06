@@ -14,6 +14,7 @@ class Configuration(PersistentBusinessObject):
 
     user_id = BORelation(User)
     configuration = BODict()
+    is_root_bo: bool = True
 
     @property
     def configuration_dict(self):

@@ -1,6 +1,7 @@
 """Websocket messages exchanged between backend and frontend"""
 
 from datetime import datetime, date
+from decimal import Decimal
 import pathlib
 from enum import StrEnum
 from json import dumps, loads
@@ -73,7 +74,7 @@ def json_encode(obj: Any) -> Any:
     "jsonize objects"
     if hasattr(obj, "json_encode"):
         return obj.json_encode()
-    return str(obj) if isinstance(obj, (datetime, date, pathlib.Path)) else obj
+    return str(obj) if isinstance(obj, (datetime, date, pathlib.Path, Decimal)) else obj
 
 
 async def _load_value(val):
@@ -102,7 +103,7 @@ class Message(BaseObject):
     "Commons of messages"
 
     def __new__(cls, json_message: str | None = None, **kwa):
-        # LOG.debug(f"Message.__new__({cls=} {json_message=} {kwa=})")
+        LOG.debug(f"Message.__new__({cls=} {json_message=} {kwa=})")
         if json_message and isinstance(json_message, str):
             message_type = loads(json_message).get(MessageAttribute.WS_ATTR_TYPE)
             if message_type:
@@ -165,8 +166,17 @@ class Message(BaseObject):
 
     async def serialize(self):
         "Serialize to JSON"
-        # LOG.debug(f"Message.serialize: message={self.message}")
-        return dumps(await _serialize(self.message), default=json_encode)
+        LOG.debug(f"Message.serialize: message={self.message}")
+        serialized_message = None
+        try:
+            serialized_message = await _serialize(self.message)
+            return dumps(serialized_message, default=json_encode)
+        except ValueError as e:
+            LOG.error(f"Error serializing message: {e}")
+            LOG.error(f"{self.message=}")
+            LOG.error(f"{serialized_message=}")
+            LOG.error(f"Message.serialize: message={self.message}")
+            raise
 
     async def handle_message(self, connection):
         "Handle unknown message type"

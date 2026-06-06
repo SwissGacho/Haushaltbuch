@@ -8,7 +8,7 @@ from core.const import DEFAULT_DECIMAL_SCALE_DIGITS, MAX_DECIMAL_TOTAL_DIGITS
 
 
 def configured_money_scale_digits() -> int:
-    """Configured money scale digits with bounds and fallback."""
+    """Configured money scale digits with strict validation."""
     try:
         configured_digits = App.get_config_item(
             Config.CONFIG_APP_MONEY_SCALE, DEFAULT_DECIMAL_SCALE_DIGITS
@@ -17,15 +17,24 @@ def configured_money_scale_digits() -> int:
         return DEFAULT_DECIMAL_SCALE_DIGITS
 
     if not isinstance(configured_digits, (int, str)):
-        return DEFAULT_DECIMAL_SCALE_DIGITS
+        raise ValueError(
+            "Invalid app.money_scale_digits type: "
+            f"{type(configured_digits).__name__}. Expected int or str."
+        )
 
     try:
         digits = int(configured_digits)
-    except (TypeError, ValueError):
-        return DEFAULT_DECIMAL_SCALE_DIGITS
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "Invalid app.money_scale_digits value: "
+            f"{configured_digits!r}. Expected an integer."
+        ) from exc
 
     if digits < 0 or digits > MAX_DECIMAL_TOTAL_DIGITS:
-        return DEFAULT_DECIMAL_SCALE_DIGITS
+        raise ValueError(
+            "app.money_scale_digits out of supported range [0, "
+            f"{MAX_DECIMAL_TOTAL_DIGITS}]: {digits}"
+        )
     return digits
 
 

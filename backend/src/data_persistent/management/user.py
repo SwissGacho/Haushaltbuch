@@ -25,6 +25,7 @@ class User(PersistentBusinessObject):
     name = BOStr(semantic_role=BOSemanticRole.BONAME)
     password = BOStr()
     role = BOFlag(UserRole)
+    is_root_bo: bool = True
 
 
 log_exit(LOG)

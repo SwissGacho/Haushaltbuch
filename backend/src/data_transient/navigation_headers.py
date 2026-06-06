@@ -44,7 +44,7 @@ class NavigationHeaders(TransientBusinessObject):
             navigation_list = [
                 o.navigation_header()
                 for k, o in BOBase.all_business_objects.items()
-                if issubclass(o, PersistentBusinessObject)
+                if issubclass(o, PersistentBusinessObject) and o.is_root_bo
             ]
         navigation_list = [item for item in navigation_list if item is not None]
         if LOG.isEnabledFor(VERBOSE_DEBUG):

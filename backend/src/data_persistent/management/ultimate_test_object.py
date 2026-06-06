@@ -34,6 +34,7 @@ class UltimateRelatedTestObject(PersistentBusinessObject):
     "Related Business Object for testing purposes"
 
     name = BOStr(semantic_role=BOSemanticRole.BONAME)
+    is_root_bo: bool = True
 
 
 class UltimateTestObject(PersistentBusinessObject):
@@ -49,6 +50,7 @@ class UltimateTestObject(PersistentBusinessObject):
     bo_rel = BORelation(UltimateRelatedTestObject)
     bo_rel_self = BORelation(BOSelf)
     bo_flag = BOFlag(UltimateFlag)
+    is_root_bo: bool = True
 
 
 log_exit(LOG)

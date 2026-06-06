@@ -466,7 +466,13 @@ class BOBase(BOBaseBase):
                 s = ""
                 if hasattr(sub, "__self__") and hasattr(sub.__self__, "_obj"):
                     s += f"{str(sub.__self__._obj)}: "
-                s += f"{sub.__self__._connection.connection_context.get('comp',sub.__self__._connection.connection_context.get('socket','unknown'))}"
+                try:
+                    if hasattr(sub, "__self__"):
+                        s += f"{sub.__self__._connection.connection_context.get('comp',sub.__self__._connection.connection_context.get('socket','unknown'))}"
+                    else:
+                        s += repr(sub)
+                except Exception as e:
+                    LOG.error(f"{e} for {sub=}")
                 rslt.append(s)
             return rslt
 
