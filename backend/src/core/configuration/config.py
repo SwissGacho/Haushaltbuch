@@ -23,8 +23,8 @@ from core.status import Status
 from core.reconfigure_logging import reconfigure_logging
 from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config, ConfigDict
-from data_persistent.management.configuration import Configuration
-from data_persistent.management.user import User, UserRole
+from data.management.configuration import Configuration
+from data.management.user import User, UserRole
 from database.sql_expression import ColumnName
 
 

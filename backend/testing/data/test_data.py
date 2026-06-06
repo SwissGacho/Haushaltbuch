@@ -74,8 +74,8 @@ class Test_100_Data_Package(unittest.TestCase):
             mock_import_module.side_effect = [mock_module1, mock_module2]
             mock_import_module.reset_mock()
 
-            import data_persistent
-            import data_transient
+            import data
+            import transient_data
 
             self.assertEqual(Mock_Path.call_count, 2)
             mock_base_path.rglob.assert_called_with("*.py")

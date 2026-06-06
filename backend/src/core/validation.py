@@ -7,7 +7,7 @@ LOG = getLogger(__name__)
 from core.app import App
 from core.const import SINGLE_USER_NAME
 from core.status import Status
-from data_persistent.management.user import User
+from data.management.user import User
 from messages.message import MessageAttribute
 from database.sql_expression import ColumnName
 

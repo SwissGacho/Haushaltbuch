@@ -13,7 +13,7 @@ import database
 import database.dbms.db_base
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
-from data_persistent.management.db_schema import DBSchema
+from data.management.db_schema import DBSchema
 
 CURRENT_DB_SCHEMA_VERSION = 1
 COMPATIBLE_DB_SCHEMA_VERSIONS = [1]

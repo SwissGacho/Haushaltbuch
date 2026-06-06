@@ -6,7 +6,7 @@ LOG = getLogger(__name__)
 
 from business_objects.persistant_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import BODict, BORelation
-from data_persistent.management.user import User
+from data.management.user import User
 
 
 class Configuration(PersistentBusinessObject):
@@ -14,6 +14,7 @@ class Configuration(PersistentBusinessObject):
 
     user_id = BORelation(User)
     configuration = BODict()
+    is_root_bo: bool = True
 
     @property
     def configuration_dict(self):

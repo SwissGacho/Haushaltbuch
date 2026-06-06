@@ -3,7 +3,7 @@ A session is created by a WS connection without session token.
 """
 
 from typing import Self, Optional
-from data_persistent.management.user import User
+from data.management.user import User
 
 from core.app_logging import get_context_logger, getLogger, log_exit, Logger
 

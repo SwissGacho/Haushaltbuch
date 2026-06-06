@@ -18,8 +18,8 @@ from core.const import SINGLE_USER_NAME
 from core.base_objects import Config
 from core.base_objects import BaseObject
 from core.exceptions import ConfigurationError, DataError
-from data_persistent.management.user import User, UserRole
-from data_persistent.management.configuration import Configuration
+from data.management.user import User, UserRole
+from data.management.configuration import Configuration
 from database.sql_expression import ColumnName
 
 WAIT_AVAILABLE_TASK = "wait_for_available"

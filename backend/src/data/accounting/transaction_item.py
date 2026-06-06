@@ -19,8 +19,8 @@ from business_objects.bo_descriptors import (
     BODate,
     BODecimal,
 )
-from data_persistent.accounting.transaction import Transaction
-from data_persistent.accounting.category import Category
+from data.accounting.transaction import Transaction
+from data.accounting.category import Category
 
 
 class TransactionItem(PersistentBusinessObject):
