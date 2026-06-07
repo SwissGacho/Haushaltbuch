@@ -1,6 +1,7 @@
 """Base class for DB connections"""
 
-from typing import Any, Self, Optional, Protocol, AsyncContextManager
+from typing import Any, NamedTuple, Self, Optional, Protocol, AsyncContextManager
+from decimal import Decimal, InvalidOperation
 import re
 import json
 
@@ -16,8 +17,15 @@ from database.sql_statement import SQLTemplate
 from database.sql_clause import SQLColumnDefinition
 
 
+class DecimalCapabilities(NamedTuple):
+    max_total_digits: int
+    max_decimal_scale: int
+
+
 class DB(DBBaseClass):
     "application Data Base"
+
+    DECIMAL_CAPABILITIES: DecimalCapabilities | None = None
 
     def __init__(self, **cfg) -> None:
         self._cfg = cfg
@@ -29,6 +37,36 @@ class DB(DBBaseClass):
     def sql_factory(self):
         "DB specific SQL factory"
         raise NotImplementedError("sqlFactory not defined on base class")
+
+    @property
+    def decimal_capabilities(self) -> DecimalCapabilities:
+        "Decimal capabilities of the underlying DBMS"
+        caps = self.__class__.DECIMAL_CAPABILITIES
+        if caps is None:
+            raise NotImplementedError(
+                "DECIMAL_CAPABILITIES not defined on DB implementation class"
+            )
+        return caps
+
+    @classmethod
+    def validate_decimal(cls, value: Decimal) -> bool:
+        "validate a Decimal value against the DB's supported precision and scale"
+        caps = cls.DECIMAL_CAPABILITIES
+        if caps is None:
+            raise NotImplementedError(
+                "DECIMAL_CAPABILITIES not defined on DB implementation class"
+            )
+
+        quantizer = Decimal(1).scaleb(-caps.max_decimal_scale)
+        try:
+            quantized = value.quantize(quantizer)
+        except (InvalidOperation, ValueError):
+            return False
+        if quantized != value:
+            return False
+
+        scaled = int(quantized * (10**caps.max_decimal_scale))
+        return abs(scaled) < 10 ** (caps.max_total_digits)
 
     def check_column(self, tab, col, name, data_type, constraint, **pars):
         "check compatibility of a DB column with a business object attribute"
@@ -98,6 +136,16 @@ class DB(DBBaseClass):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
         # LOG.debug(f"DB.execute: {query=}, {params=}, {close=}, {commit=} {connection=}")
+
+        if params is not None:
+            for param in params.values():
+                if isinstance(param, Decimal):
+                    valid = self.__class__.validate_decimal(param)
+                    if not valid:
+                        raise ValueError(
+                            f"Decimal value {param} does not meet MySQL decimal precision requirements."
+                        )
+
         return await (connection or await self.connect()).execute(
             query=query, params=params
         )

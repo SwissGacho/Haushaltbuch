@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from business_objects.business_object_base import BOBase
-from data_transient.bo_list import BOList
+from transient_data.bo_list import BOList
 
 
 class MockBOBase(BOBase):

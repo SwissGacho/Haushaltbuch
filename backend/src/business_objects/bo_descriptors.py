@@ -5,15 +5,16 @@ import json
 from enum import EnumType, Flag, StrEnum, auto
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+from typing import Any, Protocol, cast
 import sys
 
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
+from core.app import App
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_attribute_base import BaseFlag
-from business_objects.business_rules import validate_money_decimal
 
 
 class AttributeType(StrEnum):
@@ -106,6 +107,22 @@ class BOBaseBase:
     @classmethod
     def _name(cls) -> str:
         return cls.__name__.lower()
+
+
+class _DecimalCapabilities(Protocol):
+    max_total_digits: int
+    max_decimal_scale: int
+
+
+class _DecimalValidatingDB(Protocol):
+    def validate_decimal(self, value: Decimal) -> bool: ...
+
+    @property
+    def decimal_capabilities(self) -> _DecimalCapabilities: ...
+
+
+def _get_decimal_db() -> _DecimalValidatingDB:
+    return cast(_DecimalValidatingDB, getattr(App, "db"))
 
 
 class _PersistantAttr[T]:
@@ -215,8 +232,20 @@ class BODecimal(_PersistantAttr[Decimal]):
         return super().__set__(obj=obj, value=value)
 
     def validate(self, value):
+        # pylint: disable=no-member
         if isinstance(value, Decimal):
-            validate_money_decimal(value)
+            try:
+                db: Any = _get_decimal_db()
+            except ReferenceError as exc:
+                raise ValueError(
+                    "Decimal validation requires an initialized DB implementation"
+                ) from exc
+            if not db.validate_decimal(value):
+                caps = db.decimal_capabilities
+                raise ValueError(
+                    f"Value '{value}' exceeds decimal capabilities "
+                    f"(total_digits={caps.max_total_digits}, scale={caps.max_decimal_scale})"
+                )
         return super().validate(value) or isinstance(value, Decimal)
 
 

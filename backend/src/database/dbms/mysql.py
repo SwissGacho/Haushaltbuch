@@ -3,7 +3,7 @@
 from decimal import Decimal
 import ssl
 import datetime
-from typing import Optional, Self
+from typing import Any, Optional, Self
 from pathlib import Path
 
 from core.app_logging import getLogger, log_exit, DEBUG
@@ -13,12 +13,12 @@ LOG = getLogger(__name__)
 from core.configuration.config import Config, DBConfig
 from core.exceptions import ConfigurationError, OperationalError
 from core.util_base import get_config_item
-from core.const import MAX_DECIMAL_TOTAL_DIGITS
 from database.dbms.db_base import (
     DB,
     Connection,
     Cursor,
     DBCursorProtocol,
+    DecimalCapabilities,
 )
 from database.sql_factory import SQLFactory
 from database.sql import SQL
@@ -26,7 +26,6 @@ from database.sql_statement import SQLTemplate, SQLScript, Insert, Update
 from database.sql_clause import SQLColumnDefinition
 from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
 from business_objects.business_attribute_base import BaseFlag
-from business_objects.business_rules import configured_money_scale_digits
 
 try:
     import asyncmy
@@ -59,6 +58,8 @@ class MySQLFactory(SQLFactory):
 
 
 MYSQL_JSON_TYPE = "JSON"
+MYSQL_MAXIMUM_DECIMAL_DIGITS = 65
+MYSQL_MAXIMUM_DECIMAL_SCALE = 30  # MariaDB supports up to 38 but MySQL only up to 30
 
 
 def baseflag_datatype(data_type: type, **args) -> str:
@@ -93,9 +94,8 @@ def timestamp_datatype(data_type: type, constraints: BOColumnConstraint, **args)
 def decimal_datatype(data_type: type, **_args) -> str:
     if data_type is not Decimal:
         raise ValueError(f"decimal_datatype called with invalid type {data_type}")
-    digits = configured_money_scale_digits()
 
-    return f"DECIMAL({MAX_DECIMAL_TOTAL_DIGITS},{digits})"
+    return f"DECIMAL({MYSQL_MAXIMUM_DECIMAL_DIGITS},{MYSQL_MAXIMUM_DECIMAL_SCALE})"
 
 
 class MySQLColumnDefinition(SQLColumnDefinition):
@@ -253,6 +253,11 @@ class MySQLDB(DB):
     @property
     def sql_factory(self):
         return MySQLFactory
+
+    DECIMAL_CAPABILITIES = DecimalCapabilities(
+        max_total_digits=MYSQL_MAXIMUM_DECIMAL_DIGITS,
+        max_decimal_scale=MYSQL_MAXIMUM_DECIMAL_SCALE,
+    )
 
     async def _get_table_info(self, table_name: str) -> dict[str, str]:
         # LOG.debug(f"MySQLDB._get_table_info({table_name=})")

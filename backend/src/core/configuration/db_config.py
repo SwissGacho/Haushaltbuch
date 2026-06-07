@@ -14,7 +14,7 @@ LOG = getLogger(__name__)
 from core.const import APPNAME
 from core.app import App
 from core.base_objects import BaseObject, Config
-import data_transient  # pylint: disable=unused-import
+import transient_data  # pylint: disable=unused-import
 
 
 class DBConfig(BaseObject):

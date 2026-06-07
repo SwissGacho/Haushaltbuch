@@ -1,5 +1,8 @@
 """Connection to SQLit DB using aiosqlite"""
 
+from __future__ import annotations
+
+
 from decimal import Decimal
 from typing import Self, Any, Optional
 from datetime import datetime, date, UTC
@@ -13,8 +16,7 @@ LOG = getLogger(__name__)
 
 from core.exceptions import OperationalError
 from core.configuration.config import Config
-from core.const import MAX_DECIMAL_TOTAL_DIGITS
-from database.dbms.db_base import DB, Connection, Cursor
+from database.dbms.db_base import DB, Connection, Cursor, DecimalCapabilities
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
@@ -22,11 +24,6 @@ from database.sql_factory import SQLFactory
 from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
 from business_objects.persistant_business_object import PersistentBusinessObject
 from business_objects.business_attribute_base import BaseFlag
-from business_objects.business_rules import (
-    configured_money_max_scaled_value,
-    configured_money_scale_digits,
-    configured_money_scale_multiplier,
-)
 
 # pylint: disable=invalid-name
 try:
@@ -57,7 +54,8 @@ SQLITE_BASEFLAG_TYPE = "FLAG"
 SQLITE_DATE_TYPE = "ISODATE"
 SQLITE_DATETIME_TYPE = "ISODATETIME"
 SQLITE_DECIMAL_TYPE = "DECIMAL"
-MAX_DECIMAL_SCALED_VALUE = configured_money_max_scaled_value()
+SQLITE_MAXIMUM_DECIMAL_DIGITS = 19
+SQLITE_MAXIMUM_DECIMAL_SCALE = 4
 
 
 class SQLiteColumnDefinition(SQLColumnDefinition):
@@ -91,15 +89,16 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
 
 
 def _adapt_decimal(value: Decimal) -> int:
-    digits = configured_money_scale_digits()
-    scale = configured_money_scale_multiplier()
+    if not SQLiteDB.validate_decimal(value):
+        raise ValueError(f"Decimal value out of supported range for SQLite: {value}")
 
-    quantizer = Decimal(1).scaleb(-digits)
-    scaled = int(value.quantize(quantizer) * scale)
-    if abs(scaled) > MAX_DECIMAL_SCALED_VALUE:
-        raise OverflowError(
-            f"Decimal value out of supported range for total precision {MAX_DECIMAL_TOTAL_DIGITS}: {value}"
-        )
+    scale = SQLITE_MAXIMUM_DECIMAL_SCALE
+
+    quantizer = Decimal(1).scaleb(-scale)
+    quantized = value.quantize(quantizer)
+
+    scaled = int(quantized * (10**scale))
+
     return scaled
 
 
@@ -136,7 +135,8 @@ def _convert_json(value: bytes) -> dict | list:
 
 
 def _convert_decimal(value: bytes) -> Decimal:
-    return Decimal(int(value)) / Decimal(configured_money_scale_multiplier())
+    scale = SQLITE_MAXIMUM_DECIMAL_SCALE
+    return Decimal(int(value)) / Decimal(10**scale)
 
 
 def _convert_isodate(value: bytes) -> date:
@@ -234,6 +234,13 @@ class SQLiteDB(DB):
     @property
     def sql_factory(self):
         return SQLiteSQLFactory
+
+    @property
+    def decimal_capabilities(self) -> DecimalCapabilities:
+        return DecimalCapabilities(
+            max_total_digits=SQLITE_MAXIMUM_DECIMAL_DIGITS,
+            max_decimal_scale=SQLITE_MAXIMUM_DECIMAL_SCALE,
+        )
 
     async def _get_table_info(self, table_name: str) -> dict[str, str]:
         # LOG.debug(f"SQLiteDB._get_table_info({table_name=})")
