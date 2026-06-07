@@ -28,7 +28,6 @@ class Transaction(PersistentBusinessObject):
     counterparty = BOStr()
     amount = BODecimal()
     balance = BODecimal()
-    aha = BOStr()
 
 
 log_exit(LOG)
