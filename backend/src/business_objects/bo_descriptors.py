@@ -109,22 +109,6 @@ class BOBaseBase:
         return cls.__name__.lower()
 
 
-class _DecimalCapabilities(Protocol):
-    max_total_digits: int
-    max_decimal_scale: int
-
-
-class _DecimalValidatingDB(Protocol):
-    def validate_decimal(self, value: Decimal) -> bool: ...
-
-    @property
-    def decimal_capabilities(self) -> _DecimalCapabilities: ...
-
-
-def _get_decimal_db() -> _DecimalValidatingDB:
-    return cast(_DecimalValidatingDB, getattr(App, "db"))
-
-
 class _PersistantAttr[T]:
     def __init__(
         self,
@@ -235,7 +219,7 @@ class BODecimal(_PersistantAttr[Decimal]):
         # pylint: disable=no-member
         if isinstance(value, Decimal):
             try:
-                db: Any = _get_decimal_db()
+                db: Any = App.db
             except ReferenceError as exc:
                 raise ValueError(
                     "Decimal validation requires an initialized DB implementation"

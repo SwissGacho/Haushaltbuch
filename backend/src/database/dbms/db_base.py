@@ -1,7 +1,7 @@
 """Base class for DB connections"""
 
 from typing import Any, NamedTuple, Self, Optional, Protocol, AsyncContextManager
-from decimal import Decimal, InvalidOperation
+from decimal import Context, Decimal, InvalidOperation
 import re
 import json
 
@@ -52,12 +52,15 @@ class DB(DBBaseClass):
     def validate_decimal(cls, value: Decimal) -> bool:
         "validate a Decimal value against the DB's supported precision and scale"
         caps = cls.DECIMAL_CAPABILITIES
+        LOG.debug(f"DB.validate_decimal: {value=}, {caps=}")
         if caps is None:
+            LOG.error("DECIMAL_CAPABILITIES not defined on DB implementation class")
             raise NotImplementedError(
                 "DECIMAL_CAPABILITIES not defined on DB implementation class"
             )
 
         quantizer = Decimal(1).scaleb(-caps.max_decimal_scale)
+        LOG.debug(f"{quantizer=}")
         try:
             quantized = value.quantize(quantizer)
         except (InvalidOperation, ValueError):
@@ -65,8 +68,15 @@ class DB(DBBaseClass):
         if quantized != value:
             return False
 
+        LOG.debug(f"{quantized=}")
         scaled = int(quantized * (10**caps.max_decimal_scale))
+        LOG.debug(f"{scaled=}, Max: {10 ** (caps.max_total_digits)=}")
         return abs(scaled) < 10 ** (caps.max_total_digits)
+
+    def configure_decimal_context(self, decimal_context: Context):
+        "Configure the decimal context according to the DB's capabilities"
+        caps = self.decimal_capabilities
+        decimal_context.prec = caps.max_total_digits
 
     def check_column(self, tab, col, name, data_type, constraint, **pars):
         "check compatibility of a DB column with a business object attribute"

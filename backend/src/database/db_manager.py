@@ -1,6 +1,7 @@
 """Manage connection to the database"""
 
 from contextlib import asynccontextmanager
+import decimal
 
 from core.app_logging import getLogger, log_exit
 
@@ -66,6 +67,7 @@ async def get_db():
         return
     try:
         App.db = db
+        db.configure_decimal_context(decimal.DefaultContext)
         await check_db_schema()
         LOG.debug("DB ready")
         yield db
