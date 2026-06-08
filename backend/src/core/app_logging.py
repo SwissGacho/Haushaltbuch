@@ -4,6 +4,7 @@ import datetime
 from enum import StrEnum
 import re
 import json
+import pprint
 
 import logging
 import logging.config
@@ -98,6 +99,19 @@ def redact(value: Any) -> Any:
         except json.JSONDecodeError:
             pass
     return value
+
+
+def pprint_lines(value: Any) -> list[str]:
+    "Return a list of lines for pretty-printing a value in logs."
+    return pprint.pformat(redact(value), indent=4, width=120, compact=True).splitlines()
+
+
+def redact_truncate(value: Any, max_length: int = 80) -> str:
+    "Return a string representation of the value truncated to max_length characters."
+    s = str(redact(value))
+    if len(s) > max_length:
+        return f"{s[:max_length]}... (total {len(s)} chars)"
+    return s
 
 
 entered_modules = [__name__]
