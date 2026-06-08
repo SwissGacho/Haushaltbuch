@@ -20,6 +20,7 @@ from database.sql_statement import CreateTable, NamedValueListList, Value
 from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
+from server.ws_connection_base import SessionBase
 
 
 class PersistentBusinessObject(BOBase):
@@ -217,23 +218,23 @@ class PersistentBusinessObject(BOBase):
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
         return self
 
-    async def store(self):
+    async def store(self, session: Optional[SessionBase] = None):
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
         if self.id is None:
-            await self._insert_self()
+            await self._insert_self(session)
         else:
-            await self._update_self()
-        await super().store()
+            await self._update_self(session)
+        await super().store(session)
 
     async def business_values_as_dict(self) -> dict[str, Any]:
         # LOG.debug(f"{self}.business_values_as_dict: {self.id=}")
         await self.fetch(self.id)
         return await super().business_values_as_dict()
 
-    async def _insert_self(self):
+    async def _insert_self(self, session: SessionBase):
         assert self.id is None, "id must be None for insert operation"
         values_to_store: NamedValueListList = [
             (k, v) for k, v in self._data.items() if k != "id" and v is not None
@@ -243,7 +244,9 @@ class PersistentBusinessObject(BOBase):
         for k, v in self._data.items():
             if k != "id" and v is None:
                 LOG.debug(f"{k=}: {v}")
-        LOG.debug(f"Inserting new {self} into DB")
+        LOG.debug(
+            f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
+        )
         async with SQLTransaction() as txaction:
             self.id = (
                 await (
@@ -256,8 +259,9 @@ class PersistentBusinessObject(BOBase):
                 ).fetchone()
             ).get("id")
 
-    async def _update_self(self):
+    async def _update_self(self, session: SessionBase):
         assert self.id is not None, "id must not be None for update operation"
+        LOG.debug(f"Updating {self} in DB; user={session.user if session else 'N/A'}")
         async with SQLTransaction() as txaction:
             value_class = Value
             update = txaction.sql().update(self.table).where(Eq("id", self.id))

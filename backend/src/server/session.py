@@ -10,12 +10,13 @@ from core.app_logging import get_context_logger, getLogger, log_exit, Logger
 LOG: Logger = getLogger(__name__)
 
 from core.exceptions import TokenExpiredError
+from server.ws_connection_base import SessionBase
 from server.ws_token import WSToken
 
 # from server.ws_connection import WS_Connection
 
 
-class Session:
+class Session(SessionBase):
     "a user session with limited lifetime"
 
     _all_sessions: list[Self] = []
@@ -31,7 +32,7 @@ class Session:
         self.LOG = get_context_logger(LOG, session=self.session_id)
         self.connections = [connection]
         self.token = WSToken()
-        self.user: User = user
+        self._user: User = user
         self._tokens: set[WSToken] = {conn_token} if conn_token else set()
 
     @property
@@ -70,6 +71,11 @@ class Session:
     def conn_tokens(self) -> set[str]:
         "get all connection tokens of session"
         return {token.token for token in self._tokens}
+
+    @property
+    def user(self) -> User:
+        "get user associated with session"
+        return self._user
 
     def add_connection(self, connection) -> int:
         "add a connection to session"

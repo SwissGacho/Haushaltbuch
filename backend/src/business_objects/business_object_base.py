@@ -25,6 +25,7 @@ from business_objects.bo_descriptors import (
     BODatetime,
 )
 from business_objects.bo_semantic_role import BOSemanticRole
+from server.ws_connection_base import SessionBase
 
 BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 
@@ -403,24 +404,24 @@ class BOBase(BOBaseBase):
         return value_dict
 
     # removed unused code to avoid warnings in TransientBusinessObject classes
-    # async def fetch(self, id=None, newest=None):
+    # async def fetch(self, id=None, newest=None, session: Optional[SessionBase] = None):
     #     """Fetch the business object from the database by id.
     #     If 'id' is None, fetch the latest version of the object.
     #     If 'newest' is True, fetch the latest version of the object.
     #     """
     #     raise NotImplementedError("fetch not implemented")
 
-    async def store(self):
+    async def store(self, session: Optional[SessionBase] = None):
         """Store pending changes to the business object.
         In addition, the instance subscribers are notified.
         """
         self.notify_instance_subscribers()
         self.__class__.notify_change_subscribers(self)
 
-    async def _insert_self(self):
+    async def _insert_self(self, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
 
-    async def _update_self(self):
+    async def _update_self(self, session: Optional[SessionBase] = None):
         assert self.id is not None, "id must not be None for update operation"
 
     def notify_instance_subscribers(self):

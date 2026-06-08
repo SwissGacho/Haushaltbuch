@@ -26,6 +26,7 @@ from messages.setup import FetchSetupMessage, StoreSetupMessage
 from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 from server.ws_token import WSToken
+from server.session import Session
 
 
 class WSConnection(WSConnectionBase):
@@ -36,7 +37,7 @@ class WSConnection(WSConnectionBase):
     def __init__(self, websocket, sock_nbr) -> None:
         self._socket = websocket
         self._socket_nbr = sock_nbr
-        self._session = None
+        self._session: Session | None = None
         self._conn_nbr = sock_nbr
         self._comp = None
         self.is_primary = False

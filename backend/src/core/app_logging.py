@@ -107,7 +107,8 @@ def pprint_lines(value: Any) -> list[str]:
 
 
 def redact_truncate(value: Any, max_length: int = 80) -> str:
-    "Return a string representation of the value with its prefix truncated to max_length characters (plus a length suffix when truncated)."
+    """Return a string representation of the value with its prefix truncated to max_length
+    characters (plus a length suffix when truncated)."""
     s = str(redact(value))
     if len(s) > max_length:
         return f"{s[:max_length]}... (total {len(s)} chars)"
