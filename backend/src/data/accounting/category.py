@@ -1,3 +1,5 @@
+"""Category for an item on a transaction, used for reporting and budgeting"""
+
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)

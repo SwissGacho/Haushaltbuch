@@ -1,4 +1,4 @@
-"""Business Object with all possible attribute types for testing purposes"""
+"""An account, containing transactions and representing a financial account like a bank account or a cash box"""
 
 from core.app_logging import getLogger, log_exit
 

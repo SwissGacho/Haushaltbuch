@@ -35,7 +35,7 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
         )
         MockBOBase.get_business_object_by_name = self.mock_get_business_object_by_name
         self.patchers = {
-            patch("data_transient.bo_list.BOBase", MockBOBase),
+            patch("transient_data.bo_list.BOBase", MockBOBase),
         }
         for patcher in self.patchers:
             patcher.start()

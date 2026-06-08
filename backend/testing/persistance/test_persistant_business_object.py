@@ -171,7 +171,6 @@ class Test_100_Persistant_Business_Object_classmethods(
             )
             for a in mock_attr_desc
         ]
-        print(f"{mock_sql.column.call_args_list=}, {exp_arglist=}")
         self.assertEqual(mock_sql.column.call_args_list, exp_arglist)
         mock_sql.execute.assert_awaited_once_with()
 

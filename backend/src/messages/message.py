@@ -7,7 +7,7 @@ from enum import StrEnum
 from json import dumps, loads
 from typing import Any, Optional
 
-from core.app_logging import getLogger, log_exit, Logger
+from core.app_logging import getLogger, log_exit, Logger, redact
 
 LOG: Logger = getLogger(__name__)
 
@@ -103,7 +103,7 @@ class Message(BaseObject):
     "Commons of messages"
 
     def __new__(cls, json_message: str | None = None, **kwa):
-        LOG.debug(f"Message.__new__({cls=} {json_message=} {kwa=})")
+        LOG.debug(f"Message.__new__({cls=} {redact(json_message)=} {redact(kwa)=})")
         if json_message and isinstance(json_message, str):
             message_type = loads(json_message).get(MessageAttribute.WS_ATTR_TYPE)
             if message_type:
@@ -171,17 +171,17 @@ class Message(BaseObject):
         try:
             serialized_message = await _serialize(self.message)
             return dumps(serialized_message, default=json_encode)
-        except ValueError as e:
-            LOG.error(f"Error serializing message: {e}")
-            LOG.error(f"{self.message=}")
-            LOG.error(f"{serialized_message=}")
-            LOG.error(f"Message.serialize: message={self.message}")
+        except (ValueError, TypeError) as e:
+            LOG.error(f"Error serializing message: {redact(e)}")
+            LOG.error(f"{redact(self.message)=}")
+            LOG.error(f"{redact(serialized_message)=}")
+            LOG.error(f"Message.serialize: message={redact(self.message)}")
             raise
 
     async def handle_message(self, connection):
         "Handle unknown message type"
         _ = connection
-        LOG.error(f"received unknown message ({self.message})")
+        LOG.error(f"received unknown message ({redact(self.message)})")
 
 
 log_exit(LOG)

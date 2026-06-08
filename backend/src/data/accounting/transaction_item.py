@@ -1,4 +1,4 @@
-"""Business Object with all possible attribute types for testing purposes"""
+"""A single item on a transaction, representing a single line on an invoice or a single entry in a cash book, containing an amount and a category"""
 
 from core.app_logging import getLogger, log_exit
 
