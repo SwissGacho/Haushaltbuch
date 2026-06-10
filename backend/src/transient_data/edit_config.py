@@ -38,7 +38,7 @@ class EditConfig(TransientBusinessObject):
                     f"EditConfig.__new__: bo_id in kwargs ({kwargs['bo_id']}) "
                     f"does not match index ({index})"
                 )
-            if index >= 0:
+            if index >= 0: # A persistant config was requested by index
                 return Configuration(bo_id=index)
             elif index == CMDLINE_CONFIG_BOID:
                 return CmdlineConfiguration(bo_id=CMDLINE_CONFIG_BOID)
