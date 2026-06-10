@@ -38,7 +38,7 @@ class EditConfig(TransientBusinessObject):
                     f"EditConfig.__new__: bo_id in kwargs ({kwargs['bo_id']}) "
                     f"does not match index ({index})"
                 )
-            if index >= 0: # A persistant config was requested by index
+            if index >= 0:  # A persistant config was requested by index
                 return Configuration(bo_id=index)
             elif index == CMDLINE_CONFIG_BOID:
                 return CmdlineConfiguration(bo_id=CMDLINE_CONFIG_BOID)
@@ -68,7 +68,7 @@ class EditConfig(TransientBusinessObject):
         LOG.debug(
             f"EditConfig.get_matching_objects: conditions={conditions}, attributes={attributes}"
         )
-        if conditions or attributes:
+        if conditions or (attributes and attributes != ["name"]):
             LOG.warning(
                 f"EditConfig.get_matching_objects() cannot be called with {conditions=} or {attributes=}"
             )

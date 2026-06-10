@@ -127,12 +127,10 @@ class FileConfig(BaseObject):
                 PermissionError,
                 OSError,
             ) as exc:
-                LOG.warning(f"Unable to read configuration from {filecfg_file}: {exc}")
+                LOG.error(f"Unable to read configuration from {filecfg_file}: {exc}")
                 return None
             except json.JSONDecodeError as exc:
-                LOG.warning(
-                    f"Unable to decode configuration from {filecfg_file}: {exc}"
-                )
+                LOG.error(f"Unable to decode configuration from {filecfg_file}: {exc}")
                 return None
             cls.file_config_file_path = filename
             LOG.debug(f"File configuration file found: {cls.file_config_file_path}")
