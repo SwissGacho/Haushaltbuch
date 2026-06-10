@@ -47,7 +47,7 @@ class AppConfiguration(ConfigurationBaseClass):
         e.g. to reconfigure logging when the log level is changed in the configuration.
         """
         LOG.debug(
-            "AppConfiguration._handle_event_: Configuration changed, reconfiguring logging."
+            "AppConfiguration.config_change_handler: Configuration changed, reconfiguring logging."
         )
         reconfigure_logging()
 
@@ -137,7 +137,7 @@ class AppConfiguration(ConfigurationBaseClass):
             )
 
     def configuration(self) -> dict[str, Any]:
-        "global configuration"
+        "Returns a deepcopy of the combined configuration (global, file and cmdline)"
         if self._global_configuration:
             cfg = copy.deepcopy(self._global_configuration.configuration_dict)
         else:
