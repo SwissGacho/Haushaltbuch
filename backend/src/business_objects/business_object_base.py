@@ -75,9 +75,15 @@ class BOBase(BOBaseBase):
         cls._change_subscribers = {}
 
     # pylint: disable=redefined-builtin, unused-argument
-    def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
+    def __init__(
+        self,
+        *args,
+        bo_id: int | None = None,
+        session: Optional[SessionBase] = None,
+        **attributes,
+    ) -> None:
         LOG.debug(
-            f"{self.__class__.__name__}.__init__({bo_id=},{attributes})  "
+            f"{self.__class__.__name__}.__init__({bo_id=},{session=},{attributes})  "
             f"-  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}"
         )
         if getattr(self, "_initialized", False):

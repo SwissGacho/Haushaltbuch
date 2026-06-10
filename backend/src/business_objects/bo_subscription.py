@@ -13,7 +13,7 @@ from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 LOG = getLogger(__name__)
 
 from messages.bo_message import ObjectMessage
-from server.ws_connection_base import WSConnectionBase
+from server.ws_connection_base import WSConnectionBase, SessionBase
 from server.ws_message_sender import WSMessageSender
 from business_objects.business_object_base import BOBase
 from business_objects.persistant_business_object import PersistentBusinessObject
@@ -62,7 +62,9 @@ class BOSubscription(Generic[T], WSMessageSender):
         WSMessageSender.__init__(self, connection=connection)
 
         try:
-            self._initialize_subscriptions(index=index, **kwargs)
+            self._initialize_subscriptions(
+                session=connection.session, index=index, **kwargs
+            )
         except Exception as e:
             connection.unregister_message_sender(self)
             LOG.error(
@@ -73,7 +75,7 @@ class BOSubscription(Generic[T], WSMessageSender):
         if notify_subscribers_on_init:
             asyncio.create_task(self.notify_subscription_subscribers())
 
-    def _initialize_subscriptions(self, **kwargs):
+    def _initialize_subscriptions(self, session: SessionBase, **kwargs):
         if "index" not in kwargs:
             raise ValueError("BOSubscription requires an 'index' argument")
         self._index = kwargs["index"]
@@ -87,7 +89,7 @@ class BOSubscription(Generic[T], WSMessageSender):
             kwargs.pop("index")
         else:
             bo_id = None
-        bo: T = self._bo_type(bo_id=bo_id, **kwargs)
+        bo: T = self._bo_type(bo_id=bo_id, session=session, **kwargs)
         self._subscription_id = bo.subscribe_to_instance(self._handle_event_)
         self._obj = bo
 
