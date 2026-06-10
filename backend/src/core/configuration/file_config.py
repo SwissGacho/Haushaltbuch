@@ -8,7 +8,14 @@ from pathlib import Path
 from typing import Optional
 from asyncio import Lock
 
-from core.app_logging import getLogger, log_exit, redact, DEBUG, VERBOSE_DEBUG
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    redact,
+    DEBUG,
+    VERBOSE_DEBUG,
+    pprint_lines,
+)
 
 LOG = getLogger(__name__)
 
@@ -103,33 +110,37 @@ class FileConfig(BaseObject):
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             for pth in searchpath:
                 LOG.log(VERBOSE_DEBUG, f" - {pth}")
-        try:
-            for filename in (
-                [filecfg_file]
-                if filecfg_file.is_absolute()
-                else ([Path(path, filecfg_file) for path in searchpath])
-            ):
-                LOG.log(VERBOSE_DEBUG, f"Searching file: {str(filename)}")
-                try:
-                    with open(filename, encoding="utf-8") as cfg_file:
-                        cfg_from_cfg_file = json.load(cfg_file)
-                    cls.file_config_file_path = filename
-                    LOG.debug(
-                        f"File configuration file found: {cls.file_config_file_path}"
-                    )
-                    if LOG.isEnabledFor(VERBOSE_DEBUG):
-                        for pth in pprint.pformat(
-                            redact(cfg_from_cfg_file), indent=4, width=120, compact=True
-                        ).splitlines():
-                            LOG.log(VERBOSE_DEBUG, f" - {pth}")
-                    return cfg_from_cfg_file
-                except FileNotFoundError:
-                    continue
-            LOG.info(f"configuration file {filecfg_file} not found.")
-        except json.JSONDecodeError as exc:
-            LOG.warning(f"Unable to decode configuration from {filecfg_file}: {exc}")
-        except (IsADirectoryError, NotADirectoryError, PermissionError, OSError) as exc:
-            LOG.warning(f"Unable to read configuration from {filecfg_file}: {exc}")
+        for filename in (
+            [filecfg_file]
+            if filecfg_file.is_absolute()
+            else ([Path(path, filecfg_file) for path in searchpath])
+        ):
+            LOG.log(VERBOSE_DEBUG, f"Searching file: {str(filename)}")
+            try:
+                with open(filename, encoding="utf-8") as cfg_file:
+                    cfg_from_cfg_file = json.load(cfg_file)
+            except FileNotFoundError:
+                continue
+            except (
+                IsADirectoryError,
+                NotADirectoryError,
+                PermissionError,
+                OSError,
+            ) as exc:
+                LOG.warning(f"Unable to read configuration from {filecfg_file}: {exc}")
+                return None
+            except json.JSONDecodeError as exc:
+                LOG.warning(
+                    f"Unable to decode configuration from {filecfg_file}: {exc}"
+                )
+                return None
+            cls.file_config_file_path = filename
+            LOG.debug(f"File configuration file found: {cls.file_config_file_path}")
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                for line in pprint_lines(cfg_from_cfg_file):
+                    LOG.log(VERBOSE_DEBUG, f" - {line}")
+            return cfg_from_cfg_file
+        LOG.info(f"configuration file {filecfg_file} not found.")
 
     @classmethod
     def write_file_config_file(cls, config: dict) -> bool:

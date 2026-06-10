@@ -68,6 +68,10 @@ class EditConfig(TransientBusinessObject):
         LOG.debug(
             f"EditConfig.get_matching_objects: conditions={conditions}, attributes={attributes}"
         )
+        if conditions or attributes:
+            LOG.warning(
+                f"EditConfig.get_matching_objects() cannot be called with {conditions=} or {attributes=}"
+            )
         config_objs = await Configuration.get_matching_objects(
             attributes=Configuration.display_name_components() or ["name"]
         )

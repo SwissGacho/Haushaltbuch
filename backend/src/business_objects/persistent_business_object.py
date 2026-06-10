@@ -8,7 +8,14 @@ import json
 import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
-from core.app_logging import getLogger, log_exit, DEBUG, VERBOSE_DEBUG, redact
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    DEBUG,
+    VERBOSE_DEBUG,
+    redact,
+    pprint_lines,
+)
 
 LOG = getLogger(__name__)
 
@@ -210,7 +217,12 @@ class PersistentBusinessObject(BOBase):
         self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
-            # LOG.debug(f"PersistentBusinessObject._fetch_self: {self._db_data=}")
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                LOG.log(
+                    VERBOSE_DEBUG, "PersistentBusinessObject._fetch_self: _db_data="
+                )
+                for line in pprint_lines(self._db_data):
+                    LOG.log(VERBOSE_DEBUG, f" -  {line}")
             for description in self.attribute_descriptions():
                 self._data[description.name] = PersistentBusinessObject.convert_from_db(
                     self._db_data.get(description.name),
