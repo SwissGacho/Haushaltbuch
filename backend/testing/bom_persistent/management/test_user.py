@@ -1,4 +1,4 @@
-"""Testsuite for persistant business object User"""
+"""Testsuite for persistent business object User"""
 
 import unittest
 from unittest.mock import Mock
