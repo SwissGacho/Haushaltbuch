@@ -16,7 +16,7 @@ from messages.bo_message import ObjectMessage
 from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 from business_objects.business_object_base import BOBase
-from business_objects.persistant_business_object import PersistentBusinessObject
+from business_objects.persistent_business_object import PersistentBusinessObject
 
 T = TypeVar("T", bound=BOBase)
 

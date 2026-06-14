@@ -10,7 +10,6 @@ class Test_100_Data_Package(unittest.TestCase):
         # Remove the package/module from sys.modules if it is already imported
         for mod in ["data"]:
             if mod in sys.modules:
-                print(f"{sys.modules[mod]=}")
                 del sys.modules[mod]
 
     def test_100_import_business_objects(self):
@@ -85,7 +84,6 @@ class Test_100_Data_Package(unittest.TestCase):
                 "Path.relative_to() should be called 3 times",
             )
             mock_abs_path.relative_to.assert_called_with(MOCK_BASE_PARENT)
-            print(f"{mock_import_module.call_args_list=}")
             self.assertEqual(
                 mock_import_module.call_count,
                 2,

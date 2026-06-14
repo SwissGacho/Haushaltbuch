@@ -46,7 +46,7 @@ class App:
         else:
             cls._config = cls._config_class(app_location)
         cls._config.initialize_configuration()
-        # LOG.debug("app initialized")
+        LOG.debug("app initialized")
 
     @classmethod
     async def db_ready(cls):

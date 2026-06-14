@@ -25,7 +25,7 @@ class MockBOFlag(BaseFlag):
 
 class MockBO(BOBase):
     def __new__(cls, id: int | None = None, *args, **attributes):
-        print(f"MockBOBase.__new__({cls=}, {id=}, {args=}, {attributes=})")
+        # print(f"MockBOBase.__new__({cls=}, {id=}, {args=}, {attributes=})")
         return super().__new__(cls)
 
     # Really should mock attribute_descriptions instead...
@@ -105,10 +105,6 @@ class Test_100__ObjectSchema(unittest.TestCase):
         )
         for v in test_type.attribute_descriptions():
             target_type = v.attribute_type.value if v.attribute_type else None
-            print(
-                f"Testing attribute_type_representation for {v.name=}:"
-                f" {v.attribute_type=}, {target_type=}"
-            )
             self.assertEqual(
                 target_type,
                 obj.attribute_type_representation(v.attribute_type),

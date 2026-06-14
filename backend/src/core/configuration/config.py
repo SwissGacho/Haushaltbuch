@@ -7,14 +7,15 @@
 """
 
 import copy
-from typing import Optional
-from core.app_logging import getLogger, log_exit
+import pprint
+from typing import Optional, Any
+
+from core.app_logging import getLogger, log_exit, redact, VERBOSE_DEBUG
 from core.util_base import update_dicts_recursively
 
 LOG = getLogger(__name__)
 
-from core.configuration.cmd_line import CommandLine
-from core.configuration.db_config import DBConfig
+from core.configuration.file_config import FileConfig
 from core.const import SINGLE_USER_NAME
 from core.util_base import get_config_item
 from core.configuration.setup_config import SetupConfigValues
@@ -22,9 +23,12 @@ from core.app import App
 from core.status import Status
 from core.reconfigure_logging import reconfigure_logging
 from core.exceptions import ConfigurationError
-from core.base_objects import ConfigurationBaseClass, Config, ConfigDict
+from core.base_objects import ConfigurationBaseClass, Config
+from business_objects.business_object_base import BOBase
 from data.management.configuration import Configuration
 from data.management.user import User, UserRole
+from transient_data.cmdline_configuration import CmdlineConfiguration
+from transient_data.file_configuration import FileConfiguration
 from database.sql_expression import ColumnName
 
 
@@ -33,13 +37,19 @@ class AppConfiguration(ConfigurationBaseClass):
 
     def __init__(self, app_location: str) -> None:
         super().__init__(app_location)
-        self._cmdline_configuration: Optional[ConfigDict] = None
+        self._cmdline_configuration: Optional[CmdlineConfiguration] = None
+        self._file_configuration: Optional[FileConfiguration] = None
         self._global_configuration: Optional[Configuration] = None
-        self._user_configuration: Optional[Configuration] = None
 
-    def cmdline_configuration(self) -> ConfigDict:
-        "Config parsed from commandline"
-        return self._cmdline_configuration or {}
+    async def config_change_handler(self, _: BOBase):
+        """Handle events from the configuration business objects.
+        This is needed to react to changes in the configuration,
+        e.g. to reconfigure logging when the log level is changed in the configuration.
+        """
+        LOG.debug(
+            "AppConfiguration.config_change_handler: Configuration changed, reconfiguring logging."
+        )
+        reconfigure_logging()
 
     def initialize_configuration(self):
         """Initialize App configuration
@@ -48,30 +58,26 @@ class AppConfiguration(ConfigurationBaseClass):
             - set DB configuration from commandline
             - read DB configuration from config file
         """
-        # LOG.debug("AppConfiguration.initialize_configuration()")
-        self._cmdline_configuration = {}
-        cmdline_cfg = CommandLine.get_commandline_config()
-        self._cmdline_configuration.update(cmdline_cfg)
-        if Config.CONFIG_DB in cmdline_cfg:
-            DBConfig.set_db_configuration(
-                {Config.CONFIG_DB: cmdline_cfg[Config.CONFIG_DB]}
-            )
-        else:
-            update_dicts_recursively(
-                self._cmdline_configuration,
-                DBConfig.read_db_config_file() or {},
-                source_overrides_target=False,
-            )
+        LOG.debug("AppConfiguration.initialize_configuration()")
+        self._cmdline_configuration = CmdlineConfiguration()
+        self._cmdline_configuration.subscribe_to_instance(self.config_change_handler)
+        self._file_configuration = FileConfiguration(
+            cmdline_config=self._cmdline_configuration.configuration
+        )
+        self._file_configuration.subscribe_to_instance(self.config_change_handler)
         reconfigure_logging()
 
     async def get_configuration_from_db(self):
         "Fetch configuration from database"
-        async with DBConfig.db_config_lock:
-            # LOG.debug("AppConfiguration.get_configuration_from_db: DB available")
+        async with FileConfig.db_config_lock:
+            LOG.debug("AppConfiguration.get_configuration_from_db: DB available")
             config_ids = await Configuration.get_matching_ids(
                 {ColumnName("user_id"): None}
             )
-            # LOG.debug(f"AppConfiguration.get_configuration_from_db: {config_ids=}")
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"AppConfiguration.get_configuration_from_db: {config_ids=}",
+            )
             if len(config_ids) == 0:
                 LOG.info(
                     "Creating global configuration "
@@ -94,9 +100,16 @@ class AppConfiguration(ConfigurationBaseClass):
                 )
             else:
                 raise ConfigurationError("Multiple global configurations in DB.")
-            # LOG.debug(
-            #     f"AppConfiguration.get_configuration_from_db: {self._global_configuration=}"
-            # )
+            self._global_configuration.subscribe_to_instance(self.config_change_handler)
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                LOG.log(VERBOSE_DEBUG, f"AppConfiguration.get_configuration_from_db:")
+                for line in pprint.pformat(
+                    redact(self._global_configuration.configuration_dict),
+                    indent=4,
+                    width=120,
+                    compact=True,
+                ).splitlines():
+                    LOG.log(VERBOSE_DEBUG, f" - {line}")
 
             user_mode = get_config_item(
                 self._global_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
@@ -116,22 +129,31 @@ class AppConfiguration(ConfigurationBaseClass):
                 # create single user
                 LOG.info(f"Creating single user '{SINGLE_USER_NAME}'")
                 await User(name=SINGLE_USER_NAME, role=UserRole.ADMIN).store()
-            # LOG.debug(f"AppConfiguration.get_configuration_from_db: {user_mode=}")
+            LOG.debug(f"AppConfiguration.get_configuration_from_db: {user_mode=}")
             App.status = (
                 Status.STATUS_SINGLE_USER
                 if user_mode == SetupConfigValues.SINGLE_USER
                 else Status.STATUS_MULTI_USER
             )
 
-    def configuration(self) -> dict:
-        "global configuration"
+    def configuration(self) -> dict[str, Any]:
+        "Returns a deepcopy of the combined configuration (global, file and cmdline)"
         if self._global_configuration:
-            global_cfg_dict = self._global_configuration.configuration_dict
+            cfg = copy.deepcopy(self._global_configuration.configuration_dict)
         else:
-            global_cfg_dict = {}
-        cfg = copy.deepcopy(global_cfg_dict)
-        update_dicts_recursively(cfg, self._cmdline_configuration or {})
-        # LOG.debug(f"AppConfiguration.configuration() -> {cfg}")
+            cfg = {}
+        if self._file_configuration:
+            update_dicts_recursively(cfg, self._file_configuration.configuration or {})
+        if self._cmdline_configuration:
+            update_dicts_recursively(
+                cfg, self._cmdline_configuration.configuration or {}
+            )
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            LOG.debug("AppConfiguration.configuration():")
+            for line in pprint.pformat(
+                redact(cfg), indent=4, width=120, compact=True
+            ).splitlines():
+                LOG.log(VERBOSE_DEBUG, f" - {line}")
         return cfg
 
 

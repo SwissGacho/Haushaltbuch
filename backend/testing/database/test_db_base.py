@@ -14,7 +14,6 @@ from business_objects.bo_descriptors import BOColumnConstraint
 
 class MockFactory:
     def get_sql_class(self, cls):
-        print(f"mock_factory {cls=}")
         return cls
 
 
