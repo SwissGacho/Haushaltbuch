@@ -15,7 +15,7 @@ from core.exceptions import ConfigurationError
 from core.status import Status
 import core.configuration.config
 from core.util_base import update_dicts_recursively
-from data.management.user import UserRole
+from bom_persistent.management.user import UserRole
 
 
 class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):

@@ -11,7 +11,7 @@ from business_objects.bo_descriptors import AttributeAccessLevel, BOSelf
 from business_objects.bo_semantic_role import BOSemanticRole
 
 
-class MockAttr(business_objects.bo_descriptors._PersistantAttr):
+class MockAttr(business_objects.bo_descriptors._PersistentAttr):
     @classmethod
     def data_type(cls):
         return str
@@ -52,7 +52,7 @@ class MockBO:
         )
 
 
-class Test_100__PersistantAttr(unittest.TestCase):
+class Test_100__PersistentAttr(unittest.TestCase):
 
     def test_101_initialization(self):
         self.assertEqual(MockBO("mick").mock_attr, "mick")

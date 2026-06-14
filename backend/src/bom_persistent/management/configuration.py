@@ -7,7 +7,7 @@ LOG = getLogger(__name__)
 
 from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
-from data.management.user import User
+from bom_persistent.management.user import User
 
 
 class Configuration(PersistentBusinessObject):

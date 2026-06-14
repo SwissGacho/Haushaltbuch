@@ -20,7 +20,7 @@ class UserRole(BaseFlag):
 
 
 class User(PersistentBusinessObject):
-    "Persistant user object"
+    "Persistent user object"
 
     name = BOStr(semantic_role=BOSemanticRole.BONAME)
     password = BOStr()

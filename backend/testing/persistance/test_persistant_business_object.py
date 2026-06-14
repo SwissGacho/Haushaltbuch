@@ -17,16 +17,16 @@ from business_objects.bo_descriptors import (
 )
 
 MOCK_TAB1 = "mock_table"
-MOCK_TAB2 = "mockpersistantbo2s"
+MOCK_TAB2 = "mockpersistentbo2s"
 
 
-class MockPersistantBO1(PersistentBusinessObject):
+class MockPersistentBO1(PersistentBusinessObject):
     _table = MOCK_TAB1
 
 
-class MockPersistantBO2(PersistentBusinessObject):
+class MockPersistentBO2(PersistentBusinessObject):
     mock_attr1 = BOStr()
-    mock_attr2 = BORelation(MockPersistantBO1)
+    mock_attr2 = BORelation(MockPersistentBO1)
     mock_attr3 = BOList()
 
     def __init__(
@@ -77,7 +77,7 @@ mock_attr_desc = [
         "mock_attr2",
         BOBaseBase,
         BOColumnConstraint.BOC_FK,
-        {"semantic_role": BOSemanticRole.RAW, "relation": MockPersistantBO1},
+        {"semantic_role": BOSemanticRole.RAW, "relation": MockPersistentBO1},
     ),
     MockAttrDesc(
         "mock_attr3",
@@ -91,7 +91,7 @@ mock_bo2_as_dict = {a.name: a.data_type for a in mock_attr_desc}
 mock_bo2_constr_vals = {a.name: a.constraint_values for a in mock_attr_desc}
 
 
-class Test_100_Persistant_Business_Object_classmethods(
+class Test_100_Persistent_Business_Object_classmethods(
     unittest.IsolatedAsyncioTestCase
 ):
 
@@ -155,7 +155,7 @@ class Test_100_Persistant_Business_Object_classmethods(
             "business_objects.persistent_business_object.SQLTransaction",
             new=MockSQLTx,
         ):
-            await MockPersistantBO2.sql_create_table()
+            await MockPersistentBO2.sql_create_table()
 
         MockSQLTx.assert_called_once_with()
         mock_tx.__aenter__.assert_awaited_once_with()
@@ -193,7 +193,7 @@ class Test_100_Persistant_Business_Object_classmethods(
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
             patch("business_objects.persistent_business_object.Filter") as MockFilter,
         ):
-            result = await MockPersistantBO2.count_rows(mock_conditions)
+            result = await MockPersistentBO2.count_rows(mock_conditions)
         MockSQL.assert_called_once_with()
         mock_sql.__aenter__.assert_awaited_once_with()
         mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
@@ -224,7 +224,7 @@ class Test_100_Persistant_Business_Object_classmethods(
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
             patch("business_objects.persistent_business_object.Filter") as MockFilter,
         ):
-            result = await MockPersistantBO2.get_matching_ids(mock_conditions)
+            result = await MockPersistentBO2.get_matching_ids(mock_conditions)
         MockSQL.assert_called_once_with()
         mock_sql.__aenter__.assert_awaited_once_with()
         mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
@@ -251,7 +251,7 @@ class Test_100_Persistant_Business_Object_classmethods(
                     1
                     if a == "id"
                     else (
-                        MockPersistantBO1(bo_id=2)
+                        MockPersistentBO1(bo_id=2)
                         if a == "mock_attr2"
                         else (
                             [1, 11]
@@ -267,7 +267,7 @@ class Test_100_Persistant_Business_Object_classmethods(
                     9
                     if a == "id"
                     else (
-                        MockPersistantBO1(bo_id=8)
+                        MockPersistentBO1(bo_id=8)
                         if a == "mock_attr2"
                         else (
                             [99, 99]
@@ -281,7 +281,7 @@ class Test_100_Persistant_Business_Object_classmethods(
         ]
         mock_result = [
             # {a if a != "id" else "bo_id": v for a, v in r.items()}
-            MockPersistantBO2(
+            MockPersistentBO2(
                 bo_id=r.get("id"), **{a: v for a, v in r.items() if a != "id"}
             )
             for r in mock_fetch_result
@@ -309,7 +309,7 @@ class Test_100_Persistant_Business_Object_classmethods(
                 new=mock_convert_from_db,
             ),
         ):
-            result = await MockPersistantBO2.get_matching_objects(
+            result = await MockPersistentBO2.get_matching_objects(
                 mock_conditions, mock_cols
             )
         MockSQL.assert_called_once_with()
@@ -341,7 +341,7 @@ class Test_100_Persistant_Business_Object_classmethods(
 
 class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.mock_bo = MockPersistantBO2()
+        self.mock_bo = MockPersistentBO2()
         self.mock_sql = Mock(name="mock_sql")
         self.mock_sql.__aenter__ = AsyncMock(return_value=self.mock_sql)
         self.mock_sql.__aexit__ = AsyncMock(return_value=None)
@@ -463,7 +463,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 "business_objects.persistent_business_object.PersistentBusinessObject._fetch_self"
             ) as mock_fetch_self,
         ):
-            mock_bo = MockPersistantBO2(**mock_attrs)
+            mock_bo = MockPersistentBO2(**mock_attrs)
 
             await mock_bo._insert_self()
 
@@ -489,7 +489,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         await self._204_insert_self()
 
     async def test_204c_insert_self(self):
-        mock_bo1 = MockPersistantBO1()
+        mock_bo1 = MockPersistentBO1()
         await self._204_insert_self(mock_attr2=mock_bo1)
 
     async def _205_update_self(self, exception=False):
@@ -596,35 +596,35 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             await self.mock_bo._update_self()
 
     async def test_205b_update_self(self):
-        self.mock_bo = MockPersistantBO2(bo_id=55)
+        self.mock_bo = MockPersistentBO2(bo_id=55)
         await self._205_update_self()
 
     async def test_205c_update_self(self):
-        self.mock_bo = MockPersistantBO2(bo_id=55, mock_attr2=MockPersistantBO1())
+        self.mock_bo = MockPersistentBO2(bo_id=55, mock_attr2=MockPersistentBO1())
         await self._205_update_self()
 
     async def test_205d_update_self(self):
-        self.mock_bo = MockPersistantBO2(
-            bo_id=55, mock_attr2=MockPersistantBO1(), mock_attr3=[1, 2, 3]
+        self.mock_bo = MockPersistentBO2(
+            bo_id=55, mock_attr2=MockPersistentBO1(), mock_attr3=[1, 2, 3]
         )
         await self._205_update_self()
 
     async def test_205e_update_self_exception(self):
-        self.mock_bo = MockPersistantBO2(bo_id=55)
+        self.mock_bo = MockPersistentBO2(bo_id=55)
         await self._205_update_self(exception=True)
 
     async def test_205f_update_last_updated(self):
-        self.mock_bo = MockPersistantBO2(bo_id=55)
+        self.mock_bo = MockPersistentBO2(bo_id=55)
         self.mock_bo.last_updated = datetime.datetime(2031, 4, 25, 13, 45)
         await self._205_update_self()
 
 
 class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.mock_bo = MockPersistantBO2()
+        self.mock_bo = MockPersistentBO2()
 
     def test_01_convert_from_db_none(self):
-        self.assertIsNone(MockPersistantBO2.convert_from_db(None, int, {}))
+        self.assertIsNone(MockPersistentBO2.convert_from_db(None, int, {}))
 
     def test_01_convert_from_db_date_time(self):
         mock_tz_cet = datetime.timezone(datetime.timedelta(hours=+1), name="CET")
@@ -636,48 +636,48 @@ class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
         mock_date = datetime.date(2031, 4, 25)
 
         # convert 'CET' datetime string
-        res = MockPersistantBO2.convert_from_db(
+        res = MockPersistentBO2.convert_from_db(
             value=mock_dt_cet.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_cet, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert 'CET' datetime object
-        res = MockPersistantBO2.convert_from_db(
+        res = MockPersistentBO2.convert_from_db(
             value=mock_dt_cet, typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_cet, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert 'EST' datetime string
-        res = MockPersistantBO2.convert_from_db(
+        res = MockPersistentBO2.convert_from_db(
             value=mock_dt_est.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_est, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert 'UTC' datetime string
-        res = MockPersistantBO2.convert_from_db(
+        res = MockPersistentBO2.convert_from_db(
             value=mock_dt_utc.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_utc, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert naive datetime string (assume UTC)
-        res = MockPersistantBO2.convert_from_db(
+        res = MockPersistentBO2.convert_from_db(
             value=mock_dt_none.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_none.replace(tzinfo=datetime.UTC), res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert naive datetime (assume UTC)
-        res = MockPersistantBO2.convert_from_db(
+        res = MockPersistentBO2.convert_from_db(
             value=mock_dt_none, typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_none.replace(tzinfo=datetime.UTC), res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
-        res = MockPersistantBO2.convert_from_db(
+        res = MockPersistentBO2.convert_from_db(
             value=mock_date.isoformat(), typ=datetime.date, subtyp={}
         )
         self.assertEqual(mock_date, res)

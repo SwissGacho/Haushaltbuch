@@ -25,10 +25,10 @@ from core.reconfigure_logging import reconfigure_logging
 from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config
 from business_objects.business_object_base import BOBase
-from data.management.configuration import Configuration
-from data.management.user import User, UserRole
-from transient_data.cmdline_configuration import CmdlineConfiguration
-from transient_data.file_configuration import FileConfiguration
+from bom_persistent.management.configuration import Configuration
+from bom_persistent.management.user import User, UserRole
+from bom_transient.cmdline_configuration import CmdlineConfiguration
+from bom_transient.file_configuration import FileConfiguration
 from database.sql_expression import ColumnName
 
 
