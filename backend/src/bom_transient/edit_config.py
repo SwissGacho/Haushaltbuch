@@ -14,10 +14,10 @@ from business_objects.bo_descriptors import (
     BORelation,
     BOStr,
 )
-from data.management.configuration import Configuration
-from data.management.user import User
-from transient_data.cmdline_configuration import CmdlineConfiguration
-from transient_data.file_configuration import FileConfiguration
+from bom_persistent.management.configuration import Configuration
+from bom_persistent.management.user import User
+from bom_transient.cmdline_configuration import CmdlineConfiguration
+from bom_transient.file_configuration import FileConfiguration
 
 
 class EditConfig(TransientBusinessObject):
