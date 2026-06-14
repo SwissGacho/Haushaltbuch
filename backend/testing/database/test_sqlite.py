@@ -22,7 +22,7 @@ from datetime import datetime as dt, date
 
 
 def restore_sys_modules(name, module=None):
-    print(f"====================== restoring sys.modules['{name}'] -> {module}")
+    # print(f"====================== restoring sys.modules['{name}'] -> {module}")
     if module:
         sys.modules[name] = module
     elif name in sys.modules:
@@ -31,7 +31,7 @@ def restore_sys_modules(name, module=None):
 
 def setUpModule() -> None:
     def remove(mod):
-        print(f"----------------- remove {mod}")
+        # print(f"----------------- remove {mod}")
         unittest.addModuleCleanup(
             restore_sys_modules, name=mod, module=sys.modules.get(mod)
         )

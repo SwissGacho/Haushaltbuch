@@ -12,14 +12,14 @@ LOG = getLogger(__name__)
 
 from core.app import App
 from core.util_base import get_config_item
-from core.configuration.db_config import DBConfig
+from core.configuration.file_config import FileConfig
 from core.status import Status
 from core.const import SINGLE_USER_NAME
 from core.base_objects import Config
 from core.base_objects import BaseObject
 from core.exceptions import ConfigurationError, DataError
-from data.management.user import User, UserRole
-from data.management.configuration import Configuration
+from bom_persistent.management.user import User, UserRole
+from bom_persistent.management.configuration import Configuration
 from database.sql_expression import ColumnName
 
 WAIT_AVAILABLE_TASK = "wait_for_available"
@@ -145,11 +145,13 @@ class ConfigSetup(BaseObject):
         """
         # LOG.debug(f"ConfigSetup.setup_configuration({setup_cfg=}")
         db_filename = cls._write_db_cfg_file(setup_cfg=setup_cfg)
-        DBConfig.read_db_config_file([Path(db_filename).parent], Path(db_filename).name)
+        FileConfig.read_file_config_file(
+            [Path(db_filename).parent], Path(db_filename).name
+        )
         app_configuration = {
             Config.CONFIG_APP: get_config_item(setup_cfg, SetupConfigKeys.CFG_APP)
         }
-        async with DBConfig.db_config_lock:
+        async with FileConfig.db_config_lock:
             if await cls._wait_for_db():
                 await cls._create_or_update_global_configuration(
                     app_configuration=app_configuration

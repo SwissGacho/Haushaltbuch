@@ -285,7 +285,6 @@ class AsyncTest_200_SQL(unittest.IsolatedAsyncioTestCase):
                 ]
             )
         )
-        print(self.sql.get_sql())
         self.assertEqual(
             clean_sql(self.sql.get_sql()),
             {

@@ -339,11 +339,11 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         ConfigSetup._create_or_update_initial_user = AsyncMock()
         with (
             patch("core.configuration.setup_config.get_config_item") as mock_get_cfg,
-            patch("core.configuration.setup_config.DBConfig") as MockDBCfg,
+            patch("core.configuration.setup_config.FileConfig") as MockDBCfg,
             patch("core.configuration.setup_config.Path") as MockPath,
         ):
             MockPath.return_value = mock_path
-            MockDBCfg.read_db_config_file = Mock()
+            MockDBCfg.read_file_config_file = Mock()
             mock_get_cfg.return_value = mock_app_cfg
             # SetupConfigValues.MULTI_USER if multi else "other",
 
@@ -351,7 +351,7 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
 
         ConfigSetup._write_db_cfg_file.assert_called_once_with(setup_cfg=mock_cfg)
         self.assertEqual(MockPath.call_args_list, [call(mock_filename)] * 2)
-        MockDBCfg.read_db_config_file.assert_called_once_with(
+        MockDBCfg.read_file_config_file.assert_called_once_with(
             [mock_path_parent], mock_path_name
         )
         mock_get_cfg.assert_called_once_with(mock_cfg, SetupConfigKeys.CFG_APP)

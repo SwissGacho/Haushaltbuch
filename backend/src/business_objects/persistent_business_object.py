@@ -8,7 +8,14 @@ import json
 import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
-from core.app_logging import getLogger, log_exit, DEBUG, VERBOSE_DEBUG, redact
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    DEBUG,
+    VERBOSE_DEBUG,
+    redact,
+    pprint_lines,
+)
 
 LOG = getLogger(__name__)
 
@@ -197,26 +204,34 @@ class PersistentBusinessObject(BOBase):
             LOG.debug(f"fetching {self} without id or newest")
             return self
         # LOG.debug(f"fetching {self} with {id=}, {newest=}")
-
         async with SQL() as sql:
-            select = sql.select([], True).from_(self.table)
-            if id is not None:
-                select.where(Eq("id", id))
-            elif newest:
-                select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
-            # LOG.debug(f"BOBase.fetch: {select=} // {select.get_sql()=}")
-            self._db_data = await (await select.execute()).fetchone()
+            await self._fetch_self(sql, id=id, newest=newest)
+        return self
+
+    async def _fetch_self(self, sql: SQL, id=None, newest=None):
+        select = sql.select([], True).from_(self.table)
+        if id is not None:
+            select.where(Eq("id", id))
+        elif newest:
+            select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
+        # LOG.debug(f"BOBase._fetch_self: {select=} // {select.get_sql()=}")
+        self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
-            # LOG.debug(f"PersistentBusinessObject.fetch: {self._db_data=}")
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                LOG.log(
+                    VERBOSE_DEBUG, "PersistentBusinessObject._fetch_self: _db_data="
+                )
+                for line in pprint_lines(self._db_data):
+                    LOG.log(VERBOSE_DEBUG, f" -  {line}")
             for description in self.attribute_descriptions():
                 self._data[description.name] = PersistentBusinessObject.convert_from_db(
                     self._db_data.get(description.name),
                     description.data_type,
                     description.constraint_values,
                 )
+            self.register_instance(self)
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
-        return self
 
     async def store(self, session: Optional[SessionBase] = None):
         """Store the business object in the database.
@@ -258,6 +273,8 @@ class PersistentBusinessObject(BOBase):
                     ).execute()
                 ).fetchone()
             ).get("id")
+            # read the new row back to get any default values set by the DB
+            await self._fetch_self(txaction.sql(), id=self.id)
 
     async def _update_self(self, session: SessionBase):
         assert self.id is not None, "id must not be None for update operation"
@@ -283,7 +300,8 @@ class PersistentBusinessObject(BOBase):
                 if changes:
                     await update.execute()
             finally:
-                await self.fetch()
+                # read the row back to get any changes made by the DB (e.g. triggers)
+                await self._fetch_self(txaction.sql(), id=self.id)
 
 
 log_exit(LOG)

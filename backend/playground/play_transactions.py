@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.realpath(__file__)) + "/../src")
 
 from core.exceptions import OperationalError, RollBackRequested
 from core.app import App
-from core.configuration.db_config import DBConfig
+from core.configuration.file_config import FileConfig
 
 from database.dbms.sqlite import SQLiteDB
 from database.dbms.mysql import MySQLDB
@@ -267,7 +267,6 @@ async def main():
         App.db = SQLiteDB(**SQLiITE_CONFIG)
     elif db == "m":
         App.db = MySQLDB(**MARIADB_CONFIG)
-        DBConfig.db_configuration = {"db_cfg": MARIADB_CONFIG}
     print("   press 'h' for help or 'q' for quit")
 
     keep_conn = True
