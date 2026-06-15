@@ -10,7 +10,7 @@
 import pprint
 from typing import Any
 
-from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
+from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG, pprint_lines
 
 LOG = getLogger(__name__)
 
@@ -69,7 +69,7 @@ class BOList(TransientBusinessObject):
 
     async def business_values_as_dict(self) -> dict[str, Any]:
         LOG.debug(
-            f"{str(self)}.business_values_as_dict: bo={self._bo_type}, conditions={self._conditions}"
+            f"{str(self)}.business_values_as_dict: bo={self._bo_type}, cond={self._conditions}"
         )
         name_components = self._bo_type.display_name_components() or ["name"]
         matching_objects = await self._bo_type.get_matching_objects(
@@ -83,12 +83,7 @@ class BOList(TransientBusinessObject):
                 VERBOSE_DEBUG,
                 f"Updating subscribers of {self._bo_type} with {len(name_list)} objects:",
             )
-            for obj in pprint.pformat(
-                name_list,
-                indent=4,
-                width=120,
-                compact=True,
-            ).splitlines():
+            for obj in pprint_lines(name_list):
                 LOG.log(VERBOSE_DEBUG, f" - {obj}")
         else:
             LOG.debug(
