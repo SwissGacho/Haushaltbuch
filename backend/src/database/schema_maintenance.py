@@ -2,7 +2,7 @@
 
 from graphlib import TopologicalSorter
 
-from core.app_logging import getLogger, log_exit
+from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG, pprint_lines
 
 LOG = getLogger(__name__)
 
@@ -62,15 +62,19 @@ async def check_db_schema():
         table_count = await cur.rowcount
         # if table_count < 1:
         #     raise DBSchemaError("No tables in DB")
-        LOG.debug(f"Found {table_count} tables in DB:")
+        LOG.debug(f"Found {table_count} tables in DB")
         if table_count > 0:
-            LOG.debug(
-                f"    tables: {', '.join([t['table_name'] for t in await cur.fetchall()])}"
-            )
+            for line in pprint_lines(
+                [row["table_name"] for row in await cur.fetchall()]
+            ):
+                LOG.log(VERBOSE_DEBUG, line)
 
             try:
                 db_schema = await DBSchema().fetch(newest=True)
-                # LOG.debug(f"DB schema version {db_schema.version_nr} found in DB")
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"DB schema version {db_schema.version_nr} found in DB",
+                )
                 if db_schema.version_nr is None:
                     LOG.error(
                         "No DB schema version found in DB. "
@@ -94,6 +98,13 @@ async def check_db_schema():
         for pbo in PersistentBusinessObject.all_business_objects.values()
         if isinstance(pbo, type) and issubclass(pbo, PersistentBusinessObject)
     ]
+    LOG.debug(f"Found {len(all_business_objects)} persistent business objects")
+    if LOG.isEnabledFor(VERBOSE_DEBUG):
+        LOG.log(
+            VERBOSE_DEBUG,
+            "Persistent business objects found: "
+            f"{', '.join([bo.__name__ for bo in all_business_objects])}",
+        )
     if (
         db_schema.version_nr is None
         or db_schema.version_nr < CURRENT_DB_SCHEMA_VERSION

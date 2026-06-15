@@ -5,10 +5,12 @@ from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
+from core.const import SINGLE_USER_NAME
+from business_objects.business_object_base import BOBase
 from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
 from bom_persistent.management.user import User
-from core.const import SINGLE_USER_NAME
+from database.sql_clause import ColumnName
 
 
 class Configuration(PersistentBusinessObject):
@@ -50,6 +52,45 @@ class Configuration(PersistentBusinessObject):
         if not isinstance(self.configuration, dict):
             return {}
         return self.configuration
+
+
+class GlobalConfiguration(Configuration):
+    "Global configuration (not user specific)"
+
+    @classmethod
+    async def get_matching_ids(cls, conditions: dict | None = None):
+        """Return the ID of the global configuration object. There should be only one."""
+        conditions = conditions or {}
+        conditions.update({ColumnName("user_id"): None})
+        return await super().get_matching_ids(conditions=conditions)
+
+    @classmethod
+    async def get_matching_objects(
+        cls, conditions: dict | None = None, attributes: list[str] | None = None
+    ) -> list[BOBase]:
+        """Return the global configuration object. There should be only one."""
+        conditions = conditions or {}
+        conditions.update({ColumnName("user_id"): None})
+        return await super().get_matching_objects(
+            conditions=conditions, attributes=attributes
+        )
+
+
+class UserConfiguration(Configuration):
+    "User specific configuration"
+
+    @property
+    def display_name(self) -> str:
+        if self.user_id is None:
+            return "User Configuration (invalid user)"
+        if not isinstance(self.user_id, User):
+            LOG.warning(
+                f"UserConfiguration.display_name: user_id is not a User instance: {self.user_id}"
+            )
+            return "User Configuration (invalid user)"
+        if self.user_id.name == SINGLE_USER_NAME:
+            return "Single User Configuration"
+        return f"Configuration for user ({self.user_id.display_name})"
 
 
 log_exit(LOG)
