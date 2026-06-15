@@ -18,6 +18,7 @@ from bom_persistent.management.configuration import Configuration
 from bom_persistent.management.user import User
 from bom_transient.cmdline_configuration import CmdlineConfiguration
 from bom_transient.file_configuration import FileConfiguration
+from database.sql_clause import ColumnName
 
 
 class EditConfig(TransientBusinessObject):
@@ -73,7 +74,8 @@ class EditConfig(TransientBusinessObject):
                 f"EditConfig.get_matching_objects() cannot be called with {conditions=} or {attributes=}"
             )
         config_objs = await Configuration.get_matching_objects(
-            attributes=Configuration.display_name_components() or ["name"]
+            conditions={ColumnName("user_id"): None},
+            attributes=Configuration.display_name_components() or ["name"],
         )
         config_objs.append(EditConfig(index=FILE_CONFIG_BOID))
         config_objs.append(EditConfig(index=CMDLINE_CONFIG_BOID))
