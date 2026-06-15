@@ -8,6 +8,7 @@ LOG = getLogger(__name__)
 from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
 from bom_persistent.management.user import User
+from core.const import SINGLE_USER_NAME
 
 
 class Configuration(PersistentBusinessObject):
@@ -21,7 +22,19 @@ class Configuration(PersistentBusinessObject):
         """A human-readable name for this business object instance, used in the frontend."""
         if self.user_id is None:
             return "Global Configuration"
-        return f"Configuration for user ({self.user_id})"
+        if not isinstance(self.user_id, User):
+            LOG.warning(
+                f"Configuration.display_name: user_id is not a User instance: {self.user_id}"
+            )
+            return "Invalid User Configuration"
+        if self.user_id.name == SINGLE_USER_NAME:
+            return "Single User Configuration"
+        return f"Configuration for user ({self.user_id.display_name})"
+
+    @classmethod
+    def display_name_components(cls) -> list[str]:
+        """Return a list of attribute names that should be used to construct the display name."""
+        return super().display_name_components() + ["user_id"]
 
     @classmethod
     def navigation_header(
