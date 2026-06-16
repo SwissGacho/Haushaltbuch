@@ -109,7 +109,7 @@ class BOBaseBase:
         return cls.__name__.lower()
 
 
-class _PersistantAttr[T]:
+class _PersistentAttr[T]:
     def __init__(
         self,
         constraint: BOColumnConstraint = BOColumnConstraint.BOC_NONE,
@@ -142,7 +142,7 @@ class _PersistantAttr[T]:
     def __set_name__(self, owner, name):
         self.my_name = name
         # LOG.debug(
-        #     f"PersistantAttr.__set_name__({owner=}, {name=})"
+        #     f"PersistentAttr.__set_name__({owner=}, {name=})"
         #     f" {self.__class__.data_type()=} {self._flag=} {self._flag_values=}"
         # )
         # assert issubclass(owner, BOBaseBase)
@@ -178,7 +178,7 @@ class _PersistantAttr[T]:
 
 
 # pylint: disable=missing-class-docstring
-class BOInt(_PersistantAttr[int]):
+class BOInt(_PersistentAttr[int]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:
@@ -241,7 +241,7 @@ class BOId(BOInt):
         obj.__class__.register_instance(obj)
 
 
-class BOStr(_PersistantAttr[str]):
+class BOStr(_PersistentAttr[str]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:
@@ -255,7 +255,7 @@ class BOStr(_PersistantAttr[str]):
         return super().validate(value) or isinstance(value, str)
 
 
-class BODatetime(_PersistantAttr[datetime]):
+class BODatetime(_PersistentAttr[datetime]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:
@@ -274,7 +274,7 @@ class BODatetime(_PersistantAttr[datetime]):
         return super().validate(value) or isinstance(value, datetime)
 
 
-class BODate(_PersistantAttr[date]):
+class BODate(_PersistentAttr[date]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:
@@ -293,7 +293,7 @@ class BODate(_PersistantAttr[date]):
         return super().validate(value) or isinstance(value, date)
 
 
-class BODict(_PersistantAttr[dict]):
+class BODict(_PersistentAttr[dict]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:
@@ -313,7 +313,7 @@ class BODict(_PersistantAttr[dict]):
         return isinstance(value, dict)
 
 
-class BOList(_PersistantAttr[list]):
+class BOList(_PersistentAttr[list]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:
@@ -337,7 +337,7 @@ class BOSelf:
     "Marker for self-relation in BORelation"
 
 
-class BORelation(_PersistantAttr[BOBaseBase]):
+class BORelation(_PersistentAttr[BOBaseBase]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:
@@ -384,7 +384,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
             self._relation = resolved
             self._constraint_values["relation"] = resolved
         # LOG.debug(
-        #     f"PersistantAttr.__set_name__({owner=}, {name=})"
+        #     f"PersistentAttr.__set_name__({owner=}, {name=})"
         #     f" {self.__class__.data_type()=} {self._flag=} {self._flag_values=}"
         # )
         # assert issubclass(owner, BOBaseBase)
@@ -430,7 +430,7 @@ class BORelation(_PersistantAttr[BOBaseBase]):
         super().__set__(obj=obj, value=value)
 
 
-class BOFlag(_PersistantAttr[Flag]):
+class BOFlag(_PersistentAttr[Flag]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:

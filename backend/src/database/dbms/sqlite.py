@@ -22,7 +22,7 @@ from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
 from database.sql_factory import SQLFactory
 from business_objects.bo_descriptors import BOColumnConstraint, BOBaseBase
-from business_objects.persistant_business_object import PersistentBusinessObject
+from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.business_attribute_base import BaseFlag
 
 # pylint: disable=invalid-name

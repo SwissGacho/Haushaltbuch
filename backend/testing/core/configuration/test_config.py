@@ -3,6 +3,7 @@
 # pyright: reportPrivateUsage=false
 
 import platform
+import copy
 
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
@@ -13,7 +14,8 @@ from core.configuration.setup_config import SetupConfigValues
 from core.exceptions import ConfigurationError
 from core.status import Status
 import core.configuration.config
-from data.management.user import UserRole
+from core.util_base import update_dicts_recursively
+from bom_persistent.management.user import UserRole
 
 
 class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
@@ -22,57 +24,76 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
         self.mock_location = "mock_location"
         self.config_obj = core.configuration.config.AppConfiguration(self.mock_location)
 
+        self.MockApp = Mock(name="MockApp")
+        self.MockApp.configuration = Mock(name="AppConfig")
+        self.MockApp.config_object = Mock(name="config_object")
+
+        self.mockCmdLineCfg = Mock(name="mockCmdLineCfg")
+        self.mockCmdLineCfg.subscribe_to_instance = Mock(name="subscribe_2_cmdline_cfg")
+        self.mockCmdLineCfg.configuration = {"Mock": "CmdConfig"}
+
+        self.MockCmdLineCfg = Mock(
+            name="MockCmdLineCfg", return_value=self.mockCmdLineCfg
+        )
+
+        self.mockFileCfg = Mock(name="mockFileCfg")
+        self.mockFileCfg.subscribe_to_instance = Mock(name="subscribe_2_file_cfg")
+        self.mockFileCfg.configuration = {"Mock": "FileConfig"}
+        self.MockFileCfg = Mock(name="MockFileCfg", return_value=self.mockFileCfg)
+
+        self.mock_cfg_chg_handler = AsyncMock(name="mock_cfg_chg_handler")
+        self.patchers = {
+            patch("core.configuration.config.App", self.MockApp),
+            patch(
+                "core.configuration.config.CmdlineConfiguration", self.MockCmdLineCfg
+            ),
+            patch("core.configuration.config.FileConfiguration", self.MockFileCfg),
+            patch(
+                "core.configuration.config.AppConfiguration.config_change_handler",
+                self.mock_cfg_chg_handler,
+            ),
+        }
+        for patcher in self.patchers:
+            patcher.start()
+        return super().setUp()
+
+    def tearDown(self):
+        for patcher in self.patchers:
+            patcher.stop()
+
     def test_101__init__(self):
         self.assertEqual(self.config_obj.app_location, self.mock_location)
         self.assertEqual(self.config_obj.system, platform.system())
         self.assertIsNone(getattr(self.config_obj, "_cmdline_configuration"))
+        self.assertIsNone(getattr(self.config_obj, "_file_configuration"))
         self.assertIsNone(getattr(self.config_obj, "_global_configuration"))
-        self.assertIsNone(getattr(self.config_obj, "_user_configuration"))
 
-    def test_201_cmdline_configuration(self):
-        self.assertEqual(self.config_obj.cmdline_configuration(), {})
-        mock_cfg: ConfigDict = {"mock": "Config"}
-        setattr(self.config_obj, "_cmdline_configuration", mock_cfg)
-        self.assertEqual(self.config_obj.cmdline_configuration(), mock_cfg)
+    def test_301_initialize_configuration(self):
 
-    def test_301_initialize_configuration_with_db_cfg(self):
         with (
-            patch("core.configuration.config.CommandLine") as MockCmdLine,
-            patch("core.configuration.config.DBConfig") as mock_dbcfg,
             patch("core.configuration.config.reconfigure_logging") as mock_reconf_log,
         ):
-            MockCmdLine.get_commandline_config = Mock(name="get_commandline_config")
-            mock_db_cfg = {Config.CONFIG_DB: "MockDBCfg"}
-            mock_cmdline_cfg = {"Mock": "Config"} | mock_db_cfg
-            MockCmdLine.get_commandline_config.return_value = mock_cmdline_cfg
-            mock_dbcfg.set_db_configuration = Mock()
-            mock_dbcfg.read_db_config_file = Mock(return_value={})
+            mock_cmd_config = {"Mock": "Config", Config.CONFIG_DB: "MockDBCfg"}
+            self.mockCmdLineCfg.configuration = Mock(
+                name="configuration", return_value=mock_cmd_config
+            )
 
             self.config_obj.initialize_configuration()
 
-            self.assertEqual(self.config_obj.cmdline_configuration(), mock_cmdline_cfg)
-            mock_dbcfg.set_db_configuration.assert_called_once_with(mock_db_cfg)
-            mock_dbcfg.read_db_config_file.assert_not_called()
-            mock_reconf_log.assert_called_once_with()
-
-    def test_302_initialize_configuration_no_db_cfg(self):
-        with (
-            patch("core.configuration.config.CommandLine") as MockCmdLine,
-            patch("core.configuration.config.DBConfig") as mock_dbcfg,
-            patch("core.configuration.config.reconfigure_logging") as mock_reconf_log,
-        ):
-            MockCmdLine.get_commandline_config = Mock(name="get_commandline_config")
-            mock_db_cfg = {"NoCfgDb": "MockDBCfg"}
-            mock_cmdline_cfg = {"Mock": "Config"} | mock_db_cfg
-            MockCmdLine.get_commandline_config.return_value = mock_cmdline_cfg
-            mock_dbcfg.set_db_configuration = Mock()
-            mock_dbcfg.read_db_config_file = Mock(return_value={})
-
-            self.config_obj.initialize_configuration()
-
-            self.assertEqual(self.config_obj.cmdline_configuration(), mock_cmdline_cfg)
-            mock_dbcfg.set_db_configuration.assert_not_called()
-            mock_dbcfg.read_db_config_file.assert_called_once_with()
+            self.assertEqual(
+                self.config_obj._cmdline_configuration, self.mockCmdLineCfg
+            )
+            self.MockCmdLineCfg.assert_called_once_with()
+            self.assertEqual(self.config_obj._file_configuration, self.mockFileCfg)
+            self.MockFileCfg.assert_called_once_with(
+                cmdline_config=self.mockCmdLineCfg.configuration
+            )
+            self.config_obj._cmdline_configuration.subscribe_to_instance.assert_called_once_with(
+                self.mock_cfg_chg_handler
+            )
+            self.config_obj._file_configuration.subscribe_to_instance.assert_called_once_with(
+                self.mock_cfg_chg_handler
+            )
             mock_reconf_log.assert_called_once_with()
 
     async def _400_get_configuration_from_db(
@@ -167,19 +188,25 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
                 "MockUMode", Status.STATUS_SINGLE_USER
             )
 
-    def _500_configuration(self, glbl, cmdln):
+    def _500_configuration(self, glbl, cmdln, filecfg=None):
+        self.config_obj._cmdline_configuration = self.mockCmdLineCfg
+        self.config_obj._file_configuration = self.mockFileCfg
+
         if glbl:
             setattr(self.config_obj, "_global_configuration", Mock())
             getattr(self.config_obj, "_global_configuration").configuration_dict = glbl
-            expct = glbl
+            expct = copy.deepcopy(glbl)
         else:
             setattr(self.config_obj, "_global_configuration", None)
             expct = {}
-        setattr(self.config_obj, "_cmdline_configuration", cmdln)
+        self.mockFileCfg.configuration = filecfg
+        if filecfg:
+            update_dicts_recursively(expct, copy.deepcopy(filecfg))
+        self.mockCmdLineCfg.configuration = cmdln
+        if cmdln:
+            update_dicts_recursively(expct, copy.deepcopy(cmdln))
 
         result = self.config_obj.configuration()
-        if cmdln:
-            expct |= cmdln
 
         self.assertEqual(result, expct)
 
@@ -194,3 +221,26 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
 
     def test_504_configuration(self):
         self._500_configuration(None, None)
+
+    def test_505_configuration_file_only(self):
+        self._500_configuration(None, None, {"file": "muck"})
+
+    def test_506_configuration_global_file(self):
+        self._500_configuration({"global": "mock"}, None, {"file": "muck"})
+
+    def test_507_configuration_all_sources(self):
+        self._500_configuration(
+            {"global": "mock"}, {"cmdlin": "mick"}, {"file": "muck"}
+        )
+
+    def test_508_configuration_precedence_flat(self):
+        self._500_configuration(
+            {"shared": "global"}, {"shared": "cmdline"}, {"shared": "file"}
+        )
+
+    def test_509_configuration_precedence_nested(self):
+        self._500_configuration(
+            {"node": {"g": 1, "shared": "global"}},
+            {"node": {"c": 1, "shared": "cmdline"}},
+            {"node": {"f": 1, "shared": "file"}},
+        )

@@ -42,13 +42,13 @@ class TestCmdLine(unittest.TestCase):
         ):
             mock_testrun.return_value = True
             mock_parsed = Mock()
-            mock_parsed.dbcfg_file = "mock-path"
+            mock_parsed.filecfg_file = "mock-path"
             mock_parsed.cfg = args
             mock_parser = Mock(name="parser")
             mock_parser.add_argument = Mock()
             mock_parser.parse_known_args = Mock(return_value=(mock_parsed, ["unknown"]))
             MockParser.return_value = mock_parser
-            mock_res_dbcfg = {"mockKey": "mock-path"}
+            mock_res_filecfg = {"mockKey": "mock-path"}
             parsed_cfgs = [{"mock": arg} for arg in args if "=" in arg]
             mock_parse_dict.side_effect = parsed_cfgs
 
@@ -58,9 +58,9 @@ class TestCmdLine(unittest.TestCase):
 
         MockParser.assert_called_once_with(prog=APPNAME, description=APPDESC)
         call1 = call(
-            "-d",
-            "--db-configuration-file",
-            dest="dbcfg_file",
+            "-c",
+            "--configuration-file",
+            dest="filecfg_file",
             type=Path,
             default=ANY,
             help=ANY,
@@ -79,9 +79,9 @@ class TestCmdLine(unittest.TestCase):
         )
         self.assertEqual(
             mock_update_dicts.call_args_list,
-            [call(mock_res_dbcfg, cfg) for cfg in parsed_cfgs],
+            [call(mock_res_filecfg, cfg) for cfg in parsed_cfgs],
         )
-        self.assertEqual(result, mock_res_dbcfg)
+        self.assertEqual(result, mock_res_filecfg)
 
     def test_301_parse_commandline_no_args(self):
         self._300_parse_commandline()
@@ -98,7 +98,7 @@ class TestCmdLine(unittest.TestCase):
         ):
             mock_testrun.return_value = False
             mock_parsed = Mock()
-            mock_parsed.dbcfg_file = "mock-path"
+            mock_parsed.filecfg_file = "mock-path"
             mock_parsed.cfg = []
             mock_parser = Mock(name="parser")
             mock_parser.add_argument = Mock()
@@ -120,7 +120,7 @@ class TestCmdLine(unittest.TestCase):
         ):
             mock_testrun.return_value = True
             mock_parsed = Mock()
-            mock_parsed.dbcfg_file = "mock-path"
+            mock_parsed.filecfg_file = "mock-path"
             mock_parsed.cfg = []
             mock_parser = Mock(name="parser")
             mock_parser.add_argument = Mock()

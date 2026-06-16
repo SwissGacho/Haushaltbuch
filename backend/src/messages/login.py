@@ -11,7 +11,7 @@ from core.validation import check_login
 from server.ws_token import WSToken
 from server.session import Session
 from messages.message import Message, MessageType, MessageAttribute
-from data.management.user import User
+from bom_persistent.management.user import User
 
 
 class HelloMessage(Message):

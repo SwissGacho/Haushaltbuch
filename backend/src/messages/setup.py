@@ -6,7 +6,7 @@ from core.app_logging import getLogger, log_exit
 LOG = getLogger(__name__)
 
 from core.app import App
-from core.configuration.db_config import DBConfig
+from core.configuration.file_config import FileConfig
 from core.configuration.setup_config import ConfigSetup
 from messages.fetch_message import FetchMessage
 from messages.store_message import StoreMessage
@@ -33,8 +33,8 @@ class FetchSetupMessage(FetchMessage):
         index = self.get_str(MessageAttribute.WS_ATTR_INDEX)
         token = self.message.get(MessageAttribute.WS_ATTR_TOKEN)
         if object_type == DataObjectTypes.DO_TYPE_SETUP_CONFIG:
-            cfg_searchpath = DBConfig.cfg_searchpath()
-            db_locations = DBConfig.db_locations()
+            cfg_searchpath = FileConfig.cfg_searchpath()
+            db_locations = FileConfig.db_locations()
             msg = ObjectSetupMessage(
                 object_type=DataObjectTypes.DO_TYPE_SETUP_CONFIG,
                 index=index,

@@ -8,9 +8,8 @@ from unittest.mock import Mock, MagicMock, patch, call
 class Test_100_Data_Package(unittest.TestCase):
     def setUp(self):
         # Remove the package/module from sys.modules if it is already imported
-        for mod in ["data_persistent", "data_transient"]:
+        for mod in ["bom_persistent"]:
             if mod in sys.modules:
-                print(f"{sys.modules[mod]=}")
                 del sys.modules[mod]
 
     def test_100_import_business_objects(self):
@@ -74,10 +73,12 @@ class Test_100_Data_Package(unittest.TestCase):
             mock_import_module.side_effect = [mock_module1, mock_module2]
             mock_import_module.reset_mock()
 
-            import data
-            import transient_data
+            import bom_persistent
 
-            self.assertEqual(Mock_Path.call_count, 2)
+            Mock_Path.assert_called_once()
+            self.assertRegex(
+                Mock_Path.call_args.args[0], r"\\bom_persistent\\__init__\.py$"
+            )
             mock_base_path.rglob.assert_called_with("*.py")
             self.assertEqual(
                 mock_abs_path.relative_to.call_count,
@@ -85,7 +86,6 @@ class Test_100_Data_Package(unittest.TestCase):
                 "Path.relative_to() should be called 3 times",
             )
             mock_abs_path.relative_to.assert_called_with(MOCK_BASE_PARENT)
-            print(f"{mock_import_module.call_args_list=}")
             self.assertEqual(
                 mock_import_module.call_count,
                 2,

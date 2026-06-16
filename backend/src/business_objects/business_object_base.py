@@ -49,6 +49,10 @@ class BOBase(BOBaseBase):
     _last_subscriber_id = itertools.count(1)
 
     def __new__(cls, *args, bo_id: int | None = None, **attributes):
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"BOBase.__new__({cls.__name__}, {args=}, {bo_id=}, {attributes})",
+        )
         if cls is BOBase:
             raise TypeError(
                 "BOBase is an abstract class and cannot be instantiated directly"
@@ -59,10 +63,15 @@ class BOBase(BOBaseBase):
                 assert isinstance(
                     obj, cls
                 ), f"Loaded instance with id {bo_id} is not of type {cls.__name__}"
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"Found loaded instance id={id(obj)}",
+                )
                 return obj
 
         instance = super().__new__(cls)
         instance._initialized = False
+        LOG.log(VERBOSE_DEBUG, f"Created new instance id={id(instance)}")
         return instance
 
     def __init_subclass__(cls) -> None:
@@ -80,7 +89,10 @@ class BOBase(BOBaseBase):
             f"-  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}"
         )
         if getattr(self, "_initialized", False):
-            # LOG.debug(f"BOBase __init__ called again for {self} with id {self.id}, skipping reinitialization")
+            LOG.debug(
+                f"BOBase __init__ called again for {self} "
+                f"with id {self.id}, skipping reinitialization"
+            )
             self._init_attrs(attributes)
             return
         self._instance_subscribers: dict[int, BOCallback] = {}
@@ -109,7 +121,7 @@ class BOBase(BOBaseBase):
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__} "
-            f"({', '.join([a+': '+str(v) for a,v in self._data.items()])})"
+            f"({', '.join([a+': '+str(v) for a,v in self._data.items()if v is not None])})"
         )
 
     def __str__(self) -> str:
@@ -160,7 +172,9 @@ class BOBase(BOBaseBase):
         """Register an instance of this class as being loaded from the database."""
         if instance.id is not None:
             LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
+            LOG.log(VERBOSE_DEBUG, f"   id=: {id(instance)}")
             cls._loaded_instances[instance.id] = instance  # type: ignore
+            cls.subscriptions_report()
 
     @classmethod
     def add_attribute(
@@ -465,14 +479,14 @@ class BOBase(BOBaseBase):
             for sub in subs.values():
                 s = ""
                 if hasattr(sub, "__self__") and hasattr(sub.__self__, "_obj"):
-                    s += f"{str(sub.__self__._obj)}: "
-                try:
-                    if hasattr(sub, "__self__"):
-                        s += f"{sub.__self__._connection.connection_context.get('comp',sub.__self__._connection.connection_context.get('socket','unknown'))}"
-                    else:
-                        s += repr(sub)
-                except Exception as e:
-                    LOG.error(f"{e} for {sub=}")
+                    s += f"{str(sub.__self__._obj)}{('<'+str(id(sub.__self__._obj))[-4:]+'>') if py_id else ''}: "
+                    s += f"{sub.__self__._connection.connection_context.get('comp',sub.__self__._connection.connection_context.get('socket','unknown'))}"
+                elif hasattr(sub, "__self__") and isinstance(sub.__self__, BOBase):
+                    s += f"{str(sub.__self__)}{('<'+str(id(sub.__self__))[-4:]+'>') if py_id else ''}"
+                elif hasattr(sub, "__name__"):
+                    s += f"{sub.__name__}"
+                else:
+                    s += f"{repr(sub)}"
                 rslt.append(s)
             return rslt
 
@@ -494,6 +508,7 @@ class BOBase(BOBaseBase):
             exclude = [exclude]
         if not isinstance(include, list) or not isinstance(exclude, list):
             return
+        py_id = bool(subs_rep_cfg.get("py_id", False))
 
         for bo_name, bo_class in [
             (name, cls)
@@ -514,7 +529,9 @@ class BOBase(BOBaseBase):
                     )
                 else:
                     subs[bo_name]["instances"].append(
-                        f"{str(instance)}: no subscribers"
+                        f"{str(instance)}"
+                        + (" <" + f"{id(instance)}"[-4:] + ">" if py_id else "")
+                        + ": no subscribers"
                     )
         # LOG.debug(f"{subs=}")
         try:

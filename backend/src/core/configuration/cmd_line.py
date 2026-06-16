@@ -11,7 +11,7 @@ from typing import Any
 
 
 from core.util_base import update_dicts_recursively
-from core.const import APPDESC, APPNAME, DBCFG_FILE_NAME
+from core.const import APPDESC, APPNAME, FILECFG_FILE_NAME, CONFIG_FILECFG_FILE
 
 # from core.base_objects import ConfigDict
 
@@ -49,16 +49,16 @@ class CommandLine:
     parsed_commandline = {}
 
     @classmethod
-    def parse_commandline(cls, dbcfg_file_key: str):
+    def parse_commandline(cls, filecfg_file_key: str):
         "Parse the commandline for configuration overrides"
         parser = argparse.ArgumentParser(prog=APPNAME, description=APPDESC)
         parser.add_argument(
-            "-d",
-            "--db-configuration-file",
-            dest="dbcfg_file",
+            "-c",
+            "--configuration-file",
+            dest=CONFIG_FILECFG_FILE,
             type=Path,
-            default=Path(DBCFG_FILE_NAME),
-            help="Name of the database configuration file (default: %(default)s)",
+            default=Path(FILECFG_FILE_NAME),
+            help="Name of the configuration file (default: %(default)s)",
         )
         parser.add_argument(
             "cfg",
@@ -70,7 +70,9 @@ class CommandLine:
         if unknown and not _is_test_runner_context():
             parser.error(f"unrecognized arguments: {' '.join(unknown)}")
 
-        cls.parsed_commandline = {dbcfg_file_key: args.dbcfg_file}
+        cls.parsed_commandline = {
+            filecfg_file_key: str(getattr(args, CONFIG_FILECFG_FILE))
+        }
         for arg in args.cfg:
             if "=" not in arg:
                 continue
@@ -80,4 +82,10 @@ class CommandLine:
 
     @classmethod
     def get_commandline_config(cls) -> dict[str, Any]:
+        """Get the commandline configuration as a dictionary."""
         return cls.parsed_commandline
+
+    @classmethod
+    def set_commandline_config(cls, config: dict[str, Any]):
+        """Set the commandline configuration as a dictionary."""
+        cls.parsed_commandline = config

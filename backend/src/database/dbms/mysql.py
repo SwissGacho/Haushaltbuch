@@ -10,7 +10,8 @@ from core.app_logging import getLogger, log_exit, DEBUG
 
 LOG = getLogger(__name__)
 
-from core.configuration.config import Config, DBConfig
+from core.app import App
+from core.configuration.config import Config
 from core.exceptions import ConfigurationError, OperationalError
 from core.util_base import get_config_item
 from database.dbms.db_base import (
@@ -176,7 +177,7 @@ class MySQLInsert(Insert):
     """MySQL specific INSERT statement"""
 
     def returning(self, column: str):
-        db_type = get_config_item(DBConfig.db_configuration, Config.CONFIG_DB_DB)
+        db_type = get_config_item(App.configuration, Config.CONFIG_DB_DB)
         LOG.debug(f"MySQLInsert.returning({column=});  {db_type=}")
         if db_type == "MySQL":
             raise NotImplementedError(
@@ -189,7 +190,7 @@ class MySQLUpdate(Update):
     """MySQL specific UPDATE statement"""
 
     def returning(self, column: str):
-        db_type = get_config_item(DBConfig.db_configuration, Config.CONFIG_DB_DB)
+        db_type = get_config_item(App.configuration, Config.CONFIG_DB_DB)
         if db_type == "MySQL":
             raise NotImplementedError(
                 "MySQL does not support returning values from UPDATE statements."
@@ -306,8 +307,8 @@ class MySQLConnection(Connection):
             db_version = (
                 await (await sql.script(SQLTemplate.DBVERSION).execute()).fetchone()
             )["version"]
-            LOG.info(f"Connected to DB version {db_version} / [{self._db}]")
-        if get_config_item(DBConfig.db_configuration, Config.CONFIG_DB_DB) == "MariaDB":
+            LOG.info(f"Connected to DB version {db_version}")
+        if get_config_item(App.configuration, Config.CONFIG_DB_DB) == "MariaDB":
             if not "MariaDB" in db_version:
                 raise ConfigurationError(
                     "Connected DB is not a MariaDB database."

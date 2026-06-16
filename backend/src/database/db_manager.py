@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 import decimal
 
-from core.app_logging import getLogger, log_exit
+from core.app_logging import getLogger, log_exit, redact, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
@@ -11,7 +11,6 @@ from core.app import App
 from core.util_base import get_config_item
 from core.status import Status
 from core.configuration.config import Config
-from core.configuration.db_config import DBConfig
 from database.dbms.sqlite import SQLiteDB
 from database.dbms.mysql import MySQLDB
 from database.schema_maintenance import check_db_schema
@@ -25,15 +24,15 @@ async def get_db():
         yield
         return
 
-    db_config = get_config_item(DBConfig.db_configuration, Config.CONFIG_DB)
-    db_type = get_config_item(DBConfig.db_configuration, Config.CONFIG_DB_DB)
+    db_config = get_config_item(App.configuration, Config.CONFIG_DB)
+    db_type = get_config_item(App.configuration, Config.CONFIG_DB_DB)
     if not (db_config and db_type):
-        LOG.error(f"Invalid DB configuration: {App.configuration}")
+        LOG.error(f"Invalid DB configuration: {redact(App.configuration)}")
         yield
         return
-    # LOG.debug(f"DB configuration: {db_config=}, {db_type=}")
+    LOG.debug(f"DB configuration: {redact(db_config)=}, {db_type=}")
     if db_type == "SQLite":
-        # LOG.debug("Connect to SQLite")
+        LOG.info("Connecting to SQLite")
         try:
             db = SQLiteDB(**db_config)
         except ModuleNotFoundError as exc:
@@ -47,7 +46,7 @@ async def get_db():
             yield
             return
     elif db_type == "MySQL" or db_type == "MariaDB":
-        LOG.info(f"Connect to {db_type}")
+        LOG.info(f"Connecting to {db_type}")
         try:
             db = MySQLDB(**db_config)
         except ModuleNotFoundError as exc:
@@ -62,7 +61,7 @@ async def get_db():
             return
     else:
         App.status = Status.STATUS_DB_UNSUPPORTED
-        LOG.warning(f"Invalid DB configuration: {db_config}")
+        LOG.warning(f"Invalid DB configuration: {redact(db_config)}")
         yield
         return
     try:

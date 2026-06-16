@@ -18,8 +18,8 @@ LOG = getLogger(__name__)
 
 from core.exceptions import DBSchemaError, ConfigurationError
 from core.app import App
+from core.base_objects import Config
 from core.status import Status
-from core.configuration.db_config import DBConfig
 from core.util import check_environment
 from core.reconfigure_logging import reconfigure_logging
 from database.db_manager import get_db
@@ -53,7 +53,8 @@ async def main():
             # LOG.debug("Start DB, config")
             App.status = (
                 Status.STATUS_DB_CFG
-                if DBConfig.db_configuration
+                if Config.CONFIG_DB
+                in App.configuration  # pylint: disable=unsupported-membership-test
                 else Status.STATUS_NO_DB
             )
             try:
