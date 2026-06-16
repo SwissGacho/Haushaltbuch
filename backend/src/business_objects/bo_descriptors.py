@@ -5,10 +5,11 @@ import json
 from enum import EnumType, Flag, StrEnum, auto
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Protocol, cast
+from typing import Any
 import sys
 
 from core.app_logging import getLogger, log_exit
+from core.exceptions import ConfigurationError, OperationalError
 
 LOG = getLogger(__name__)
 
@@ -220,9 +221,9 @@ class BODecimal(_PersistentAttr[Decimal]):
         if isinstance(value, Decimal):
             try:
                 db: Any = App.db
-            except ReferenceError as exc:
-                raise ValueError(
-                    "Decimal validation requires an initialized DB implementation"
+            except (ConfigurationError, ReferenceError) as exc:
+                raise OperationalError(
+                    f"Decimal validation requires an initialized DB implementation, got error: {exc}"
                 ) from exc
             if not db.validate_decimal(value):
                 caps = db.decimal_capabilities
