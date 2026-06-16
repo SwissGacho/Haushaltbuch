@@ -192,7 +192,7 @@ class BOInt(_PersistentAttr[int]):
         return super().validate(value) or isinstance(value, int)
 
 
-class BODecimal(_PersistantAttr[Decimal]):
+class BODecimal(_PersistentAttr[Decimal]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:
