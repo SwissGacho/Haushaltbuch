@@ -19,7 +19,7 @@ from business_objects.bo_descriptors import (
     BODate,
     BODecimal,
 )
-from data.accounting.account import Account
+from bom_persistent.account.account import Account
 
 
 class Transaction(PersistentBusinessObject):
