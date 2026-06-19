@@ -8,6 +8,7 @@ from datetime import datetime
 import itertools
 from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 import weakref
+import copy
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
@@ -21,6 +22,7 @@ from business_objects.bo_descriptors import (
     AttributeType,
     BOColumnConstraint,
     BOBaseBase,
+    BOStr,
     BOId,
     BODatetime,
 )
@@ -31,6 +33,8 @@ BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 
 class BOBase(BOBaseBase):
     "Business Object baseclass"
+
+    bo_name = BOStr()
 
     id = BOId(
         BOColumnConstraint.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_READ_ONLY
@@ -208,7 +212,9 @@ class BOBase(BOBaseBase):
     def register_bo_class(cls):
         "Register the Business Object."
         BOBase._business_objects |= {cls._name(): cls}
-        LOG.debug(f"registered class '{cls.__name__}' as {cls._name()}")
+        LOG.debug(
+            f"registered {'specialized ' if 'Specialized' in [base.__name__ for base in cls.__bases__] else ''}class '{cls.__name__}' as {cls._name()}"
+        )
 
     # pylint: disable=no-self-argument
     @_classproperty
@@ -263,10 +269,11 @@ class BOBase(BOBaseBase):
     @classmethod
     def attribute_descriptions(cls) -> list[AttributeDescription]:
         "list of attribute descriptions"
-        cls_cols = cls._attributes.get(cls.__name__, [])
+        cls_cols = copy.copy(cls._attributes.get(cls.__name__, []))
         assert cls.__base__ is not None, "BOBase.__base__ is None"
-        if issubclass(cls.__base__, BOBase):
-            return cls.__base__.attribute_descriptions() + cls_cols
+        for base in cls.__bases__:
+            if issubclass(base, BOBase):
+                cls_cols = base.attribute_descriptions() + cls_cols
         return cls_cols
 
     @classmethod

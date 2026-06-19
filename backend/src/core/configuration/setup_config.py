@@ -19,7 +19,7 @@ from core.base_objects import Config
 from core.base_objects import BaseObject
 from core.exceptions import ConfigurationError, DataError
 from bom_persistent.management.user import User, UserRole
-from bom_persistent.management.configuration import Configuration
+from bom_persistent.management.configuration import CommonConfiguration
 from database.sql_expression import ColumnName
 
 WAIT_AVAILABLE_TASK = "wait_for_available"
@@ -93,15 +93,17 @@ class ConfigSetup(BaseObject):
             Config.CONFIG_APP: {Config.CONFIG_USR_MODE: SetupConfigValues.SINGLE_USER}
         }
         update_dicts_recursively(target=configuration, source=app_configuration)
-        rows_in_db = await Configuration.get_matching_ids({ColumnName("user_id"): None})
+        rows_in_db = await CommonConfiguration.get_matching_ids(
+            {ColumnName("user_id"): None}
+        )
         if len(rows_in_db) > 1:
             LOG.error(f"Multiple ({len(rows_in_db)}) global configurations in DB")
             raise ConfigurationError("Multiple global configurations in DB")
         elif len(rows_in_db) == 1:
-            bo = await Configuration(bo_id=rows_in_db[0]).fetch()
+            bo = await CommonConfiguration(bo_id=rows_in_db[0]).fetch()
             update_dicts_recursively(target=bo.configuration, source=configuration)
         else:
-            bo = Configuration(configuration=configuration)
+            bo = CommonConfiguration(configuration=configuration)
         # LOG.debug(
         #     f"ConfigSetup._create_or_update_global_configuration(): {bo.configuration=}"
         # )

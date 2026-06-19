@@ -4,13 +4,24 @@ from typing import Any, Self, Optional, Protocol, AsyncContextManager
 import re
 import json
 
-from core.app_logging import getLogger, log_exit, redact, DEBUG
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    redact,
+    pprint_lines,
+    DEBUG,
+    VERBOSE_DEBUG,
+)
 
 LOG = getLogger(__name__)
 
 from core.base_objects import DBBaseClass, ConnectionBaseClass
 from core.exceptions import OperationalError
 from business_objects.business_object_base import BOBase
+from business_objects.persistent_business_object import (
+    PersistentBusinessObject,
+    Specialized,
+)
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
 from database.sql_clause import SQLColumnDefinition
@@ -32,9 +43,11 @@ class DB(DBBaseClass):
 
     def check_column(self, tab, col, name, data_type, constraint, **pars):
         "check compatibility of a DB column with a business object attribute"
-        # LOG.debug(
-        #     f"DB.check_column({col=}, {name=}, {data_type=}, {constraint=}, {pars=})"
-        # )
+        LOG.debug(f"DB.check_column {tab}.{name}")
+        for line in pprint_lines(
+            (f"   {col=}", f"{name=}", f"{data_type=}", f"{constraint=}", f"{pars=}")
+        ):
+            LOG.debug(line)
         attr_sql = SQLColumnDefinition(
             name, data_type, constraint, parent=SQL(), **pars
         ).get_query()
@@ -67,10 +80,15 @@ class DB(DBBaseClass):
 
     async def check_table(self, obj: BOBase):
         "check compatibility of a DB table with a business object"
-        # LOG.debug(f"Checking table '{obj.table}'")
+        if not isinstance(obj, type) or not issubclass(obj, PersistentBusinessObject):
+            raise TypeError(
+                f"check_table: {obj} is not a subclass of PersistentBusinessObject"
+            )
+        LOG.debug(f"Checking table '{obj.table}'")
         tab_info = await self._get_table_info(obj.table)
+        attributes = obj.attribute_descriptions(include_specialized=True)
         ok = True
-        for description in obj.attribute_descriptions():
+        for description in attributes:
             ok = (
                 self.check_column(
                     obj.table,
