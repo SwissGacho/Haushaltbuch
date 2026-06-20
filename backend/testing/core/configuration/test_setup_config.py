@@ -125,7 +125,9 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         mock_col = "mock_colname"
         captured_args = []
         with (
-            patch("core.configuration.setup_config.Configuration") as MockConfiguration,
+            patch(
+                "core.configuration.setup_config.CommonConfiguration"
+            ) as MockConfiguration,
             patch("core.configuration.setup_config.ColumnName") as MockColumnName,
             patch(
                 "core.configuration.setup_config.update_dicts_recursively"
@@ -194,7 +196,9 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         mock_cfg = {"mock": "configuration"}
         mock_col = "mock_colname"
         with (
-            patch("core.configuration.setup_config.Configuration") as MockConfiguration,
+            patch(
+                "core.configuration.setup_config.CommonConfiguration"
+            ) as MockConfiguration,
             patch("core.configuration.setup_config.ColumnName") as MockColumnName,
             self.assertRaises(ConfigurationError),
         ):

@@ -71,9 +71,7 @@ class AppConfiguration(ConfigurationBaseClass):
         "Fetch configuration from database"
         async with FileConfig.db_config_lock:
             LOG.debug("AppConfiguration.get_configuration_from_db: DB available")
-            config_ids = await CommonConfiguration.get_matching_ids(
-                # {ColumnName("user_id"): None}
-            )
+            config_ids = await CommonConfiguration.get_matching_ids()
             LOG.log(
                 VERBOSE_DEBUG,
                 f"AppConfiguration.get_configuration_from_db: {config_ids=}",

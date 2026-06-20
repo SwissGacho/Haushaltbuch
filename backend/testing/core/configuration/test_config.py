@@ -103,7 +103,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             mock_ids = [1]
 
         with (
-            patch("core.configuration.config.Configuration") as MockConfiguration,
+            patch("core.configuration.config.CommonConfiguration") as MockConfiguration,
             patch("core.configuration.config.ColumnName") as MockColNam,
             patch("core.configuration.config.get_config_item") as mock_get_config_item,
             patch("core.configuration.config.User") as MockUser,
@@ -128,14 +128,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             result = await self.config_obj.get_configuration_from_db()
 
             self.assertIsNone(result)
-            self.assertEqual(
-                MockColNam.call_count,
-                2 if u_mode == SetupConfigValues.SINGLE_USER else 1,
-            )
-            MockColNam.assert_any_call("user_id")
-            MockConfiguration.get_matching_ids.assert_awaited_once_with(
-                {mock_col: None}
-            )
+            MockConfiguration.get_matching_ids.assert_awaited_once_with()
             mock_configuration.fetch.assert_awaited_once_with(id=mock_ids[0])
             self.assertEqual(
                 getattr(self.config_obj, "_global_configuration"),
@@ -146,7 +139,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(MockApp.status, stat)
             if u_mode == SetupConfigValues.SINGLE_USER:
-                MockColNam.assert_any_call("name")
+                MockColNam.assert_called_once_with("name")
                 MockUser.get_matching_ids.assert_awaited_once_with(
                     {MockColNam.return_value: SINGLE_USER_NAME}
                 )
@@ -159,6 +152,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
                     MockUser.assert_not_called()
                     MockUser.return_value.store.assert_not_awaited()
             else:
+                MockColNam.assert_not_called()
                 MockUser.get_matching_ids.assert_not_awaited()
                 MockUser.assert_not_called()
                 MockUser.return_value.store.assert_not_awaited()

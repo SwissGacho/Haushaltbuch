@@ -284,7 +284,7 @@ class PersistentBusinessObject(BOBase):
                     description.constraint_values,
                 )
             LOG.debug(
-                f"Creating {(cls if bo_name is None else cls.get_business_object_by_name(bo_name)).__name__} object with id={obj.get('id')} {bo_name=}   XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+                f"Creating {(cls if bo_name is None else cls.get_business_object_by_name(bo_name)).__name__} object with id={obj.get('id')}"
             )
             objects.append(
                 (cls if bo_name is None else cls.get_business_object_by_name(bo_name))(
@@ -393,7 +393,10 @@ class PersistentBusinessObject(BOBase):
             changes = False
             descriptions = {d.name: d for d in self.attribute_descriptions()}
             for k, v in self._data.items():
-                if k != "id" and v != PersistentBusinessObject.convert_from_db(
+                if k not in (
+                    "bo_name",
+                    "id",
+                ) and v != PersistentBusinessObject.convert_from_db(
                     self._db_data.get(k),
                     descriptions[k].data_type,
                     descriptions[k].constraint_values,

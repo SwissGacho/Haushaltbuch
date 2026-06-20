@@ -31,6 +31,7 @@ class MockPersistentBO2(PersistentBusinessObject):
 
     def __init__(
         self,
+        bo_name=None,
         bo_id=None,
         last_updated=None,
         mock_attr1="mockk attriubute 1",
@@ -38,6 +39,7 @@ class MockPersistentBO2(PersistentBusinessObject):
         mock_attr3=[],
     ) -> None:
         super().__init__(bo_id=bo_id, last_updated=last_updated)
+        self.bo_name = bo_name
         self.mock_attr1 = mock_attr1
         self.mock_attr2 = mock_attr2
         self.mock_attr3 = mock_attr3
@@ -58,6 +60,12 @@ class MockAttrDesc:
 
 
 mock_attr_desc = [
+    MockAttrDesc(
+        "bo_name",
+        str,
+        BOColumnConstraint.BOC_NONE,
+        {"semantic_role": BOSemanticRole.RAW},
+    ),
     MockAttrDesc(
         "id", int, BOColumnConstraint.BOC_PK_INC, {"semantic_role": BOSemanticRole.RAW}
     ),
@@ -248,15 +256,19 @@ class Test_100_Persistent_Business_Object_classmethods(
         mock_fetch_result = [
             {
                 a: (
-                    1
-                    if a == "id"
+                    "mockpersistentbo2"
+                    if a == "bo_name"
                     else (
-                        MockPersistentBO1(bo_id=2)
-                        if a == "mock_attr2"
+                        1
+                        if a == "id"
                         else (
-                            [1, 11]
-                            if a == "mock_attr3"
-                            else "12341231 123456" if a == "last_updated" else a
+                            MockPersistentBO1(bo_id=2)
+                            if a == "mock_attr2"
+                            else (
+                                [1, 11]
+                                if a == "mock_attr3"
+                                else "12341231 123456" if a == "last_updated" else a
+                            )
                         )
                     )
                 )
@@ -264,15 +276,19 @@ class Test_100_Persistent_Business_Object_classmethods(
             },
             {
                 a: (
-                    9
-                    if a == "id"
+                    "mockpersistentbo2"
+                    if a == "bo_name"
                     else (
-                        MockPersistentBO1(bo_id=8)
-                        if a == "mock_attr2"
+                        9
+                        if a == "id"
                         else (
-                            [99, 99]
-                            if a == "mock_attr3"
-                            else "12341231 123456" if a == "last_updated" else a
+                            MockPersistentBO1(bo_id=8)
+                            if a == "mock_attr2"
+                            else (
+                                [99, 99]
+                                if a == "mock_attr3"
+                                else "12341231 123456" if a == "last_updated" else a
+                            )
                         )
                     )
                 )
@@ -301,12 +317,20 @@ class Test_100_Persistent_Business_Object_classmethods(
         mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
         mock_sql.__aexit__ = AsyncMock(return_value=None)
 
+        mock_get_business_object_by_name = Mock(
+            name="get_business_object_by_name", return_value=MockPersistentBO2
+        )
+
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
             patch("business_objects.persistent_business_object.Filter") as MockFilter,
             patch(
                 "business_objects.persistent_business_object.PersistentBusinessObject.convert_from_db",
                 new=mock_convert_from_db,
+            ),
+            patch(
+                "business_objects.persistent_business_object.BOBase.get_business_object_by_name",
+                new=mock_get_business_object_by_name,
             ),
         ):
             result = await MockPersistentBO2.get_matching_objects(
@@ -347,6 +371,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_sql.__aexit__ = AsyncMock(return_value=None)
         self.mock_cursor = Mock(name="mock_cursor")
         self.FETCH_RESULT = {
+            "bo_name": "mock persistent bo 2",
             "id": 33,
             "last_updated": "1990-01-31 17:38",
             "mock_attr1": "mick mack",
@@ -454,6 +479,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self, mock_attr1="micki mock", mock_attr3=[], **mock_attrs
     ):
         mock_attrs |= {"mock_attr1": mock_attr1, "mock_attr3": mock_attr3}
+        mock_attrs |= {"bo_name": "mockpersistentbo2"}
         with (
             patch(
                 "business_objects.persistent_business_object.SQLTransaction",
@@ -524,7 +550,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                     mock_bo2_constr_vals[a],
                 )
                 for a in mock_bo2_as_dict
-                if a != "id"
+                if a not in ("bo_name", "id")
             ]
             self.mock_bo.attributes_as_dict = Mock(
                 name="attributes_as_dict", return_value=mock_bo2_as_dict
@@ -535,7 +561,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             new_vals = [
                 (a, self.mock_bo._data[a])
                 for a in self.mock_bo._data
-                if a != "id" and self.mock_bo._data[a] != self.mock_bo._db_data.get(a)
+                if a not in ("bo_name", "id")
+                and self.mock_bo._data[a] != self.mock_bo._db_data.get(a)
             ]
             last_updated_present = (
                 "last_updated" in self.mock_bo._data

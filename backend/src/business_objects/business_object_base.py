@@ -34,7 +34,7 @@ BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 class BOBase(BOBaseBase):
     "Business Object baseclass"
 
-    bo_name = BOStr()
+    bo_name = BOStr(access_level=AttributeAccessLevel.AAL_READ_ONLY)
 
     id = BOId(
         BOColumnConstraint.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_READ_ONLY
