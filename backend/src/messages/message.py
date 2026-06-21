@@ -7,7 +7,7 @@ from enum import StrEnum
 from json import dumps, loads
 from typing import Any, Optional
 
-from core.app_logging import getLogger, log_exit, Logger, redact
+from core.app_logging import getLogger, log_exit, Logger, redact, VERBOSE_DEBUG
 
 LOG: Logger = getLogger(__name__)
 
@@ -172,10 +172,17 @@ class Message(BaseObject):
             serialized_message = await _serialize(self.message)
             return dumps(serialized_message, default=json_encode)
         except (ValueError, TypeError) as e:
-            LOG.error(f"Error serializing message: {redact(e)}")
-            LOG.error(f"{redact(self.message)=}")
-            LOG.error(f"{redact(serialized_message)=}")
-            LOG.error(f"Message.serialize: message={redact(self.message)}")
+            LOG.error(
+                f"Error serializing message ({type(e).__name__}). "
+                "Enable VERBOSE_DEBUG for redacted details."
+            )
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                LOG.log(VERBOSE_DEBUG, f"Message.serialize: {redact(e)=}")
+                LOG.log(VERBOSE_DEBUG, f"Message.serialize: {redact(self.message)=}")
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"Message.serialize: {redact(serialized_message)=}",
+                )
             raise
 
     async def handle_message(self, connection):

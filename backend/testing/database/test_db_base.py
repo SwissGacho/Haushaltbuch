@@ -1,15 +1,13 @@
 """Test suite for DB connection base classes"""
 
+from decimal import Decimal, Context
 import logging
 import unittest
-from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call, ANY
+from unittest.mock import Mock, PropertyMock, AsyncMock, patch, call, ANY
 
 
 import database.dbms.db_base
 from database.sql_executable import SQLExecutable
-from database.sql import SQL
-from database.sql_clause import SQLColumnDefinition
-from business_objects.bo_descriptors import BOColumnConstraint
 
 
 class MockFactory:
@@ -94,6 +92,81 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
         await self.db.close()
         con1.close.assert_awaited_once_with()
         con2.close.assert_awaited_once_with()
+
+    def test_204_test_decimal_capability(self):
+        # decimal_capabilities property should raise NotImplementedError by default
+        with self.assertRaises(NotImplementedError):
+            self.db.decimal_capabilities
+        with self.assertRaises(NotImplementedError):
+            self.db.validate_decimal(Decimal("123.45"))
+
+        # Test with actual DecimalCapabilities instance
+        test_capabilities = database.dbms.db_base.DecimalCapabilities(
+            max_total_digits=20, max_decimal_scale=10
+        )
+        with patch.object(self.db.__class__, "DECIMAL_CAPABILITIES", test_capabilities):
+            self.assertEqual(self.db.decimal_capabilities, test_capabilities)
+
+            # Test validate_decimal classmethod - valid cases
+            self.assertTrue(
+                self.db.validate_decimal(Decimal("0")),
+                msg="Zero should be valid",
+            )
+            self.assertTrue(
+                self.db.validate_decimal(Decimal("123.45")),
+                msg="Normal decimal should be valid",
+            )
+            self.assertTrue(
+                self.db.validate_decimal(Decimal("1234567890.1234567890")),
+                msg="Value at maximum precision should be valid",
+            )
+            self.assertTrue(
+                self.db.validate_decimal(Decimal("-123.45")),
+                msg="Negative decimal should be valid",
+            )
+            self.assertTrue(
+                self.db.validate_decimal(Decimal("0.0000000000")),
+                msg="Zero with explicit scale should be valid",
+            )
+            self.assertTrue(
+                self.db.validate_decimal(Decimal("100")),
+                msg="Integer without decimal places should be valid",
+            )
+
+            # Test validate_decimal classmethod - invalid cases
+            self.assertFalse(
+                self.db.validate_decimal(Decimal("12345678901234567890.1234567890")),
+                msg="Decimal exceeding total digits should be invalid",
+            )
+            self.assertFalse(
+                self.db.validate_decimal(Decimal("123.45123456789")),
+                msg="Decimal exceeding max scale should be invalid",
+            )
+
+    def test_205_configure_decimal_context(self):
+        # configure_decimal_context should raise NotImplementedError when DECIMAL_CAPABILITIES not set
+        decimal_context = Context()
+        with self.assertRaises(NotImplementedError):
+            self.db.configure_decimal_context(decimal_context)
+
+        # Test with actual DecimalCapabilities
+        test_capabilities = database.dbms.db_base.DecimalCapabilities(
+            max_total_digits=15, max_decimal_scale=5
+        )
+        with patch.object(self.db.__class__, "DECIMAL_CAPABILITIES", test_capabilities):
+            decimal_context = Context()
+            initial_prec = decimal_context.prec
+            self.db.configure_decimal_context(decimal_context)
+            self.assertEqual(
+                decimal_context.prec,
+                15,
+                msg="Context precision should be set to max_total_digits",
+            )
+            self.assertNotEqual(
+                decimal_context.prec,
+                initial_prec,
+                msg="Context precision should have changed from initial value",
+            )
 
 
 class TestDBConnection(unittest.IsolatedAsyncioTestCase):

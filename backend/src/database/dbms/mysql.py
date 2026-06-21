@@ -3,7 +3,7 @@
 from decimal import Decimal
 import ssl
 import datetime
-from typing import Any, Optional, Self
+from typing import Optional, Self
 from pathlib import Path
 
 from core.app_logging import getLogger, log_exit, DEBUG
