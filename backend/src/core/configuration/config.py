@@ -16,7 +16,6 @@ from core.util_base import update_dicts_recursively
 LOG = getLogger(__name__)
 
 from core.configuration.file_config import FileConfig
-from core.const import SINGLE_USER_NAME
 from core.util_base import get_config_item
 from core.configuration.setup_config import SetupConfigValues
 from core.app import App
@@ -26,7 +25,7 @@ from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config
 from business_objects.business_object_base import BOBase
 from bom_persistent.management.configuration import CommonConfiguration
-from bom_persistent.management.user import User, UserRole
+from bom_persistent.management.user import SingleUser, User, UserRole
 from bom_transient.cmdline_configuration import CmdlineConfiguration
 from bom_transient.file_configuration import FileConfiguration
 from database.sql_expression import ColumnName
@@ -120,13 +119,11 @@ class AppConfiguration(ConfigurationBaseClass):
                 raise ConfigurationError(f"User mode: '{user_mode}'")
             if (
                 user_mode == SetupConfigValues.SINGLE_USER
-                and not await User.get_matching_ids(
-                    {ColumnName("name"): SINGLE_USER_NAME}
-                )
+                and not await SingleUser.get_matching_ids()
             ):
                 # create single user
-                LOG.info(f"Creating single user '{SINGLE_USER_NAME}'")
-                await User(name=SINGLE_USER_NAME, role=UserRole.ADMIN).store()
+                LOG.info(f"Creating single user.")
+                await SingleUser(role=UserRole.ADMIN).store()
             LOG.debug(f"AppConfiguration.get_configuration_from_db: {user_mode=}")
             App.status = (
                 Status.STATUS_SINGLE_USER

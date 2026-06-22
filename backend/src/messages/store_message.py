@@ -42,6 +42,11 @@ class StoreMessage(Message):
         for key, value in payload.items():
             if key in bo_type.attributes_as_dict().keys():
                 setattr(affected_bo, key, value)
+            else:
+                LOG.warning(
+                    f"StoreMessage.handle_message: Ignoring unknown attribute '{key}' "
+                    f"for business object '{bo_type.__name__}'"
+                )
         await affected_bo.store()
 
         # Send a response message back to the frontend with the new id of the stored business object

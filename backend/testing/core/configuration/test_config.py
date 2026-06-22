@@ -8,7 +8,6 @@ import copy
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from core.const import SINGLE_USER_NAME
 from core.base_objects import Config, ConfigDict
 from core.configuration.setup_config import SetupConfigValues
 from core.exceptions import ConfigurationError
@@ -106,6 +105,7 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             patch("core.configuration.config.CommonConfiguration") as MockConfiguration,
             patch("core.configuration.config.ColumnName") as MockColNam,
             patch("core.configuration.config.get_config_item") as mock_get_config_item,
+            patch("core.configuration.config.SingleUser") as MockSingleUser,
             patch("core.configuration.config.User") as MockUser,
             patch("core.configuration.config.App") as MockApp,
         ):
@@ -119,6 +119,13 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             )
             MockConfiguration.return_value = mock_configuration
             mock_get_config_item.return_value = u_mode
+
+            MockSingleUser.get_matching_ids = AsyncMock(
+                return_value=[] if no_sngl_usr else [1]
+            )
+            MockSingleUser.return_value = Mock(name="mockuser")
+            MockSingleUser.return_value.store = AsyncMock()
+
             MockUser.get_matching_ids = AsyncMock(
                 return_value=[] if no_sngl_usr else [1]
             )
@@ -139,18 +146,14 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(MockApp.status, stat)
             if u_mode == SetupConfigValues.SINGLE_USER:
-                MockColNam.assert_called_once_with("name")
-                MockUser.get_matching_ids.assert_awaited_once_with(
-                    {MockColNam.return_value: SINGLE_USER_NAME}
-                )
+                MockColNam.assert_not_called()
+                MockSingleUser.get_matching_ids.assert_awaited_once_with()
                 if no_sngl_usr:
-                    MockUser.assert_called_once_with(
-                        name=SINGLE_USER_NAME, role=UserRole.ADMIN
-                    )
-                    MockUser.return_value.store.assert_awaited_once()
+                    MockSingleUser.assert_called_once_with(role=UserRole.ADMIN)
+                    MockSingleUser.return_value.store.assert_awaited_once()
                 else:
-                    MockUser.assert_not_called()
-                    MockUser.return_value.store.assert_not_awaited()
+                    MockSingleUser.assert_not_called()
+                    MockSingleUser.return_value.store.assert_not_awaited()
             else:
                 MockColNam.assert_not_called()
                 MockUser.get_matching_ids.assert_not_awaited()

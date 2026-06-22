@@ -157,7 +157,7 @@ class BOBase(BOBaseBase):
         """Return a list of attribute names that should be used to construct the display name."""
         return [
             cur.name
-            for cur in cls.attribute_descriptions()
+            for cur in cls.attribute_descriptions(include_specialized=True)
             if cur.constraint_values.get("semantic_role") == BOSemanticRole.BONAME
         ]
 
@@ -249,8 +249,9 @@ class BOBase(BOBaseBase):
         "dict of BO attribute types with attribute names as keys"
         cls_cols = {a.name: a.data_type for a in cls._attributes.get(cls.__name__, [])}
         assert cls.__base__ is not None, "BOBase.__base__ is None"
-        if issubclass(cls.__base__, BOBase):
-            return cls.__base__.attributes_as_dict() | cls_cols
+        for base in cls.__bases__:
+            if issubclass(base, BOBase):
+                cls_cols = base.attributes_as_dict() | cls_cols
         return cls_cols
 
     @classmethod
@@ -267,8 +268,11 @@ class BOBase(BOBaseBase):
         return cls_cols
 
     @classmethod
-    def attribute_descriptions(cls) -> list[AttributeDescription]:
-        "list of attribute descriptions"
+    def attribute_descriptions(
+        cls, include_specialized: bool = False
+    ) -> list[AttributeDescription]:
+        """list of attribute descriptions.
+        'include_specialized' is ignored for non-persistent BOs"""
         cls_cols = copy.copy(cls._attributes.get(cls.__name__, []))
         assert cls.__base__ is not None, "BOBase.__base__ is None"
         for base in cls.__bases__:

@@ -7,7 +7,7 @@ from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import BOBase
-from business_objects.persistent_business_object import PersistentBusinessObject
+from business_objects.persistent_business_object import PersistentBusinessObject, Specialized
 from business_objects.bo_descriptors import (
     BOStr,
     BOList,
@@ -708,3 +708,203 @@ class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
             value=mock_date.isoformat(), typ=datetime.date, subtyp={}
         )
         self.assertEqual(mock_date, res)
+
+
+class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
+    """Tests for the Specialized mixin and related PersistentBusinessObject behaviour."""
+
+    # ------------------------------------------------------------------ #
+    #  Fixture classes – defined locally so each test run is deterministic #
+    # ------------------------------------------------------------------ #
+
+    def setUp(self):
+        """Create a fresh set of mock BO classes for every test."""
+
+        class GenericBO(PersistentBusinessObject):
+            generic_attr = BOStr()
+
+        class SpecializedBO(Specialized, GenericBO):
+            special_attr = BOStr()
+
+        class VerySpecializedBO(SpecializedBO):
+            very_special_attr = BOStr()
+
+        self.GenericBO = GenericBO
+        self.SpecializedBO = SpecializedBO
+        self.VerySpecializedBO = VerySpecializedBO
+
+    # ------------------------------------------------------------------ #
+    #  is_specializing                                                     #
+    # ------------------------------------------------------------------ #
+
+    def test_401_is_specializing_false_for_regular_bo(self):
+        self.assertFalse(self.GenericBO.is_specializing())
+
+    def test_401_is_specializing_true_for_specialized_mixin(self):
+        self.assertTrue(self.SpecializedBO.is_specializing())
+
+    def test_401_is_specializing_true_for_subclass_of_specialized(self):
+        """A class that inherits from a Specialized BO (without re-applying the mixin)
+        is also considered specializing."""
+        self.assertTrue(self.VerySpecializedBO.is_specializing())
+
+    def test_401_is_specializing_false_for_pbo_base(self):
+        """PersistentBusinessObject itself is not a specialization."""
+        self.assertFalse(PersistentBusinessObject.is_specializing())
+
+    # ------------------------------------------------------------------ #
+    #  register_bo_class – specialist registration                         #
+    # ------------------------------------------------------------------ #
+
+    def test_402_register_bo_class_populates_specialists_on_generic(self):
+        """Registering a Specialized BO must add it to the base BO's specialists set."""
+        self.SpecializedBO.register_bo_class()
+        self.assertIn(self.SpecializedBO, self.GenericBO.specialists)
+
+    def test_402_register_bo_class_also_adds_self_to_own_specialists(self):
+        """After registration the specializing class must appear in its own specialists set."""
+        self.SpecializedBO.register_bo_class()
+        self.assertIn(self.SpecializedBO, self.SpecializedBO.specialists)
+
+    def test_402_register_bo_class_multi_level(self):
+        """Registering VerySpecializedBO must propagate to both SpecializedBO and GenericBO."""
+        self.SpecializedBO.register_bo_class()
+        self.VerySpecializedBO.register_bo_class()
+        self.assertIn(self.VerySpecializedBO, self.GenericBO.specialists)
+        self.assertIn(self.VerySpecializedBO, self.SpecializedBO.specialists)
+
+    def test_402_register_bo_class_non_specializing_unaffected(self):
+        """Registering a plain BO must not alter its (empty) specialists set."""
+        self.GenericBO.register_bo_class()
+        self.assertEqual(self.GenericBO.specialists, set())
+
+    # ------------------------------------------------------------------ #
+    #  attribute_descriptions with include_specialized                     #
+    # ------------------------------------------------------------------ #
+
+    def test_403_attribute_descriptions_without_include_specialized(self):
+        """Without include_specialized the base BO returns only its own attributes."""
+        self.SpecializedBO.register_bo_class()
+        names = [d.name for d in self.GenericBO.attribute_descriptions(include_specialized=False)]
+        self.assertIn("generic_attr", names)
+        self.assertNotIn("special_attr", names)
+
+    def test_403_attribute_descriptions_with_include_specialized(self):
+        """With include_specialized=True the base BO also returns attributes of specialist BOs."""
+        self.SpecializedBO.register_bo_class()
+        names = [d.name for d in self.GenericBO.attribute_descriptions(include_specialized=True)]
+        self.assertIn("generic_attr", names)
+        self.assertIn("special_attr", names)
+
+    def test_403_attribute_descriptions_no_duplicates(self):
+        """Attributes already present on the base BO must not be duplicated even if a
+        specialist declares the same attribute name."""
+        self.SpecializedBO.register_bo_class()
+        names = [d.name for d in self.GenericBO.attribute_descriptions(include_specialized=True)]
+        self.assertEqual(len(names), len(set(names)))
+
+    # ------------------------------------------------------------------ #
+    #  sql_create_table – skip for Specialized                             #
+    # ------------------------------------------------------------------ #
+
+    async def test_404_sql_create_table_skipped_for_specialized(self):
+        """sql_create_table must be a no-op for a Specialized BO (it shares the base table)."""
+        MockSQLTx = Mock(name="MockSQLTx")
+        with patch(
+            "business_objects.persistent_business_object.SQLTransaction",
+            new=MockSQLTx,
+        ):
+            await self.SpecializedBO.sql_create_table()
+        MockSQLTx.assert_not_called()
+
+    async def test_404_sql_create_table_executes_for_generic(self):
+        """sql_create_table must proceed normally for a non-Specialized base BO."""
+        mock_sql = Mock(name="mock_sql")
+        mock_sql.create_table = Mock(return_value=mock_sql)
+        mock_sql.column = Mock()
+        mock_sql.execute = AsyncMock()
+        mock_tx = AsyncMock(name="mock_tx")
+        mock_tx.__aenter__ = AsyncMock(return_value=mock_tx)
+        mock_tx.__aexit__ = AsyncMock(return_value=False)
+        mock_tx.sql = Mock(return_value=mock_sql)
+        MockSQLTx = Mock(name="MockSQLTx", return_value=mock_tx)
+        with patch(
+            "business_objects.persistent_business_object.SQLTransaction",
+            new=MockSQLTx,
+        ):
+            await self.GenericBO.sql_create_table()
+        MockSQLTx.assert_called_once_with()
+        mock_sql.create_table.assert_called_once_with(self.GenericBO.table)
+
+    # ------------------------------------------------------------------ #
+    #  _filter_conditions with specialists                                 #
+    # ------------------------------------------------------------------ #
+
+    def test_405_filter_conditions_no_specialists(self):
+        """Without specialists _filter_conditions returns the given conditions unchanged."""
+        mock_cond = Mock(name="mock_condition")
+        result = self.GenericBO._filter_conditions(mock_cond)
+        self.assertIs(result, mock_cond)
+
+    def test_405_filter_conditions_no_specialists_none(self):
+        """Without specialists and no conditions _filter_conditions returns None."""
+        result = self.GenericBO._filter_conditions(None)
+        self.assertIsNone(result)
+
+    def test_405_filter_conditions_with_specialists_no_extra_cond(self):
+        """With specialists _filter_conditions wraps a bo_name IN expression."""
+        self.SpecializedBO.register_bo_class()
+        with (
+            patch("business_objects.persistent_business_object.In") as MockIn,
+            patch("business_objects.persistent_business_object.ColumnName") as MockColumnName,
+            patch("business_objects.persistent_business_object.SQLString") as MockSQLString,
+        ):
+            result = self.GenericBO._filter_conditions(None)
+        MockColumnName.assert_called_once_with("bo_name")
+        MockIn.assert_called_once()
+        self.assertIs(result, MockIn())
+
+    def test_405_filter_conditions_with_specialists_and_extra_cond(self):
+        """With specialists and extra conditions _filter_conditions combines both with And."""
+        self.SpecializedBO.register_bo_class()
+        mock_cond = Mock(name="mock_condition")
+        with (
+            patch("business_objects.persistent_business_object.In") as MockIn,
+            patch("business_objects.persistent_business_object.ColumnName"),
+            patch("business_objects.persistent_business_object.SQLString"),
+            patch("business_objects.persistent_business_object.And") as MockAnd,
+        ):
+            result = self.GenericBO._filter_conditions(mock_cond)
+        MockAnd.assert_called_once_with([MockIn(), mock_cond])
+        self.assertIs(result, MockAnd())
+
+    # ------------------------------------------------------------------ #
+    #  get_matching_objects – bo_name column added when specialists exist  #
+    # ------------------------------------------------------------------ #
+
+    async def test_406_get_matching_objects_adds_bo_name_for_specialists(self):
+        """When attributes are requested and specialists exist, 'bo_name' must be
+        appended to the SELECT column list automatically."""
+        self.SpecializedBO.register_bo_class()
+        mock_cursor = Mock(name="mock_cursor")
+        mock_cursor.fetchall = AsyncMock(return_value=[])
+        mock_sql = Mock(name="mock_sql")
+        mock_sql.execute = AsyncMock(return_value=mock_cursor)
+        mock_sql.select = Mock(return_value=mock_sql)
+        mock_sql.from_ = Mock(return_value=mock_sql)
+        mock_sql.where = Mock(return_value=mock_sql)
+        mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
+        mock_sql.__aexit__ = AsyncMock(return_value=None)
+        MockSQL = Mock(name="MockSQL", return_value=mock_sql)
+        with (
+            patch("business_objects.persistent_business_object.SQL", new=MockSQL),
+            patch("business_objects.persistent_business_object.Filter"),
+            patch("business_objects.persistent_business_object.In"),
+            patch("business_objects.persistent_business_object.ColumnName"),
+            patch("business_objects.persistent_business_object.SQLString"),
+        ):
+            await self.GenericBO.get_matching_objects(
+                conditions=None, attributes=["generic_attr"]
+            )
+        select_call_args = mock_sql.select.call_args[0][0]
+        self.assertIn("bo_name", select_call_args)

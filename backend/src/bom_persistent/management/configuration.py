@@ -7,6 +7,7 @@ LOG = getLogger(__name__)
 
 from business_objects.persistent_business_object import (
     Specialized,
+    Singleton,
     PersistentBusinessObject,
 )
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
@@ -35,7 +36,7 @@ class Configuration(PersistentBusinessObject):
         return self.configuration
 
 
-class CommonConfiguration(Specialized, Configuration):
+class CommonConfiguration(Specialized, Singleton, Configuration):
     "Persistent (non-user-specific) configuration for the whole application"
 
     @property
@@ -48,14 +49,6 @@ class PersonalConfiguration(Specialized, Configuration):
     "Persistent configuration for a specific user"
 
     user_id = BORelation(User)
-
-
-class GeneralConfig(CommonConfiguration):
-    "General configuration for the application, not specific to a user"
-
-
-class AdminCfg(PersonalConfiguration):
-    "Personal configuration for the admin user"
 
 
 log_exit(LOG)

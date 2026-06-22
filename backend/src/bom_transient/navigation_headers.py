@@ -11,6 +11,7 @@ from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
+from bom_persistent.management.configuration import PersistentBusinessObject
 from business_objects.business_object_base import BOBase
 from business_objects.transient_business_object import TransientBusinessObject
 
@@ -29,6 +30,22 @@ class NavigationHeaders(TransientBusinessObject):
         )
         super().__init__(**kwargs)
 
+    def _get_navigattion_list(
+        self, base: type[PersistentBusinessObject]
+    ) -> list[dict[str, str]]:
+        navigation_list = []
+        for bo in base.__subclasses__():
+            header = bo.navigation_header()
+            LOG.debug(
+                f"NavigationHeaders._get_navigattion_list: BO {bo.__name__} "
+                f"has header {header}"
+            )
+            if header is None:
+                navigation_list += self._get_navigattion_list(bo)
+            elif not bo.is_specializing():
+                navigation_list.append(header)
+        return navigation_list
+
     async def business_values_as_dict(self) -> dict[str, Any]:
         LOG.debug(
             f"{str(self)}.business_values_as_dict: parent "
@@ -40,10 +57,7 @@ class NavigationHeaders(TransientBusinessObject):
                 for referer, attribute in self._parent_bo.referenced_by()
             ]
         else:
-            navigation_list = [
-                o.navigation_header()
-                for o in BOBase.all_business_objects.values()  # pylint: disable=no-member
-            ]
+            navigation_list = self._get_navigattion_list(PersistentBusinessObject)
         navigation_list = [item for item in navigation_list if item is not None]
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(

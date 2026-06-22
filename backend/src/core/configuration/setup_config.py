@@ -14,11 +14,10 @@ from core.app import App
 from core.util_base import get_config_item
 from core.configuration.file_config import FileConfig
 from core.status import Status
-from core.const import SINGLE_USER_NAME
 from core.base_objects import Config
 from core.base_objects import BaseObject
 from core.exceptions import ConfigurationError, DataError
-from bom_persistent.management.user import User, UserRole
+from bom_persistent.management.user import SingleUser, User, UserRole
 from bom_persistent.management.configuration import CommonConfiguration
 from database.sql_expression import ColumnName
 
@@ -93,9 +92,7 @@ class ConfigSetup(BaseObject):
             Config.CONFIG_APP: {Config.CONFIG_USR_MODE: SetupConfigValues.SINGLE_USER}
         }
         update_dicts_recursively(target=configuration, source=app_configuration)
-        rows_in_db = await CommonConfiguration.get_matching_ids(
-            {ColumnName("user_id"): None}
-        )
+        rows_in_db = await CommonConfiguration.get_matching_ids()
         if len(rows_in_db) > 1:
             LOG.error(f"Multiple ({len(rows_in_db)}) global configurations in DB")
             raise ConfigurationError("Multiple global configurations in DB")
@@ -112,29 +109,37 @@ class ConfigSetup(BaseObject):
     @classmethod
     async def _create_or_update_initial_user(cls, setup_cfg: dict):
         # LOG.debug(f"ConfigSetup._create_or_update_initial_user({setup_cfg=}")
-        initial_user = (
-            get_config_item(setup_cfg, SetupConfigKeys.ADM_USER)
-            if App.status == Status.STATUS_MULTI_USER
-            else {"name": SINGLE_USER_NAME, "password": None}
-        )
-        if not isinstance(initial_user, dict):
-            raise TypeError(f"initial user must be dict not {type(initial_user)}")
-        rows_in_db = await User.get_matching_ids(
-            {ColumnName("name"): initial_user["name"]}
-        )
-        if len(rows_in_db) > 1:
-            LOG.error(f"{len(rows_in_db)} users named {initial_user['name']} in DB")
-            raise DataError("Multiple users in DB")
-        elif len(rows_in_db) == 1:
-            user: User = await User(bo_id=rows_in_db[0]).fetch()
-            user.password = initial_user["password"]
-            user.role |= UserRole.ADMIN
-        else:
-            user = User(
-                name=initial_user["name"],
-                password=initial_user["password"],
-                role=UserRole.ADMIN,
+        if App.status == Status.STATUS_MULTI_USER:
+
+            initial_user = get_config_item(setup_cfg, SetupConfigKeys.ADM_USER)
+            if not isinstance(initial_user, dict):
+                raise TypeError(f"initial user must be dict not {type(initial_user)}")
+            rows_in_db = await User.get_matching_ids(
+                {ColumnName("name"): initial_user["name"]}
             )
+            if len(rows_in_db) > 1:
+                LOG.error(f"{len(rows_in_db)} users named {initial_user['name']} in DB")
+                raise DataError("Multiple users in DB")
+            elif len(rows_in_db) == 1:
+                user: User = await User(bo_id=rows_in_db[0]).fetch()
+                user.password = initial_user["password"]
+                user.role |= UserRole.ADMIN
+            else:
+                user = User(
+                    name=initial_user["name"],
+                    password=initial_user["password"],
+                    role=UserRole.ADMIN,
+                )
+        else:
+            rows_in_db = await SingleUser.get_matching_ids()
+            if len(rows_in_db) > 1:
+                LOG.error(f"{len(rows_in_db)} single-users in DB")
+                raise DataError("Multiple users in DB")
+            elif len(rows_in_db) == 1:
+                user = await SingleUser(bo_id=rows_in_db[0]).fetch()
+                user.role |= UserRole.ADMIN
+            else:
+                user = SingleUser(role=UserRole.ADMIN)
         # LOG.debug(f"ConfigSetup._create_or_update_admin_user(): {user=}")
         await user.store()
 

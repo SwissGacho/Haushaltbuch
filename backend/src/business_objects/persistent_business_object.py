@@ -38,7 +38,7 @@ from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
 
 
-class Specialized(BOBase):
+class Specialized:
     """Mixin class for specialized business objects.
     BOs derived from a specialized BO are considered
     to be a specialization without using this Mixin.
@@ -50,6 +50,12 @@ class Specialized(BOBase):
         ...
     class MyVerySpecializedBO(MySpecializedBO):
         ...
+    """
+
+
+class Singleton:
+    """Mixin class for singleton business objects.
+    Singleton BOs are BOs of which there should only be one instance in the database.
     """
 
 
@@ -85,6 +91,25 @@ class PersistentBusinessObject(BOBase):
         super().register_bo_class()
 
     @classmethod
+    def attributes_as_dict(cls, include_specialized: bool = False) -> dict[str, type]:
+        """dict of BO attribute types with attribute names as keys.
+        If 'include_specialized' is True, also include the attributes of specialized BOs.
+        """
+        attrs = super().attributes_as_dict()
+        if include_specialized and hasattr(cls, "specialists") and cls.specialists:
+            for specialized in cls.specialists:
+                attrs.update(
+                    {
+                        a.name: a.data_type
+                        for a in specialized.attribute_descriptions(
+                            include_specialized=False
+                        )
+                        if a.name not in attrs
+                    }
+                )
+        return attrs
+
+    @classmethod
     def attribute_descriptions(
         cls, include_specialized: bool = False
     ) -> list[AttributeDescription]:
@@ -92,7 +117,7 @@ class PersistentBusinessObject(BOBase):
         If 'include_specialized' is True, also include the attributes of specialized BOs.
         """
         descriptions = super().attribute_descriptions()
-        if include_specialized:
+        if include_specialized and hasattr(cls, "specialists") and cls.specialists:
             for specialized in cls.specialists:
                 descriptions += [
                     a
@@ -195,20 +220,6 @@ class PersistentBusinessObject(BOBase):
             await create_table.execute()
 
     @classmethod
-    async def count_rows(cls, conditions: Optional[dict] = None) -> int:
-        """Count the number of existing business objects in the DB table matching the conditions"""
-        async with SQL() as sql:
-            select = sql.select(["count(*) as count"]).from_(cls.table)
-            if conditions:
-                select.where(Filter(conditions))
-            result = await (await select.execute()).fetchone()
-        # LOG.debug(
-        #     f"PersistentBusinessObject.count_rows({conditions=}) "
-        #     f"{result=} -> return {result["count"]}"
-        # )
-        return result["count"]
-
-    @classmethod
     def _filter_conditions(
         cls, conditions: Optional[SQLExpression] = None
     ) -> SQLExpression | None:
@@ -221,6 +232,23 @@ class PersistentBusinessObject(BOBase):
                 return And([cond, conditions])
             return cond
         return conditions
+
+    @classmethod
+    async def count_rows(cls, conditions: Optional[dict] = None) -> int:
+        """Count the number of existing business objects in the DB table matching the conditions"""
+        async with SQL() as sql:
+            select = sql.select(["count(*) as count"]).from_(cls.table)
+            filter_conditions: SQLExpression | None = cls._filter_conditions(
+                Filter(conditions) if conditions else None
+            )
+            if filter_conditions:
+                select.where(filter_conditions)
+            result = await (await select.execute()).fetchone()
+        LOG.debug(
+            f"PersistentBusinessObject.count_rows({conditions=}) "
+            f"{result=} -> return {result["count"]}"
+        )
+        return result["count"]
 
     @classmethod
     async def get_matching_ids(cls, conditions: dict | None = None):
@@ -242,7 +270,11 @@ class PersistentBusinessObject(BOBase):
     ) -> list[BOBase]:
         """Get the business objects matching the conditions"""
         if attributes:
-            cols = [a for a in attributes if a in cls.attributes_as_dict()]
+            cols = [
+                a
+                for a in attributes
+                if a in cls.attributes_as_dict(include_specialized=True)
+            ]
             if "id" not in cols:
                 cols.append("id")
             if "bo_name" not in cols and cls.specialists:
@@ -364,6 +396,12 @@ class PersistentBusinessObject(BOBase):
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
+        if isinstance(self, Singleton):
+            existing_count = await self.count_rows()
+            if existing_count > 0:
+                raise CannotStoreEmptyBO(
+                    f"Cannot insert {self} as it is a Singleton and already exists in the DB"
+                )
         self.bo_name = self.bo_type_name()
         values_to_store: NamedValueListList = [
             (k, v) for k, v in self._data.items() if k != "id" and v is not None
@@ -387,6 +425,10 @@ class PersistentBusinessObject(BOBase):
 
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}._update_self: _data=")
+            for line in pprint_lines(self._data):
+                LOG.log(VERBOSE_DEBUG, f" -  {line}")
         async with SQLTransaction() as txaction:
             value_class = Value
             update = txaction.sql().update(self.table).where(Eq("id", self.id))
