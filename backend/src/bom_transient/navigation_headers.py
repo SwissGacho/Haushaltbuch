@@ -30,16 +30,16 @@ class NavigationHeaders(TransientBusinessObject):
         )
         super().__init__(**kwargs)
 
-    def _get_navigattion_list(self, base: type[BOBase]) -> list[dict[str, str]]:
+    def _get_navigation_list(self, base: type[BOBase]) -> list[dict[str, str]]:
         navigation_list = []
         for bo in base.__subclasses__():
             header = bo.navigation_header()
             LOG.debug(
-                f"NavigationHeaders._get_navigattion_list: BO {bo.__name__} "
+                f"NavigationHeaders._get_navigation_list: BO {bo.__name__} "
                 f"has header {header}"
             )
             if header is None:
-                navigation_list += self._get_navigattion_list(bo)
+                navigation_list += self._get_navigation_list(bo)
             elif (
                 not issubclass(bo, PersistentBusinessObject) or not bo.is_specializing()
             ):
@@ -57,9 +57,9 @@ class NavigationHeaders(TransientBusinessObject):
                 for referer, attribute in self._parent_bo.referenced_by()
             ]
         else:
-            navigation_list = self._get_navigattion_list(
+            navigation_list = self._get_navigation_list(
                 PersistentBusinessObject
-            ) + self._get_navigattion_list(TransientBusinessObject)
+            ) + self._get_navigation_list(TransientBusinessObject)
         navigation_list = [item for item in navigation_list if item is not None]
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(

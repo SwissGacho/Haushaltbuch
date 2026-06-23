@@ -14,7 +14,7 @@ from business_objects.bo_descriptors import (
     BORelation,
     BOStr,
 )
-from bom_persistent.management.configuration import CommonConfiguration, Configuration
+from bom_persistent.management.configuration import Configuration
 from bom_persistent.management.user import User
 from bom_transient.cmdline_configuration import CmdlineConfiguration
 from bom_transient.file_configuration import FileConfiguration
