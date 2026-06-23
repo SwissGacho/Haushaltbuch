@@ -66,7 +66,7 @@ class EditConfig(TransientBusinessObject):
     ) -> list["BOBase"]:
         """Get the business objects matching the conditions"""
         LOG.debug(
-            f"EditConfig.get_matching_objects: conditions={conditions}, attributes={attributes} <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+            f"EditConfig.get_matching_objects: conditions={conditions}, attributes={attributes}"
         )
         if conditions or (attributes and attributes != ["name"]):
             LOG.warning(
