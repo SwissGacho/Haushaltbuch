@@ -8,10 +8,7 @@ LOG = getLogger(__name__)
 
 import core.app
 from core.exceptions import DBSchemaError, DataError, OperationalError
-from business_objects.persistent_business_object import (
-    PersistentBusinessObject,
-    Specialized,
-)
+from business_objects.persistent_business_object import PersistentBusinessObject
 import database
 import database.dbms.db_base
 from database.sql import SQL

@@ -65,7 +65,7 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        cls.specialists: set[type[Self]] = set()
+        cls.specialists: set[type[PersistentBusinessObject]] = set()
 
     @classmethod
     def is_specializing(cls: Type[Self]) -> bool:
@@ -76,7 +76,7 @@ class PersistentBusinessObject(BOBase):
     def register_bo_class(cls):
         "Register the Business Object."
         if cls.is_specializing():
-            specs: set[type[Self]] = {cls}
+            specs: set[type[PersistentBusinessObject]] = {cls}
             for super_cls in cls.__mro__:
                 if hasattr(super_cls, "specialists") and issubclass(
                     super_cls, PersistentBusinessObject
@@ -95,7 +95,7 @@ class PersistentBusinessObject(BOBase):
         If 'include_specialized' is True, also include the attributes of specialized BOs.
         """
         attrs = super().attributes_as_dict()
-        if include_specialized and hasattr(cls, "specialists") and cls.specialists:
+        if include_specialized and getattr(cls, "specialists", None):
             for specialized in cls.specialists:
                 attrs.update(
                     {
@@ -116,7 +116,7 @@ class PersistentBusinessObject(BOBase):
         If 'include_specialized' is True, also include the attributes of specialized BOs.
         """
         descriptions = super().attribute_descriptions()
-        if include_specialized and hasattr(cls, "specialists") and cls.specialists:
+        if include_specialized and getattr(cls, "specialists", None):
             for specialized in cls.specialists:
                 descriptions += [
                     a
@@ -220,11 +220,10 @@ class PersistentBusinessObject(BOBase):
     def _filter_conditions(
         cls, conditions: Optional[SQLExpression] = None
     ) -> SQLExpression | None:
-        specialists = getattr(cls, "specialists", set())
-        if specialists:
+        if getattr(cls, "specialists", None):
             cond = In(
                 ColumnName("bo_name"),
-                [SQLString(s.bo_type_name()) for s in specialists],
+                [SQLString(s.bo_type_name()) for s in cls.specialists],
             )
             if conditions:
                 return And([cond, conditions])
@@ -275,7 +274,7 @@ class PersistentBusinessObject(BOBase):
             ]
             if "id" not in cols:
                 cols.append("id")
-            if "bo_name" not in cols and cls.specialists:
+            if "bo_name" not in cols and getattr(cls, "specialists", None):
                 cols.append("bo_name")
         else:
             cols = None
