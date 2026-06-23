@@ -100,11 +100,8 @@ async def check_db_schema():
     ]
     LOG.debug(f"Found {len(all_business_objects)} persistent business objects")
     if LOG.isEnabledFor(VERBOSE_DEBUG):
-        LOG.log(
-            VERBOSE_DEBUG,
-            "Persistent business objects found: "
-            f"{', '.join([bo.__name__ for bo in all_business_objects])}",
-        )
+        for line in pprint_lines([bo.__name__ for bo in all_business_objects]):
+            LOG.log(VERBOSE_DEBUG, line)
     if (
         db_schema.version_nr is None
         or db_schema.version_nr < CURRENT_DB_SCHEMA_VERSION
@@ -119,8 +116,9 @@ async def check_db_schema():
 
     ok = True
     for bo in all_business_objects:
-        # LOG.debug(f"checking table for business object {bo.__name__}")
-        ok = await this_database.check_table(bo) and ok
+        if not bo.is_specializing():
+            LOG.debug(f"checking table for business object {bo.__name__}")
+            ok = await this_database.check_table(bo) and ok
     if not ok:
         raise DBSchemaError("DB schema not compatible")
     if upgraded:

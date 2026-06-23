@@ -16,7 +16,6 @@ from core.util_base import update_dicts_recursively
 LOG = getLogger(__name__)
 
 from core.configuration.file_config import FileConfig
-from core.const import SINGLE_USER_NAME
 from core.util_base import get_config_item
 from core.configuration.setup_config import SetupConfigValues
 from core.app import App
@@ -25,8 +24,8 @@ from core.reconfigure_logging import reconfigure_logging
 from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config
 from business_objects.business_object_base import BOBase
-from bom_persistent.management.configuration import Configuration
-from bom_persistent.management.user import User, UserRole
+from bom_persistent.management.configuration import CommonConfiguration
+from bom_persistent.management.user import SingleUser, User, UserRole
 from bom_transient.cmdline_configuration import CmdlineConfiguration
 from bom_transient.file_configuration import FileConfiguration
 from database.sql_expression import ColumnName
@@ -39,7 +38,7 @@ class AppConfiguration(ConfigurationBaseClass):
         super().__init__(app_location)
         self._cmdline_configuration: Optional[CmdlineConfiguration] = None
         self._file_configuration: Optional[FileConfiguration] = None
-        self._global_configuration: Optional[Configuration] = None
+        self._global_configuration: Optional[CommonConfiguration] = None
 
     async def config_change_handler(self, _: BOBase):
         """Handle events from the configuration business objects.
@@ -71,9 +70,7 @@ class AppConfiguration(ConfigurationBaseClass):
         "Fetch configuration from database"
         async with FileConfig.db_config_lock:
             LOG.debug("AppConfiguration.get_configuration_from_db: DB available")
-            config_ids = await Configuration.get_matching_ids(
-                {ColumnName("user_id"): None}
-            )
+            config_ids = await CommonConfiguration.get_matching_ids()
             LOG.log(
                 VERBOSE_DEBUG,
                 f"AppConfiguration.get_configuration_from_db: {config_ids=}",
@@ -83,19 +80,19 @@ class AppConfiguration(ConfigurationBaseClass):
                     "Creating global configuration "
                     f"{str(Config.CONFIG_USR_MODE)}={SetupConfigValues.SINGLE_USER}"
                 )
-                configuration = Configuration(
+                configuration = CommonConfiguration(
                     configuration={
                         Config.CONFIG_APP: {
                             Config.CONFIG_USR_MODE: SetupConfigValues.SINGLE_USER
                         }
                     }
                 )
-                if not isinstance(configuration, Configuration):
+                if not isinstance(configuration, CommonConfiguration):
                     raise ConfigurationError("Cannot create global configuration.")
                 self._global_configuration = configuration
                 await self._global_configuration.store()
             elif len(config_ids) == 1:
-                self._global_configuration = await Configuration().fetch(
+                self._global_configuration = await CommonConfiguration().fetch(
                     id=config_ids[0]
                 )
             else:
@@ -122,13 +119,11 @@ class AppConfiguration(ConfigurationBaseClass):
                 raise ConfigurationError(f"User mode: '{user_mode}'")
             if (
                 user_mode == SetupConfigValues.SINGLE_USER
-                and not await User.get_matching_ids(
-                    {ColumnName("name"): SINGLE_USER_NAME}
-                )
+                and not await SingleUser.get_matching_ids()
             ):
                 # create single user
-                LOG.info(f"Creating single user '{SINGLE_USER_NAME}'")
-                await User(name=SINGLE_USER_NAME, role=UserRole.ADMIN).store()
+                LOG.info(f"Creating single user.")
+                await SingleUser(role=UserRole.ADMIN).store()
             LOG.debug(f"AppConfiguration.get_configuration_from_db: {user_mode=}")
             App.status = (
                 Status.STATUS_SINGLE_USER

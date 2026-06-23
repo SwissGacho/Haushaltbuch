@@ -12,5 +12,3 @@ FILECFG_FILE_NAME = "configuration.json"
 CONFIG_FILECFG_FILE = "filecfg_file"
 
 WEBSOCKET_PORT = 8765
-
-SINGLE_USER_NAME = "<single_user>"

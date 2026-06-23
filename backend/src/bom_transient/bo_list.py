@@ -76,7 +76,8 @@ class BOList(TransientBusinessObject):
             attributes=name_components, conditions=self._conditions
         )
         name_list = [
-            {"id": cur.id, "display_name": cur.display_name} for cur in matching_objects
+            {"object": cur.bo_name, "id": cur.id, "display_name": cur.display_name}
+            for cur in matching_objects
         ]
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(

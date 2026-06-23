@@ -28,6 +28,24 @@ class SQLExpression:
         return km.merge_params(query=":param", params={"param": self._expression})
 
 
+class In(SQLExpression):
+    """Represents a SQL IN expression."""
+
+    def __init__(self, value: SQLExpression | str, values: list[SQLExpression]):
+        super().__init__()
+        if isinstance(value, str):
+            value = ColumnName(value)
+        self._value = value
+        self._values = values
+
+    def get_query(self, km: SQLKeyManager) -> str:
+        """Get the SQL query for this expression."""
+        if not self._values:
+            raise ValueError("IN expression requires at least one value")
+        values_str = ", ".join([value.get_query(km=km) for value in self._values])
+        return f"{self._value.get_query(km=km)} IN ({values_str})"
+
+
 class SQLMultiExpression(SQLExpression):
     """Abstract class to combine any number of SQL expressions with an operator.
     Should not be instantiated directly."""
@@ -53,7 +71,7 @@ class SQLMultiExpression(SQLExpression):
         return (
             "("
             + re.sub(
-                "  +",
+                "  +",  # replace multiple spaces with a single space
                 " ",
                 f" {self.__class__.operator} ".join(
                     [expression.get_query(km=km) for expression in self._arguments]

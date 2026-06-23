@@ -49,6 +49,14 @@ class MockBO3(MockBO2):
 
 mock_attr_desc = [
     AttributeDescription(
+        name="bo_name",
+        data_type=str,
+        constraint=BOColumnConstraint.BOC_NONE,
+        constraint_values={"semantic_role": BOSemanticRole.RAW},
+        attribute_type=AttributeType.ATYPE_STR,
+        access_level=AttributeAccessLevel.AAL_READ_ONLY,
+    ),
+    AttributeDescription(
         name="id",
         data_type=int,
         constraint=BOColumnConstraint.BOC_PK_INC,
