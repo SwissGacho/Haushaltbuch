@@ -162,16 +162,12 @@ class Test_300_SQLExpression(unittest.TestCase):
 
     def test_307_eq_column_and_string(self):
         sql = Eq(ColumnName("a"), SQLString("b"))
-        self.assertEqual(
-            normalize_sql(sql.get_query(self.SQLKeyManager)), "(a = 'b')"
-        )
+        self.assertEqual(normalize_sql(sql.get_query(self.SQLKeyManager)), "(a = 'b')")
         self.SQLKeyManager.merge_params.assert_not_called()
 
     def test_308_is_direct(self):
         sql = Is(ColumnName("a"), ColumnName("b"))
-        self.assertEqual(
-            normalize_sql(sql.get_query(self.SQLKeyManager)), "(a IS b)"
-        )
+        self.assertEqual(normalize_sql(sql.get_query(self.SQLKeyManager)), "(a IS b)")
         self.SQLKeyManager.merge_params.assert_not_called()
 
     def test_309_and_empty_raises(self):
@@ -217,7 +213,7 @@ class Test_350_In(unittest.TestCase):
 
     def test_353_empty_values_list(self):
         sql = In("col", [])
-        self.assertEqual(sql.get_query(self.SQLKeyManager), "col IN ()")
+        self.assertRaises(ValueError, sql.get_query, self.SQLKeyManager)
 
     def test_354_expression_values(self):
         sql = In("col", [SQLExpression(1), SQLExpression(2)])
