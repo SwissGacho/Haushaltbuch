@@ -220,10 +220,11 @@ class PersistentBusinessObject(BOBase):
     def _filter_conditions(
         cls, conditions: Optional[SQLExpression] = None
     ) -> SQLExpression | None:
-        if cls.specialists:
+        specialists = getattr(cls, "specialists", set())
+        if specialists:
             cond = In(
                 ColumnName("bo_name"),
-                [SQLString(s.bo_type_name()) for s in cls.specialists],
+                [SQLString(s.bo_type_name()) for s in specialists],
             )
             if conditions:
                 return And([cond, conditions])

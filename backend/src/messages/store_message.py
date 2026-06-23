@@ -40,7 +40,12 @@ class StoreMessage(Message):
         if not isinstance(payload, dict):
             raise ValueError("Payload of an ObjectMessage must be a JSON object")
         for key, value in payload.items():
-            if key in bo_type.attributes_as_dict().keys():
+            if key in ("id", "bo_name", "last_updated"):
+                LOG.warning(
+                    f"StoreMessage.handle_message: Ignoring read-only attribute '{key}' "
+                    f"for business object '{bo_type.__name__}'"
+                )
+            elif key in bo_type.attributes_as_dict().keys():
                 setattr(affected_bo, key, value)
             else:
                 LOG.warning(

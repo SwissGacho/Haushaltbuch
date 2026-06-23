@@ -18,10 +18,7 @@ LOG = getLogger(__name__)
 from core.base_objects import DBBaseClass, ConnectionBaseClass
 from core.exceptions import OperationalError
 from business_objects.business_object_base import BOBase
-from business_objects.persistent_business_object import (
-    PersistentBusinessObject,
-    Specialized,
-)
+from business_objects.persistent_business_object import PersistentBusinessObject
 from database.sql import SQL
 from database.sql_statement import SQLTemplate
 from database.sql_clause import SQLColumnDefinition
