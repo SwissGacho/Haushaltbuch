@@ -40,6 +40,8 @@ class In(SQLExpression):
 
     def get_query(self, km: SQLKeyManager) -> str:
         """Get the SQL query for this expression."""
+        if not self._values:
+            raise ValueError("IN expression requires at least one value")
         values_str = ", ".join([value.get_query(km=km) for value in self._values])
         return f"{self._value.get_query(km=km)} IN ({values_str})"
 

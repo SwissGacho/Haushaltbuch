@@ -30,7 +30,7 @@ async def check_login(login_message: dict) -> User:
             raise ValueError("multiple single-users found")
         if matching_count < 1:
             raise PermissionError("Single-user not found.")
-    user = await User(bo_id=matching_users[0]).fetch()
+    user = await (User if multi else SingleUser)(bo_id=matching_users[0]).fetch()
     # LOG.debug(f"check_login() -> {repr(user)}")
     # LOG.debug(f"    {type(user.role)=}; {user.role if user.role else 'No role'}")
     # LOG.debug(f"    {user._data=}")  # pylint: disable=protected-access
