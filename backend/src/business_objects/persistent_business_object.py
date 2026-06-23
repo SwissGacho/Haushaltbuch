@@ -5,7 +5,6 @@ application's data model."""
 
 import copy
 import json
-from operator import is_
 import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
@@ -33,7 +32,7 @@ from database.sql_expression import (
     Filter,
 )
 from database.sql_statement import CreateTable, NamedValueListList, Value
-from business_objects.bo_descriptors import BOBaseBase, AttributeDescription, BOStr
+from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
 
@@ -206,11 +205,9 @@ class PersistentBusinessObject(BOBase):
         LOG.log(VERBOSE_DEBUG, f"   collect attributes for {cls.__name__}")
         async with SQLTransaction() as txaction:
             create_table: CreateTable = txaction.sql().create_table(cls.table)
-            col_names = set()
             for description in cls.attribute_descriptions(include_specialized=True):
                 for line in pprint_lines(description):
                     LOG.log(VERBOSE_DEBUG, f"   - {line}")
-                col_names.add(description.name)
                 create_table.column(
                     name=description.name,
                     data_type=description.data_type,
@@ -296,7 +293,9 @@ class PersistentBusinessObject(BOBase):
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             for line in pprint_lines(redact(result)):
                 LOG.log(VERBOSE_DEBUG, f"  {line}")
-        descriptions = {d.name: d for d in cls.attribute_descriptions()}
+        descriptions = {
+            d.name: d for d in cls.attribute_descriptions(include_specialized=True)
+        }
         objects: list[BOBase] = []
         for obj in result:
             bo_name = None
