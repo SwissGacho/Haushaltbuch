@@ -246,7 +246,7 @@ class PersistentBusinessObject(BOBase):
             result = await (await select.execute()).fetchone()
         LOG.debug(
             f"PersistentBusinessObject.count_rows({conditions=}) "
-            f"{result=} -> return {result["count"]}"
+            f"{result=} -> return {result['count']}"
         )
         return result["count"]
 
