@@ -263,8 +263,9 @@ class BOBase(BOBaseBase):
             if a.access_level != AttributeAccessLevel.AAL_WRITE_ONLY
         }
         assert cls.__base__ is not None, "BOBase.__base__ is None"
-        if issubclass(cls.__base__, BOBase):
-            return cls.__base__.business_attributes_as_dict() | cls_cols
+        for base in cls.__bases__:
+            if issubclass(base, BOBase):
+                cls_cols = base.business_attributes_as_dict() | cls_cols
         return cls_cols
 
     @classmethod
