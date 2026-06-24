@@ -24,7 +24,7 @@ from core.reconfigure_logging import reconfigure_logging
 from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config
 from business_objects.business_object_base import BOBase
-from bom_persistent.management.configuration import CommonConfiguration
+from bom_persistent.management.configuration import ApplicationConfiguration
 from bom_persistent.management.user import SingleUser, User, UserRole
 from bom_transient.cmdline_configuration import CmdlineConfiguration
 from bom_transient.file_configuration import FileConfiguration
@@ -38,7 +38,7 @@ class AppConfiguration(ConfigurationBaseClass):
         super().__init__(app_location)
         self._cmdline_configuration: Optional[CmdlineConfiguration] = None
         self._file_configuration: Optional[FileConfiguration] = None
-        self._global_configuration: Optional[CommonConfiguration] = None
+        self._global_configuration: Optional[ApplicationConfiguration] = None
 
     async def config_change_handler(self, _: BOBase):
         """Handle events from the configuration business objects.
@@ -70,7 +70,7 @@ class AppConfiguration(ConfigurationBaseClass):
         "Fetch configuration from database"
         async with FileConfig.db_config_lock:
             LOG.debug("AppConfiguration.get_configuration_from_db: DB available")
-            config_ids = await CommonConfiguration.get_matching_ids()
+            config_ids = await ApplicationConfiguration.get_matching_ids()
             LOG.log(
                 VERBOSE_DEBUG,
                 f"AppConfiguration.get_configuration_from_db: {config_ids=}",
@@ -80,19 +80,19 @@ class AppConfiguration(ConfigurationBaseClass):
                     "Creating global configuration "
                     f"{str(Config.CONFIG_USR_MODE)}={SetupConfigValues.SINGLE_USER}"
                 )
-                configuration = CommonConfiguration(
+                configuration = ApplicationConfiguration(
                     configuration={
                         Config.CONFIG_APP: {
                             Config.CONFIG_USR_MODE: SetupConfigValues.SINGLE_USER
                         }
                     }
                 )
-                if not isinstance(configuration, CommonConfiguration):
+                if not isinstance(configuration, ApplicationConfiguration):
                     raise ConfigurationError("Cannot create global configuration.")
                 self._global_configuration = configuration
                 await self._global_configuration.store()
             elif len(config_ids) == 1:
-                self._global_configuration = await CommonConfiguration().fetch(
+                self._global_configuration = await ApplicationConfiguration().fetch(
                     id=config_ids[0]
                 )
             else:

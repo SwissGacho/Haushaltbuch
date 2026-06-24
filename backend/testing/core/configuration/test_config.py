@@ -102,7 +102,9 @@ class TestAppConfiguration(unittest.IsolatedAsyncioTestCase):
             mock_ids = [1]
 
         with (
-            patch("core.configuration.config.CommonConfiguration") as MockConfiguration,
+            patch(
+                "core.configuration.config.ApplicationConfiguration"
+            ) as MockConfiguration,
             patch("core.configuration.config.ColumnName") as MockColNam,
             patch("core.configuration.config.get_config_item") as mock_get_config_item,
             patch("core.configuration.config.SingleUser") as MockSingleUser,
