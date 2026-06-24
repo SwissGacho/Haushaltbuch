@@ -7,8 +7,7 @@
     the connection sends appropriate messages
 """
 
-import pprint
-from typing import Any
+from typing import Any, Optional
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG, pprint_lines
 
@@ -16,6 +15,7 @@ LOG = getLogger(__name__)
 
 from business_objects.business_object_base import BOBase, BOCallback
 from business_objects.transient_business_object import TransientBusinessObject
+from server.ws_connection_base import SessionBase
 
 
 class BOList(TransientBusinessObject):
@@ -31,6 +31,7 @@ class BOList(TransientBusinessObject):
         self._bo_type = BOBase.get_business_object_by_name(index)
         self._conditions = conditions
         self._subscription_id: int | None = None
+        self._session: Optional[SessionBase] = kwargs.get("session")
         super().__init__(**kwargs)
 
     async def _on_change(self, _: BOBase) -> None:
@@ -73,7 +74,9 @@ class BOList(TransientBusinessObject):
         )
         name_components = self._bo_type.display_name_components() or ["name"]
         matching_objects = await self._bo_type.get_matching_objects(
-            attributes=name_components, conditions=self._conditions
+            attributes=name_components,
+            conditions=self._conditions,
+            session=self._session,
         )
         name_list = [
             {"object": cur.bo_name, "id": cur.id, "display_name": cur.display_name}

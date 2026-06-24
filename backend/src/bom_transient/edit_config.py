@@ -2,6 +2,8 @@
 This is a proxy for the configuration read from the DB and the config file and allows their modifications.
 """
 
+from typing import Optional
+
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
@@ -14,10 +16,11 @@ from business_objects.bo_descriptors import (
     BORelation,
     BOStr,
 )
-from bom_persistent.management.configuration import GlobalConfiguration, Configuration
+from bom_persistent.management.configuration import Configuration
 from bom_persistent.management.user import User
 from bom_transient.cmdline_configuration import CmdlineConfiguration
 from bom_transient.file_configuration import FileConfiguration
+from server.ws_connection_base import SessionBase
 
 
 class EditConfig(TransientBusinessObject):
@@ -62,7 +65,10 @@ class EditConfig(TransientBusinessObject):
 
     @classmethod
     async def get_matching_objects(
-        cls, conditions: dict | None = None, attributes: list[str] | None = None
+        cls,
+        conditions: dict | None = None,
+        attributes: list[str] | None = None,
+        session: Optional[SessionBase] = None,
     ) -> list["BOBase"]:
         """Get the business objects matching the conditions"""
         LOG.debug(
@@ -72,8 +78,9 @@ class EditConfig(TransientBusinessObject):
             LOG.warning(
                 f"EditConfig.get_matching_objects() cannot be called with {conditions=} or {attributes=}"
             )
-        config_objs = await GlobalConfiguration.get_matching_objects(
-            attributes=GlobalConfiguration.display_name_components() or ["name"],
+        config_objs = await Configuration.get_matching_objects(
+            attributes=Configuration.display_name_components() or ["name"],
+            session=session,
         )
         config_objs.append(EditConfig(index=FILE_CONFIG_BOID))
         config_objs.append(EditConfig(index=CMDLINE_CONFIG_BOID))

@@ -8,6 +8,7 @@ LOG = getLogger(__name__)
 from business_objects.persistent_business_object import (
     Specialized,
     Singleton,
+    Personal,
     PersistentBusinessObject,
 )
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
@@ -46,10 +47,15 @@ class CommonConfiguration(Specialized, Singleton, Configuration):
         return "Global Configuration"
 
 
-class PersonalConfiguration(Specialized, Configuration):
+class PersonalConfiguration(Specialized, Personal, Configuration):
     "Persistent configuration for a specific user"
 
     user_id = BORelation(User)
+
+    @property
+    def display_name(self) -> str:
+        """A human-readable name for this business object instance, used in the frontend."""
+        return "Personal Configuration"
 
 
 log_exit(LOG)
