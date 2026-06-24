@@ -9,6 +9,7 @@ from business_objects.persistent_business_object import (
     Specialized,
     Singleton,
     Personal,
+    AdminOnly,
     PersistentBusinessObject,
 )
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
@@ -38,7 +39,7 @@ class Configuration(PersistentBusinessObject):
         return self.configuration
 
 
-class ApplicationConfiguration(Specialized, Singleton, Configuration):
+class ApplicationConfiguration(Specialized, Singleton, AdminOnly, Configuration):
     "Persistent (non-user-specific) configuration for the whole application"
 
     @property

@@ -68,6 +68,15 @@ class Personal:
     """
 
 
+class AdminOnly:
+    """Mixin class for admin-only business objects.
+    Admin-only BOs are BOs that are only accessible to users with the admin role.
+    Admin-only BOs are not visible to other users.
+    """
+
+    ADMIN_ONLY = True
+
+
 class PersistentBusinessObject(BOBase):
     """Base class for persistent Business Objects.
     Every subclass will be registered in a table in the database."""
@@ -254,6 +263,8 @@ class PersistentBusinessObject(BOBase):
                             ),
                         )
                         for s in cls.specialists
+                        if not issubclass(s, AdminOnly)
+                        or getattr(user, "is_admin", False)
                     ],
                 )
             else:

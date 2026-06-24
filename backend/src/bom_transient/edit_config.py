@@ -17,7 +17,7 @@ from business_objects.bo_descriptors import (
     BOStr,
 )
 from bom_persistent.management.configuration import Configuration
-from bom_persistent.management.user import User
+from bom_persistent.management.user import User, UserRole
 from bom_transient.cmdline_configuration import CmdlineConfiguration
 from bom_transient.file_configuration import FileConfiguration
 from server.ws_connection_base import SessionBase
@@ -82,8 +82,9 @@ class EditConfig(TransientBusinessObject):
             attributes=Configuration.display_name_components() or ["name"],
             session=session,
         )
-        config_objs.append(EditConfig(index=FILE_CONFIG_BOID))
-        config_objs.append(EditConfig(index=CMDLINE_CONFIG_BOID))
+        if session and UserRole.ADMIN in session.user.role:
+            config_objs.append(EditConfig(index=FILE_CONFIG_BOID))
+            config_objs.append(EditConfig(index=CMDLINE_CONFIG_BOID))
         LOG.debug(f"- get_matching_objects returning {len(config_objs)} objects")
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             for obj in config_objs:
