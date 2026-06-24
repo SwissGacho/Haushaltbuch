@@ -36,7 +36,7 @@ class Configuration(PersistentBusinessObject):
         return self.configuration
 
 
-class CommonConfiguration(Specialized, Singleton, Configuration):
+class ApplicationConfiguration(Specialized, Singleton, Configuration):
     "Persistent (non-user-specific) configuration for the whole application"
 
     @property
