@@ -5,7 +5,11 @@ from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
-from business_objects.persistent_business_object import PersistentBusinessObject
+from business_objects.persistent_business_object import (
+    Specialized,
+    Singleton,
+    PersistentBusinessObject,
+)
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
 from bom_persistent.management.user import User
 
@@ -13,15 +17,8 @@ from bom_persistent.management.user import User
 class Configuration(PersistentBusinessObject):
     "Persistent configuration (global or user specific)"
 
-    user_id = BORelation(User)
     configuration = BODict()
-
-    @property
-    def display_name(self) -> str:
-        """A human-readable name for this business object instance, used in the frontend."""
-        if self.user_id is None:
-            return "Global Configuration"
-        return f"Configuration for user ({self.user_id})"
+    _table = "configurations"
 
     @classmethod
     def navigation_header(
@@ -37,6 +34,21 @@ class Configuration(PersistentBusinessObject):
         if not isinstance(self.configuration, dict):
             return {}
         return self.configuration
+
+
+class ApplicationConfiguration(Specialized, Singleton, Configuration):
+    "Persistent (non-user-specific) configuration for the whole application"
+
+    @property
+    def display_name(self) -> str:
+        """A human-readable name for this business object instance, used in the frontend."""
+        return "Global Configuration"
+
+
+class PersonalConfiguration(Specialized, Configuration):
+    "Persistent configuration for a specific user"
+
+    user_id = BORelation(User)
 
 
 log_exit(LOG)

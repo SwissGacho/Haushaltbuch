@@ -8,6 +8,7 @@ from datetime import datetime
 import itertools
 from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 import weakref
+import copy
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
@@ -21,6 +22,7 @@ from business_objects.bo_descriptors import (
     AttributeType,
     BOColumnConstraint,
     BOBaseBase,
+    BOStr,
     BOId,
     BODatetime,
 )
@@ -31,6 +33,8 @@ BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 
 class BOBase(BOBaseBase):
     "Business Object baseclass"
+
+    bo_name = BOStr(access_level=AttributeAccessLevel.AAL_READ_ONLY)
 
     id = BOId(
         BOColumnConstraint.BOC_PK_INC, access_level=AttributeAccessLevel.AAL_READ_ONLY
@@ -153,7 +157,7 @@ class BOBase(BOBaseBase):
         """Return a list of attribute names that should be used to construct the display name."""
         return [
             cur.name
-            for cur in cls.attribute_descriptions()
+            for cur in cls.attribute_descriptions(include_specialized=True)
             if cur.constraint_values.get("semantic_role") == BOSemanticRole.BONAME
         ]
 
@@ -208,7 +212,9 @@ class BOBase(BOBaseBase):
     def register_bo_class(cls):
         "Register the Business Object."
         BOBase._business_objects |= {cls._name(): cls}
-        LOG.debug(f"registered class '{cls.__name__}' as {cls._name()}")
+        LOG.debug(
+            f"registered {'specialized ' if 'Specialized' in [base.__name__ for base in cls.__bases__] else ''}class '{cls.__name__}' as {cls._name()}"
+        )
 
     # pylint: disable=no-self-argument
     @_classproperty
@@ -243,8 +249,9 @@ class BOBase(BOBaseBase):
         "dict of BO attribute types with attribute names as keys"
         cls_cols = {a.name: a.data_type for a in cls._attributes.get(cls.__name__, [])}
         assert cls.__base__ is not None, "BOBase.__base__ is None"
-        if issubclass(cls.__base__, BOBase):
-            return cls.__base__.attributes_as_dict() | cls_cols
+        for base in cls.__bases__:
+            if issubclass(base, BOBase):
+                cls_cols = base.attributes_as_dict() | cls_cols
         return cls_cols
 
     @classmethod
@@ -256,17 +263,22 @@ class BOBase(BOBaseBase):
             if a.access_level != AttributeAccessLevel.AAL_WRITE_ONLY
         }
         assert cls.__base__ is not None, "BOBase.__base__ is None"
-        if issubclass(cls.__base__, BOBase):
-            return cls.__base__.business_attributes_as_dict() | cls_cols
+        for base in cls.__bases__:
+            if issubclass(base, BOBase):
+                cls_cols = base.business_attributes_as_dict() | cls_cols
         return cls_cols
 
     @classmethod
-    def attribute_descriptions(cls) -> list[AttributeDescription]:
-        "list of attribute descriptions"
-        cls_cols = cls._attributes.get(cls.__name__, [])
+    def attribute_descriptions(
+        cls, include_specialized: bool = False
+    ) -> list[AttributeDescription]:
+        """list of attribute descriptions.
+        'include_specialized' is ignored for non-persistent BOs"""
+        cls_cols = copy.copy(cls._attributes.get(cls.__name__, []))
         assert cls.__base__ is not None, "BOBase.__base__ is None"
-        if issubclass(cls.__base__, BOBase):
-            return cls.__base__.attribute_descriptions() + cls_cols
+        for base in cls.__bases__:
+            if issubclass(base, BOBase):
+                cls_cols = base.attribute_descriptions() + cls_cols
         return cls_cols
 
     @classmethod
