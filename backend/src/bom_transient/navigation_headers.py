@@ -47,6 +47,7 @@ class NavigationHeaders(TransientBusinessObject):
                 if issubclass(o, PersistentBusinessObject) and o.is_root_bo
             ]
         navigation_list = [item for item in navigation_list if item is not None]
+        print(f"{navigation_list=}")
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(
                 VERBOSE_DEBUG,

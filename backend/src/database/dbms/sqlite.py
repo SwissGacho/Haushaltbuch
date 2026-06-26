@@ -235,12 +235,10 @@ class SQLiteDB(DB):
     def sql_factory(self):
         return SQLiteSQLFactory
 
-    @property
-    def decimal_capabilities(self) -> DecimalCapabilities:
-        return DecimalCapabilities(
-            max_total_digits=SQLITE_MAXIMUM_DECIMAL_DIGITS,
-            max_decimal_scale=SQLITE_MAXIMUM_DECIMAL_SCALE,
-        )
+    DECIMAL_CAPABILITIES = DecimalCapabilities(
+        max_total_digits=SQLITE_MAXIMUM_DECIMAL_DIGITS,
+        max_decimal_scale=SQLITE_MAXIMUM_DECIMAL_SCALE,
+    )
 
     async def _get_table_info(self, table_name: str) -> dict[str, str]:
         # LOG.debug(f"SQLiteDB._get_table_info({table_name=})")

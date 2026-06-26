@@ -14,7 +14,3 @@ CONFIG_FILECFG_FILE = "filecfg_file"
 WEBSOCKET_PORT = 8765
 
 SINGLE_USER_NAME = "<single_user>"
-
-# Monetary precision policy shared across DB backends.
-DEFAULT_DECIMAL_SCALE_DIGITS = 4
-MAX_DECIMAL_TOTAL_DIGITS = 18
