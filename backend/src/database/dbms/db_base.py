@@ -156,7 +156,7 @@ class DB(DBBaseClass):
                     valid = self.__class__.validate_decimal(param)
                     if not valid:
                         raise ValueError(
-                            f"Decimal value {param} does not meet MySQL decimal precision requirements."
+                            f"Decimal value {param} does not meet {self.__class__.__name__} decimal precision requirements."
                         )
 
         return await (connection or await self.connect()).execute(
