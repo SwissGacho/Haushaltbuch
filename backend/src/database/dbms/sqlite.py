@@ -1,5 +1,9 @@
 """Connection to SQLit DB using aiosqlite"""
 
+from __future__ import annotations
+
+
+from decimal import Decimal
 from typing import Self, Any, Optional
 from datetime import datetime, date, UTC
 from pathlib import Path
@@ -12,7 +16,7 @@ LOG = getLogger(__name__)
 
 from core.exceptions import OperationalError
 from core.configuration.config import Config
-from database.dbms.db_base import DB, Connection, Cursor
+from database.dbms.db_base import DB, Connection, Cursor, DecimalCapabilities
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
@@ -49,6 +53,9 @@ SQLITE_JSON_TYPE = "JSON"
 SQLITE_BASEFLAG_TYPE = "FLAG"
 SQLITE_DATE_TYPE = "ISODATE"
 SQLITE_DATETIME_TYPE = "ISODATETIME"
+SQLITE_DECIMAL_TYPE = "DECIMAL"
+SQLITE_MAXIMUM_DECIMAL_DIGITS = 19
+SQLITE_MAXIMUM_DECIMAL_SCALE = 4
 
 
 class SQLiteColumnDefinition(SQLColumnDefinition):
@@ -64,6 +71,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         list: SQLITE_JSON_TYPE,
         BOBaseBase: "INTEGER",
         BaseFlag: SQLITE_BASEFLAG_TYPE,
+        Decimal: SQLITE_DECIMAL_TYPE,
     }
     constraint_map = {
         BOColumnConstraint.BOC_NONE: "",
@@ -78,6 +86,20 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
+
+
+def _adapt_decimal(value: Decimal) -> int:
+    if not SQLiteDB.validate_decimal(value):
+        raise ValueError(f"Decimal value out of supported range for SQLite: {value}")
+
+    scale = SQLITE_MAXIMUM_DECIMAL_SCALE
+
+    quantizer = Decimal(1).scaleb(-scale)
+    quantized = value.quantize(quantizer)
+
+    scaled = int(quantized * (10**scale))
+
+    return scaled
 
 
 def _adapt_dict(value: dict) -> str:
@@ -112,6 +134,11 @@ def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
 
+def _convert_decimal(value: bytes) -> Decimal:
+    scale = SQLITE_MAXIMUM_DECIMAL_SCALE
+    return Decimal(int(value)) / Decimal(10**scale)
+
+
 def _convert_isodate(value: bytes) -> date:
     return date.fromisoformat(value.decode())
 
@@ -131,10 +158,12 @@ if sqlite3:
     sqlite3.register_adapter(BaseFlag, _adapt_flag)
     sqlite3.register_adapter(date, _adapt_date_iso)
     sqlite3.register_adapter(datetime, _adapt_datetime_iso)
+    sqlite3.register_adapter(Decimal, _adapt_decimal)
 
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
     sqlite3.register_converter(SQLITE_DATE_TYPE, _convert_isodate)
     sqlite3.register_converter(SQLITE_DATETIME_TYPE, _convert_isodatetime)
+    sqlite3.register_converter(SQLITE_DECIMAL_TYPE, _convert_decimal)
 
     # Register adapter for all existing PersistentBusinessObject subclasses recursively
     def _setup_bo_subclasses(cls):
@@ -205,6 +234,11 @@ class SQLiteDB(DB):
     @property
     def sql_factory(self):
         return SQLiteSQLFactory
+
+    DECIMAL_CAPABILITIES = DecimalCapabilities(
+        max_total_digits=SQLITE_MAXIMUM_DECIMAL_DIGITS,
+        max_decimal_scale=SQLITE_MAXIMUM_DECIMAL_SCALE,
+    )
 
     async def _get_table_info(self, table_name: str) -> dict[str, str]:
         # LOG.debug(f"SQLiteDB._get_table_info({table_name=})")

@@ -15,11 +15,13 @@ def import_business_objects():
     "Import all business object modules to register their classes"
     base_path = pathlib.Path(__file__).parent
     rel_paths = [p.relative_to(base_path.parent) for p in base_path.rglob("*.py")]
+    LOG.debug(f"Found business object modules: {rel_paths}")
     modules = [
         ".".join(m)
         for m in [p.with_suffix("").parts for p in rel_paths if p.name[0] != "_"]
     ]
     for mod in modules:
+        LOG.debug(f"Importing module {mod}")
         module = importlib.import_module(name=mod)
         for module_class in [
             cls

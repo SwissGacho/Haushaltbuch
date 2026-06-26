@@ -33,6 +33,8 @@ class PersistentBusinessObject(BOBase):
     """Base class for persistent Business Objects.
     Every subclass will be registered in a table in the database."""
 
+    is_root_bo: bool = False
+
     @classmethod
     def navigation_header(
         cls, ref: AttributeDescription | str | None = None

@@ -1,14 +1,17 @@
 """Test suite for business object attributes descriptors."""
 
 import datetime
+from decimal import Decimal
 from enum import Flag, auto
 
+from sqlite3 import OperationalError
 import unittest
-from unittest.mock import Mock, ANY
+from unittest.mock import Mock, ANY, patch
 
 import business_objects.bo_descriptors
 from business_objects.bo_descriptors import AttributeAccessLevel, BOSelf
 from business_objects.bo_semantic_role import BOSemanticRole
+from core.exceptions import OperationalError
 
 
 class MockAttr(business_objects.bo_descriptors._PersistentAttr):
@@ -122,6 +125,7 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
     rel_attr = business_objects.bo_descriptors.BORelation(MockRel)
     rel_self_attr = business_objects.bo_descriptors.BORelation(BOSelf)
     flag_attr = business_objects.bo_descriptors.BOFlag(flag_type=MockFlag)
+    decimal_attr = business_objects.bo_descriptors.BODecimal()
 
     @classmethod
     def add_attribute(
@@ -185,7 +189,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT,
             business_objects.bo_descriptors.AttributeType.ATYPE_DICT,
             AttributeAccessLevel.AAL_READ_WRITE,
-            {"semantic_role": BOSemanticRole.RAW, "default": {"a": 1, "b": 2}},
+            {"default": {"a": 1, "b": 2}, "semantic_role": BOSemanticRole.RAW},
         ),
         (
             "list_attr",
@@ -209,7 +213,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_FK,
             business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
             AttributeAccessLevel.AAL_READ_WRITE,
-            {"semantic_role": BOSemanticRole.RAW, "relation": ANY},
+            {"relation": MockObj, "semantic_role": BOSemanticRole.RAW},
         ),
         (
             "flag_attr",
@@ -217,7 +221,15 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_FLAG,
             AttributeAccessLevel.AAL_READ_WRITE,
-            {"semantic_role": BOSemanticRole.RAW, "flag_type": MockFlag},
+            {"flag_type": MockFlag, "semantic_role": BOSemanticRole.RAW},
+        ),
+        (
+            "decimal_attr",
+            Decimal,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
+            business_objects.bo_descriptors.AttributeType.ATYPE_DECIMAL,
+            AttributeAccessLevel.AAL_READ_WRITE,
+            {"semantic_role": BOSemanticRole.RAW},
         ),
     ]
 }
@@ -316,3 +328,50 @@ class Test_200_BOAttributes(unittest.TestCase):
         self.assertIsInstance(self.mock_obj._data["flag_attr"], MockFlag)
         self.assertIsInstance(self.mock_obj.flag_attr, MockFlag)
         self.assertEqual(self.mock_obj.flag_attr, MockFlag(0b11))
+
+    def test_206_BODecimal_data_type(self):
+
+        self.assertEqual(business_objects.bo_descriptors.BODecimal.data_type(), Decimal)
+
+    def test_207_BODecimal_setter(self):
+        mock_obj = MockObj()
+
+        # Should raise a ValueError because App.db is not initialized
+        with self.assertRaises(
+            OperationalError,
+            msg="BODecimal setter should raise OperationalError when App.db is not initialized.",
+        ):
+            mock_obj.decimal_attr = Decimal("10.75")
+
+        # Mock initialized App.db
+        with patch("business_objects.bo_descriptors.App", new=Mock()) as mock_app:
+            mock_db = Mock()
+            mock_app.db = mock_db
+            mock_obj.decimal_attr = Decimal("20.75")
+            self.assertEqual(mock_obj.decimal_attr, Decimal("20.75"))
+
+            # Patch db.validate decimal to return False to simulate invalid decimal
+            with patch.object(mock_db, "validate_decimal", return_value=False):
+                with self.assertRaises(
+                    ValueError,
+                    msg="BODecimal setter should raise ValueError when db.validate_decimal returns False.",
+                ):
+                    mock_obj.decimal_attr = Decimal("30.75")
+
+            # If super.validate returns False, it should raise ValueError
+            with patch.object(MockObj.decimal_attr, "validate", return_value=False):
+                with self.assertRaises(
+                    ValueError,
+                    msg="BODecimal setter should raise ValueError when super().validate returns False.",
+                ):
+                    mock_obj.decimal_attr = Decimal("40.75")
+
+            # If the value is not a Decimal, it should raise ValueError
+            with self.assertRaises(
+                ValueError,
+                msg="BODecimal setter should raise ValueError when value is not a Decimal.",
+            ):
+                mock_obj.decimal_attr = "not a decimal"
+
+        with self.assertRaises(ValueError):
+            mock_obj.decimal_attr = "not a decimal"
