@@ -292,6 +292,9 @@ class Test_100_Persistent_Business_Object_classmethods(
         mock_sql.select = Mock(return_value=mock_sql)
         mock_sql.from_ = Mock(return_value=mock_sql)
         mock_sql.where = Mock(return_value=mock_sql)
+        mock_convert_from_db = Mock(
+            name="convert_from_db", side_effect=lambda value, typ, subtyp: value
+        )
 
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
         mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
@@ -317,6 +320,16 @@ class Test_100_Persistent_Business_Object_classmethods(
         mock_sql.where.assert_called_once_with(MockFilter())
         mock_sql.execute.assert_awaited_once_with()
         mock_cursor.fetchall.assert_awaited_once_with()
+        convert_args = [
+            call(value, mock_bo2_as_dict[key], mock_bo2_constr_vals[key])
+            for row in mock_fetch_result
+            for key, value in row.items()
+            if key != "id"
+        ]
+        self.assertEqual(
+            mock_convert_from_db.call_count, len(convert_args), "attributes converted"
+        )
+        self.assertEqual(mock_convert_from_db.call_args_list, convert_args)
         self.assertEqual(result, mock_result)
 
     async def test_104_get_matching_objects(self):

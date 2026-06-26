@@ -189,7 +189,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT,
             business_objects.bo_descriptors.AttributeType.ATYPE_DICT,
             AttributeAccessLevel.AAL_READ_WRITE,
-            {"semantic_role": BOSemanticRole.RAW, "default": {"a": 1, "b": 2}},
+            {"default": {"a": 1, "b": 2}, "semantic_role": BOSemanticRole.RAW},
         ),
         (
             "list_attr",
@@ -213,7 +213,7 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_FK,
             business_objects.bo_descriptors.AttributeType.ATYPE_RELATION,
             AttributeAccessLevel.AAL_READ_WRITE,
-            {"semantic_role": BOSemanticRole.RAW, "relation": ANY},
+            {"relation": MockObj, "semantic_role": BOSemanticRole.RAW},
         ),
         (
             "flag_attr",
@@ -221,7 +221,15 @@ expected_attributes = {
             business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
             business_objects.bo_descriptors.AttributeType.ATYPE_FLAG,
             AttributeAccessLevel.AAL_READ_WRITE,
-            {"semantic_role": BOSemanticRole.RAW, "flag_type": MockFlag},
+            {"flag_type": MockFlag, "semantic_role": BOSemanticRole.RAW},
+        ),
+        (
+            "decimal_attr",
+            Decimal,
+            business_objects.bo_descriptors.BOColumnConstraint.BOC_NONE,
+            business_objects.bo_descriptors.AttributeType.ATYPE_DECIMAL,
+            AttributeAccessLevel.AAL_READ_WRITE,
+            {"semantic_role": BOSemanticRole.RAW},
         ),
     ]
 }

@@ -52,7 +52,14 @@ class DBManager:
         if db_type not in DB_TYPE_MAP:
             LOG.error(f"Unsupported DB type: {db_type}")
             raise ConfigurationError(f"Unsupported DB type: {db_type}")
-        db_class = self.import_db_by_name(*DB_TYPE_MAP[db_type])
+        db_module_name, db_class_name = DB_TYPE_MAP[db_type]
+        module_imported = self.import_db_by_name(db_module_name)
+        if not module_imported:
+            raise ConfigurationError(f"Import failed for: {db_type}")
+        db_class = getattr(
+            importlib.import_module(f"database.dbms.{db_module_name.lower()}"),
+            db_class_name,
+        )
         return db_config, db_type, db_class
 
     @asynccontextmanager
@@ -70,16 +77,6 @@ class DBManager:
         try:
             db_config, db_type, db_class = self._valid_db_config()
         except ConfigurationError as exc:
-            LOG.error(f"{exc}")
-            self._set_db_unsupported()
-            yield None
-            return
-        except ModuleNotFoundError as exc:
-            missing_module = exc.name or "<unknown>"
-            LOG.error(
-                f"Library '{missing_module}' could not be imported for {db_type=}"
-            )
-            LOG.error(f"Please install using 'pip install {missing_module}'")
             LOG.error(f"{exc}")
             self._set_db_unsupported()
             yield None
@@ -115,10 +112,20 @@ class DBManager:
         LOG.debug("DB ready")
         return db
 
-    def import_db_by_name(self, db_name: str, db_class_name: str) -> type[DB]:
+    def import_db_by_name(self, db_name: str) -> bool:
         "Import the DB class based on the resolved module name"
-        LOG.debug(f"Importing DB class '{db_class_name}' from module '{db_name}'")
-        module = importlib.import_module(f"database.dbms.{db_name.lower()}")
+        LOG.debug(f"Importing db module '{db_name}'")
+        try:
+            module = importlib.import_module(f"database.dbms.{db_name.lower()}")
+        except ModuleNotFoundError as exc:
+            missing_module = exc.name or "<unknown>"
+            LOG.error(
+                f"Library '{missing_module}' could not be imported for {db_name=}"
+            )
+            LOG.error(f"Please install using 'pip install {missing_module}'")
+            LOG.error(f"{exc}")
+            return False
+        return True
 
         db_class = getattr(module, db_class_name)
         return db_class

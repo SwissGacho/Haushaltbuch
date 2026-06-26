@@ -20,6 +20,8 @@ from unittest.mock import (
 )
 from contextlib import asynccontextmanager
 
+import database.dbms.mysql
+
 
 def restore_sys_modules(name, module=None):
     # print(f"====================== restoring sys.modules['{name}'] -> {module}")

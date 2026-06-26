@@ -1,7 +1,7 @@
 """Base class for DB connections"""
 
 from typing import Any, NamedTuple, Self, Optional, Protocol, AsyncContextManager
-from decimal import Context, Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, Context as DecimalContext
 import re
 import json
 
@@ -27,11 +27,14 @@ class DB(DBBaseClass):
 
     DECIMAL_CAPABILITIES: DecimalCapabilities | None = None
 
-    def __init__(self, **cfg) -> None:
+    def __init__(self, decimal_context: DecimalContext | None = None, **cfg) -> None:
         self._cfg = cfg
         if LOG.isEnabledFor(DEBUG):
             LOG.debug(f"DB.__init__: cfg={redact(cfg)}")
+
         self.db_connections = set()
+        if decimal_context is not None:
+            self.configure_decimal_context(decimal_context)
 
     @property
     def sql_factory(self):
@@ -73,7 +76,7 @@ class DB(DBBaseClass):
         LOG.debug(f"{scaled=}, Max: {10 ** (caps.max_total_digits)=}")
         return abs(scaled) < 10 ** (caps.max_total_digits)
 
-    def configure_decimal_context(self, decimal_context: Context):
+    def configure_decimal_context(self, decimal_context: DecimalContext):
         "Configure the decimal context according to the DB's capabilities"
         caps = self.decimal_capabilities
         decimal_context.prec = caps.max_total_digits
