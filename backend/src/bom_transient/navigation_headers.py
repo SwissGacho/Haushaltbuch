@@ -13,6 +13,7 @@ LOG = getLogger(__name__)
 
 from business_objects.business_object_base import BOBase
 from business_objects.transient_business_object import TransientBusinessObject
+from business_objects.persistent_business_object import PersistentBusinessObject
 
 
 class NavigationHeaders(TransientBusinessObject):

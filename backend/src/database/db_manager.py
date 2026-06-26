@@ -2,12 +2,13 @@
 
 from contextlib import asynccontextmanager
 import importlib
-from typing import AsyncContextManager, AsyncIterator, cast
+from types import ModuleType
+from typing import AsyncIterator, cast
 import decimal
 
 from core.app_logging import getLogger, log_exit, redact
 from core.exceptions import ConfigurationError
-from .dbms.db_base import DB
+from database.dbms.db_base import DB
 
 LOG = getLogger(__name__)
 
@@ -27,9 +28,13 @@ DB_TYPE_MAP: dict[str, tuple[str, str]] = {
 class DBManager:
     "Initialize and configure the app database"
 
+    RECONNECT_ATTEMPTS: int = 3
+
     def __init__(self, app: type[App]):
         self._app = app
         self.db: DB | None = None
+
+    _db_module: ModuleType | None = None
 
     @property
     def _db_identifiers(self) -> tuple[dict | None, str | None]:
@@ -53,13 +58,18 @@ class DBManager:
             LOG.error(f"Unsupported DB type: {db_type}")
             raise ConfigurationError(f"Unsupported DB type: {db_type}")
         db_module_name, db_class_name = DB_TYPE_MAP[db_type]
-        module_imported = self.import_db_by_name(db_module_name)
+        module_imported = self._import_db_by_name(db_module_name)
         if not module_imported:
             raise ConfigurationError(f"Import failed for: {db_type}")
-        db_class = getattr(
-            importlib.import_module(f"database.dbms.{db_module_name.lower()}"),
-            db_class_name,
-        )
+        try:
+            db_class = getattr(self._db_module, db_class_name)
+        except AttributeError as exc:
+            LOG.error(
+                f"DB class '{db_class_name}' not found in module '{db_module_name}'"
+            )
+            raise ConfigurationError(
+                f"DB class '{db_class_name}' not found in module '{self._db_module=}'"
+            ) from exc
         return db_config, db_type, db_class
 
     @asynccontextmanager
@@ -84,11 +94,13 @@ class DBManager:
 
         LOG.debug(f"DB configuration: {redact(db_config)=}, {db_type=}")
 
-        db = db_class(**db_config)
+        db = db_class(decimal_context=decimal.DefaultContext, **db_config)
 
         # Post-connection configuration and schema check
         try:
-            await self.connect_and_setup_db(db)
+            App.db = db
+            await self._try_check_db_schema(db)
+            LOG.debug("DB ready")
             yield db
         except (TypeError, ValueError) as exc:
             LOG.error(f"DB connection failed: {exc}")
@@ -97,22 +109,39 @@ class DBManager:
             return
         except Exception as exc:  # pylint: disable=broad-exception-caught
             LOG.warning(f"DB connection failed: {exc}")
+            App.status = Status.STATUS_UNCONFIGURED
+            yield None
+            return
         finally:
             LOG.debug("DB disconnecting")
             await db.close()
 
+    async def _try_check_db_schema(self, db: DB):
+        "Try to check the database schema; on connection error, retry up to RECONNECT_ATTEMPTS times"
+        attempts = 0
+        while attempts < self.RECONNECT_ATTEMPTS:
+            try:
+                LOG.debug(f"Checking DB schema (attempt {attempts + 1})")
+                await check_db_schema()
+                return True
+            except (TypeError, ValueError) as exc:
+                LOG.error(f"DB schema check failed: {exc}")
+                raise
+            except Exception as exc:  # pylint: disable=broad-exception-caught
+                attempts += 1
+                if attempts >= self.RECONNECT_ATTEMPTS:
+                    LOG.error(
+                        f"DB schema check failed after {attempts} attempts: {exc}"
+                    )
+                    raise
+                LOG.warning(
+                    f"DB schema check failed (attempt {attempts}/{self.RECONNECT_ATTEMPTS}): {exc}"
+                )
+
     def _set_db_unsupported(self):
         App.status = Status.STATUS_DB_UNSUPPORTED
 
-    async def connect_and_setup_db(self, db: DB):
-        "Connect to the database and perform setup tasks"
-        App.db = db
-        db.configure_decimal_context(decimal.DefaultContext)
-        await check_db_schema()
-        LOG.debug("DB ready")
-        return db
-
-    def import_db_by_name(self, db_name: str) -> bool:
+    def _import_db_by_name(self, db_name: str) -> bool:
         "Import the DB class based on the resolved module name"
         LOG.debug(f"Importing db module '{db_name}'")
         try:
@@ -125,10 +154,8 @@ class DBManager:
             LOG.error(f"Please install using 'pip install {missing_module}'")
             LOG.error(f"{exc}")
             return False
+        self._db_module = module
         return True
-
-        db_class = getattr(module, db_class_name)
-        return db_class
 
 
 def get_db():

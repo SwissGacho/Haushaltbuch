@@ -206,7 +206,7 @@ class BODecimal(_PersistentAttr[Decimal]):
     def __set__(self, obj, value) -> None:
         if isinstance(value, (int, str)):
             try:
-                value = Decimal(str(value))
+                value = Decimal(value)
             except (InvalidOperation, ValueError) as exc:
                 raise ValueError(
                     f"'{value}' invalid to set attribute {self.my_name} of type {self.__class__.__name__}"
