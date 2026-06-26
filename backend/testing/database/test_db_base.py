@@ -168,6 +168,29 @@ class TestDB(unittest.IsolatedAsyncioTestCase):
                 msg="Context precision should have changed from initial value",
             )
 
+    async def test_206_execute_check_invalid_decimal(self):
+        with patch.object(
+            self.db.__class__, "validate_decimal", return_value=False
+        ) as mock_validate:
+            with self.assertRaises(ValueError):
+                await self.db.execute(
+                    query="DUMMYSQL", params={"amount": Decimal("123.456")}
+                )
+            mock_validate.assert_called_once_with(Decimal("123.456"))
+
+        mock_cursor = Mock(name="cursor")
+        mock_connection = Mock(name="connection")
+        mock_connection.execute = AsyncMock(return_value=mock_cursor)
+        with patch.object(
+            self.db.__class__, "validate_decimal", return_value=True
+        ) as mock_validate, patch.object(
+            self.db, "connect", new=AsyncMock(return_value=mock_connection)
+        ):
+            await self.db.execute(
+                query="DUMMYSQL", params={"amount": Decimal("23.45")}
+            )
+            mock_validate.assert_called_once_with(Decimal("23.45"))
+
 
 class TestDBConnection(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
