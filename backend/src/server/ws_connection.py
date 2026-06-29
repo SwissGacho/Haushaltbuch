@@ -12,6 +12,8 @@ from core.app_logging import (
     DEBUG,
     VERBOSE_DEBUG,
     redact,
+    pprint_lines,
+    redact_truncate,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -107,6 +109,7 @@ class WSConnection(WSConnectionBase):
 
     async def _send(self, payload):
         await self._socket.send(payload)
+        # if self.conn_logger.isEnabledFor(DEBUG):
         if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
             self.conn_logger.debug("WSConnection._send(): sent message:")
             try:

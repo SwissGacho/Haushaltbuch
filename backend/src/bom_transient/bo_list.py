@@ -68,7 +68,9 @@ class BOList(TransientBusinessObject):
             self._bo_type.unsubscribe_from_all_changes(self._subscription_id)
             self._subscription_id = None
 
-    async def business_values_as_dict(self) -> dict[str, Any]:
+    async def business_values_as_dict(
+        self, session: Optional[SessionBase] = None
+    ) -> dict[str, Any]:
         LOG.debug(
             f"{str(self)}.business_values_as_dict: bo={self._bo_type}, cond={self._conditions}"
         )
@@ -76,7 +78,7 @@ class BOList(TransientBusinessObject):
         matching_objects = await self._bo_type.get_matching_objects(
             attributes=name_components,
             conditions=self._conditions,
-            session=self._session,
+            session=session or self._session,
         )
         name_list = [
             {"object": cur.bo_name, "id": cur.id, "display_name": cur.display_name}

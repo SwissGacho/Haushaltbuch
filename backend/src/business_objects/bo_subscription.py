@@ -58,13 +58,13 @@ class BOSubscription(Generic[T], WSMessageSender):
         self._bo_type: Type[T] = bo_type
         self._instance_subscriptions: dict[int, T] = {}
         self._obj: T | None = None
+        self._session: SessionBase | None = connection.session
+        self._notify_subscribers_on_init = notify_subscribers_on_init
 
         WSMessageSender.__init__(self, connection=connection)
 
         try:
-            self._initialize_subscriptions(
-                session=connection.session, index=index, **kwargs
-            )
+            self._initialize_subscriptions(index=index, **kwargs)
         except Exception as e:
             connection.unregister_message_sender(self)
             LOG.error(
@@ -72,26 +72,49 @@ class BOSubscription(Generic[T], WSMessageSender):
             )
             raise
         connection.unregister_other_senders(self)
-        if notify_subscribers_on_init:
+        if self._notify_subscribers_on_init:
             asyncio.create_task(self.notify_subscription_subscribers())
 
-    def _initialize_subscriptions(self, session: SessionBase, **kwargs):
+    def _initialize_subscriptions(self, **kwargs):
         if "index" not in kwargs:
             raise ValueError("BOSubscription requires an 'index' argument")
         self._index = kwargs["index"]
-        if issubclass(self._bo_type, PersistentBusinessObject):
+        if self._index == "personal":
+            LOG.debug("BOSubscription: 'personal' index detected.")
+            bo_id = None
+            kwargs.pop("index")
+            asyncio.create_task(self._init_bo_and_subscribe(bo_id=bo_id, **kwargs))
+            return
+        elif issubclass(self._bo_type, PersistentBusinessObject):
             if not isinstance(self._index, int):
                 raise ValueError(
                     "BOSubscription requires an 'index' argument of type int"
                 )
-
             bo_id = int(self._index)
             kwargs.pop("index")
         else:
             bo_id = None
-        bo: T = self._bo_type(bo_id=bo_id, session=session, **kwargs)
+        bo: T = self._bo_type(bo_id=bo_id, **kwargs)
         self._subscription_id = bo.subscribe_to_instance(self._handle_event_)
         self._obj = bo
+
+    async def _init_bo_and_subscribe(self, bo_id: int | None, **kwargs):
+        if bo_id is None and self._index == "personal":
+            LOG.log(VERBOSE_DEBUG, "BOSubscription: determining bo_id")
+            bo_id = (
+                await getattr(self._bo_type, "get_single_matching_id")(
+                    session=self._session
+                )
+                if self._session
+                and getattr(self._bo_type, "get_single_matching_id", None)
+                else None
+            )
+            LOG.log(VERBOSE_DEBUG, f"BOSubscription: determined bo_id={bo_id}")
+        bo: T = self._bo_type(bo_id=bo_id, **kwargs)
+        self._subscription_id = bo.subscribe_to_instance(self._handle_event_)
+        self._obj = bo
+        if self._notify_subscribers_on_init:
+            asyncio.create_task(self.notify_subscription_subscribers())
 
     async def _get_objects_(self) -> list[T]:
         if self._bo_type is None:
@@ -132,12 +155,13 @@ class BOSubscription(Generic[T], WSMessageSender):
             )
         BOBase.subscriptions_report()
 
+        payload = await self._obj.business_values_as_dict(session=self._session)
+        if self._index is None or self._index == "personal":
+            index = self._obj.id
+        else:
+            index = self._index
         await self.send_message(
-            ObjectMessage(
-                object_type=self._bo_type,
-                index=self._index if self._index is not None else self._obj.id,
-                payload=await self._obj.business_values_as_dict(),
-            )
+            ObjectMessage(object_type=self._bo_type, index=index, payload=payload)
         )
 
     def cleanup(self):

@@ -432,7 +432,9 @@ class BOBase(BOBaseBase):
         del self._instance_subscribers[callback_id]
         BOBase.subscriptions_report()
 
-    async def business_values_as_dict(self) -> dict[str, Any]:
+    async def business_values_as_dict(
+        self, session: Optional[SessionBase] = None
+    ) -> dict[str, Any]:
         "dict of BO attribute values with attribute names as keys"
 
         value_dict = {k: v for k, v in self._data.items() if k not in ("bo_type")}

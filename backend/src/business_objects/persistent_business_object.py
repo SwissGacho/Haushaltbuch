@@ -273,7 +273,7 @@ class PersistentBusinessObject(BOBase):
                     [SQLString(s.bo_type_name()) for s in cls.specialists],
                 )
         if issubclass(cls, Personal) and user is not None:
-            user_cond = Eq("user_id", user.id)
+            user_cond = Eq("user_id", Value(user))
         conds = [c for c in [spec_cond, user_cond, conditions] if c is not None]
         if len(conds) == 1:
             return conds[0]
@@ -317,6 +317,25 @@ class PersistentBusinessObject(BOBase):
             result = await (await select.execute()).fetchall()
         # LOG.debug(f"PersistentBusinessObject.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
+
+    @classmethod
+    async def get_single_matching_id(
+        cls, conditions: dict | None = None, session: Optional[SessionBase] = None
+    ) -> int | None:
+        """Get the id of a single business object matching the conditions"""
+        ids = await cls.get_matching_ids(conditions, session)
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"PersistentBusinessObject.get_single_matching_id({conditions=}) -> {ids=}",
+        )
+        if len(ids) == 1:
+            return ids[0]
+        if len(ids) > 1:
+            raise ValueError(
+                f"PersistentBusinessObject.get_single_matching_id: "
+                f"Multiple objects found for {cls.__name__} with conditions {conditions}"
+            )
+        return None
 
     @classmethod
     async def get_matching_objects(
@@ -454,10 +473,14 @@ class PersistentBusinessObject(BOBase):
             await self._update_self(session)
         await super().store(session)
 
-    async def business_values_as_dict(self) -> dict[str, Any]:
-        # LOG.debug(f"{self}.business_values_as_dict: {self.id=}")
-        await self.fetch(self.id)
-        return await super().business_values_as_dict()
+    async def business_values_as_dict(
+        self, session: Optional[SessionBase] = None
+    ) -> dict[str, Any]:
+        LOG.debug(
+            f"{self}.business_values_as_dict: {self.id=}, user={getattr(session, 'user', None)}"
+        )
+        await self.fetch(self.id, session=session)
+        return await super().business_values_as_dict(session=session)
 
     async def _insert_self(self, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"

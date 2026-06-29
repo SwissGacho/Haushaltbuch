@@ -17,6 +17,8 @@ from core.app_logging import (
     WARNING,
     DEBUG,
     VERBOSE_DEBUG,
+    pprint_lines,
+    redact_truncate,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -43,29 +45,13 @@ class WSHandler:
                 local_LOG = get_context_logger(LOG, **connection.connection_context)
                 local_LOG.debug("Connection started.")
                 async for ws_message in websocket:
-                    if local_LOG.isEnabledFor(VERBOSE_DEBUG):
-                        local_LOG.debug("WSHandler.handler(): client posted:")
-                        try:
-                            debug_message = pprint.pformat(
-                                redact(json.loads(ws_message)),
-                                indent=4,
-                                width=120,
-                                compact=True,
-                            )
-                        except json.JSONDecodeError:
-                            debug_message = redact(ws_message)
-                        for line in debug_message.splitlines():
-                            LOG.log(VERBOSE_DEBUG, f"    {line}")
-                    elif local_LOG.isEnabledFor(DEBUG):
-                        debug_message = redact(ws_message)
-                        if len(str(debug_message)) > 80:
-                            debug_message = (
-                                f"{str(debug_message)[:80]}... "
-                                + f"(total {len(str(debug_message))} chars)"
-                            )
+                    if local_LOG.isEnabledFor(DEBUG):
                         local_LOG.debug(
-                            f"WSHandler.handler(): client posted: {debug_message}"
+                            f"WSHandler.handler(): client posted: {redact_truncate(ws_message)}"
                         )
+                        if local_LOG.isEnabledFor(VERBOSE_DEBUG):
+                            for line in pprint_lines(ws_message, width=80):
+                                local_LOG.log(VERBOSE_DEBUG, f" -   {line}")
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:
