@@ -110,8 +110,9 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
                 Mock(id=2, display_name="Second object", bo_name="mock_bo2"),
             ]
         )
+        ses = Mock(name="session")
 
-        result = await bo_list.business_values_as_dict()
+        result = await bo_list.business_values_as_dict(session=ses)
 
         self.assertEqual(
             result,
@@ -124,5 +125,5 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
         )
         MockConcreteBO.display_name_components.assert_called_once_with()
         MockConcreteBO.get_matching_objects.assert_awaited_once_with(
-            attributes=["name"], conditions=conditions
+            attributes=["name"], conditions=conditions, session=ses
         )
