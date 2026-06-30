@@ -2,7 +2,6 @@
 
 import os
 import json
-import pprint
 import socket
 import websockets
 import websockets.asyncio.server as websockets_server
@@ -50,8 +49,12 @@ class WSHandler:
                             f"WSHandler.handler(): client posted: {redact_truncate(ws_message)}"
                         )
                         if local_LOG.isEnabledFor(VERBOSE_DEBUG):
-                            for line in pprint_lines(ws_message, width=80):
-                                local_LOG.log(VERBOSE_DEBUG, f" -   {line}")
+                            try:
+                                msg = json.loads(ws_message)
+                            except Exception:
+                                msg = ws_message
+                            for line in pprint_lines(msg):
+                                LOG.log(VERBOSE_DEBUG, f" -   {line}")
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:
