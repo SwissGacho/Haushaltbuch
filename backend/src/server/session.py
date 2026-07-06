@@ -88,6 +88,9 @@ class Session(SessionBase):
         if token:
             self._tokens.add(WSToken(token))
 
+    def __str__(self) -> str:
+        return f"Session[#{self._session_nbr}]"
+
     def __repr__(self) -> str:
         return (
             f"<Session[#{self._session_nbr}](user={self.user},"

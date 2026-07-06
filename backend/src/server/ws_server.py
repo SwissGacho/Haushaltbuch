@@ -46,7 +46,7 @@ class WSHandler:
                 async for ws_message in websocket:
                     if local_LOG.isEnabledFor(DEBUG):
                         local_LOG.debug(
-                            f"WSHandler.handler(): client posted: {redact_truncate(ws_message)}"
+                            f"WSHandler.handler(): client posted: {redact_truncate(ws_message,max_length=50)}"
                         )
                         if local_LOG.isEnabledFor(VERBOSE_DEBUG):
                             try:
@@ -54,7 +54,7 @@ class WSHandler:
                             except Exception:
                                 msg = ws_message
                             for line in pprint_lines(msg):
-                                LOG.log(VERBOSE_DEBUG, f" -   {line}")
+                                LOG.log(VERBOSE_DEBUG, f"     {line}")
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:

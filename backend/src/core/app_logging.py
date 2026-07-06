@@ -118,6 +118,19 @@ def redact_truncate(value: Any, max_length: int = 80) -> str:
     return s
 
 
+def callable_name(func) -> str:
+    "Return a readable name of a callable."
+    fun_name = getattr(
+        func,
+        "__qualname__",
+        getattr(func, "__name__", type(func).__name__),
+    )
+    fun_self = getattr(func, "__self__", None)
+    if fun_self is not None and "." not in fun_name:
+        fun_name = f"{fun_self.__class__.__name__}.{fun_name}"
+    return fun_name
+
+
 entered_modules = [__name__]
 
 
@@ -334,20 +347,13 @@ def configure_logging(log_cfg: dict | None = None):
         log.error(f"ERROR configuring logging: {e}")
     if log.isEnabledFor(VERBOSE_DEBUG):
         log.log(VERBOSE_DEBUG, f"Logging dictConfig:")
-        for line in pprint.pformat(
-            logging_dict, indent=4, width=120, compact=True
-        ).splitlines():
-            log.log(VERBOSE_DEBUG, f" - {line}")
+        for line in pprint_lines(logging_dict):
+            log.log(VERBOSE_DEBUG, f"  {line}")
     if log.isEnabledFor(DEBUG):
         if log.isEnabledFor(VERBOSE_DEBUG):
             log.log(VERBOSE_DEBUG, f"Logging configured with config:")
-            for line in pprint.pformat(
-                (log_cfg or {}).get(LogConfig.CONFIG_LOGGING, {}),
-                indent=4,
-                width=120,
-                compact=True,
-            ).splitlines():
-                log.log(VERBOSE_DEBUG, f" - {line}")
+            for line in pprint_lines((log_cfg or {}).get(LogConfig.CONFIG_LOGGING, {})):
+                log.log(VERBOSE_DEBUG, f"  {line}")
         log.debug("Logging is now (re)configured:")
         for l in sorted(
             [

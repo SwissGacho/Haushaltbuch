@@ -61,30 +61,28 @@ class PersonalConfiguration(Specialized, Personal, Configuration):
         If self.id is None, it will attempt to fetch the configuration for the current user.
         """
         LOG.debug(
-            f"{str(self)}.business_values_as_dict: {self.id=}, {session=}, {getattr(session, 'user', None)=}"
+            f"{str(self)}.business_values_as_dict: {self.id=}, session={str(session)}, user={str(getattr(session, 'user', None))}"
         )
         if self.id is None:
             user = getattr(session, "user", None)
             # Fetch the configuration for the current user
             if user is None:
                 raise ValueError(
-                    "Cannot fetch personal configuration without a valid session and user"
+                    "Cannot fetch personal configuration without a valid session user"
                 )
             ids = await self.get_matching_ids(session=session)
-            if len(ids) == 0:
-                LOG.debug(
-                    f"No personal configuration found for user {getattr(session, 'user', None)}. Creating a new one."
-                )
-                self.user_id = user
-                self.configuration = {"new": user.name}
-                return await super(
-                    PersistentBusinessObject, self
-                ).business_values_as_dict(session=session)
-            elif len(ids) > 1:
+            if len(ids) > 1:
                 raise ValueError(
                     f"Multiple personal configurations found for user {getattr(session, 'user', 'None')}"
                 )
-            self.id = ids[0]
+            if len(ids) == 0:
+                LOG.debug(
+                    f"No personal configuration found for user {getattr(session, 'user', None)}."
+                    " Returning a new empty one."
+                )
+                self.user_id = user
+            else:
+                self.id = ids[0]
         return await super().business_values_as_dict(session=session)
 
     @property

@@ -10,7 +10,7 @@ from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 import weakref
 import copy
 
-from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
+from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG, callable_name
 
 LOG = getLogger(__name__)
 
@@ -381,8 +381,11 @@ class BOBase(BOBaseBase):
         cls._change_subscribers[subscriber_id] = callback
         LOG.log(
             VERBOSE_DEBUG,
-            f"BOBase.subscribe_to_all_changes: Subscribed callback '{repr(callback)}' "
-            f"with id {subscriber_id} to all changes on {cls.__name__}",
+            f"BOBase.subscribe_to_all_changes: Subscribed callback '{callable_name(callback)}' ",
+        )
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"    with id {subscriber_id} to all changes on {cls.__name__}",
         )
         BOBase.subscriptions_report()
         return subscriber_id
@@ -410,8 +413,11 @@ class BOBase(BOBaseBase):
         subscriber_id: int = next(self._instance_subscriber_id)
         LOG.log(
             VERBOSE_DEBUG,
-            f"BOBase.subscribe_to_instance: Subscribing callback '{repr(callback)}' "
-            f"with id {subscriber_id} to instance {str(self)} with id {self.id}",
+            f"BOBase.subscribe_to_instance: Subscribing callback '{callable_name(callback)}' ",
+        )
+        LOG.log(
+            VERBOSE_DEBUG,
+            f" -  with id {subscriber_id} to instance {str(self)} with id {self.id}",
         )
         self._instance_subscribers[subscriber_id] = callback
         BOBase.subscriptions_report()

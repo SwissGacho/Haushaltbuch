@@ -5,7 +5,6 @@ application's data model."""
 
 import copy
 import json
-import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
 from core.app_logging import (
@@ -33,7 +32,7 @@ from database.sql_expression import (
     Filter,
     Value,
 )
-from database.sql_statement import CreateTable, NamedValueListList, Value
+from database.sql_statement import CreateTable, NamedValueListList
 from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag

@@ -2,7 +2,6 @@
 
 import websockets
 import json
-import pprint
 
 from core.app_logging import (
     get_context_logger,
@@ -109,29 +108,13 @@ class WSConnection(WSConnectionBase):
 
     async def _send(self, payload):
         await self._socket.send(payload)
-        # if self.conn_logger.isEnabledFor(DEBUG):
         if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
             self.conn_logger.debug("WSConnection._send(): sent message:")
-            try:
-                if isinstance(payload, (bytes, bytearray)):
-                    debug_payload = json.loads(payload.decode())
-                elif isinstance(payload, str):
-                    debug_payload = json.loads(payload)
-                else:
-                    debug_payload = payload
-                debug_output = pprint.pformat(
-                    redact(debug_payload), indent=4, width=120, compact=True
-                )
-            except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
-                debug_output = str(redact(payload))
-            for line in debug_output.splitlines():
-                LOG.log(VERBOSE_DEBUG, f"    {line}")
+            for line in pprint_lines(json.loads(payload)):
+                LOG.log(VERBOSE_DEBUG, f"  {line}")
         elif self.conn_logger.isEnabledFor(DEBUG):
-            debug_payload = redact(payload)
-            if len(str(debug_payload)) > 80:
-                debug_payload = f"{str(debug_payload)[:80]}... (total {len(str(debug_payload))} chars)"
             self.conn_logger.debug(
-                f"WSConnection._send(): sent message: {debug_payload}"
+                f"WSConnection._send(): sent message: {redact_truncate(payload,max_length=50)}"
             )
 
     async def send_message(self, message: Message, status=False):
@@ -148,7 +131,7 @@ class WSConnection(WSConnectionBase):
         Send a message to component(s) on a specified connection or
         list of connections (if 'comp=="*" send to all component connections).
         """
-        self.conn_logger.debug(f"Send {msg} to {comp}")
+        self.conn_logger.debug(redact_truncate(f"Send {msg} to {comp}"))
         if comp == "*":
             conns = WSConnection.connections.values()
         else:
@@ -164,22 +147,15 @@ class WSConnection(WSConnectionBase):
             while json_message := await self._socket.recv():
                 if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
                     # self.conn_logger.debug(f"sent message: {payload}")
-                    self.conn_logger.debug(
-                        "WS_Connection.start_connection(): reply to hello is:"
+                    self.conn_logger.log(
+                        VERBOSE_DEBUG,
+                        "WS_Connection.start_connection(): reply to hello is:",
                     )
                     try:
-                        debug_message = pprint.pformat(
-                            redact(json.loads(json_message)),
-                            indent=4,
-                            width=120,
-                            compact=True,
-                        )
+                        debug_message = json.loads(json_message)
                     except Exception:
-                        try:
-                            debug_message = str(redact(json_message))
-                        except Exception:
-                            debug_message = json_message
-                    for line in debug_message.splitlines():
+                        debug_message = json_message
+                    for line in pprint_lines(debug_message):
                         LOG.log(VERBOSE_DEBUG, f"    {line}")
                 elif self.conn_logger.isEnabledFor(DEBUG):
                     debug_message = redact(json_message)

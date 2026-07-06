@@ -283,9 +283,13 @@ class SQLiteCursor(Cursor):
         self._last_params = params or {}
         try:
             if LOG.isEnabledFor(DEBUG):
-                LOG.debug(f"SQLiteCursor.execute:  {query=},  params:")
+                LOG.debug("SQLiteCursor.execute:")
+                LOG.debug("  query:")
+                for line in pprint_lines(query):
+                    LOG.debug(f"     {line}")
+                LOG.debug("  params:")
                 for line in pprint_lines(params):
-                    LOG.debug(f" -   {line}")
+                    LOG.debug(f"     {line}")
             await self._cursor.execute(sql=query, parameters=params)
             self._rowcount = self._cursor.rowcount
         except sqlite3.OperationalError as exc:
