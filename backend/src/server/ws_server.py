@@ -36,19 +36,20 @@ class WSHandler:
         "Handle a ws connection"
         sock_nbr = WSHandler.counter
         WSHandler.counter += 1
-        local_LOG = get_context_logger(LOG, socket=f"sock #{sock_nbr}")
-        local_LOG.debug("connection opened")
+        context_log = get_context_logger(LOG, socket=f"sock #{sock_nbr}")
+        context_log.debug("connection opened")
         connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
             if await connection.start_connection():
-                local_LOG = get_context_logger(LOG, **connection.connection_context)
-                local_LOG.debug("Connection started.")
+                context_log = get_context_logger(LOG, **connection.connection_context)
+                context_log.debug("Connection started.")
                 async for ws_message in websocket:
-                    if local_LOG.isEnabledFor(DEBUG):
-                        local_LOG.debug(
-                            f"WSHandler.handler(): client posted: {redact_truncate(ws_message,max_length=50)}"
+                    if context_log.isEnabledFor(DEBUG):
+                        context_log.debug(
+                            "WSHandler.handler(): client posted: "
+                            f"{redact_truncate(ws_message,max_length=50)}"
                         )
-                        if local_LOG.isEnabledFor(VERBOSE_DEBUG):
+                        if context_log.isEnabledFor(VERBOSE_DEBUG):
                             try:
                                 msg = json.loads(ws_message)
                             except Exception:
@@ -58,20 +59,20 @@ class WSHandler:
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:
-                        if local_LOG.isEnabledFor(WARNING):
-                            local_LOG.warning(
+                        if context_log.isEnabledFor(WARNING):
+                            context_log.warning(
                                 "message handler failed to create Message object "
                                 f"from json: {redact(ws_message)}"
                             )
                         raise
                     await connection.handle_message(message=message)
         except websockets.exceptions.ConnectionClosed as exc:
-            local_LOG.debug(f"Connection closed by peer: {exc}")
+            context_log.debug(f"Connection closed by peer: {exc}")
         except Exception as exc:
-            local_LOG.error(f"Connection aborted by exception {exc}")
+            context_log.error(f"Connection aborted by exception {exc}")
             raise
         finally:
-            local_LOG.debug("Connection ended.")
+            context_log.debug("Connection ended.")
             connection.connection_closed()
 
 
