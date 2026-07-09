@@ -13,8 +13,7 @@ from business_objects.persistent_business_object import (
     PersistentBusinessObject,
 )
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
-from bom_persistent.management.user import User
-from database.sql_clause import ColumnName
+from bom_persistent.management.user import GenericUser
 from server.ws_connection_base import SessionBase
 
 
@@ -52,7 +51,7 @@ class ApplicationConfiguration(Specialized, Singleton, AdminOnly, Configuration)
 class PersonalConfiguration(Specialized, Personal, Configuration):
     "Persistent configuration for a specific user"
 
-    user_id = BORelation(User)
+    user_id = BORelation(GenericUser)
 
     async def business_values_as_dict(
         self, session: Optional[SessionBase] = None
@@ -81,6 +80,7 @@ class PersonalConfiguration(Specialized, Personal, Configuration):
                     " Returning a new empty one."
                 )
                 self.user_id = user
+                await self.store(session=session)
             else:
                 self.id = ids[0]
         return await super().business_values_as_dict(session=session)

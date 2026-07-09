@@ -10,7 +10,13 @@ from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 import weakref
 import copy
 
-from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG, callable_name
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    VERBOSE_DEBUG,
+    pprint_lines,
+    callable_name,
+)
 
 LOG = getLogger(__name__)
 
@@ -96,8 +102,13 @@ class BOBase(BOBaseBase):
         **attributes,
     ) -> None:
         LOG.debug(
-            f"{self.__class__.__name__}.__init__({bo_id=},{session=},{attributes})  "
-            f"-  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}"
+            f"{self.__class__.__name__}.__init__({bo_id=},{session=},attributes:)"
+        )
+        for line in pprint_lines(attributes):
+            LOG.debug(f"    {line}")
+        LOG.log(
+            VERBOSE_DEBUG,
+            f" -  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}",
         )
         if getattr(self, "_initialized", False):
             LOG.debug(

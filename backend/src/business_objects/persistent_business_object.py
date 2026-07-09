@@ -173,7 +173,7 @@ class PersistentBusinessObject(BOBase):
         }
 
     @classmethod
-    def convert_from_db(cls, value, typ, subtyp):
+    async def convert_from_db(cls, value, typ, subtyp):
         "convert a value of type 'typ' read from the DB"
         # LOG.debug(
         #     f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})"
@@ -197,7 +197,14 @@ class PersistentBusinessObject(BOBase):
         if typ == BOBaseBase and isinstance(value, int):
             relation = subtyp.get("relation") if isinstance(subtyp, dict) else None
             if isinstance(relation, type) and issubclass(relation, BOBase):
-                return relation(bo_id=value)
+                objs = await relation.get_matching_objects({"id": value})
+                if len(objs) == 1:
+                    return objs[0]
+                LOG.error(
+                    "PersistentBusinessObject.convert_from_db: "
+                    f"Could not find a single object of type {relation} with id {value}. "
+                    f"Found {len(objs)} objects."
+                )
             LOG.error(
                 f"PersistentBusinessObject.convert_from_db: Cannot convert {value} to class {relation}"
             )
@@ -388,7 +395,7 @@ class PersistentBusinessObject(BOBase):
                 if description is None:
                     converted[key] = value
                     continue
-                converted[key] = cls.convert_from_db(
+                converted[key] = await cls.convert_from_db(
                     value,
                     description.data_type,
                     description.constraint_values,
@@ -449,10 +456,12 @@ class PersistentBusinessObject(BOBase):
                 for line in pprint_lines(self._db_data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
             for description in self.attribute_descriptions():
-                self._data[description.name] = PersistentBusinessObject.convert_from_db(
-                    self._db_data.get(description.name),
-                    description.data_type,
-                    description.constraint_values,
+                self._data[description.name] = (
+                    await PersistentBusinessObject.convert_from_db(
+                        self._db_data.get(description.name),
+                        description.data_type,
+                        description.constraint_values,
+                    )
                 )
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}._fetch_self: _data=")
@@ -533,7 +542,7 @@ class PersistentBusinessObject(BOBase):
                 if k not in (
                     "bo_name",
                     "id",
-                ) and v != PersistentBusinessObject.convert_from_db(
+                ) and v != await PersistentBusinessObject.convert_from_db(
                     self._db_data.get(k),
                     descriptions[k].data_type,
                     descriptions[k].constraint_values,
