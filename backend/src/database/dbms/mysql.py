@@ -358,7 +358,7 @@ class MySQLCursor(Cursor):
             )
         try:
             if LOG.isEnabledFor(DEBUG):
-                LOG.debug("SQLiteCursor.execute:")
+                LOG.debug("MySQLCursor.execute:")
                 LOG.debug("  query:")
                 for line in pprint_lines(conv_sql):
                     LOG.debug(f"     {line}")
