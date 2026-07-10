@@ -110,7 +110,11 @@ class WSConnection(WSConnectionBase):
         await self._socket.send(payload)
         if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
             self.conn_logger.debug("WSConnection._send(): sent message:")
-            for line in pprint_lines(json.loads(payload)):
+            try:
+                payloaded = json.loads(payload)
+            except Exception:
+                payloaded = payload
+            for line in pprint_lines(payloaded):
                 LOG.log(VERBOSE_DEBUG, f"  {line}")
         elif self.conn_logger.isEnabledFor(DEBUG):
             self.conn_logger.debug(
