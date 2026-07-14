@@ -79,7 +79,16 @@ class Test200Util(unittest.TestCase):
         self.assertEqual(
             core.util_base.get_config_item(mock_dict, "lvl1b/lvl2b/lvl3"), "val3"
         )
+        self.assertEqual(core.util_base.get_config_item(mock_dict, ""), mock_dict)
         self.assertIsNone(core.util_base.get_config_item({}, "mick/mock"))
+        self.assertEqual(
+            core.util_base.get_config_item(mock_dict, "lvl1b/lvl2c", default="default"),
+            "default",
+        )
+        self.assertEqual(
+            core.util_base.get_config_item(mock_dict, "", default="default"),
+            mock_dict,
+        )
 
     def test_201_update_dicts_recursively(self):
         mock_tgt = {
