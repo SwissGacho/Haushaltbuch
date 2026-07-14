@@ -80,6 +80,9 @@ class ColorFormatter(logging.Formatter):
             record.levelname = original_levelname
 
 
+# If True, redact sensitive values but keep last 4 chars for debugging
+_LOG_WEAK_REDACT = False
+
 _REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
 
 
@@ -90,7 +93,13 @@ def redact(value: Any) -> Any:
     if isinstance(value, dict):
         return {
             key: (
-                "***redacted***" if _REDACT_PATTERN.search(str(key)) else redact(item)
+                (
+                    "..." + str(item)[-4:]
+                    if _LOG_WEAK_REDACT and len(str(item)) > 8
+                    else "***redacted***"
+                )
+                if _REDACT_PATTERN.search(str(key))
+                else redact(item)
             )
             for key, item in value.items()
         }
