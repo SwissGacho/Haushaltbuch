@@ -5,7 +5,17 @@
 from enum import StrEnum
 import logging
 
-from core.app_logging import getLogger, log_exit, Logger
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    Logger,
+    CRITICAL,
+    ERROR,
+    WARNING,
+    INFO,
+    DEBUG,
+    VERBOSE_DEBUG,
+)
 
 LOG: Logger = getLogger(__name__)
 from messages.message import Message, MessageType, MessageAttribute
@@ -15,6 +25,7 @@ from server.ws_connection_base import WSConnectionBase
 class LogLevel(StrEnum):
     "Logging levels from Frontend"
 
+    LOG_LEVEL_VERBOSE_DEBUG = "verbose_debug"
     LOG_LEVEL_DEBUG = "debug"
     LOG_LEVEL_INFO = "info"
     LOG_LEVEL_WARNING = "warning"
@@ -23,11 +34,12 @@ class LogLevel(StrEnum):
 
 
 LOGGING_LEVEL = {
-    LogLevel.LOG_LEVEL_DEBUG: logging.DEBUG,
-    LogLevel.LOG_LEVEL_INFO: logging.INFO,
-    LogLevel.LOG_LEVEL_WARNING: logging.WARNING,
-    LogLevel.LOG_LEVEL_ERROR: logging.ERROR,
-    LogLevel.LOG_LEVEL_CRITICAL: logging.CRITICAL,
+    LogLevel.LOG_LEVEL_VERBOSE_DEBUG: VERBOSE_DEBUG,
+    LogLevel.LOG_LEVEL_DEBUG: DEBUG,
+    LogLevel.LOG_LEVEL_INFO: INFO,
+    LogLevel.LOG_LEVEL_WARNING: WARNING,
+    LogLevel.LOG_LEVEL_ERROR: ERROR,
+    LogLevel.LOG_LEVEL_CRITICAL: CRITICAL,
 }
 
 
@@ -48,7 +60,6 @@ class LogMessage(Message):
         caller = "FrontEnd." + str(
             self.message.get(MessageAttribute.WS_ATTR_CALLER, "")
         )
-        # LOG.debug(f"Logging message from {caller=} at level {level}: {text}")
         getLogger(caller).log(LOGGING_LEVEL.get(LogLevel(level), logging.NOTSET), text)
 
 
