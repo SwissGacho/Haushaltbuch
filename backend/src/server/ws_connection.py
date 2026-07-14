@@ -2,7 +2,6 @@
 
 import websockets
 import json
-import pprint
 
 from core.app_logging import (
     get_context_logger,
@@ -12,6 +11,8 @@ from core.app_logging import (
     DEBUG,
     VERBOSE_DEBUG,
     redact,
+    redact_truncate,
+    pprint_lines,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -40,7 +41,7 @@ class WSConnection(WSConnectionBase):
         self._conn_nbr = sock_nbr
         self._comp = None
         self.is_primary = False
-        self._token = WSToken()
+        self._token = WSToken(inactive_seconds_timeout=None)
         self.subscribers: list[WSMessageSender] = []
         self.conn_logger = get_context_logger(LOG, **self.connection_context)
         self._register_connection()
@@ -115,19 +116,13 @@ class WSConnection(WSConnectionBase):
                     debug_payload = json.loads(payload)
                 else:
                     debug_payload = payload
-                debug_output = pprint.pformat(
-                    redact(debug_payload), indent=4, width=120, compact=True
-                )
             except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
-                debug_output = str(redact(payload))
-            for line in debug_output.splitlines():
+                debug_payload = payload
+            for line in pprint_lines(debug_payload):
                 LOG.log(VERBOSE_DEBUG, f"    {line}")
         elif self.conn_logger.isEnabledFor(DEBUG):
-            debug_payload = redact(payload)
-            if len(str(debug_payload)) > 80:
-                debug_payload = f"{str(debug_payload)[:80]}... (total {len(str(debug_payload))} chars)"
             self.conn_logger.debug(
-                f"WSConnection._send(): sent message: {debug_payload}"
+                f"WSConnection._send(): sent message: {redact_truncate(payload, max_length=80)}"
             )
 
     async def send_message(self, message: Message, status=False):
@@ -164,25 +159,14 @@ class WSConnection(WSConnectionBase):
                         "WS_Connection.start_connection(): reply to hello is:"
                     )
                     try:
-                        debug_message = pprint.pformat(
-                            redact(json.loads(json_message)),
-                            indent=4,
-                            width=120,
-                            compact=True,
-                        )
+                        debug_message = json.loads(json_message)
                     except Exception:
-                        try:
-                            debug_message = str(redact(json_message))
-                        except Exception:
-                            debug_message = json_message
-                    for line in debug_message.splitlines():
+                        debug_message = json_message
+                    for line in pprint_lines(debug_message):
                         LOG.log(VERBOSE_DEBUG, f"    {line}")
                 elif self.conn_logger.isEnabledFor(DEBUG):
-                    debug_message = redact(json_message)
-                    if len(str(debug_message)) > 80:
-                        debug_message = f"{str(debug_message)[:80]}... (total {len(str(debug_message))} chars)"
                     self.conn_logger.debug(
-                        f"WS_Connection.start_connection(): reply to hello is: {debug_message}"
+                        f"WS_Connection.start_connection(): reply to hello is: {redact_truncate(json_message, max_length=80)}"
                     )
                 msg = Message(json_message=json_message)
                 if isinstance(msg, LoginMessage):
@@ -192,10 +176,10 @@ class WSConnection(WSConnectionBase):
                     self.is_primary = msg.message.get(
                         MessageAttribute.WS_ATTR_IS_PRIMARY, False
                     )
-                    await self.handle_message(msg)
+                    await self.handle_message(msg, check_ses_token=False)
                     break
                 if isinstance(msg, (FetchSetupMessage, StoreSetupMessage, EchoMessage)):
-                    await self.handle_message(msg)
+                    await self.handle_message(msg, check_ses_token=False)
                     continue
                 self.conn_logger.error(
                     f"WS_Connection.start_connection(): unhandled {msg.__class__.__name__}"
@@ -229,10 +213,12 @@ class WSConnection(WSConnectionBase):
             sender.handle_connection_closed()
         self._unregister_connection()
 
-    async def handle_message(self, message: Message):
+    async def handle_message(self, message: Message, check_ses_token=True):
         "accept a message from the client and trigger according actions"
-        # self.conn_logger.debug(f"handle {message=} {message.message=} {message.token=}")
-        if message.token == self._token:
+        if message.token == self._token and (
+            not check_ses_token
+            or (self._session and WSToken.check_token(self._session.token))
+        ):
             # self.conn_logger.debug(f"Received message")
             await message.handle_message(self)
         else:
