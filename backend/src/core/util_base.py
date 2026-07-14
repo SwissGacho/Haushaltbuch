@@ -2,9 +2,13 @@
 Utility functions without import of other app modules.
 """
 
+from typing import Any
+
 
 def update_dicts_recursively(
-    target: dict | None, source: dict, source_overrides_target: bool = True
+    target: dict[str, Any] | None,
+    source: dict[str, Any],
+    source_overrides_target: bool = True,
 ):
     """Merge source into target.
     If source_overrides_target is True, source values will override target values,
@@ -21,13 +25,18 @@ def update_dicts_recursively(
                 target[key] = value.copy() if isinstance(value, dict) else value
 
 
-def get_config_item(cfg: dict | None, key: str):
+def get_config_item(cfg: dict[str, Any] | None, key: str, default: Any = None):
     "Extract a value from a dict of dicts using 'key' as '/' separated path."
     if not cfg:
-        return None
-    sub_cfg = cfg
-    for key_part in key.split("/"):
-        if not isinstance(sub_cfg, dict):
-            return None
-        sub_cfg = sub_cfg.get(key_part, {})
-    return sub_cfg
+        return default
+    if not key:
+        return cfg
+    current = cfg
+    for part in key.split("/"):
+        if not isinstance(current, dict):
+            return default
+        if part not in current:
+            return default
+        current = current[part]
+
+    return current
