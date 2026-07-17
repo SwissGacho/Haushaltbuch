@@ -15,6 +15,7 @@ from core.app_logging import (
     INFO,
     DEBUG,
     VERBOSE_DEBUG,
+    JSLOG,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -27,6 +28,7 @@ class LogLevel(StrEnum):
 
     LOG_LEVEL_VERBOSE_DEBUG = "verbose_debug"
     LOG_LEVEL_DEBUG = "debug"
+    LOG_LEVEL_JSLOG = "log"
     LOG_LEVEL_INFO = "info"
     LOG_LEVEL_WARNING = "warning"
     LOG_LEVEL_ERROR = "error"
@@ -36,6 +38,7 @@ class LogLevel(StrEnum):
 LOGGING_LEVEL = {
     LogLevel.LOG_LEVEL_VERBOSE_DEBUG: VERBOSE_DEBUG,
     LogLevel.LOG_LEVEL_DEBUG: DEBUG,
+    LogLevel.LOG_LEVEL_JSLOG: JSLOG,
     LogLevel.LOG_LEVEL_INFO: INFO,
     LogLevel.LOG_LEVEL_WARNING: WARNING,
     LogLevel.LOG_LEVEL_ERROR: ERROR,
@@ -53,6 +56,7 @@ class LogMessage(Message):
     async def handle_message(self, connection):
         "handle a log message"
         # LOG.debug(f"LogMessage.handle_message({connection=})")
+        _ = connection
         level: str = self.message.get(
             MessageAttribute.WS_ATTR_LOGLEVEL, LogLevel.LOG_LEVEL_WARNING
         )
@@ -60,7 +64,20 @@ class LogMessage(Message):
         caller = "FrontEnd." + str(
             self.message.get(MessageAttribute.WS_ATTR_CALLER, "")
         )
-        getLogger(caller).log(LOGGING_LEVEL.get(LogLevel(level), logging.NOTSET), text)
+        line_number = self.message.get(MessageAttribute.WS_ATTR_LINE_NUMBER)
+        extra: dict[str, int] = {}
+        if isinstance(line_number, int):
+            extra["line_number"] = line_number
+        elif isinstance(line_number, str):
+            stripped = line_number.strip()
+            if stripped.isdigit():
+                extra["line_number"] = int(stripped)
+
+        logger = getLogger(caller)
+        if extra:
+            logger.log(LOGGING_LEVEL.get(LogLevel(level), logging.NOTSET), text, extra=extra)
+        else:
+            logger.log(LOGGING_LEVEL.get(LogLevel(level), logging.NOTSET), text)
 
 
 class EchoMessage(Message):
