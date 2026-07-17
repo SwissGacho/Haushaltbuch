@@ -52,6 +52,11 @@ class WSToken(BaseObject):
                     return True
         return False
 
+    def invalidate(self):
+        "invalidate the token"
+        self._all_tokens.discard(self)
+        self._expires = datetime.now() - timedelta(seconds=1)
+
     def __eq__(self, __value: object) -> bool:
         return __value == self.token
 
