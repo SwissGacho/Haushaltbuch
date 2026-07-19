@@ -22,11 +22,40 @@ LOG = getLogger(__name__)
 from core.exceptions import CannotStoreEmptyBO
 from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
-from database.sql_expression import Eq, Filter, SQLExpression
+from database.sql_expression import (
+    SQLExpression,
+    ColumnName,
+    SQLString,
+    And,
+    In,
+    Eq,
+    Filter,
+)
 from database.sql_statement import CreateTable, NamedValueListList, Value
 from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
+
+
+class Specialized:
+    """Mixin class for specialized business objects.
+    BOs derived from a specialized BO are considered
+    to be a specialization without using this Mixin.
+
+    Use it like this:
+    class MyGenericBO(PersistentBusinessObject):
+        ...
+    class MySpecializedBO( Specialized, MyGenericBO):
+        ...
+    class MyVerySpecializedBO(MySpecializedBO):
+        ...
+    """
+
+
+class Singleton:
+    """Mixin class for singleton business objects.
+    Singleton BOs are BOs of which there should only be one instance in the database.
+    """
 
 
 class PersistentBusinessObject(BOBase):
@@ -34,6 +63,71 @@ class PersistentBusinessObject(BOBase):
     Every subclass will be registered in a table in the database."""
 
     is_root_bo: bool = False
+
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.specialists: set[type[PersistentBusinessObject]] = set()
+
+    @classmethod
+    def is_specializing(cls: Type[Self]) -> bool:
+        """Return True if this class is a specialization of another business object class."""
+        return issubclass(cls, Specialized) and cls is not Specialized
+
+    @classmethod
+    def register_bo_class(cls):
+        "Register the Business Object."
+        if cls.is_specializing():
+            specs: set[type[PersistentBusinessObject]] = {cls}
+            for super_cls in cls.__mro__:
+                if hasattr(super_cls, "specialists") and issubclass(
+                    super_cls, PersistentBusinessObject
+                ):
+                    specs.add(super_cls)
+                    super_cls.specialists = super_cls.specialists | specs
+                    if (
+                        not hasattr(super_cls, "is_specializing")
+                    ) or not super_cls.is_specializing():
+                        break
+        super().register_bo_class()
+
+    @classmethod
+    def attributes_as_dict(cls, include_specialized: bool = False) -> dict[str, type]:
+        """dict of BO attribute types with attribute names as keys.
+        If 'include_specialized' is True, also include the attributes of specialized BOs.
+        """
+        attrs = super().attributes_as_dict()
+        if include_specialized and getattr(cls, "specialists", None):
+            for specialized in cls.specialists:
+                attrs.update(
+                    {
+                        a.name: a.data_type
+                        for a in specialized.attribute_descriptions(
+                            include_specialized=False
+                        )
+                        if a.name not in attrs
+                    }
+                )
+        return attrs
+
+    @classmethod
+    def attribute_descriptions(
+        cls, include_specialized: bool = False
+    ) -> list[AttributeDescription]:
+        """Return the list of attribute descriptions for this business object class.
+        If 'include_specialized' is True, also include the attributes of specialized BOs.
+        """
+        descriptions = super().attribute_descriptions()
+        if include_specialized and getattr(cls, "specialists", None):
+            for specialized in cls.specialists:
+                descriptions += [
+                    a
+                    for a in specialized.attribute_descriptions(
+                        include_specialized=False
+                    )
+                    if a.name not in [d.name for d in descriptions]
+                ]
+        return descriptions
 
     @classmethod
     def navigation_header(
@@ -104,17 +198,18 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     async def sql_create_table(cls):
         "Create a DB table for this class"
-        attributes = cls.attribute_descriptions()
+        if issubclass(cls, Specialized):
+            LOG.debug(
+                f"PersistentBusinessObject.sql_create_table(): {cls.__name__} is a Specialized BO, skipping table creation"
+            )
+            return
+        LOG.debug(f"PersistentBusinessObject.sql_create_table(): {cls.table=}")
+        LOG.log(VERBOSE_DEBUG, f"   collect attributes for {cls.__name__}")
         async with SQLTransaction() as txaction:
-            # create_table: CreateTable = txaction.sql().create_table(cls.table)
-            s = txaction.sql()
-            create_table: CreateTable = s.create_table(cls.table)
-            # LOG.debug(f"PersistentBusinessObject.sql_create_table():  {cls.table=}")
-            for description in attributes:
-                # LOG.debug(
-                #     f" -  {description.name=}, {description.data_type=}, "
-                #     f"{description.constraint=}, {description.flag_values=}"
-                # )
+            create_table: CreateTable = txaction.sql().create_table(cls.table)
+            for description in cls.attribute_descriptions(include_specialized=True):
+                for line in pprint_lines(description):
+                    LOG.log(VERBOSE_DEBUG, f"   - {line}")
                 create_table.column(
                     name=description.name,
                     data_type=description.data_type,
@@ -124,17 +219,34 @@ class PersistentBusinessObject(BOBase):
             await create_table.execute()
 
     @classmethod
+    def _filter_conditions(
+        cls, conditions: Optional[SQLExpression] = None
+    ) -> SQLExpression | None:
+        if getattr(cls, "specialists", None):
+            cond = In(
+                ColumnName("bo_name"),
+                [SQLString(s.bo_type_name()) for s in cls.specialists],
+            )
+            if conditions:
+                return And([cond, conditions])
+            return cond
+        return conditions
+
+    @classmethod
     async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
         async with SQL() as sql:
             select = sql.select(["count(*) as count"]).from_(cls.table)
-            if conditions:
-                select.where(Filter(conditions))
+            filter_conditions: SQLExpression | None = cls._filter_conditions(
+                Filter(conditions) if conditions else None
+            )
+            if filter_conditions:
+                select.where(filter_conditions)
             result = await (await select.execute()).fetchone()
-        # LOG.debug(
-        #     f"PersistentBusinessObject.count_rows({conditions=}) "
-        #     f"{result=} -> return {result["count"]}"
-        # )
+        LOG.debug(
+            f"PersistentBusinessObject.count_rows({conditions=}) "
+            f"{result=} -> return {result['count']}"
+        )
         return result["count"]
 
     @classmethod
@@ -142,8 +254,11 @@ class PersistentBusinessObject(BOBase):
         """Get the ids of business objects matching the conditions"""
         async with SQL() as sql:
             select = sql.select(["id"]).from_(cls.table)
-            if conditions:
-                select.where(Filter(conditions))
+            filter_conditions: SQLExpression | None = cls._filter_conditions(
+                Filter(conditions) if conditions else None
+            )
+            if filter_conditions:
+                select.where(filter_conditions)
             result = await (await select.execute()).fetchall()
         # LOG.debug(f"PersistentBusinessObject.get_matching_ids({conditions=}) -> {result=}")
         return [id["id"] for id in result]
@@ -154,32 +269,44 @@ class PersistentBusinessObject(BOBase):
     ) -> list[BOBase]:
         """Get the business objects matching the conditions"""
         if attributes:
-            cols = [a for a in attributes if a in cls.attributes_as_dict()]
+            cols = [
+                a
+                for a in attributes
+                if a in cls.attributes_as_dict(include_specialized=True)
+            ]
             if "id" not in cols:
                 cols.append("id")
+            if "bo_name" not in cols and getattr(cls, "specialists", None):
+                cols.append("bo_name")
         else:
             cols = None
         async with SQL() as sql:
             select = sql.select(cols).from_(cls.table)
-            if conditions:
-                select.where(Filter(conditions))
+            filter_conditions: SQLExpression | None = cls._filter_conditions(
+                Filter(conditions) if conditions else None
+            )
+            if filter_conditions:
+                select.where(filter_conditions)
             result = await (await select.execute()).fetchall()
         LOG.debug(
             f"PersistentBusinessObject.get_matching_objects(conditions={redact(conditions)}, {attributes=}) "
             f"-> {len(result)} objects"
         )
         if LOG.isEnabledFor(VERBOSE_DEBUG):
-            for line in pprint.pformat(
-                redact(result), indent=4, width=120, compact=True
-            ).splitlines():
+            for line in pprint_lines(redact(result)):
                 LOG.log(VERBOSE_DEBUG, f"  {line}")
-        descriptions = {d.name: d for d in cls.attribute_descriptions()}
+        descriptions = {
+            d.name: d for d in cls.attribute_descriptions(include_specialized=True)
+        }
         objects: list[BOBase] = []
         for obj in result:
+            bo_name = None
             converted: dict[str, Any] = {}
             for key, value in obj.items():
                 if key == "id":
                     continue
+                if key == "bo_name":
+                    bo_name = value
                 description = descriptions.get(key)
                 if description is None:
                     converted[key] = value
@@ -189,7 +316,14 @@ class PersistentBusinessObject(BOBase):
                     description.data_type,
                     description.constraint_values,
                 )
-            objects.append(cls(bo_id=obj.get("id"), **converted))
+            LOG.debug(
+                f"Creating {(cls if bo_name is None else cls.get_business_object_by_name(bo_name)).__name__} object with id={obj.get('id')}"
+            )
+            objects.append(
+                (cls if bo_name is None else cls.get_business_object_by_name(bo_name))(
+                    bo_id=obj.get("id"), **converted
+                )
+            )
         return objects
 
     async def fetch(self, id=None, newest=None):
@@ -211,17 +345,24 @@ class PersistentBusinessObject(BOBase):
 
     async def _fetch_self(self, sql: SQL, id=None, newest=None):
         select = sql.select([], True).from_(self.table)
-        if id is not None:
-            select.where(Eq("id", id))
-        elif newest:
-            select.where(SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})"))
+        filter_conditions = self._filter_conditions(
+            Eq("id", id)
+            if id is not None
+            else (
+                SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})")
+                if newest
+                else None
+            )
+        )
+        if filter_conditions:
+            select.where(filter_conditions)
         # LOG.debug(f"BOBase._fetch_self: {select=} // {select.get_sql()=}")
         self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(
-                    VERBOSE_DEBUG, "PersistentBusinessObject._fetch_self: _db_data="
+                    VERBOSE_DEBUG, f"{self.__class__.__name__}._fetch_self: _db_data="
                 )
                 for line in pprint_lines(self._db_data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
@@ -231,6 +372,10 @@ class PersistentBusinessObject(BOBase):
                     description.data_type,
                     description.constraint_values,
                 )
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}._fetch_self: _data=")
+                for line in pprint_lines(self._data):
+                    LOG.log(VERBOSE_DEBUG, f" -  {line}")
             self.register_instance(self)
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
 
@@ -252,6 +397,13 @@ class PersistentBusinessObject(BOBase):
 
     async def _insert_self(self):
         assert self.id is None, "id must be None for insert operation"
+        if isinstance(self, Singleton):
+            existing_count = await self.count_rows()
+            if existing_count > 0:
+                raise CannotStoreEmptyBO(
+                    f"Cannot insert {self} as it is a Singleton and already exists in the DB"
+                )
+        self.bo_name = self.bo_type_name()
         values_to_store: NamedValueListList = [
             (k, v) for k, v in self._data.items() if k != "id" and v is not None
         ]
@@ -274,13 +426,20 @@ class PersistentBusinessObject(BOBase):
 
     async def _update_self(self):
         assert self.id is not None, "id must not be None for update operation"
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}._update_self: _data=")
+            for line in pprint_lines(self._data):
+                LOG.log(VERBOSE_DEBUG, f" -  {line}")
         async with SQLTransaction() as txaction:
             value_class = Value
             update = txaction.sql().update(self.table).where(Eq("id", self.id))
             changes = False
             descriptions = {d.name: d for d in self.attribute_descriptions()}
             for k, v in self._data.items():
-                if k != "id" and v != PersistentBusinessObject.convert_from_db(
+                if k not in (
+                    "bo_name",
+                    "id",
+                ) and v != PersistentBusinessObject.convert_from_db(
                     self._db_data.get(k),
                     descriptions[k].data_type,
                     descriptions[k].constraint_values,

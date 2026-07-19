@@ -106,8 +106,8 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
         MockConcreteBO.display_name_components = Mock(return_value=["name"])
         MockConcreteBO.get_matching_objects = AsyncMock(
             return_value=[
-                Mock(id=1, display_name="First object"),
-                Mock(id=2, display_name="Second object"),
+                Mock(id=1, display_name="First object", bo_name="mock_bo1"),
+                Mock(id=2, display_name="Second object", bo_name="mock_bo2"),
             ]
         )
 
@@ -117,8 +117,8 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
             result,
             {
                 "objects": [
-                    {"id": 1, "display_name": "First object"},
-                    {"id": 2, "display_name": "Second object"},
+                    {"object": "mock_bo1", "id": 1, "display_name": "First object"},
+                    {"object": "mock_bo2", "id": 2, "display_name": "Second object"},
                 ]
             },
         )

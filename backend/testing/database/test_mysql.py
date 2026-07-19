@@ -45,6 +45,7 @@ def setUpModule() -> None:
 
 from core.exceptions import ConfigurationError
 import database.sql_statement
+import database.dbms.mysql
 
 
 class MockConnection:

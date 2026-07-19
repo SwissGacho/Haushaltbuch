@@ -125,8 +125,9 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         mock_col = "mock_colname"
         captured_args = []
         with (
-            patch("core.configuration.setup_config.Configuration") as MockConfiguration,
-            patch("core.configuration.setup_config.ColumnName") as MockColumnName,
+            patch(
+                "core.configuration.setup_config.ApplicationConfiguration"
+            ) as MockConfiguration,
             patch(
                 "core.configuration.setup_config.update_dicts_recursively"
             ) as mock_update_dicts_recursively,
@@ -139,7 +140,6 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
             MockConfig.CONFIG_USR_MODE = "MockApp/usrmode"
             MockSetupConfigValues.SINGLE_USER = "mock-single"
             MockConfiguration.get_matching_ids = AsyncMock(return_value=mock_ids)
-            MockColumnName.return_value = mock_col
             mock_cfg_object = Mock()
             mock_cfg_object.fetch = AsyncMock(return_value=mock_cfg_object)
             mock_cfg_object.store = AsyncMock()
@@ -156,8 +156,7 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
             mock_update_dicts_recursively.side_effect = side_effect
             await ConfigSetup._create_or_update_global_configuration(mock_cfg)
 
-        MockColumnName.assert_called_once_with("user_id")
-        MockConfiguration.get_matching_ids.assert_awaited_once_with({mock_col: None})
+        MockConfiguration.get_matching_ids.assert_awaited_once_with()
         if len(mock_ids) == 0:
             self.assertEqual(mock_update_dicts_recursively.call_count, 1)
             MockConfiguration.assert_called_once_with(
@@ -194,17 +193,16 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         mock_cfg = {"mock": "configuration"}
         mock_col = "mock_colname"
         with (
-            patch("core.configuration.setup_config.Configuration") as MockConfiguration,
-            patch("core.configuration.setup_config.ColumnName") as MockColumnName,
+            patch(
+                "core.configuration.setup_config.ApplicationConfiguration"
+            ) as MockConfiguration,
             self.assertRaises(ConfigurationError),
         ):
             MockConfiguration.get_matching_ids = AsyncMock(return_value=[1, 2])
-            MockColumnName.return_value = mock_col
 
             await ConfigSetup._create_or_update_global_configuration(mock_cfg)
 
-        MockColumnName.assert_called_once_with("user_id")
-        MockConfiguration.get_matching_ids.assert_awaited_once_with({mock_col: None})
+        MockConfiguration.get_matching_ids.assert_awaited_once_with()
 
     async def _400_create_or_update_initial_user(self, mock_ids=None):
         class MockRole(enum.Flag):
@@ -223,50 +221,53 @@ class TestConfigSetup(unittest.IsolatedAsyncioTestCase):
         with (
             patch("core.configuration.setup_config.App") as MockApp,
             patch("core.configuration.setup_config.get_config_item") as mock_get_cfg,
+            patch("core.configuration.setup_config.SingleUser") as MockSingleUser,
             patch("core.configuration.setup_config.User") as MockUser,
             patch("core.configuration.setup_config.ColumnName") as MockColumnName,
             patch("core.configuration.setup_config.UserRole") as MockUserRole,
-            patch("core.configuration.setup_config.SINGLE_USER_NAME", "<mock_single>"),
         ):
             MockApp.status = (
                 Status.STATUS_SINGLE_USER if single_user else Status.STATUS_MULTI_USER
             )
             mock_get_cfg.return_value = mock_adm_usr
-            MockUser.get_matching_ids = AsyncMock(return_value=mock_ids)
+            if single_user:
+                mock_User = MockSingleUser
+            else:
+                mock_User = MockUser
+            mock_User.get_matching_ids = AsyncMock(return_value=mock_ids)
             MockColumnName.return_value = mock_col
             mock_usr_object = Mock()
             mock_usr_object.fetch = AsyncMock(return_value=mock_usr_object)
             mock_usr_object.store = AsyncMock()
             mock_usr_object.role = mock_ex_role
             mock_usr_object.password = mock_adm_usr["password"]
-            MockUser.return_value = mock_usr_object
+            mock_User.return_value = mock_usr_object
             MockUserRole.ADMIN = MockRole.ADMIN
 
             await ConfigSetup._create_or_update_initial_user(mock_cfg)
 
         if single_user:
             mock_get_cfg.assert_not_called()
+            mock_User.get_matching_ids.assert_awaited_once_with()
         else:
             mock_get_cfg.assert_called_once_with(mock_cfg, SetupConfigKeys.ADM_USER)
-        MockUser.get_matching_ids.assert_awaited_once_with(
-            {mock_col: "<mock_single>" if single_user else mock_adm_usr["name"]}
-        )
+            mock_User.get_matching_ids.assert_awaited_once_with(
+                {mock_col: mock_adm_usr["name"]}
+            )
         if len(mock_ids) == 0:
             mock_usr_object.fetch.assert_not_awaited()
-            MockUser.assert_called_once_with(
+            mock_User.assert_called_once_with(
                 name=mock_adm_usr["name"],
                 password=mock_adm_usr["password"],
                 role=MockRole.ADMIN,
             )
         elif len(mock_ids) == 1:
-            MockUser.assert_called_once_with(bo_id=mock_ids[0])
+            mock_User.assert_called_once_with(bo_id=mock_ids[0])
             mock_usr_object.fetch.assert_awaited_once_with()
             self.assertIn(MockRole.ADMIN, mock_usr_object.role)
             self.assertIn(MockRole.EXISTING, mock_usr_object.role)
             self.assertEqual(mock_usr_object.role, MockRole.ADMIN | MockRole.EXISTING)
-        if single_user:
-            self.assertIsNone(mock_usr_object.password)
-        else:
+        if not single_user:
             self.assertEqual(mock_usr_object.password, mock_adm_usr["password"])
         mock_usr_object.store.assert_awaited_once_with()
 

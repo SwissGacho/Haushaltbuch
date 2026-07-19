@@ -10,7 +10,7 @@ from pathlib import Path
 import json
 import re
 
-from core.app_logging import getLogger, log_exit, DEBUG
+from core.app_logging import getLogger, log_exit, pprint_lines, DEBUG
 
 LOG = getLogger(__name__)
 
@@ -317,7 +317,9 @@ class SQLiteCursor(Cursor):
         self._last_params = params or {}
         try:
             if LOG.isEnabledFor(DEBUG):
-                LOG.debug(f"SQLiteCursor.execute({query=}, {params=})")
+                LOG.debug(f"SQLiteCursor.execute:  {query=},  params:")
+                for line in pprint_lines(params):
+                    LOG.debug(f" -   {line}")
             await self._cursor.execute(sql=query, parameters=params)
             self._rowcount = self._cursor.rowcount
         except sqlite3.OperationalError as exc:
