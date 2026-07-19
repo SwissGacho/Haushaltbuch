@@ -23,12 +23,17 @@ _LOG_MODULE_EXIT = _LOG_MODULE_ENTRY
 VERBOSE_DEBUG = 5
 logging.addLevelName(VERBOSE_DEBUG, "VERBOSE_DEBUG")
 
+# Logging level 'LOG' for messages from Frontend
+JSLOG = 15
+logging.addLevelName(JSLOG, "JS-LOG")
+
 
 # 🏴‍☠️ ANSI runes for color
 RESET = "\033[0m"
 BOLD = "\033[1m"
 
 # Foreground colors
+FG_BLACK = "\033[30m"
 FG_RED = "\033[31m"
 FG_GREEN = "\033[32m"
 FG_YELLOW = "\033[33m"
@@ -38,7 +43,14 @@ FG_CYAN = "\033[36m"
 FG_WHITE = "\033[97m"
 
 # Backgrounds
+BG_BLACK = "\033[40m"
 BG_RED = "\033[41m"
+BG_GREEN = "\033[42m"
+BG_YELLOW = "\033[43m"
+BG_BLUE = "\033[44m"
+BG_MAGENTA = "\033[45m"
+BG_CYAN = "\033[46m"
+BG_WHITE = "\033[107m"
 
 
 _PREFIX_PATTERN = re.compile(r"^(\[[^\]]+\])(\s*)")
@@ -50,6 +62,7 @@ class ColorFormatter(logging.Formatter):
     COLORS = {
         VERBOSE_DEBUG: FG_MAGENTA,
         DEBUG: FG_CYAN,
+        JSLOG: FG_BLACK + BG_YELLOW + BOLD,
         INFO: FG_WHITE,
         WARNING: FG_YELLOW,
         ERROR: BG_RED + FG_WHITE + BOLD,
@@ -80,6 +93,9 @@ class ColorFormatter(logging.Formatter):
             record.levelname = original_levelname
 
 
+# If True, redact sensitive values but keep last 4 chars for debugging
+_LOG_WEAK_REDACT = False
+
 _REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
 
 
@@ -90,7 +106,13 @@ def redact(value: Any) -> Any:
     if isinstance(value, dict):
         return {
             key: (
-                "***redacted***" if _REDACT_PATTERN.search(str(key)) else redact(item)
+                (
+                    "..." + str(item)[-4:]
+                    if _LOG_WEAK_REDACT and len(str(item)) > 8
+                    else "***redacted***"
+                )
+                if _REDACT_PATTERN.search(str(key))
+                else redact(item)
             )
             for key, item in value.items()
         }
@@ -188,9 +210,30 @@ def get_context_logger(logger: Logger | ContextLogger, **extra: Any) -> ContextL
     return ContextLogger(logger, extra)
 
 
+class FrontendLineNumberFilter(logging.Filter):
+    "Override record line numbers with frontend-provided values when available."
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        line_number = getattr(record, "line_number", None)
+        if line_number is None:
+            return True
+        try:
+            normalized = int(line_number)
+            if normalized > 0:
+                record.lineno = normalized
+        except (TypeError, ValueError):
+            pass
+        return True
+
+
 default_logging_dict = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "frontend_line_number": {
+            "()": FrontendLineNumberFilter,
+        }
+    },
     "formatters": {
         "color": {
             "()": ColorFormatter,
@@ -201,6 +244,7 @@ default_logging_dict = {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "color",
+            "filters": ["frontend_line_number"],
         }
     },
     "root": {
@@ -310,6 +354,7 @@ def configure_logging(log_cfg: dict | None = None):
         elif level.upper() not in [
             "VERBOSE_DEBUG",
             "DEBUG",
+            "JS-LOG",
             "INFO",
             "WARNING",
             "ERROR",

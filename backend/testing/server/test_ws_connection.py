@@ -109,11 +109,15 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         self.connection._socket.recv.assert_awaited_once_with()
         MockMessage.assert_called_once_with(json_message=mock_message)
         if exp_result == "success":
-            self.connection.handle_message.assert_awaited_once_with(mock_login_message)
+            self.connection.handle_message.assert_awaited_once_with(
+                mock_login_message, check_ses_token=False
+            )
             self.connection.abort_connection.assert_not_awaited()
             self.assertTrue(result, "successful login expected")
         elif exp_result == "ConnCloseExc":
-            self.connection.handle_message.assert_awaited_once_with(mock_login_message)
+            self.connection.handle_message.assert_awaited_once_with(
+                mock_login_message, check_ses_token=False
+            )
             self.connection.abort_connection.assert_not_awaited()
             self.assertFalse(
                 result, "login expected to be aborted by exception in handle_message"
@@ -123,7 +127,9 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
             self.connection.abort_connection.assert_awaited_once_with("Login expected")
             self.assertFalse(result, "login expected to be aborted")
         else:
-            self.connection.handle_message.assert_awaited_once_with(mock_login_message)
+            self.connection.handle_message.assert_awaited_once_with(
+                mock_login_message, check_ses_token=False
+            )
             self.connection.abort_connection.assert_not_awaited()
             self.assertEqual(exp_result, "AnyExc")
             self.assertFalse(result, "login expected to be unsuccessful")
