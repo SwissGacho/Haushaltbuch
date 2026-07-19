@@ -304,3 +304,44 @@ class Test_100_Message(unittest.IsolatedAsyncioTestCase):
 
         mock_redact.assert_called_once_with(message.message)
         mock_log.error.assert_called_once_with("received unknown message (<redacted>)")
+
+    def test_120_message_constructor_debug_is_redacted(self):
+        with (
+            patch("messages.message.LOG") as mock_log,
+            patch(
+                "messages.message.redact", side_effect=lambda value: "<redacted>"
+            ) as mock_redact,
+        ):
+            messageString = dumps(
+                {
+                    MessageAttribute.WS_ATTR_TYPE: "testType",
+                    MessageAttribute.WS_ATTR_TOKEN: "token123",
+                    MessageAttribute.WS_ATTR_PAYLOAD: {"nested": {"value": 123}},
+                }
+            )
+            kwarg = {"extra": "data"}
+            message = Message(
+                messageString,
+                kwargs=kwarg,
+            )
+        mock_log.debug.assert_called_once()
+        mock_redact.assert_any_call(messageString)
+        mock_redact.assert_any_call({"kwargs": kwarg})
+
+    async def test_121_serialize_does_not_log_when_verbose_debug_disabled(self):
+        message = Message()
+        message.add({"payload": {"secret": "top-secret"}})
+
+        with (
+            patch("messages.message.LOG") as mock_log,
+            patch(
+                "messages.message._serialize",
+                new=AsyncMock(side_effect=ValueError("boom")),
+            ),
+        ):
+            mock_log.isEnabledFor.return_value = False
+            with self.assertRaises(ValueError):
+                await message.serialize()
+
+        mock_log.error.assert_called_once()
+        mock_log.log.assert_not_called()

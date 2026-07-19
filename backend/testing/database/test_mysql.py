@@ -117,7 +117,11 @@ class Test_002_MySQLDB(unittest.IsolatedAsyncioTestCase):
             "dbuser": "mockuser",
             "password": "mockpw",
         }
-        self.db = database.dbms.mysql.MySQLDB(**self.db_cfg)
+        with (
+            patch("database.dbms.mysql.MYSQL_MAXIMUM_DECIMAL_DIGITS", 10),
+            patch("database.dbms.mysql.MYSQL_MAXIMUM_DECIMAL_SCALE", 5),
+        ):
+            self.db = database.dbms.mysql.MySQLDB(**self.db_cfg)
         self.mockCur = AsyncMock(name="mockCursor")
         self.mockCur.fetchone = AsyncMock(return_value={"sql": "mock-foo"})
         self.sql = AsyncMock(spec=database.sql.SQL, name="mocksql")
@@ -175,7 +179,7 @@ class Test_002_MySQLDB(unittest.IsolatedAsyncioTestCase):
         self.mock_pool.acquire.assert_not_awaited()
         self.mock_pool.release.assert_not_awaited()
 
-    async def test_102_connect(self):
+    async def test_002_connect(self):
         mock_con_obj = AsyncMock()
         mock_con_obj.connect = AsyncMock(return_value=mock_con_obj)
         Mock_Connection = Mock(return_value=mock_con_obj)
@@ -187,7 +191,7 @@ class Test_002_MySQLDB(unittest.IsolatedAsyncioTestCase):
             Mock_Connection.assert_called_once_with(db_obj=self.db, pool=self.mock_pool)
             mock_con_obj.connect.assert_awaited_once_with()
 
-    async def test_201_get_table_info(self):
+    async def test_003_get_table_info(self):
         mock_table = "mock_table"
         expected = {
             "mock-col-2": "mock-col-2 MOCK-TYP-2 MOCK-CONSTR-2",
@@ -207,6 +211,16 @@ class Test_002_MySQLDB(unittest.IsolatedAsyncioTestCase):
             self.sql.execute.assert_awaited_once_with()
             self.mockCur.fetchall.assert_awaited_once_with()
             self.assertDictEqual(reply, expected)
+
+    def test_004_DECIMAL_CAPABILITIES(self):
+        reply = self.db.DECIMAL_CAPABILITIES
+        self.assertEqual(
+            reply,
+            (
+                database.dbms.mysql.MYSQL_MAXIMUM_DECIMAL_DIGITS,
+                database.dbms.mysql.MYSQL_MAXIMUM_DECIMAL_SCALE,
+            ),
+        )
 
 
 class Test_003_MySQLConnection(unittest.IsolatedAsyncioTestCase):
@@ -379,3 +393,16 @@ class Test_004_MySQLCursor(unittest.IsolatedAsyncioTestCase):
             sql="ANY %s SQL %s",
             args=("value2", "value1"),
         )
+
+
+class Test_005_MySQLUtilityFunctions(unittest.TestCase):
+
+    def test_001_decimal_datatype(self):
+        with (
+            patch("database.dbms.mysql.MYSQL_MAXIMUM_DECIMAL_DIGITS", 10),
+            patch("database.dbms.mysql.MYSQL_MAXIMUM_DECIMAL_SCALE", 5),
+        ):
+            with self.assertRaises(ValueError):
+                database.dbms.mysql.decimal_datatype(str)
+            result = database.dbms.mysql.decimal_datatype(database.dbms.mysql.Decimal)
+        self.assertEqual(result, "DECIMAL(10,5)")

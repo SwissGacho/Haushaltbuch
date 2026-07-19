@@ -375,3 +375,18 @@ class Test_200_BOAttributes(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             mock_obj.decimal_attr = "not a decimal"
+
+    def test_208_BODecimal_setter_coerces_int_str_float(self):
+        mock_obj = MockObj()
+
+        with patch("business_objects.bo_descriptors.App", new=Mock()) as mock_app:
+            mock_app.db = Mock()
+
+            mock_obj.decimal_attr = 42
+            self.assertEqual(mock_obj.decimal_attr, Decimal(42))
+
+            mock_obj.decimal_attr = "15.50"
+            self.assertEqual(mock_obj.decimal_attr, Decimal("15.50"))
+
+            mock_obj.decimal_attr = 3.14
+            self.assertEqual(mock_obj.decimal_attr, Decimal(str(3.14)))
