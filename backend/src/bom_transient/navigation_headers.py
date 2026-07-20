@@ -14,7 +14,6 @@ LOG = getLogger(__name__)
 from business_objects.business_object_base import BOBase
 from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.transient_business_object import TransientBusinessObject
-from business_objects.persistent_business_object import PersistentBusinessObject
 
 
 class NavigationHeaders(TransientBusinessObject):
@@ -62,7 +61,6 @@ class NavigationHeaders(TransientBusinessObject):
                 PersistentBusinessObject
             ) + self._get_navigation_list(TransientBusinessObject)
         navigation_list = [item for item in navigation_list if item is not None]
-        print(f"{navigation_list=}")
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(
                 VERBOSE_DEBUG,

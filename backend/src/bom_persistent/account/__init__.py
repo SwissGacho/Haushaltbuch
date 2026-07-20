@@ -1,1 +1,0 @@
-"""Accounting business objects."""

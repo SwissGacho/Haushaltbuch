@@ -11,6 +11,10 @@ from core.util import _classproperty
 
 class MockBOBase(BOBase):
     @classmethod
+    def is_specializing(cls) -> bool:
+        return False
+
+    @classmethod
     async def count_rows(cls, conditions: Optional[dict] = None) -> int:
         return 0
 
@@ -27,41 +31,42 @@ class MockBOBase(BOBase):
     @_classproperty
     def all_business_objects(cls) -> dict[str, type[BOBase]]:
         return {
-            "MockRootBO": MockRootBO,
-            "MockNonRootBO": MockNonRootBO,
+            "MockGenericBO": MockGenericBO,
+            "MockSpecializedBO": MockSpecializedBO,
         }
 
 
-class MockRootBO(MockBOBase):
-    is_root_bo = True
+class MockGenericBO(MockBOBase):
+    """A regular, non-specialized BO: included in the top-level navigation list."""
 
     @classmethod
     def navigation_header(cls, ref=None):
         if ref:
-            return {"name": "MockRootBO", "type": "referer"}
-        return {"name": "MockRootBO", "type": "root"}
+            return {"name": "MockGenericBO", "type": "referer"}
+        return {"name": "MockGenericBO", "type": "generic"}
 
 
-class MockNonRootBO(MockBOBase):
-    is_root_bo = False
+class MockSpecializedBO(MockBOBase):
+
+    @classmethod
+    def is_specializing(cls) -> bool:
+        return True
 
     @classmethod
     def navigation_header(cls, ref=None):
         if ref:
-            return {"name": "MockNonRootBO", "type": "referer"}
-        return {"name": "MockNonRootBO", "type": "non-root"}
+            return {"name": "MockSpecializedBO", "type": "referer"}
+        return {"name": "MockSpecializedBO", "type": "specialized"}
 
 
 class MockRefererBO(MockBOBase):
-    is_root_bo = False
-
     @classmethod
     def navigation_header(cls, ref=None):
         return {"name": "MockRefererBO", "type": "referer"}
 
     @classmethod
     def referenced_by(cls):
-        return [(MockRootBO, "attribute1"), (MockNonRootBO, "attribute2")]
+        return [(MockGenericBO, "attribute1"), (MockSpecializedBO, "attribute2")]
 
 
 class Test_100_NavigationHeaders(unittest.IsolatedAsyncioTestCase):
@@ -69,9 +74,9 @@ class Test_100_NavigationHeaders(unittest.IsolatedAsyncioTestCase):
         self.mock_get_business_object_by_name = Mock(
             name="get_business_object_by_name",
             side_effect=lambda name: {
-                "mock_bo": MockRootBO,
+                "mock_bo": MockGenericBO,
                 "mock_referer_bo": MockRefererBO,
-                "mock_non_root_bo": MockNonRootBO,
+                "mock_specialized_bo": MockSpecializedBO,
             }.get(name, None),
         )
         MockBOBase.get_business_object_by_name = self.mock_get_business_object_by_name
@@ -93,7 +98,7 @@ class Test_100_NavigationHeaders(unittest.IsolatedAsyncioTestCase):
 
     async def test_101_initialization(self):
         nh = NavigationHeaders(index="mock_bo")
-        self.assertEqual(nh._parent_bo, MockRootBO)
+        self.assertEqual(nh._parent_bo, MockGenericBO)
         self.mock_get_business_object_by_name.assert_called_once_with("mock_bo")
 
     async def test_102_initialization_with_index_None(self):
@@ -105,15 +110,17 @@ class Test_100_NavigationHeaders(unittest.IsolatedAsyncioTestCase):
             NavigationHeaders(index=123)
 
     async def test_104_business_values_as_dict_no_parent(self):
-        # Patch a root and a non-root BO to test the behavior of business_values_as_dict when no parent is provided
+        # Patch a generic and a specialized BO to test the behavior of
+        # business_values_as_dict when no parent is provided: specialized BOs
+        # (is_specializing() == True) must be excluded from the top-level list.
 
         nh = NavigationHeaders(index=None)
         result = await nh.business_values_as_dict()
         self.assertIn("headers", result)
         self.assertIsInstance(result["headers"], list)
-        self.assertIn({"name": "MockRootBO", "type": "root"}, result["headers"])
+        self.assertIn({"name": "MockGenericBO", "type": "generic"}, result["headers"])
         self.assertNotIn(
-            {"name": "MockNonRootBO", "type": "non-root"}, result["headers"]
+            {"name": "MockSpecializedBO", "type": "specialized"}, result["headers"]
         )
 
     async def test_105_business_values_as_dict_with_parent(self):
@@ -128,4 +135,4 @@ class Test_100_NavigationHeaders(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(nh_with_referers._parent_bo, MockRefererBO)
         result = await nh_with_referers.business_values_as_dict()
         self.assertIn("headers", result)
-        self.assertIn({"name": "MockRootBO", "type": "referer"}, result["headers"])
+        self.assertIn({"name": "MockGenericBO", "type": "referer"}, result["headers"])
