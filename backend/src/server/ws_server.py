@@ -25,6 +25,7 @@ LOG: Logger = getLogger(__name__)
 from core.const import WEBSOCKET_PORT
 from server.ws_connection import WSConnection
 from messages.message import Message
+from messages.admin import LogMessage
 
 
 class WSHandler:
@@ -65,7 +66,10 @@ class WSHandler:
                                 f"from json: {redact(ws_message)}"
                             )
                         raise
-                    await connection.handle_message(message=message)
+                    await connection.handle_message(
+                        message=message,
+                        check_ses_token=not isinstance(message, LogMessage),
+                    )
         except websockets.exceptions.ConnectionClosed as exc:
             context_log.debug(f"Connection closed by peer: {exc}")
         except Exception as exc:

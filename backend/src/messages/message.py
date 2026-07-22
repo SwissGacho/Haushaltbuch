@@ -67,6 +67,7 @@ class MessageAttribute(StrEnum):
     WS_ATTR_LOGLEVEL = "log_level"
     WS_ATTR_MESSAGE = "message"
     WS_ATTR_CALLER = "caller"
+    WS_ATTR_LINE_NUMBER = "line_number"
 
 
 def json_encode(obj: Any) -> Any:

@@ -8,6 +8,7 @@ from core.app_logging import getLogger, log_exit
 LOG = getLogger(__name__)
 
 from core.util import _classproperty
+from core.util_base import get_config_item as _get_config_item
 from core.base_objects import (
     StatusBaseClass,
     Status,
@@ -107,7 +108,7 @@ class App:
         "Extract an item from global configuration"
         if not cls._config:
             raise ReferenceError("Status and Configuration not initialized")
-        return cls._config.configuration().get(key, default)
+        return _get_config_item(cls._config.configuration(), key, default=default)
 
     # pylint: disable=no-self-argument
     @_classproperty

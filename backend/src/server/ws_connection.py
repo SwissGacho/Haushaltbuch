@@ -22,7 +22,7 @@ from core.app import App
 from core.exceptions import WSConnectionError
 from messages.message import Message, MessageAttribute
 from messages.login import HelloMessage, ByeMessage, LoginMessage
-from messages.admin import EchoMessage
+from messages.admin import LogMessage, EchoMessage
 from messages.setup import FetchSetupMessage, StoreSetupMessage
 from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
@@ -42,7 +42,7 @@ class WSConnection(WSConnectionBase):
         self._conn_nbr = sock_nbr
         self._comp = None
         self.is_primary = False
-        self._token = WSToken()
+        self._token = WSToken(inactive_seconds_timeout=None)
         self.subscribers: list[WSMessageSender] = []
         self.conn_logger = get_context_logger(LOG, **self.connection_context)
         self._register_connection()
@@ -162,11 +162,8 @@ class WSConnection(WSConnectionBase):
                     for line in pprint_lines(debug_message):
                         LOG.log(VERBOSE_DEBUG, f"    {line}")
                 elif self.conn_logger.isEnabledFor(DEBUG):
-                    debug_message = redact(json_message)
-                    if len(str(debug_message)) > 80:
-                        debug_message = f"{str(debug_message)[:80]}... (total {len(str(debug_message))} chars)"
                     self.conn_logger.debug(
-                        f"WS_Connection.start_connection(): reply to hello is: {debug_message}"
+                        f"WS_Connection.start_connection(): reply to hello is: {redact_truncate(json_message, max_length=80)}"
                     )
                 msg = Message(json_message=json_message)
                 if isinstance(msg, LoginMessage):
@@ -176,10 +173,12 @@ class WSConnection(WSConnectionBase):
                     self.is_primary = msg.message.get(
                         MessageAttribute.WS_ATTR_IS_PRIMARY, False
                     )
-                    await self.handle_message(msg)
+                    await self.handle_message(msg, check_ses_token=False)
                     break
-                if isinstance(msg, (FetchSetupMessage, StoreSetupMessage, EchoMessage)):
-                    await self.handle_message(msg)
+                if isinstance(
+                    msg, (LogMessage, FetchSetupMessage, StoreSetupMessage, EchoMessage)
+                ):
+                    await self.handle_message(msg, check_ses_token=False)
                     continue
                 self.conn_logger.error(
                     f"WS_Connection.start_connection(): unhandled {msg.__class__.__name__}"
@@ -212,11 +211,29 @@ class WSConnection(WSConnectionBase):
         for sender in self.subscribers:
             sender.handle_connection_closed()
         self._unregister_connection()
+        self._token.invalidate()
 
-    async def handle_message(self, message: Message):
+    async def handle_message(self, message: Message, check_ses_token=True):
         "accept a message from the client and trigger according actions"
-        # self.conn_logger.debug(f"handle {message=} {message.message=} {message.token=}")
-        if message.token == self._token:
+        if isinstance(message, LogMessage):
+            # LogMessage is handled without checking the session token, as it may be sent before login.
+            await message.handle_message(self)
+            return
+        if self._token == message.token:
+            if check_ses_token:
+                # Check if the session token is valid for this connection
+                if not self._session:
+                    self.conn_logger.error("No session associated with this connection")
+                    await self.abort_connection(
+                        reason="No session associated with this connection"
+                    )
+                if not WSToken.check_token(str(self._session.token)):
+                    self.conn_logger.warning(
+                        "Received message with invalid session token."
+                    )
+                    await self.abort_connection(
+                        reason="Invalid session token", token=message.token
+                    )
             # self.conn_logger.debug(f"Received message")
             await message.handle_message(self)
         else:
