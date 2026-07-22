@@ -33,13 +33,12 @@ class Session(SessionBase):
         Session._all_sessions.append(self)
         self._session_nbr = Session._next_session_nbr
         Session._next_session_nbr += 1
-        self.LOG = get_context_logger(LOG, session=self.session_id)
         self.connections = [connection]
         inactive_seconds_timeout = (
             (App.get_config_item(Config.CONFIG_APP_SESSION_TIMEOUT) or 2) * 60 * 60
         )  # default: 2 hours
         self.token = WSToken(inactive_seconds_timeout=inactive_seconds_timeout)
-        self.user: User = user
+        self._user: User = user
         self._tokens: set[WSToken] = {conn_token} if conn_token else set()
 
     @property
