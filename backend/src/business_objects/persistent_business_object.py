@@ -328,7 +328,7 @@ class PersistentBusinessObject(BOBase):
     async def get_single_matching_id(
         cls, conditions: dict | None = None, session: Optional[SessionBase] = None
     ) -> int | None:
-        """Get the id of a single business object matching the conditions"""
+        """Get the id of a single business object matching the conditions. Raises ValueError if more than one id matches conditions."""
         ids = await cls.get_matching_ids(conditions, session)
         LOG.log(
             VERBOSE_DEBUG,
@@ -504,9 +504,10 @@ class PersistentBusinessObject(BOBase):
         ]
         if not values_to_store:
             raise CannotStoreEmptyBO(f"Cannot store {self._data=} as it has no values")
-        for k, v in self._data.items():
-            if k != "id" and v is None:
-                LOG.debug(f"{k=}: {v}")
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            for k, v in self._data.items():
+                if k != "id" and v is None:
+                    LOG.log(VERBOSE_DEBUG,f"{k=}: {v}")
         LOG.debug(
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )
