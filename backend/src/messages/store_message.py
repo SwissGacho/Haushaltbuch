@@ -1,15 +1,23 @@
 """This message is sent by the frontend when
 a business object should be persisted in the database."""
 
-import pprint
-
-from core.app_logging import getLogger, log_exit, Logger, redact, VERBOSE_DEBUG
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    Logger,
+    redact,
+    DEBUG,
+    VERBOSE_DEBUG,
+    pprint_lines,
+    redact_truncate,
+)
 
 LOG: Logger = getLogger(__name__)
 
 from business_objects.business_object_base import BOBase
 from messages.message import Message, MessageAttribute, MessageType
 from messages.bo_message import ObjectMessage
+from server.ws_connection_base import WSConnectionBase
 
 
 class StoreMessage(Message):
@@ -19,16 +27,14 @@ class StoreMessage(Message):
     def message_type(cls) -> MessageType:
         return MessageType.WS_TYPE_STORE
 
-    async def handle_message(self, connection):
+    async def handle_message(self, connection: WSConnectionBase):
         "Handle a StoreMessage"
-        LOG.debug(
-            f"StoreMessage.handle_message: type={self.message.get(MessageAttribute.WS_ATTR_TYPE)}"
-        )
         if LOG.isEnabledFor(VERBOSE_DEBUG):
-            for line in pprint.pformat(
-                redact(self.message), indent=4, width=120, compact=True
-            ).splitlines():
-                LOG.log(VERBOSE_DEBUG, f" - {line}")
+            LOG.debug("StoreMessage.handle_message:")
+            for line in pprint_lines(self.message):
+                LOG.log(VERBOSE_DEBUG, f" -  {line}")
+        elif LOG.isEnabledFor(DEBUG):
+            LOG.debug(f"StoreMessage.handle_message: {redact_truncate(self.message)}")
         object_type_name = self.message.get(MessageAttribute.WS_ATTR_OBJECT)
         bo_type = BOBase.get_business_object_by_name(str(object_type_name))
         bo_id = self.message.get(MessageAttribute.WS_ATTR_INDEX)

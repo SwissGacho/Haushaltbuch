@@ -2,7 +2,6 @@
 
 import os
 import json
-import pprint
 import socket
 import websockets
 import websockets.asyncio.server as websockets_server
@@ -17,6 +16,8 @@ from core.app_logging import (
     WARNING,
     DEBUG,
     VERBOSE_DEBUG,
+    pprint_lines,
+    redact_truncate,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -36,42 +37,31 @@ class WSHandler:
         "Handle a ws connection"
         sock_nbr = WSHandler.counter
         WSHandler.counter += 1
-        local_LOG = get_context_logger(LOG, socket=f"sock #{sock_nbr}")
-        local_LOG.debug("connection opened")
+        context_log = get_context_logger(LOG, socket=f"sock #{sock_nbr}")
+        context_log.debug("connection opened")
         connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
             if await connection.start_connection():
-                local_LOG = get_context_logger(LOG, **connection.connection_context)
-                local_LOG.debug("Connection started.")
+                context_log = get_context_logger(LOG, **connection.connection_context)
+                context_log.debug("Connection started.")
                 async for ws_message in websocket:
-                    if local_LOG.isEnabledFor(VERBOSE_DEBUG):
-                        local_LOG.debug("WSHandler.handler(): client posted:")
-                        try:
-                            debug_message = pprint.pformat(
-                                redact(json.loads(ws_message)),
-                                indent=4,
-                                width=120,
-                                compact=True,
-                            )
-                        except json.JSONDecodeError:
-                            debug_message = redact(ws_message)
-                        for line in debug_message.splitlines():
-                            LOG.log(VERBOSE_DEBUG, f"    {line}")
-                    elif local_LOG.isEnabledFor(DEBUG):
-                        debug_message = redact(ws_message)
-                        if len(str(debug_message)) > 80:
-                            debug_message = (
-                                f"{str(debug_message)[:80]}... "
-                                + f"(total {len(str(debug_message))} chars)"
-                            )
-                        local_LOG.debug(
-                            f"WSHandler.handler(): client posted: {debug_message}"
+                    if context_log.isEnabledFor(DEBUG):
+                        context_log.debug(
+                            "WSHandler.handler(): client posted: "
+                            f"{redact_truncate(ws_message,max_length=50)}"
                         )
+                        if context_log.isEnabledFor(VERBOSE_DEBUG):
+                            try:
+                                msg = json.loads(ws_message)
+                            except Exception:
+                                msg = ws_message
+                            for line in pprint_lines(msg):
+                                LOG.log(VERBOSE_DEBUG, f"     {line}")
                     try:
                         message = Message(json_message=ws_message)
                     except TypeError:
-                        if local_LOG.isEnabledFor(WARNING):
-                            local_LOG.warning(
+                        if context_log.isEnabledFor(WARNING):
+                            context_log.warning(
                                 "message handler failed to create Message object "
                                 f"from json: {redact(ws_message)}"
                             )
@@ -81,12 +71,12 @@ class WSHandler:
                         check_ses_token=not isinstance(message, LogMessage),
                     )
         except websockets.exceptions.ConnectionClosed as exc:
-            local_LOG.debug(f"Connection closed by peer: {exc}")
+            context_log.debug(f"Connection closed by peer: {exc}")
         except Exception as exc:
-            local_LOG.error(f"Connection aborted by exception {exc}")
+            context_log.error(f"Connection aborted by exception {exc}")
             raise
         finally:
-            local_LOG.debug("Connection ended.")
+            context_log.debug("Connection ended.")
             connection.connection_closed()
 
 

@@ -13,6 +13,7 @@ from core.configuration.cmd_line import CommandLine
 from core.reconfigure_logging import reconfigure_logging
 from business_objects.transient_business_object import TransientBusinessObject
 from business_objects.bo_descriptors import BODict
+from server.ws_connection_base import SessionBase
 
 
 class CmdlineConfiguration(TransientBusinessObject):
@@ -40,7 +41,7 @@ class CmdlineConfiguration(TransientBusinessObject):
         """A human-readable name for this business object instance, used in the frontend."""
         return "Commandline Configuration"
 
-    async def store(self):
+    async def store(self, session: Optional[SessionBase] = None):
         """User changed the commandline configuration. Adapt the configuration for this run."""
         LOG.debug("CmdlineConfiguration.store(): Storing commandline configuration.")
         if LOG.isEnabledFor(VERBOSE_DEBUG):
