@@ -151,14 +151,17 @@ class WSConnection(WSConnectionBase):
             while json_message := await self._socket.recv():
                 if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
                     # self.conn_logger.debug(f"sent message: {payload}")
+                    try:
+                        debug_message = json.loads(json_message)
+                    except Exception as exc:
+                        self.conn_logger.error(
+                            f"WS_Connection.start_connection(): failed to parse reply to hello ({exc})"
+                        )
+                        debug_message = json_message
                     self.conn_logger.log(
                         VERBOSE_DEBUG,
                         "WS_Connection.start_connection(): reply to hello is:",
                     )
-                    try:
-                        debug_message = json.loads(json_message)
-                    except Exception:
-                        debug_message = json_message
                     for line in pprint_lines(debug_message):
                         LOG.log(VERBOSE_DEBUG, f"    {line}")
                 elif self.conn_logger.isEnabledFor(DEBUG):
