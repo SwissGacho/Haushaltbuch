@@ -114,7 +114,7 @@ class App:
     @_classproperty
     def db(
         cls: Type[Self],  # type: ignore[reportGeneralTypeIssues]
-    ) -> DBBaseClass:
+    ) -> DBBaseClass | None:
         "Global DB object"
         if not cls._db:
             raise ReferenceError("DB not initialized")

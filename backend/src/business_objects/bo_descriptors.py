@@ -4,13 +4,16 @@ from dataclasses import dataclass
 import json
 from enum import EnumType, Flag, StrEnum, auto
 from datetime import date, datetime
-import sys
+from decimal import Decimal, InvalidOperation
 from typing import Any
+import sys
 
 from core.app_logging import getLogger, log_exit
+from core.exceptions import ConfigurationError, OperationalError
 
 LOG = getLogger(__name__)
 
+from core.app import App
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_attribute_base import BaseFlag
 
@@ -21,6 +24,7 @@ class AttributeType(StrEnum):
     ATYPE_INT = "int"
     ATYPE_STR = "str"
     ATYPE_DATE = "date"
+    ATYPE_DECIMAL = "decimal"
     ATYPE_DATETIME = "datetime"
     ATYPE_DICT = "dict"
     ATYPE_LIST = "list"
@@ -187,6 +191,47 @@ class BOInt(_PersistentAttr[int]):
 
     def validate(self, value):
         return super().validate(value) or isinstance(value, int)
+
+
+class BODecimal(_PersistentAttr[Decimal]):
+
+    @classmethod
+    def attribute_type(cls) -> AttributeType:
+        return AttributeType.ATYPE_DECIMAL
+
+    @classmethod
+    def data_type(cls):
+        return Decimal
+
+    def __set__(self, obj, value) -> None:
+        if isinstance(value, (int, str)):
+            try:
+                value = Decimal(value)
+            except (InvalidOperation, ValueError) as exc:
+                raise ValueError(
+                    f"'{value}' invalid to set attribute {self.my_name} of type {self.__class__.__name__}"
+                ) from exc
+        elif isinstance(value, float):
+            value = Decimal(str(value))
+
+        return super().__set__(obj=obj, value=value)
+
+    def validate(self, value):
+        # pylint: disable=no-member
+        if isinstance(value, Decimal):
+            try:
+                db: Any = App.db
+            except (ConfigurationError, ReferenceError) as exc:
+                raise OperationalError(
+                    f"Decimal validation requires an initialized DB implementation, got error: {exc}"
+                ) from exc
+            if not db.validate_decimal(value):
+                caps = db.decimal_capabilities
+                raise ValueError(
+                    f"Value '{value}' exceeds decimal capabilities "
+                    f"(total_digits={caps.max_total_digits}, scale={caps.max_decimal_scale})"
+                )
+        return super().validate(value) or isinstance(value, Decimal)
 
 
 class BOId(BOInt):

@@ -7,7 +7,10 @@ from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import BOBase
-from business_objects.persistent_business_object import PersistentBusinessObject, Specialized
+from business_objects.persistent_business_object import (
+    PersistentBusinessObject,
+    Specialized,
+)
 from business_objects.bo_descriptors import (
     BOStr,
     BOList,
@@ -785,14 +788,20 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
     def test_403_attribute_descriptions_without_include_specialized(self):
         """Without include_specialized the base BO returns only its own attributes."""
         self.SpecializedBO.register_bo_class()
-        names = [d.name for d in self.GenericBO.attribute_descriptions(include_specialized=False)]
+        names = [
+            d.name
+            for d in self.GenericBO.attribute_descriptions(include_specialized=False)
+        ]
         self.assertIn("generic_attr", names)
         self.assertNotIn("special_attr", names)
 
     def test_403_attribute_descriptions_with_include_specialized(self):
         """With include_specialized=True the base BO also returns attributes of specialist BOs."""
         self.SpecializedBO.register_bo_class()
-        names = [d.name for d in self.GenericBO.attribute_descriptions(include_specialized=True)]
+        names = [
+            d.name
+            for d in self.GenericBO.attribute_descriptions(include_specialized=True)
+        ]
         self.assertIn("generic_attr", names)
         self.assertIn("special_attr", names)
 
@@ -800,7 +809,10 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         """Attributes already present on the base BO must not be duplicated even if a
         specialist declares the same attribute name."""
         self.SpecializedBO.register_bo_class()
-        names = [d.name for d in self.GenericBO.attribute_descriptions(include_specialized=True)]
+        names = [
+            d.name
+            for d in self.GenericBO.attribute_descriptions(include_specialized=True)
+        ]
         self.assertEqual(len(names), len(set(names)))
 
     # ------------------------------------------------------------------ #
@@ -856,8 +868,12 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         self.SpecializedBO.register_bo_class()
         with (
             patch("business_objects.persistent_business_object.In") as MockIn,
-            patch("business_objects.persistent_business_object.ColumnName") as MockColumnName,
-            patch("business_objects.persistent_business_object.SQLString") as MockSQLString,
+            patch(
+                "business_objects.persistent_business_object.ColumnName"
+            ) as MockColumnName,
+            patch(
+                "business_objects.persistent_business_object.SQLString"
+            ) as MockSQLString,
         ):
             result = self.GenericBO._filter_conditions(None)
         MockColumnName.assert_called_once_with("bo_name")

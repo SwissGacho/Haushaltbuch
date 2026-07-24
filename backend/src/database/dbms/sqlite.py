@@ -1,18 +1,22 @@
 """Connection to SQLit DB using aiosqlite"""
 
+from __future__ import annotations
+
+
+from decimal import Decimal
 from typing import Self, Any, Optional
 from datetime import datetime, date, UTC
 from pathlib import Path
 import json
 import re
 
-from core.app_logging import getLogger, log_exit, pprint_lines, DEBUG
+from core.app_logging import VERBOSE_DEBUG, getLogger, log_exit, pprint_lines, DEBUG
 
 LOG = getLogger(__name__)
 
 from core.exceptions import OperationalError
 from core.configuration.config import Config
-from database.dbms.db_base import DB, Connection, Cursor
+from database.dbms.db_base import DB, Connection, Cursor, DecimalCapabilities
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript
 from database.sql_clause import SQLColumnDefinition
@@ -49,6 +53,9 @@ SQLITE_JSON_TYPE = "JSON"
 SQLITE_BASEFLAG_TYPE = "FLAG"
 SQLITE_DATE_TYPE = "ISODATE"
 SQLITE_DATETIME_TYPE = "ISODATETIME"
+SQLITE_DECIMAL_TYPE = "DECIMAL"
+SQLITE_MAXIMUM_DECIMAL_DIGITS = 19
+SQLITE_MAXIMUM_DECIMAL_SCALE = 4
 
 
 class SQLiteColumnDefinition(SQLColumnDefinition):
@@ -64,6 +71,7 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         list: SQLITE_JSON_TYPE,
         BOBaseBase: "INTEGER",
         BaseFlag: SQLITE_BASEFLAG_TYPE,
+        Decimal: SQLITE_DECIMAL_TYPE,
     }
     constraint_map = {
         BOColumnConstraint.BOC_NONE: "",
@@ -78,6 +86,20 @@ class SQLiteColumnDefinition(SQLColumnDefinition):
         # BOColumnFlag.BOC_INC: "not available ! @%?°",
         # BOColumnFlag.BOC_CURRENT_TS: "not available ! @%?°",
     }
+
+
+def _adapt_decimal(value: Decimal) -> int:
+    if not SQLiteDB.validate_decimal(value):
+        raise ValueError(f"Decimal value out of supported range for SQLite: {value}")
+
+    scale = SQLITE_MAXIMUM_DECIMAL_SCALE
+
+    quantizer = Decimal(1).scaleb(-scale)
+    quantized = value.quantize(quantizer)
+
+    scaled = int(quantized * (10**scale))
+
+    return scaled
 
 
 def _adapt_dict(value: dict) -> str:
@@ -112,6 +134,11 @@ def _convert_json(value: bytes) -> dict | list:
     return json.loads(value)
 
 
+def _convert_decimal(value: bytes) -> Decimal:
+    scale = SQLITE_MAXIMUM_DECIMAL_SCALE
+    return Decimal(int(value)).scaleb(-scale)
+
+
 def _convert_isodate(value: bytes) -> date:
     return date.fromisoformat(value.decode())
 
@@ -131,10 +158,12 @@ if sqlite3:
     sqlite3.register_adapter(BaseFlag, _adapt_flag)
     sqlite3.register_adapter(date, _adapt_date_iso)
     sqlite3.register_adapter(datetime, _adapt_datetime_iso)
+    sqlite3.register_adapter(Decimal, _adapt_decimal)
 
     sqlite3.register_converter(SQLITE_JSON_TYPE, _convert_json)
     sqlite3.register_converter(SQLITE_DATE_TYPE, _convert_isodate)
     sqlite3.register_converter(SQLITE_DATETIME_TYPE, _convert_isodatetime)
+    sqlite3.register_converter(SQLITE_DECIMAL_TYPE, _convert_decimal)
 
     # Register adapter for all existing PersistentBusinessObject subclasses recursively
     def _setup_bo_subclasses(cls):
@@ -148,34 +177,55 @@ if sqlite3:
 
     _setup_bo_subclasses(PersistentBusinessObject)
 
-    # Adapt PersistentBusinessObject.__init_subclass__ to register adapter for new subclasses
-    bo_original_init_subclass = PersistentBusinessObject.__init_subclass__
+    # Adapt PersistentBusinessObject.__init_subclass__ to register adapter for new subclasses.
+    # Guard against re-wrapping an already-wrapped __init_subclass__: this module can be
+    # reloaded multiple times within a single process (e.g. by tests that manipulate
+    # sys.modules), and re-wrapping an already-wrapped function on every reload would stack
+    # nested calls indefinitely, eventually exceeding Python's recursion limit.
+    if not getattr(
+        getattr(PersistentBusinessObject.__init_subclass__, "__func__", None),
+        "_is_sqlite_selfregistering_wrapper",
+        False,
+    ):
+        bo_original_init_subclass = PersistentBusinessObject.__init_subclass__
 
-    def _bo_init_selfregistering_subclass(cls):
-        if sqlite3 is None:
-            raise ImportError("sqlite3 module is not available.")
-        bo_original_init_subclass()
-        LOG.debug(f"Self-Registering SQLite adapter for class {cls.__name__}")
-        sqlite3.register_adapter(cls, _adapt_relation)
+        def _bo_init_selfregistering_subclass(cls):
+            if sqlite3 is None:
+                raise ImportError("sqlite3 module is not available.")
+            bo_original_init_subclass()
+            LOG.debug(f"Self-Registering SQLite adapter for class {cls.__name__}")
+            sqlite3.register_adapter(cls, _adapt_relation)
 
-    PersistentBusinessObject.__init_subclass__ = classmethod(_bo_init_selfregistering_subclass)  # type: ignore
+        _bo_init_selfregistering_subclass._is_sqlite_selfregistering_wrapper = True  # type: ignore
+
+        PersistentBusinessObject.__init_subclass__ = classmethod(_bo_init_selfregistering_subclass)  # type: ignore
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):
         # LOG.debug(f"Registering adapter and converter for {flag_type=}")
         sqlite3.register_adapter(flag_type, _adapt_flag)
 
-    # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses
-    flag_original_init_subclass = BaseFlag.__init_subclass__
+    # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses.
+    # Same re-wrapping guard as above.
+    if not getattr(
+        getattr(BaseFlag.__init_subclass__, "__func__", None),
+        "_is_sqlite_selfregistering_wrapper",
+        False,
+    ):
+        flag_original_init_subclass = BaseFlag.__init_subclass__
 
-    def _flag_init_selfregistering_subclass(cls):
-        if sqlite3 is None:
-            raise ImportError("sqlite3 module is not available.")
-        flag_original_init_subclass()
-        LOG.debug(f"Self-Registering adapter and converter for class {cls.__name__}")
-        sqlite3.register_adapter(cls, _adapt_flag)
+        def _flag_init_selfregistering_subclass(cls):
+            if sqlite3 is None:
+                raise ImportError("sqlite3 module is not available.")
+            flag_original_init_subclass()
+            LOG.debug(
+                f"Self-Registering adapter and converter for class {cls.__name__}"
+            )
+            sqlite3.register_adapter(cls, _adapt_flag)
 
-    BaseFlag.__init_subclass__ = classmethod(_flag_init_selfregistering_subclass)  # type: ignore
+        _flag_init_selfregistering_subclass._is_sqlite_selfregistering_wrapper = True  # type: ignore
+
+        BaseFlag.__init_subclass__ = classmethod(_flag_init_selfregistering_subclass)  # type: ignore
 
 
 class SQLiteScript(SQLScript):
@@ -205,6 +255,11 @@ class SQLiteDB(DB):
     @property
     def sql_factory(self):
         return SQLiteSQLFactory
+
+    DECIMAL_CAPABILITIES = DecimalCapabilities(
+        max_total_digits=SQLITE_MAXIMUM_DECIMAL_DIGITS,
+        max_decimal_scale=SQLITE_MAXIMUM_DECIMAL_SCALE,
+    )
 
     async def _get_table_info(self, table_name: str) -> dict[str, str]:
         # LOG.debug(f"SQLiteDB._get_table_info({table_name=})")
@@ -282,7 +337,7 @@ class SQLiteCursor(Cursor):
         self._last_query = query
         self._last_params = params or {}
         try:
-            if LOG.isEnabledFor(DEBUG):
+            if LOG.isEnabledFor(DEBUG) or LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.debug(f"SQLiteCursor.execute:  {query=},  params:")
                 for line in pprint_lines(params):
                     LOG.debug(f" -   {line}")

@@ -50,6 +50,8 @@ class User(Specialized, GenericUser):
 
     name = BOStr(semantic_role=BOSemanticRole.BONAME)
     password = BOStr()
+    role = BOFlag(UserRole)
+    is_root_bo: bool = True
 
     @property
     def display_name(self) -> str:

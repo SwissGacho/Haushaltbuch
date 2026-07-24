@@ -1,7 +1,8 @@
 """Applications base classes and common objects."""
 
 from abc import ABC, abstractmethod
-from typing import TypeAlias, Union, Self
+from decimal import Decimal
+from typing import TypeAlias, Union, Self, Any
 from enum import StrEnum
 import platform
 
@@ -113,6 +114,12 @@ class DBBaseClass(BaseObject, ABC):
         "DB specific SQL factory"
         raise NotImplementedError("sqlFactory not defined on base class")
 
+    @property
+    @abstractmethod
+    def decimal_capabilities(self) -> Any:
+        "Decimal capabilities of the underlying DBMS"
+        raise NotImplementedError("decimal_capabilities not defined on base class")
+
     @abstractmethod
     async def connect(self) -> "ConnectionBaseClass":
         "Open a connection and return the Connection instance"
@@ -132,6 +139,12 @@ class DBBaseClass(BaseObject, ABC):
     async def check_table(self, obj) -> bool:
         "check compatibility of a DB table with a business object"
         raise NotImplementedError("check_table not implemented in base class.")
+
+    @classmethod
+    @abstractmethod
+    def validate_decimal(cls, value: Decimal) -> bool:
+        "validate a Decimal value against the DB's supported precision and scale"
+        raise NotImplementedError("validate_decimal not implemented in base class.")
 
 
 class ConnectionBaseClass(BaseObject, ABC):

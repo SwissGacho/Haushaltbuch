@@ -1,11 +1,12 @@
 """Connection to MySQL DB using asyncmy"""
 
+from decimal import Decimal
 import ssl
 import datetime
 from typing import Optional, Self
 from pathlib import Path
 
-from core.app_logging import getLogger, log_exit, DEBUG
+from core.app_logging import VERBOSE_DEBUG, getLogger, log_exit, DEBUG
 
 LOG = getLogger(__name__)
 
@@ -13,7 +14,13 @@ from core.app import App
 from core.configuration.config import Config
 from core.exceptions import ConfigurationError, OperationalError
 from core.util_base import get_config_item
-from database.dbms.db_base import DB, Connection, Cursor, DBCursorProtocol
+from database.dbms.db_base import (
+    DB,
+    Connection,
+    Cursor,
+    DBCursorProtocol,
+    DecimalCapabilities,
+)
 from database.sql_factory import SQLFactory
 from database.sql import SQL
 from database.sql_statement import SQLTemplate, SQLScript, Insert, Update
@@ -52,6 +59,8 @@ class MySQLFactory(SQLFactory):
 
 
 MYSQL_JSON_TYPE = "JSON"
+MYSQL_MAXIMUM_DECIMAL_DIGITS = 65
+MYSQL_MAXIMUM_DECIMAL_SCALE = 30  # MariaDB supports up to 38 but MySQL only up to 30
 
 
 def baseflag_datatype(data_type: type, **args) -> str:
@@ -83,6 +92,13 @@ def timestamp_datatype(data_type: type, constraints: BOColumnConstraint, **args)
     return "DATETIME"
 
 
+def decimal_datatype(data_type: type, **_args) -> str:
+    if data_type is not Decimal:
+        raise ValueError(f"decimal_datatype called with invalid type {data_type}")
+
+    return f"DECIMAL({MYSQL_MAXIMUM_DECIMAL_DIGITS},{MYSQL_MAXIMUM_DECIMAL_SCALE})"
+
+
 class MySQLColumnDefinition(SQLColumnDefinition):
     """Definition of a column in a CREATE TABLE statement for MySQL/MariaDB"""
 
@@ -96,6 +112,7 @@ class MySQLColumnDefinition(SQLColumnDefinition):
         list: MYSQL_JSON_TYPE,
         BOBaseBase: "INT",
         BaseFlag: baseflag_datatype,
+        Decimal: decimal_datatype,
     }
     constraint_map = {
         BOColumnConstraint.BOC_NONE: "",
@@ -123,7 +140,7 @@ class MySQLScript(SQLScript):
                                 CONCAT_WS(' ',
                                     columns.COLUMN_NAME,
                                     CASE WHEN SUBSTR(constraints.CHECK_CLAUSE, 1, 4) = 'json' THEN 'JSON'
-                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit', 'timestamp' ) THEN UPPER(columns.COLUMN_TYPE)
+                                        WHEN columns.DATA_TYPE IN ( 'varchar', 'bit', 'timestamp', 'decimal' ) THEN UPPER(columns.COLUMN_TYPE)
                                         WHEN columns.DATA_TYPE = 'set' THEN CONCAT('SET ', SUBSTR(columns.COLUMN_TYPE,4))
                                         ELSE UPPER(columns.DATA_TYPE) END,
                                     UPPER(CASE WHEN columns.IS_NULLABLE <> 'YES' AND columns.COLUMN_KEY <> 'PRI' THEN 'NOT NULL' 
@@ -190,6 +207,9 @@ class MySQLDB(DB):
         super().__init__(**cfg)
         self.connection_pool: Optional["Pool"] = None
 
+    def __str__(self) -> str:
+        return f"MySQLDB(host={self._cfg.get(Config.CONFIG_DBHOST)}, db={self._cfg.get(Config.CONFIG_DBDBNAME)}, user={self._cfg.get(Config.CONFIG_DBUSER)})"
+
     async def create_pool(self) -> None:
         """Create connection pool if not exists"""
         if self.connection_pool is not None:
@@ -235,6 +255,11 @@ class MySQLDB(DB):
     def sql_factory(self):
         return MySQLFactory
 
+    DECIMAL_CAPABILITIES = DecimalCapabilities(
+        max_total_digits=MYSQL_MAXIMUM_DECIMAL_DIGITS,
+        max_decimal_scale=MYSQL_MAXIMUM_DECIMAL_SCALE,
+    )
+
     async def _get_table_info(self, table_name: str) -> dict[str, str]:
         # LOG.debug(f"MySQLDB._get_table_info({table_name=})")
         async with SQL() as sql:
@@ -254,7 +279,7 @@ class MySQLDB(DB):
     async def close(self):
         "Close the connection pool"
         if self.connection_pool:
-            LOG.debug("MySQLDB.close(): Closing connection pool")
+            LOG.debug(f"MySQLDB.close(): Closing connection pool [{self}]")
             # pylint: disable=protected-access
             LOG.debug(
                 f"   {self.connection_pool.freesize} free, {len(self.connection_pool._used)} used, "
@@ -299,7 +324,7 @@ class MySQLConnection(Connection):
 
     async def connect(self) -> Self:
         "Get connection from pool"
-        # LOG.debug("MySQLConnection.connect()")
+        LOG.debug("MySQLConnection.connect()")
         if asyncmy is None:
             raise ImportError("asyncmy module is not available.")
 
