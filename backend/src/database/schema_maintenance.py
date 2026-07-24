@@ -23,14 +23,27 @@ async def _create_all_tables(
     objects: list[type[PersistentBusinessObject]],
 ):
     dependency_graph = {
-        b: [r for r in b.references() if r is not b]
+        b: [
+            r
+            for r in (b.references() + list(getattr(b, "specialists", [])))
+            if r is not b
+        ]
         for b in objects
         if isinstance(b, type) and issubclass(b, PersistentBusinessObject)
     }
-    for bo in TopologicalSorter(dependency_graph).static_order():
+    LOG.log(
+        VERBOSE_DEBUG,
+        f"Dependency graph for persistent business objects: {[f'{b.__name__}: {[r.__name__ for r in dependency_graph[b]]}' for b in dependency_graph]}",
+    )
+    sorted_objects = list(TopologicalSorter(dependency_graph).static_order())
+    LOG.log(
+        VERBOSE_DEBUG,
+        f"Sorted persistent business objects: {[c.__name__ for c in sorted_objects]}",
+    )
+    for bo in sorted_objects:
         if not (isinstance(bo, type) and issubclass(bo, PersistentBusinessObject)):
             raise TypeError(
-                f"Business object {bo} is not a subclass of BOBase, cannot create table"
+                f"Business object {bo} is not a subclass of PersistentBusinessObject, cannot create table"
             )
         LOG.info(f"creating table '{bo.table}' for business class '{bo.__name__}'")
         await bo.sql_create_table()

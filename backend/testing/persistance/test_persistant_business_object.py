@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
 from business_objects.bo_semantic_role import BOSemanticRole
+from business_objects.business_object_base import BOBase
 from business_objects.persistent_business_object import (
     PersistentBusinessObject,
     Specialized,

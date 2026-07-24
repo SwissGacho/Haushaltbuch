@@ -10,7 +10,7 @@ from pathlib import Path
 import json
 import re
 
-from core.app_logging import getLogger, log_exit, pprint_lines, DEBUG
+from core.app_logging import VERBOSE_DEBUG, getLogger, log_exit, pprint_lines, DEBUG
 
 LOG = getLogger(__name__)
 
@@ -136,7 +136,7 @@ def _convert_json(value: bytes) -> dict | list:
 
 def _convert_decimal(value: bytes) -> Decimal:
     scale = SQLITE_MAXIMUM_DECIMAL_SCALE
-    return Decimal(int(value)) / Decimal(10**scale)
+    return Decimal(int(value)).scaleb(-scale)
 
 
 def _convert_isodate(value: bytes) -> date:
@@ -177,34 +177,55 @@ if sqlite3:
 
     _setup_bo_subclasses(PersistentBusinessObject)
 
-    # Adapt PersistentBusinessObject.__init_subclass__ to register adapter for new subclasses
-    bo_original_init_subclass = PersistentBusinessObject.__init_subclass__
+    # Adapt PersistentBusinessObject.__init_subclass__ to register adapter for new subclasses.
+    # Guard against re-wrapping an already-wrapped __init_subclass__: this module can be
+    # reloaded multiple times within a single process (e.g. by tests that manipulate
+    # sys.modules), and re-wrapping an already-wrapped function on every reload would stack
+    # nested calls indefinitely, eventually exceeding Python's recursion limit.
+    if not getattr(
+        getattr(PersistentBusinessObject.__init_subclass__, "__func__", None),
+        "_is_sqlite_selfregistering_wrapper",
+        False,
+    ):
+        bo_original_init_subclass = PersistentBusinessObject.__init_subclass__
 
-    def _bo_init_selfregistering_subclass(cls):
-        if sqlite3 is None:
-            raise ImportError("sqlite3 module is not available.")
-        bo_original_init_subclass()
-        LOG.debug(f"Self-Registering SQLite adapter for class {cls.__name__}")
-        sqlite3.register_adapter(cls, _adapt_relation)
+        def _bo_init_selfregistering_subclass(cls):
+            if sqlite3 is None:
+                raise ImportError("sqlite3 module is not available.")
+            bo_original_init_subclass()
+            LOG.debug(f"Self-Registering SQLite adapter for class {cls.__name__}")
+            sqlite3.register_adapter(cls, _adapt_relation)
 
-    PersistentBusinessObject.__init_subclass__ = classmethod(_bo_init_selfregistering_subclass)  # type: ignore
+        _bo_init_selfregistering_subclass._is_sqlite_selfregistering_wrapper = True  # type: ignore
+
+        PersistentBusinessObject.__init_subclass__ = classmethod(_bo_init_selfregistering_subclass)  # type: ignore
 
     # Register adapter and converter for all existing Flag subclasses
     for flag_type in list(BaseFlag.__subclasses__()):
         # LOG.debug(f"Registering adapter and converter for {flag_type=}")
         sqlite3.register_adapter(flag_type, _adapt_flag)
 
-    # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses
-    flag_original_init_subclass = BaseFlag.__init_subclass__
+    # Adapt Flag.__init_subclass__ to register adapter and converter for new Flag subclasses.
+    # Same re-wrapping guard as above.
+    if not getattr(
+        getattr(BaseFlag.__init_subclass__, "__func__", None),
+        "_is_sqlite_selfregistering_wrapper",
+        False,
+    ):
+        flag_original_init_subclass = BaseFlag.__init_subclass__
 
-    def _flag_init_selfregistering_subclass(cls):
-        if sqlite3 is None:
-            raise ImportError("sqlite3 module is not available.")
-        flag_original_init_subclass()
-        LOG.debug(f"Self-Registering adapter and converter for class {cls.__name__}")
-        sqlite3.register_adapter(cls, _adapt_flag)
+        def _flag_init_selfregistering_subclass(cls):
+            if sqlite3 is None:
+                raise ImportError("sqlite3 module is not available.")
+            flag_original_init_subclass()
+            LOG.debug(
+                f"Self-Registering adapter and converter for class {cls.__name__}"
+            )
+            sqlite3.register_adapter(cls, _adapt_flag)
 
-    BaseFlag.__init_subclass__ = classmethod(_flag_init_selfregistering_subclass)  # type: ignore
+        _flag_init_selfregistering_subclass._is_sqlite_selfregistering_wrapper = True  # type: ignore
+
+        BaseFlag.__init_subclass__ = classmethod(_flag_init_selfregistering_subclass)  # type: ignore
 
 
 class SQLiteScript(SQLScript):
@@ -316,7 +337,7 @@ class SQLiteCursor(Cursor):
         self._last_query = query
         self._last_params = params or {}
         try:
-            if LOG.isEnabledFor(DEBUG):
+            if LOG.isEnabledFor(DEBUG) or LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.debug(f"SQLiteCursor.execute:  {query=},  params:")
                 for line in pprint_lines(params):
                     LOG.debug(f" -   {line}")

@@ -1,13 +1,12 @@
 """Manage connection to the database"""
 
-from contextlib import asynccontextmanager
 import importlib
 from types import ModuleType
-from typing import AsyncIterator, cast
+from typing import cast
 import decimal
 
 from core.app_logging import getLogger, log_exit, redact
-from core.exceptions import ConfigurationError
+from core.exceptions import ConfigurationError, DBSchemaError
 from database.dbms.db_base import DB
 
 LOG = getLogger(__name__)
@@ -72,49 +71,56 @@ class DBManager:
             ) from exc
         return db_config, db_type, db_class
 
-    @asynccontextmanager
-    async def get_db(self) -> AsyncIterator[DB | None]:
-        "Get the database connection"
+    async def __aenter__(self) -> DB | None:
+        """Create and prepare the database connection"""
+
         app = self._app
         db_type: str | None = None
         if (
             app.status != Status.STATUS_DB_CFG
         ):  # pylint: disable=comparison-with-callable
             LOG.warning("No DB configuration available")
-            yield None
-            return
+            return None
 
         try:
             db_config, db_type, db_class = self._valid_db_config()
         except ConfigurationError as exc:
             LOG.error(f"{exc}")
             self._set_db_unsupported()
-            yield None
-            return
+            return None
 
         LOG.debug(f"DB configuration: {redact(db_config)=}, {db_type=}")
 
         db = db_class(decimal_context=decimal.DefaultContext, **db_config)
+        self.db = db
 
         # Post-connection configuration and schema check
         try:
             App.db = db
             await self._try_check_db_schema(db)
-            LOG.debug("DB ready")
-            yield db
+        except DBSchemaError:
+            # The main application owns the policy for this failure.
+            raise
         except (TypeError, ValueError) as exc:
             LOG.error(f"DB connection failed: {exc}")
             App.status = Status.STATUS_NO_DB
-            yield None
-            return
+            return None
         except Exception as exc:  # pylint: disable=broad-exception-caught
             LOG.warning(f"DB connection failed: {exc}")
             App.status = Status.STATUS_UNCONFIGURED
-            yield None
-            return
-        finally:
+            return None
+
+        LOG.debug("DB ready")
+        return db
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        """Close the database connection"""
+
+        if self.db is not None:
             LOG.debug("DB disconnecting")
-            await db.close()
+            await self.db.close()
+
+        return False  # Do not suppress exceptions
 
     async def _try_check_db_schema(self, db: DB):
         "Try to check the database schema; on connection error, retry up to RECONNECT_ATTEMPTS times"
@@ -158,9 +164,9 @@ class DBManager:
         return True
 
 
-def get_db():
+def get_db() -> DBManager:
     "Create a DB connection"
-    return DBManager(App).get_db()
+    return DBManager(App)
 
 
 log_exit(LOG)

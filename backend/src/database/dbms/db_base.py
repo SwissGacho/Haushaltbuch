@@ -1,7 +1,7 @@
 """Base class for DB connections"""
 
 from typing import Any, NamedTuple, Self, Optional, Protocol, AsyncContextManager
-from decimal import Decimal, InvalidOperation, Context as DecimalContext
+from decimal import Decimal, InvalidOperation, Context as DecimalContext, setcontext
 import re
 import json
 
@@ -85,9 +85,15 @@ class DB(DBBaseClass):
         return abs(scaled) < 10 ** (caps.max_total_digits)
 
     def configure_decimal_context(self, decimal_context: DecimalContext):
-        "Configure the decimal context according to the DB's capabilities"
+        """Configure the decimal context according to the DB's capabilities.
+        Mutates 'decimal_context' in place (e.g. decimal.DefaultContext, used as the
+        template for contexts lazily created later) *and* activates it as the current
+        context immediately via setcontext(), since a context may already have been
+        materialized for the calling thread/task before this runs, in which case
+        mutating the template alone would not affect it."""
         caps = self.decimal_capabilities
         decimal_context.prec = caps.max_total_digits
+        setcontext(decimal_context)
 
     def check_column(self, tab, col, name, data_type, constraint, **pars):
         "check compatibility of a DB column with a business object attribute"

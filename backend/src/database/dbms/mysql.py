@@ -6,7 +6,7 @@ import datetime
 from typing import Optional, Self
 from pathlib import Path
 
-from core.app_logging import getLogger, log_exit, DEBUG
+from core.app_logging import VERBOSE_DEBUG, getLogger, log_exit, DEBUG
 
 LOG = getLogger(__name__)
 

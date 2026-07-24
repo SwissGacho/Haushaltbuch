@@ -4,7 +4,6 @@ import datetime
 from decimal import Decimal
 from enum import Flag, auto
 
-from sqlite3 import OperationalError
 import unittest
 from unittest.mock import Mock, ANY, patch
 

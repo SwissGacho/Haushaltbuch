@@ -45,7 +45,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         self.MockApp.status = Status.STATUS_NO_DB
         with self.patch:
             ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            self.assertIsInstance(ctx_mgr, database.db_manager.DBManager)
 
             ctx_bind = await ctx_mgr.__aenter__()
             self.assertIsNone(ctx_bind)
@@ -63,7 +63,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             Mock(side_effect=ModuleNotFoundError("No module named 'db_package'")),
         ) as mock_import:
             ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            self.assertIsInstance(ctx_mgr, database.db_manager.DBManager)
 
             ctx_bind = await ctx_mgr.__aenter__()
             self.assertIsNone(ctx_bind)
@@ -129,7 +129,6 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             with self.assertLogs(None, logging.ERROR) as err_msg:
                 # test creation of context manager
                 ctx_mgr = database.db_manager.get_db()
-                self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
 
                 # test context entrance
                 ctx_bind = await ctx_mgr.__aenter__()
@@ -154,7 +153,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             Mock(side_effect=ModuleNotFoundError("No module named 'db_package'")),
         ) as mock_import:
             ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            self.assertIsInstance(ctx_mgr, database.db_manager.DBManager)
 
             ctx_bind = await ctx_mgr.__aenter__()
             self.assertIsNone(ctx_bind)
@@ -172,7 +171,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         }
         with self.patch:
             ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            self.assertIsInstance(ctx_mgr, database.db_manager.DBManager)
 
             db = await ctx_mgr.__aenter__()
             self.assertIsNone(db)
@@ -200,7 +199,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         ) as mock_import:
             with self.assertLogs(None, logging.ERROR) as err_msg:
                 ctx_mgr = database.db_manager.get_db()
-                self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+                self.assertIsInstance(ctx_mgr, database.db_manager.DBManager)
 
                 db = await ctx_mgr.__aenter__()
                 self.assertIsNone(db)
@@ -230,7 +229,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             ),
         ):
             ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            self.assertIsInstance(ctx_mgr, database.db_manager.DBManager)
 
             db = await ctx_mgr.__aenter__()
 
@@ -259,7 +258,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             ),
         ):
             ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            self.assertIsInstance(ctx_mgr, database.db_manager.DBManager)
 
             db = await ctx_mgr.__aenter__()
 
@@ -299,7 +298,7 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             ),
         ):
             ctx_mgr = database.db_manager.get_db()
-            self.assertIsInstance(ctx_mgr, _AsyncGeneratorContextManager)
+            self.assertIsInstance(ctx_mgr, database.db_manager.DBManager)
 
             db = await ctx_mgr.__aenter__()
             self.assertEqual(db, self.mock_db)
