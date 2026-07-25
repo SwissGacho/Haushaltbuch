@@ -46,6 +46,23 @@ class In(SQLExpression):
         return f"{self._value.get_query(km=km)} IN ({values_str})"
 
 
+class Concat(SQLExpression):
+    """Represents a SQL CONCAT expression."""
+
+    def __init__(self, *args: SQLExpression | str):
+        super().__init__()
+        self._args = [
+            arg if isinstance(arg, SQLExpression) else ColumnName(arg) for arg in args
+        ]
+
+    def get_query(self, km: SQLKeyManager) -> str:
+        """Get the SQL query for this expression."""
+        if not self._args:
+            raise ValueError("CONCAT expression requires at least one argument")
+        args_str = ", ".join([arg.get_query(km=km) for arg in self._args])
+        return f"CONCAT({args_str})"
+
+
 class SQLMultiExpression(SQLExpression):
     """Abstract class to combine any number of SQL expressions with an operator.
     Should not be instantiated directly."""

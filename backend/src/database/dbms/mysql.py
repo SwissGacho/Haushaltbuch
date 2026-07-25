@@ -5,7 +5,7 @@ import datetime
 from typing import Optional, Self
 from pathlib import Path
 
-from core.app_logging import getLogger, log_exit, DEBUG
+from core.app_logging import getLogger, log_exit, pprint_lines, DEBUG
 
 LOG = getLogger(__name__)
 
@@ -358,7 +358,13 @@ class MySQLCursor(Cursor):
             )
         try:
             if LOG.isEnabledFor(DEBUG):
-                LOG.debug(f"MySQLCursor.execute: {conv_sql=}, {args=}")
+                LOG.debug("MySQLCursor.execute:")
+                LOG.debug("  query:")
+                for line in pprint_lines(conv_sql):
+                    LOG.debug(f"     {line}")
+                LOG.debug("  params:")
+                for line in pprint_lines(args):
+                    LOG.debug(f"     {line}")
             self._rowcount = await self._cursor.execute(conv_sql, args=args)
         except (
             asyncmy.errors.MySQLError  # pylint: disable=c-extension-no-member

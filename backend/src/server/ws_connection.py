@@ -11,8 +11,8 @@ from core.app_logging import (
     DEBUG,
     VERBOSE_DEBUG,
     redact,
-    redact_truncate,
     pprint_lines,
+    redact_truncate,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -27,6 +27,7 @@ from messages.setup import FetchSetupMessage, StoreSetupMessage
 from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 from server.ws_token import WSToken
+from server.session import Session
 
 
 class WSConnection(WSConnectionBase):
@@ -37,7 +38,7 @@ class WSConnection(WSConnectionBase):
     def __init__(self, websocket, sock_nbr) -> None:
         self._socket = websocket
         self._socket_nbr = sock_nbr
-        self._session = None
+        self._session: Session | None = None
         self._conn_nbr = sock_nbr
         self._comp = None
         self.is_primary = False
@@ -110,19 +111,14 @@ class WSConnection(WSConnectionBase):
         if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
             self.conn_logger.debug("WSConnection._send(): sent message:")
             try:
-                if isinstance(payload, (bytes, bytearray)):
-                    debug_payload = json.loads(payload.decode())
-                elif isinstance(payload, str):
-                    debug_payload = json.loads(payload)
-                else:
-                    debug_payload = payload
-            except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
-                debug_payload = payload
-            for line in pprint_lines(debug_payload):
-                LOG.log(VERBOSE_DEBUG, f"    {line}")
+                payloaded = json.loads(payload)
+            except Exception:
+                payloaded = payload
+            for line in pprint_lines(payloaded):
+                LOG.log(VERBOSE_DEBUG, f"  {line}")
         elif self.conn_logger.isEnabledFor(DEBUG):
             self.conn_logger.debug(
-                f"WSConnection._send(): sent message: {redact_truncate(payload, max_length=70)}"
+                f"WSConnection._send(): sent message: {redact_truncate(payload,max_length=50)}"
             )
 
     async def send_message(self, message: Message, status=False):
@@ -139,7 +135,7 @@ class WSConnection(WSConnectionBase):
         Send a message to component(s) on a specified connection or
         list of connections (if 'comp=="*" send to all component connections).
         """
-        self.conn_logger.debug(f"Send {msg} to {comp}")
+        self.conn_logger.debug(redact_truncate(f"Send {msg} to {comp}"))
         if comp == "*":
             conns = WSConnection.connections.values()
         else:
@@ -155,13 +151,17 @@ class WSConnection(WSConnectionBase):
             while json_message := await self._socket.recv():
                 if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
                     # self.conn_logger.debug(f"sent message: {payload}")
-                    self.conn_logger.debug(
-                        "WS_Connection.start_connection(): reply to hello is:"
-                    )
                     try:
                         debug_message = json.loads(json_message)
-                    except Exception:
+                    except Exception as exc:
+                        self.conn_logger.error(
+                            f"WS_Connection.start_connection(): failed to parse reply to hello ({exc})"
+                        )
                         debug_message = json_message
+                    self.conn_logger.log(
+                        VERBOSE_DEBUG,
+                        "WS_Connection.start_connection(): reply to hello is:",
+                    )
                     for line in pprint_lines(debug_message):
                         LOG.log(VERBOSE_DEBUG, f"    {line}")
                 elif self.conn_logger.isEnabledFor(DEBUG):

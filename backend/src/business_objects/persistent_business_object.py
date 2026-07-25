@@ -5,7 +5,6 @@ application's data model."""
 
 import copy
 import json
-import pprint
 from typing import Any, Type, Self, Optional
 from datetime import date, datetime, UTC
 from core.app_logging import (
@@ -24,17 +23,20 @@ from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
 from database.sql_expression import (
     SQLExpression,
+    Concat,
     ColumnName,
     SQLString,
     And,
     In,
     Eq,
     Filter,
+    Value,
 )
-from database.sql_statement import CreateTable, NamedValueListList, Value
+from database.sql_statement import CreateTable, NamedValueListList
 from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
+from server.ws_connection_base import SessionBase
 
 
 class Specialized:
@@ -56,6 +58,22 @@ class Singleton:
     """Mixin class for singleton business objects.
     Singleton BOs are BOs of which there should only be one instance in the database.
     """
+
+
+class Personal:
+    """Mixin class for personal business objects.
+    Personal BOs are BOs that are specific to a user and have a user_id attribute.
+    Personal BOs are only accessible to the user they belong to and are not visible to other users.
+    """
+
+
+class AdminOnly:
+    """Mixin class for admin-only business objects.
+    Admin-only BOs are BOs that are only accessible to users with the admin role.
+    Admin-only BOs are not visible to other users.
+    """
+
+    ADMIN_ONLY = True
 
 
 class PersistentBusinessObject(BOBase):
@@ -155,7 +173,7 @@ class PersistentBusinessObject(BOBase):
         }
 
     @classmethod
-    def convert_from_db(cls, value, typ, subtyp):
+    async def convert_from_db(cls, value, typ, subtyp):
         "convert a value of type 'typ' read from the DB"
         # LOG.debug(
         #     f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})"
@@ -179,7 +197,14 @@ class PersistentBusinessObject(BOBase):
         if typ == BOBaseBase and isinstance(value, int):
             relation = subtyp.get("relation") if isinstance(subtyp, dict) else None
             if isinstance(relation, type) and issubclass(relation, BOBase):
-                return relation(bo_id=value)
+                objs = await relation.get_matching_objects({"id": value})
+                if len(objs) == 1:
+                    return objs[0]
+                LOG.error(
+                    "PersistentBusinessObject.convert_from_db: "
+                    f"Could not find a single object of type {relation} with id {value}. "
+                    f"Found {len(objs)} objects."
+                )
             LOG.error(
                 f"PersistentBusinessObject.convert_from_db: Cannot convert {value} to class {relation}"
             )
@@ -196,16 +221,23 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     async def sql_create_table(cls):
         "Create a DB table for this class"
+        LOG.log(VERBOSE_DEBUG, f"   collect attributes for {cls.__name__}")
+        descriptions = cls.attribute_descriptions(include_specialized=True)
+        if issubclass(cls, Personal) and "user_id" not in [
+            d.name for d in cls.attribute_descriptions()
+        ]:
+            raise TypeError(
+                f"PersistentBusinessObject.sql_create_table(): {cls.__name__} is a Personal BO but has no 'user_id' attribute"
+            )
         if issubclass(cls, Specialized):
             LOG.debug(
                 f"PersistentBusinessObject.sql_create_table(): {cls.__name__} is a Specialized BO, skipping table creation"
             )
             return
         LOG.debug(f"PersistentBusinessObject.sql_create_table(): {cls.table=}")
-        LOG.log(VERBOSE_DEBUG, f"   collect attributes for {cls.__name__}")
         async with SQLTransaction() as txaction:
             create_table: CreateTable = txaction.sql().create_table(cls.table)
-            for description in cls.attribute_descriptions(include_specialized=True):
+            for description in descriptions:
                 for line in pprint_lines(description):
                     LOG.log(VERBOSE_DEBUG, f"   - {line}")
                 create_table.column(
@@ -218,25 +250,53 @@ class PersistentBusinessObject(BOBase):
 
     @classmethod
     def _filter_conditions(
-        cls, conditions: Optional[SQLExpression] = None
+        cls, conditions: Optional[SQLExpression] = None, user: Optional[BOBase] = None
     ) -> SQLExpression | None:
+        spec_cond = None
+        user_cond = None
         if getattr(cls, "specialists", None):
-            cond = In(
-                ColumnName("bo_name"),
-                [SQLString(s.bo_type_name()) for s in cls.specialists],
-            )
-            if conditions:
-                return And([cond, conditions])
-            return cond
-        return conditions
+            if user:
+                spec_cond = In(
+                    Concat(ColumnName("bo_name"), SQLString("."), Value(user)),
+                    [
+                        Concat(
+                            SQLString(s.bo_type_name()),
+                            SQLString("."),
+                            (
+                                ColumnName("user_id")
+                                if issubclass(s, Personal)
+                                else Value(user)
+                            ),
+                        )
+                        for s in cls.specialists
+                        if not issubclass(s, AdminOnly)
+                        or getattr(user, "is_admin", False)
+                    ],
+                )
+            else:
+                spec_cond = In(
+                    ColumnName("bo_name"),
+                    [SQLString(s.bo_type_name()) for s in cls.specialists],
+                )
+        if issubclass(cls, Personal) and user is not None:
+            user_cond = Eq("user_id", Value(user))
+        conds = [c for c in [spec_cond, user_cond, conditions] if c is not None]
+        if len(conds) == 1:
+            return conds[0]
+        if len(conds) > 1:
+            return And(conds)
+        return None
 
     @classmethod
-    async def count_rows(cls, conditions: Optional[dict] = None) -> int:
+    async def count_rows(
+        cls, conditions: Optional[dict] = None, session: Optional[SessionBase] = None
+    ) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
         async with SQL() as sql:
             select = sql.select(["count(*) as count"]).from_(cls.table)
             filter_conditions: SQLExpression | None = cls._filter_conditions(
-                Filter(conditions) if conditions else None
+                Filter(conditions) if conditions else None,
+                user=session.user if session else None,
             )
             if filter_conditions:
                 select.where(filter_conditions)
@@ -248,12 +308,15 @@ class PersistentBusinessObject(BOBase):
         return result["count"]
 
     @classmethod
-    async def get_matching_ids(cls, conditions: dict | None = None):
+    async def get_matching_ids(
+        cls, conditions: dict | None = None, session: Optional[SessionBase] = None
+    ) -> list[int]:
         """Get the ids of business objects matching the conditions"""
         async with SQL() as sql:
             select = sql.select(["id"]).from_(cls.table)
             filter_conditions: SQLExpression | None = cls._filter_conditions(
-                Filter(conditions) if conditions else None
+                Filter(conditions) if conditions else None,
+                user=session.user if session else None,
             )
             if filter_conditions:
                 select.where(filter_conditions)
@@ -262,8 +325,30 @@ class PersistentBusinessObject(BOBase):
         return [id["id"] for id in result]
 
     @classmethod
+    async def get_single_matching_id(
+        cls, conditions: dict | None = None, session: Optional[SessionBase] = None
+    ) -> int | None:
+        """Get the id of a single business object matching the conditions. Raises ValueError if more than one id matches conditions."""
+        ids = await cls.get_matching_ids(conditions, session)
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"PersistentBusinessObject.get_single_matching_id({conditions=}) -> {ids=}",
+        )
+        if len(ids) == 1:
+            return ids[0]
+        if len(ids) > 1:
+            raise ValueError(
+                f"PersistentBusinessObject.get_single_matching_id: "
+                f"Multiple objects found for {cls.__name__} with conditions {conditions}"
+            )
+        return None
+
+    @classmethod
     async def get_matching_objects(
-        cls, conditions: dict | None = None, attributes: list[str] | None = None
+        cls,
+        conditions: dict | None = None,
+        attributes: list[str] | None = None,
+        session: Optional[SessionBase] = None,
     ) -> list[BOBase]:
         """Get the business objects matching the conditions"""
         if attributes:
@@ -281,7 +366,8 @@ class PersistentBusinessObject(BOBase):
         async with SQL() as sql:
             select = sql.select(cols).from_(cls.table)
             filter_conditions: SQLExpression | None = cls._filter_conditions(
-                Filter(conditions) if conditions else None
+                Filter(conditions) if conditions else None,
+                user=session.user if session else None,
             )
             if filter_conditions:
                 select.where(filter_conditions)
@@ -309,7 +395,7 @@ class PersistentBusinessObject(BOBase):
                 if description is None:
                     converted[key] = value
                     continue
-                converted[key] = cls.convert_from_db(
+                converted[key] = await cls.convert_from_db(
                     value,
                     description.data_type,
                     description.constraint_values,
@@ -324,7 +410,7 @@ class PersistentBusinessObject(BOBase):
             )
         return objects
 
-    async def fetch(self, id=None, newest=None):
+    async def fetch(self, id=None, newest=None, session: Optional[SessionBase] = None):
         """Fetch the content for a business object instance from the DB.
         If 'id' is given, fetch the identified object
         If 'id' omitted and 'newest'=True fetch the object with highest id
@@ -338,19 +424,24 @@ class PersistentBusinessObject(BOBase):
             return self
         # LOG.debug(f"fetching {self} with {id=}, {newest=}")
         async with SQL() as sql:
-            await self._fetch_self(sql, id=id, newest=newest)
+            await self._fetch_self(sql, id=id, newest=newest, session=session)
         return self
 
-    async def _fetch_self(self, sql: SQL, id=None, newest=None):
+    async def _fetch_self(
+        self, sql: SQL, id=None, newest=None, session: Optional[SessionBase] = None
+    ):
         select = sql.select([], True).from_(self.table)
         filter_conditions = self._filter_conditions(
-            Eq("id", id)
-            if id is not None
-            else (
-                SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})")
-                if newest
-                else None
-            )
+            (
+                Eq("id", id)
+                if id is not None
+                else (
+                    SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})")
+                    if newest
+                    else None
+                )
+            ),
+            user=session.user if session else None,
         )
         if filter_conditions:
             select.where(filter_conditions)
@@ -365,10 +456,12 @@ class PersistentBusinessObject(BOBase):
                 for line in pprint_lines(self._db_data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
             for description in self.attribute_descriptions():
-                self._data[description.name] = PersistentBusinessObject.convert_from_db(
-                    self._db_data.get(description.name),
-                    description.data_type,
-                    description.constraint_values,
+                self._data[description.name] = (
+                    await PersistentBusinessObject.convert_from_db(
+                        self._db_data.get(description.name),
+                        description.data_type,
+                        description.constraint_values,
+                    )
                 )
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}._fetch_self: _data=")
@@ -377,26 +470,30 @@ class PersistentBusinessObject(BOBase):
             self.register_instance(self)
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
 
-    async def store(self):
+    async def store(self, session: Optional[SessionBase] = None):
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
         if self.id is None:
-            await self._insert_self()
+            await self._insert_self(session)
         else:
-            await self._update_self()
-        await super().store()
+            await self._update_self(session)
+        await super().store(session)
 
-    async def business_values_as_dict(self) -> dict[str, Any]:
-        # LOG.debug(f"{self}.business_values_as_dict: {self.id=}")
-        await self.fetch(self.id)
-        return await super().business_values_as_dict()
+    async def business_values_as_dict(
+        self, session: Optional[SessionBase] = None
+    ) -> dict[str, Any]:
+        LOG.debug(
+            f"{self}.business_values_as_dict: {self.id=}, user={getattr(session, 'user', None)}"
+        )
+        await self.fetch(self.id, session=session)
+        return await super().business_values_as_dict(session=session)
 
-    async def _insert_self(self):
+    async def _insert_self(self, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
         if isinstance(self, Singleton):
-            existing_count = await self.count_rows()
+            existing_count = await self.count_rows(session=session)
             if existing_count > 0:
                 raise CannotStoreEmptyBO(
                     f"Cannot insert {self} as it is a Singleton and already exists in the DB"
@@ -407,7 +504,13 @@ class PersistentBusinessObject(BOBase):
         ]
         if not values_to_store:
             raise CannotStoreEmptyBO(f"Cannot store {self._data=} as it has no values")
-        LOG.debug(f"Inserting new {self} into DB")
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            for k, v in self._data.items():
+                if k != "id" and v is None:
+                    LOG.log(VERBOSE_DEBUG,f"{k=}: {v}")
+        LOG.debug(
+            f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
+        )
         async with SQLTransaction() as txaction:
             self.id = (
                 await (
@@ -420,12 +523,15 @@ class PersistentBusinessObject(BOBase):
                 ).fetchone()
             ).get("id")
             # read the new row back to get any default values set by the DB
-            await self._fetch_self(txaction.sql(), id=self.id)
+            await self._fetch_self(txaction.sql(), id=self.id, session=session)
 
-    async def _update_self(self):
+    async def _update_self(self, session: Optional[SessionBase] = None):
         assert self.id is not None, "id must not be None for update operation"
         if LOG.isEnabledFor(VERBOSE_DEBUG):
-            LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}._update_self: _data=")
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"{self.__class__.__name__}._update_self: user={session.user if session else 'N/A'}, _data=",
+            )
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
         async with SQLTransaction() as txaction:
@@ -437,7 +543,7 @@ class PersistentBusinessObject(BOBase):
                 if k not in (
                     "bo_name",
                     "id",
-                ) and v != PersistentBusinessObject.convert_from_db(
+                ) and v != await PersistentBusinessObject.convert_from_db(
                     self._db_data.get(k),
                     descriptions[k].data_type,
                     descriptions[k].constraint_values,
@@ -453,7 +559,7 @@ class PersistentBusinessObject(BOBase):
                     await update.execute()
             finally:
                 # read the row back to get any changes made by the DB (e.g. triggers)
-                await self._fetch_self(txaction.sql(), id=self.id)
+                await self._fetch_self(txaction.sql(), id=self.id, session=session)
 
 
 log_exit(LOG)

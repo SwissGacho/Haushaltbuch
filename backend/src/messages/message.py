@@ -166,7 +166,6 @@ class Message(BaseObject):
 
     async def serialize(self):
         "Serialize to JSON"
-        # LOG.debug(f"Message.serialize: message={self.message}")
         return dumps(await _serialize(self.message), default=json_encode)
 
     async def handle_message(self, connection):

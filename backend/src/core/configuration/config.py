@@ -7,10 +7,9 @@
 """
 
 import copy
-import pprint
 from typing import Optional, Any
 
-from core.app_logging import getLogger, log_exit, redact, VERBOSE_DEBUG
+from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG, pprint_lines
 from core.util_base import update_dicts_recursively
 
 LOG = getLogger(__name__)
@@ -25,10 +24,9 @@ from core.exceptions import ConfigurationError
 from core.base_objects import ConfigurationBaseClass, Config
 from business_objects.business_object_base import BOBase
 from bom_persistent.management.configuration import ApplicationConfiguration
-from bom_persistent.management.user import SingleUser, User, UserRole
+from bom_persistent.management.user import SingleUser, UserRole
 from bom_transient.cmdline_configuration import CmdlineConfiguration
 from bom_transient.file_configuration import FileConfiguration
-from database.sql_expression import ColumnName
 
 
 class AppConfiguration(ConfigurationBaseClass):
@@ -99,14 +97,9 @@ class AppConfiguration(ConfigurationBaseClass):
                 raise ConfigurationError("Multiple global configurations in DB.")
             self._global_configuration.subscribe_to_instance(self.config_change_handler)
             if LOG.isEnabledFor(VERBOSE_DEBUG):
-                LOG.log(VERBOSE_DEBUG, f"AppConfiguration.get_configuration_from_db:")
-                for line in pprint.pformat(
-                    redact(self._global_configuration.configuration_dict),
-                    indent=4,
-                    width=120,
-                    compact=True,
-                ).splitlines():
-                    LOG.log(VERBOSE_DEBUG, f" - {line}")
+                LOG.log(VERBOSE_DEBUG, "AppConfiguration.get_configuration_from_db:")
+                for line in pprint_lines(self._global_configuration.configuration_dict):
+                    LOG.log(VERBOSE_DEBUG, f"  {line}")
 
             user_mode = get_config_item(
                 self._global_configuration.configuration_dict, Config.CONFIG_APP_USRMODE
@@ -122,7 +115,7 @@ class AppConfiguration(ConfigurationBaseClass):
                 and not await SingleUser.get_matching_ids()
             ):
                 # create single user
-                LOG.info(f"Creating single user.")
+                LOG.info("Creating single user.")
                 await SingleUser(role=UserRole.ADMIN).store()
             LOG.debug(f"AppConfiguration.get_configuration_from_db: {user_mode=}")
             App.status = (
@@ -145,10 +138,8 @@ class AppConfiguration(ConfigurationBaseClass):
             )
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.debug("AppConfiguration.configuration():")
-            for line in pprint.pformat(
-                redact(cfg), indent=4, width=120, compact=True
-            ).splitlines():
-                LOG.log(VERBOSE_DEBUG, f" - {line}")
+            for line in pprint_lines(cfg):
+                LOG.log(VERBOSE_DEBUG, f"  {line}")
         return cfg
 
 

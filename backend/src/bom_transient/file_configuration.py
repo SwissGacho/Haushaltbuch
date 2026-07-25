@@ -12,6 +12,7 @@ from core.base_objects import ConfigDict
 from core.configuration.file_config import FileConfig
 from business_objects.transient_business_object import TransientBusinessObject
 from business_objects.bo_descriptors import BODict, BOStr
+from server.ws_connection_base import SessionBase
 
 
 class FileConfiguration(TransientBusinessObject):
@@ -46,7 +47,7 @@ class FileConfiguration(TransientBusinessObject):
         """A human-readable name for this business object instance, used in the frontend."""
         return "File Configuration"
 
-    async def store(self):
+    async def store(self, session: Optional[SessionBase] = None):
         """User changed the config file configuration. Adapt the configuration for this run."""
         LOG.debug("FileConfiguration.store(): Storing configuration file.")
         if self.file_path != str(FileConfig.file_config_file_path or ""):

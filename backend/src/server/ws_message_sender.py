@@ -30,8 +30,7 @@ class WSMessageSender:
 
     async def send_message(self, message):
         """Send a message to the websocket connection."""
-        # LOG.debug(f"WSMessageSender.send_message({message=})")
-        # LOG.debug(f"     {self._connection=}")
+        LOG.debug(f"WSMessageSender.send_message({message.__class__.__name__}) to {self._connection}")
         await self._connection.send_message(message)
 
 

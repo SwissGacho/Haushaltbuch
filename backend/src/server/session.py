@@ -12,12 +12,13 @@ LOG: Logger = getLogger(__name__)
 from core.app import App
 from core.base_objects import Config
 from core.exceptions import TokenExpiredError
+from server.ws_connection_base import SessionBase
 from server.ws_token import WSToken
 
 # from server.ws_connection import WS_Connection
 
 
-class Session:
+class Session(SessionBase):
     "a user session with limited lifetime"
 
     _all_sessions: list[Self] = []
@@ -32,13 +33,12 @@ class Session:
         Session._all_sessions.append(self)
         self._session_nbr = Session._next_session_nbr
         Session._next_session_nbr += 1
-        self.LOG = get_context_logger(LOG, session=self.session_id)
         self.connections = [connection]
         inactive_seconds_timeout = (
             (App.get_config_item(Config.CONFIG_APP_SESSION_TIMEOUT) or 2) * 60 * 60
         )  # default: 2 hours
         self.token = WSToken(inactive_seconds_timeout=inactive_seconds_timeout)
-        self.user: User = user
+        self._user: User = user
         self._tokens: set[WSToken] = {conn_token} if conn_token else set()
 
     @property
@@ -78,6 +78,11 @@ class Session:
         "get all connection tokens of session"
         return {token.token for token in self._tokens}
 
+    @property
+    def user(self) -> User:
+        "get user associated with session"
+        return self._user
+
     def add_connection(self, connection) -> int:
         "add a connection to session"
         if connection not in self.connections:
@@ -88,6 +93,9 @@ class Session:
         "add a connection token to session"
         if token:
             self._tokens.add(WSToken(token))
+
+    def __str__(self) -> str:
+        return f"Session[#{self._session_nbr}]"
 
     def __repr__(self) -> str:
         return (
