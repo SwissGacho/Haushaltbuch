@@ -314,7 +314,7 @@ class BODict(_PersistentAttr[dict]):
         return isinstance(value, dict)
 
 
-class BOList(_PersistentAttr[list]):
+class BODescriptorList(_PersistentAttr[list]):
 
     @classmethod
     def attribute_type(cls) -> AttributeType:

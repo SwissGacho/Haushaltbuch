@@ -10,7 +10,7 @@ from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import (
     BODatetime,
     BODict,
-    BOList,
+    BODescriptorList,
     BORelation,
     BOSelf,
     BOStr,

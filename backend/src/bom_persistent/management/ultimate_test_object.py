@@ -12,7 +12,7 @@ from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import (
     BODatetime,
     BODict,
-    BOList,
+    BODescriptorList,
     BORelation,
     BOSelf,
     BOStr,
@@ -46,7 +46,7 @@ class UltimateTestObject(PersistentBusinessObject):
     bo_datetime = BODatetime()
     bo_date = BODate()
     bo_dict = BODict()
-    bo_list = BOList()
+    bo_list = BODescriptorList()
     bo_rel = BORelation(UltimateRelatedTestObject)
     bo_rel_self = BORelation(BOSelf)
     bo_flag = BOFlag(UltimateFlag)

@@ -120,7 +120,7 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
         business_objects.bo_descriptors.BOColumnConstraint.BOC_DEFAULT,
         default={"a": 1, "b": 2},
     )
-    list_attr = business_objects.bo_descriptors.BOList()
+    list_attr = business_objects.bo_descriptors.BODescriptorList()
     rel_attr = business_objects.bo_descriptors.BORelation(MockRel)
     rel_self_attr = business_objects.bo_descriptors.BORelation(BOSelf)
     flag_attr = business_objects.bo_descriptors.BOFlag(flag_type=MockFlag)
