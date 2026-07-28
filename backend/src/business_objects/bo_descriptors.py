@@ -373,6 +373,8 @@ class BORelation(_PersistentAttr[BOBaseBase]):
                     f"Cannot convert value '{value}' to int for relation {relation}: {exc}"
                 )
         elif isinstance(value, dict) and "id" in value:
+            # when the frontend updates a relation, the related object is represented as a dict
+            LOG.debug(f"Converting dict {value} to {relation} instance")
             value = value.get("id")
         if isinstance(value, int) and isinstance(relation, type):
             value = relation(bo_id=value)
