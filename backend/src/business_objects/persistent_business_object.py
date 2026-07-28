@@ -32,7 +32,7 @@ from database.sql_expression import (
     Filter,
     Value,
 )
-from database.sql_statement import CreateTable, NamedValueListList
+from database.sql_statement import CreateTable, NamedValueListList, SQLSubquery
 from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
@@ -431,21 +431,31 @@ class PersistentBusinessObject(BOBase):
         self, sql: SQL, id=None, newest=None, session: Optional[SessionBase] = None
     ):
         select = sql.select([], True).from_(self.table)
-        filter_conditions = self._filter_conditions(
-            (
-                Eq("id", id)
-                if id is not None
-                else (
-                    SQLExpression(f"id = (SELECT MAX(id) FROM {self.table})")
-                    if newest
-                    else None
-                )
-            ),
-            user=session.user if session else None,
-        )
-        if filter_conditions:
-            select.where(filter_conditions)
-        # LOG.debug(f"BOBase._fetch_self: {select=} // {select.get_sql()=}")
+        if id is not None:
+            filter_conditions = self._filter_conditions(
+                Eq("id", id), user=session.user if session else None
+            )
+            if filter_conditions:
+                select.where(filter_conditions)
+        elif newest:
+            subselect = SQL().select(["MAX(id) as max_id"]).from_(self.table)
+            filter_conditions = self._filter_conditions(
+                user=session.user if session else None,
+            )
+            if filter_conditions:
+                subselect.where(filter_conditions)
+            select.where(Eq("id", SQLSubquery(subselect)))
+        else:
+            raise ValueError(
+                "PersistentBusinessObject._fetch_self: id or newest must be provided"
+            )
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"PersistentBusinessObject._fetch_self: {self.__class__.__name__} {self.id=}, {id=}, {newest=}, {session.user if session else 'N/A'}",
+            )
+            for line in pprint_lines(select.get_sql()):
+                LOG.log(VERBOSE_DEBUG, f"   {line}")
         self._db_data = await (await select.execute()).fetchone()
 
         if self._db_data:
@@ -507,7 +517,7 @@ class PersistentBusinessObject(BOBase):
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             for k, v in self._data.items():
                 if k != "id" and v is None:
-                    LOG.log(VERBOSE_DEBUG,f"{k=}: {v}")
+                    LOG.log(VERBOSE_DEBUG, f"{k=}: {v}")
         LOG.debug(
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )
