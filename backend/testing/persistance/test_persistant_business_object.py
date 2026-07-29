@@ -5,12 +5,12 @@ import json
 import unittest
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
+from business_objects.bo_mixin import Specialized
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
 from business_objects.persistent_business_object import (
     PersistentBusinessObject,
-    Specialized,
 )
 from business_objects.bo_descriptors import (
     BOStr,
@@ -403,7 +403,13 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_sql.rows = Mock(return_value=self.mock_sql)
         self.mock_sql.returning = Mock(return_value=self.mock_sql)
         self.mock_sql.assignment = Mock(return_value=self.mock_sql)
-        self.MockSQL = Mock(name="MockSQL", return_value=self.mock_sql)
+        self.mock_subsql = Mock(name="mock_subsql")
+        self.mock_subsql.select = Mock(return_value=self.mock_subsql)
+        self.mock_subsql.from_ = Mock(return_value=self.mock_subsql)
+        self.mock_subsql.where = Mock(return_value=self.mock_subsql)
+        self.MockSQL = Mock(
+            name="MockSQL", side_effect=[self.mock_sql, self.mock_subsql]
+        )
 
         self.mock_tx = AsyncMock(name="mock_transaction")
         self.mock_tx.__aenter__ = AsyncMock(return_value=self.mock_tx)
@@ -424,13 +430,26 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             patch(
                 "business_objects.persistent_business_object." + patch_exp
             ) as MockExp,
+            patch(
+                "business_objects.persistent_business_object.SQLSubquery"
+            ) as MockSubquery,
         ):
+            mock_subselect = Mock(name="mock_subselect")
+            MockSubquery.return_value = self.mock_subsql
             if newest == DEFAULT:
                 result = await self.mock_bo.fetch()
             else:
                 result = await self.mock_bo.fetch(newest=newest)
 
-            self.MockSQL.assert_called_once_with()
+            if newest and newest is not DEFAULT:
+                MockSubquery.assert_called_once_with(self.mock_subsql)
+                self.mock_subsql.select.assert_called_once_with(["MAX(id) as max_id"])
+                self.mock_subsql.from_.assert_called_once_with(MOCK_TAB2)
+                self.mock_subsql.where.assert_not_called()
+                self.assertEqual(self.MockSQL.call_args_list, [call(), call()])
+            else:
+                MockSubquery.assert_not_called()
+                self.MockSQL.assert_called_once_with()
             self.mock_sql.__aenter__.assert_awaited_once_with()
             self.mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
             self.mock_sql.select.assert_called_once_with([], True)
@@ -466,7 +485,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_202_fetch_newest(self):
         await self._202_fetch(
-            "SQLExpression", (f"id = (SELECT MAX(id) FROM {MOCK_TAB2})",), newest=True
+            "Eq", (f"id = (SELECT MAX(id) FROM {MOCK_TAB2})",), newest=True
         )
 
     async def test_203_store_insert(self):
@@ -502,7 +521,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 new=self.MockSQLTx,
             ),
             patch(
-                "business_objects.persistent_business_object.PersistentBusinessObject._fetch_self"
+                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
             ) as mock_fetch_self,
         ):
             mock_bo = MockPersistentBO2(**mock_attrs)
@@ -556,7 +575,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 new=mock_convert_from_db,
             ),
             patch(
-                "business_objects.persistent_business_object.PersistentBusinessObject._fetch_self"
+                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
             ) as mock_fetch_self,
             patch(
                 "business_objects.persistent_business_object.datetime"

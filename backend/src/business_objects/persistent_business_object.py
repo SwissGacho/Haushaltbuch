@@ -33,47 +33,11 @@ from database.sql_expression import (
     Value,
 )
 from database.sql_statement import CreateTable, NamedValueListList, SQLSubquery
+from business_objects.bo_mixin import AdminOnly, Personal, Singleton, Specialized
 from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
 from server.ws_connection_base import SessionBase
-
-
-class Specialized:
-    """Mixin class for specialized business objects.
-    BOs derived from a specialized BO are considered
-    to be a specialization without using this Mixin.
-
-    Use it like this:
-    class MyGenericBO(PersistentBusinessObject):
-        ...
-    class MySpecializedBO( Specialized, MyGenericBO):
-        ...
-    class MyVerySpecializedBO(MySpecializedBO):
-        ...
-    """
-
-
-class Singleton:
-    """Mixin class for singleton business objects.
-    Singleton BOs are BOs of which there should only be one instance in the database.
-    """
-
-
-class Personal:
-    """Mixin class for personal business objects.
-    Personal BOs are BOs that are specific to a user and have a user_id attribute.
-    Personal BOs are only accessible to the user they belong to and are not visible to other users.
-    """
-
-
-class AdminOnly:
-    """Mixin class for admin-only business objects.
-    Admin-only BOs are BOs that are only accessible to users with the admin role.
-    Admin-only BOs are not visible to other users.
-    """
-
-    ADMIN_ONLY = True
 
 
 class PersistentBusinessObject(BOBase):
@@ -416,7 +380,9 @@ class PersistentBusinessObject(BOBase):
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
-        # LOG.debug(f"PersistentBusinessObject.fetch({id=}, {newest=})")
+        LOG.debug(f"PersistentBusinessObject.fetch({id=}, {newest=})")
+        if mixin := getattr(self, "fetch_mixin", None):
+            return await mixin(id=id, newest=newest, session=session)
         if id is None:
             id = self.id
         if id is None and newest is None:
@@ -424,10 +390,10 @@ class PersistentBusinessObject(BOBase):
             return self
         # LOG.debug(f"fetching {self} with {id=}, {newest=}")
         async with SQL() as sql:
-            await self._fetch_self(sql, id=id, newest=newest, session=session)
+            await self.fetch_self(sql, id=id, newest=newest, session=session)
         return self
 
-    async def _fetch_self(
+    async def fetch_self(
         self, sql: SQL, id=None, newest=None, session: Optional[SessionBase] = None
     ):
         select = sql.select([], True).from_(self.table)
@@ -447,12 +413,12 @@ class PersistentBusinessObject(BOBase):
             select.where(Eq("id", SQLSubquery(subselect)))
         else:
             raise ValueError(
-                "PersistentBusinessObject._fetch_self: id or newest must be provided"
+                "PersistentBusinessObject.fetch_self: id or newest must be provided"
             )
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(
                 VERBOSE_DEBUG,
-                f"PersistentBusinessObject._fetch_self: {self.__class__.__name__} {self.id=}, {id=}, {newest=}, {session.user if session else 'N/A'}",
+                f"PersistentBusinessObject.fetch_self: {self.__class__.__name__} {self.id=}, {id=}, {newest=}, {session.user if session else 'N/A'}",
             )
             for line in pprint_lines(select.get_sql()):
                 LOG.log(VERBOSE_DEBUG, f"   {line}")
@@ -461,7 +427,7 @@ class PersistentBusinessObject(BOBase):
         if self._db_data:
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(
-                    VERBOSE_DEBUG, f"{self.__class__.__name__}._fetch_self: _db_data="
+                    VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _db_data="
                 )
                 for line in pprint_lines(self._db_data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
@@ -474,7 +440,7 @@ class PersistentBusinessObject(BOBase):
                     )
                 )
             if LOG.isEnabledFor(VERBOSE_DEBUG):
-                LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}._fetch_self: _data=")
+                LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _data=")
                 for line in pprint_lines(self._data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
             self.register_instance(self)
@@ -533,7 +499,7 @@ class PersistentBusinessObject(BOBase):
                 ).fetchone()
             ).get("id")
             # read the new row back to get any default values set by the DB
-            await self._fetch_self(txaction.sql(), id=self.id, session=session)
+            await self.fetch_self(txaction.sql(), id=self.id, session=session)
 
     async def _update_self(self, session: Optional[SessionBase] = None):
         assert self.id is not None, "id must not be None for update operation"
@@ -569,7 +535,7 @@ class PersistentBusinessObject(BOBase):
                     await update.execute()
             finally:
                 # read the row back to get any changes made by the DB (e.g. triggers)
-                await self._fetch_self(txaction.sql(), id=self.id, session=session)
+                await self.fetch_self(txaction.sql(), id=self.id, session=session)
 
 
 log_exit(LOG)
