@@ -5,7 +5,8 @@ application's data model."""
 
 import copy
 import json
-from typing import Any, Type, Self, Optional
+from inspect import iscoroutinefunction
+from typing import Any, Type, Self, Optional, cast
 from datetime import date, datetime, UTC
 from core.app_logging import (
     getLogger,
@@ -21,21 +22,11 @@ LOG = getLogger(__name__)
 from core.exceptions import CannotStoreEmptyBO
 from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
-from database.sql_expression import (
-    SQLExpression,
-    Concat,
-    ColumnName,
-    SQLString,
-    And,
-    In,
-    Eq,
-    Filter,
-    Value,
-)
+from database.sql_expression import SQLExpression, And, Eq, Filter, Value
 from database.sql_statement import CreateTable, NamedValueListList, SQLSubquery
-from business_objects.bo_mixin import AdminOnly, Personal, Singleton, Specialized
 from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
+from business_objects.bo_mixin import MixinBase
 from business_objects.business_attribute_base import BaseFlag
 from server.ws_connection_base import SessionBase
 
@@ -52,7 +43,7 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def is_specializing(cls: Type[Self]) -> bool:
         """Return True if this class is a specialization of another business object class."""
-        return issubclass(cls, Specialized) and cls is not Specialized
+        return bool((b := getattr(super(), "is_specializing", None)) and b())
 
     @classmethod
     def register_bo_class(cls):
@@ -187,15 +178,10 @@ class PersistentBusinessObject(BOBase):
         "Create a DB table for this class"
         LOG.log(VERBOSE_DEBUG, f"   collect attributes for {cls.__name__}")
         descriptions = cls.attribute_descriptions(include_specialized=True)
-        if issubclass(cls, Personal) and "user_id" not in [
-            d.name for d in cls.attribute_descriptions()
-        ]:
-            raise TypeError(
-                f"PersistentBusinessObject.sql_create_table(): {cls.__name__} is a Personal BO but has no 'user_id' attribute"
-            )
-        if issubclass(cls, Specialized):
+
+        if hasattr(cls, "skip_create_table") and cls.skip_create_table():
             LOG.debug(
-                f"PersistentBusinessObject.sql_create_table(): {cls.__name__} is a Specialized BO, skipping table creation"
+                f"PersistentBusinessObject.sql_create_table(): {cls.__name__} has no specific table, skipping creation"
             )
             return
         LOG.debug(f"PersistentBusinessObject.sql_create_table(): {cls.table=}")
@@ -216,35 +202,9 @@ class PersistentBusinessObject(BOBase):
     def _filter_conditions(
         cls, conditions: Optional[SQLExpression] = None, user: Optional[BOBase] = None
     ) -> SQLExpression | None:
-        spec_cond = None
-        user_cond = None
-        if getattr(cls, "specialists", None):
-            if user:
-                spec_cond = In(
-                    Concat(ColumnName("bo_name"), SQLString("."), Value(user)),
-                    [
-                        Concat(
-                            SQLString(s.bo_type_name()),
-                            SQLString("."),
-                            (
-                                ColumnName("user_id")
-                                if issubclass(s, Personal)
-                                else Value(user)
-                            ),
-                        )
-                        for s in cls.specialists
-                        if not issubclass(s, AdminOnly)
-                        or getattr(user, "is_admin", False)
-                    ],
-                )
-            else:
-                spec_cond = In(
-                    ColumnName("bo_name"),
-                    [SQLString(s.bo_type_name()) for s in cls.specialists],
-                )
-        if issubclass(cls, Personal) and user is not None:
-            user_cond = Eq("user_id", Value(user))
-        conds = [c for c in [spec_cond, user_cond, conditions] if c is not None]
+        cond_list: list[SQLExpression] = [conditions] if conditions else []
+        cond_list += MixinBase.special_conditions(gen_cls=cls, user=user)
+        conds = [c for c in cond_list if c is not None]
         if len(conds) == 1:
             return conds[0]
         if len(conds) > 1:
@@ -380,8 +340,8 @@ class PersistentBusinessObject(BOBase):
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the oject is not found in the DB return the instance unchanged
         """
-        LOG.debug(f"PersistentBusinessObject.fetch({id=}, {newest=})")
-        if mixin := getattr(self, "fetch_mixin", None):
+        LOG.log(VERBOSE_DEBUG, f"PersistentBusinessObject.fetch({id=}, {newest=})")
+        if (mixin := getattr(self, "fetch_mixin", None)) and iscoroutinefunction(mixin):
             return await mixin(id=id, newest=newest, session=session)
         if id is None:
             id = self.id
@@ -451,10 +411,16 @@ class PersistentBusinessObject(BOBase):
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
-        if self.id is None:
-            await self._insert_self(session)
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"{self.__class__.__name__}.store({session.user if session else 'N/A'})",
+        )
+        if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(mixin):
+            await mixin(session=session)
+        elif self.id is None:
+            await self.insert_self(session)
         else:
-            await self._update_self(session)
+            await self.update_self(session)
         await super().store(session)
 
     async def business_values_as_dict(
@@ -466,14 +432,8 @@ class PersistentBusinessObject(BOBase):
         await self.fetch(self.id, session=session)
         return await super().business_values_as_dict(session=session)
 
-    async def _insert_self(self, session: Optional[SessionBase] = None):
+    async def insert_self(self, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
-        if isinstance(self, Singleton):
-            existing_count = await self.count_rows(session=session)
-            if existing_count > 0:
-                raise CannotStoreEmptyBO(
-                    f"Cannot insert {self} as it is a Singleton and already exists in the DB"
-                )
         self.bo_name = self.bo_type_name()
         values_to_store: NamedValueListList = [
             (k, v) for k, v in self._data.items() if k != "id" and v is not None
@@ -501,7 +461,7 @@ class PersistentBusinessObject(BOBase):
             # read the new row back to get any default values set by the DB
             await self.fetch_self(txaction.sql(), id=self.id, session=session)
 
-    async def _update_self(self, session: Optional[SessionBase] = None):
+    async def update_self(self, session: Optional[SessionBase] = None):
         assert self.id is not None, "id must not be None for update operation"
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(

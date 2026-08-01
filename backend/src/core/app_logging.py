@@ -121,7 +121,7 @@ def redact(value: Any) -> Any:
             return json.dumps(redact(json.loads(value)))
         except json.JSONDecodeError:
             pass
-    return value
+    return str(value)
 
 
 def pprint_lines(value: Any, width=120) -> list[str]:
