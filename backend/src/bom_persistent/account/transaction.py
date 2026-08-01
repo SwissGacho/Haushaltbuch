@@ -1,12 +1,12 @@
 """Transaction, representing a single financial transaction from one account to another"""
 
-from .transaction_item import TransactionItem
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
 from business_objects.bo_semantic_role import BOSemanticRole
-from business_objects.business_attribute_base import BaseFlag
+from business_objects.persistent_business_object import PersistentBusinessObject
+from bom_persistent.account.category import Category
 from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import (
     BODatetime,
@@ -43,23 +43,16 @@ class Transaction(PersistentBusinessObject):
                 "No debit or credit account specified. At least one must be specified."
             )
         if not self.debit_account:
-            default_debit_account = await DefaultDebitAccount().fetch(newest=True)
-            await default_debit_account.store()
-            if default_debit_account:
-                self.debit_account = default_debit_account
-            else:
-                raise RuntimeError(
-                    "No debit account specified and no default debit account found."
-                )
+            self.debit_account = await DefaultDebitAccount().fetch_singleton()
         if not self.credit_account:
-            default_credit_account = await DefaultCreditAccount().fetch(newest=True)
-            await default_credit_account.store()
-            if default_credit_account:
-                self.credit_account = default_credit_account
-            else:
-                raise RuntimeError(
-                    "No credit account specified and no default credit account found."
-                )
+            self.credit_account = await DefaultCreditAccount().fetch_singleton()
+
+
+class TransactionItem(PersistentBusinessObject):
+    transaction = BORelation(Transaction)
+    amount = BODecimal()
+    category = BORelation(Category)
+    description = BOStr()
 
 
 log_exit(LOG)

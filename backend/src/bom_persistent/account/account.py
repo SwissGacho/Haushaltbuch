@@ -9,7 +9,9 @@ from business_objects.business_attribute_base import BaseFlag
 from business_objects.persistent_business_object import (
     PersistentBusinessObject,
     Singleton,
+    Specialized,
 )
+
 from business_objects.bo_descriptors import (
     BODatetime,
     BODict,
@@ -30,18 +32,12 @@ class Account(PersistentBusinessObject):
     is_root_bo: bool = True
 
 
-class DefaultDebitAccount(Account, Singleton):
+class DefaultDebitAccount(Specialized, Singleton, Account):
     """A default debit account, used when no debit account is specified in a transaction"""
 
-    is_root_bo: bool = False
-    is_specializing: bool = True
 
-
-class DefaultCreditAccount(Account, Singleton):
+class DefaultCreditAccount(Specialized, Singleton, Account):
     """A default credit account, used when no credit account is specified in a transaction"""
-
-    is_root_bo: bool = False
-    is_specializing: bool = True
 
 
 log_exit(LOG)
