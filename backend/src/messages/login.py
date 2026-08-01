@@ -8,6 +8,7 @@ from core.app_logging import get_context_logger, getLogger, log_exit, Logger
 LOG: Logger = getLogger(__name__)
 
 from core.validation import check_login
+from core.exceptions import TokenExpiredError
 from server.ws_token import WSToken
 from server.session import Session
 from messages.message import Message, MessageType, MessageAttribute
@@ -62,6 +63,8 @@ class LoginMessage(Message):
             )
         except PermissionError:
             await connection.abort_connection(reason="Access denied")
+        except TokenExpiredError:
+            await connection.abort_connection(reason="Session expired")
         except ValueError as exc:
             raise RuntimeError("Login Failure.") from exc
 

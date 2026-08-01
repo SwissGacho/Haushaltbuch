@@ -10,7 +10,13 @@ from typing import Any, Coroutine, Type, TypeAlias, Optional, Callable, Self
 import weakref
 import copy
 
-from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    VERBOSE_DEBUG,
+    pprint_lines,
+    callable_name,
+)
 
 LOG = getLogger(__name__)
 
@@ -27,6 +33,7 @@ from business_objects.bo_descriptors import (
     BODatetime,
 )
 from business_objects.bo_semantic_role import BOSemanticRole
+from server.ws_connection_base import SessionBase
 
 BOCallback: TypeAlias = Callable[["BOBase"], Coroutine[Any, Any, None]]
 
@@ -87,10 +94,21 @@ class BOBase(BOBaseBase):
         cls._change_subscribers = {}
 
     # pylint: disable=redefined-builtin, unused-argument
-    def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
+    def __init__(
+        self,
+        *args,
+        bo_id: int | None = None,
+        session: Optional[SessionBase] = None,
+        **attributes,
+    ) -> None:
         LOG.debug(
-            f"{self.__class__.__name__}.__init__({bo_id=},{attributes})  "
-            f"-  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}"
+            f"{self.__class__.__name__}.__init__({bo_id=},{session=},attributes:)"
+        )
+        for line in pprint_lines(attributes):
+            LOG.debug(f"    {line}")
+        LOG.log(
+            VERBOSE_DEBUG,
+            f" -  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}",
         )
         if getattr(self, "_initialized", False):
             LOG.debug(
@@ -328,7 +346,10 @@ class BOBase(BOBaseBase):
 
     @classmethod
     async def get_matching_objects(
-        cls, conditions: dict | None = None, attributes: list[str] | None = None
+        cls,
+        conditions: dict | None = None,
+        attributes: list[str] | None = None,
+        session: Optional[SessionBase] = None,
     ) -> list["BOBase"]:
         """Get the business objects matching the conditions"""
         raise NotImplementedError("get_matching_objects not implemented")
@@ -371,8 +392,11 @@ class BOBase(BOBaseBase):
         cls._change_subscribers[subscriber_id] = callback
         LOG.log(
             VERBOSE_DEBUG,
-            f"BOBase.subscribe_to_all_changes: Subscribed callback '{repr(callback)}' "
-            f"with id {subscriber_id} to all changes on {cls.__name__}",
+            f"BOBase.subscribe_to_all_changes: Subscribed callback '{callable_name(callback)}' ",
+        )
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"    with id {subscriber_id} to all changes on {cls.__name__}",
         )
         BOBase.subscriptions_report()
         return subscriber_id
@@ -400,8 +424,11 @@ class BOBase(BOBaseBase):
         subscriber_id: int = next(self._instance_subscriber_id)
         LOG.log(
             VERBOSE_DEBUG,
-            f"BOBase.subscribe_to_instance: Subscribing callback '{repr(callback)}' "
-            f"with id {subscriber_id} to instance {str(self)} with id {self.id}",
+            f"BOBase.subscribe_to_instance: Subscribing callback '{callable_name(callback)}' ",
+        )
+        LOG.log(
+            VERBOSE_DEBUG,
+            f" -  with id {subscriber_id} to instance {str(self)} with id {self.id}",
         )
         self._instance_subscribers[subscriber_id] = callback
         BOBase.subscriptions_report()
@@ -422,31 +449,33 @@ class BOBase(BOBaseBase):
         del self._instance_subscribers[callback_id]
         BOBase.subscriptions_report()
 
-    async def business_values_as_dict(self) -> dict[str, Any]:
+    async def business_values_as_dict(
+        self, session: Optional[SessionBase] = None
+    ) -> dict[str, Any]:
         "dict of BO attribute values with attribute names as keys"
 
         value_dict = {k: v for k, v in self._data.items() if k not in ("bo_type")}
         return value_dict
 
     # removed unused code to avoid warnings in TransientBusinessObject classes
-    # async def fetch(self, id=None, newest=None):
+    # async def fetch(self, id=None, newest=None, session: Optional[SessionBase] = None):
     #     """Fetch the business object from the database by id.
     #     If 'id' is None, fetch the latest version of the object.
     #     If 'newest' is True, fetch the latest version of the object.
     #     """
     #     raise NotImplementedError("fetch not implemented")
 
-    async def store(self):
+    async def store(self, session: Optional[SessionBase] = None):
         """Store pending changes to the business object.
         In addition, the instance subscribers are notified.
         """
         self.notify_instance_subscribers()
         self.__class__.notify_change_subscribers(self)
 
-    async def _insert_self(self):
+    async def _insert_self(self, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
 
-    async def _update_self(self):
+    async def _update_self(self, session: Optional[SessionBase] = None):
         assert self.id is not None, "id must not be None for update operation"
 
     def notify_instance_subscribers(self):

@@ -1,4 +1,4 @@
-"""Manage DB schema versins and check compatibility"""
+"""Manage DB schema versions and check compatibility"""
 
 from graphlib import TopologicalSorter
 

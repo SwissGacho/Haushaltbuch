@@ -5,7 +5,7 @@
 """
 
 import pprint
-from typing import Any
+from typing import Any, Optional
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
@@ -14,6 +14,7 @@ LOG = getLogger(__name__)
 from business_objects.business_object_base import BOBase
 from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.transient_business_object import TransientBusinessObject
+from server.ws_connection_base import SessionBase
 
 
 class NavigationHeaders(TransientBusinessObject):
@@ -46,7 +47,9 @@ class NavigationHeaders(TransientBusinessObject):
                 navigation_list.append(header)
         return navigation_list
 
-    async def business_values_as_dict(self) -> dict[str, Any]:
+    async def business_values_as_dict(
+        self, session: Optional[SessionBase] = None
+    ) -> dict[str, Any]:
         LOG.debug(
             f"{str(self)}.business_values_as_dict: parent "
             f"BO={self._parent_bo.__name__ if self._parent_bo else None}"

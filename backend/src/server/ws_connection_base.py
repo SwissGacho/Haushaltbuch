@@ -1,6 +1,15 @@
 """Base class for WebSocket connections"""
 
 
+class SessionBase:
+    "a user session with limited lifetime"
+
+    @property
+    def user(self):
+        "get user associated with session"
+        raise NotImplementedError()
+
+
 class WSConnectionBase:
     "Base class for WebSocket connections"
 

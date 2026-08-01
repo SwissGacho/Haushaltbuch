@@ -35,6 +35,11 @@ class GenericUser(PersistentBusinessObject):
     ) -> dict[str, str] | None:
         return {"name": "genericuser", "display_name": "User"}
 
+    @property
+    def is_admin(self) -> bool:
+        """Check if the user has admin role"""
+        return UserRole.ADMIN in self.role
+
 
 class SingleUser(Specialized, Singleton, GenericUser):
     "Persistent user object for single-user mode"
