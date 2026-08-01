@@ -1,6 +1,8 @@
 """Testsuite testing the importing of the aiosqlite library"""
 
 import sys, types
+import importlib
+from decimal import Decimal
 import unittest
 from unittest.mock import Mock, PropertyMock, MagicMock, AsyncMock, patch, call
 
@@ -49,4 +51,26 @@ class SQLiteImport(unittest.TestCase):
 
             self.assertIsInstance(
                 database.dbms.sqlite.AIOSQLITE_IMPORT_ERROR, ModuleNotFoundError
+            )
+
+    def test_102_register_decimal_adapter_and_converter(self):
+        mock_sqlite3 = types.ModuleType("sqlite3")
+        mock_sqlite3.register_adapter = Mock(name="register_adapter")
+        mock_sqlite3.register_converter = Mock(name="register_converter")
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "aiosqlite": types.ModuleType("aiosqlite"),
+                "sqlite3": mock_sqlite3,
+            },
+        ):
+            restore_sys_modules("database.dbms.sqlite")
+            import database.dbms.sqlite as sqlite_mod
+
+            sqlite_mod = importlib.reload(sqlite_mod)
+
+            mock_sqlite3.register_adapter.assert_any_call(Decimal, sqlite_mod._adapt_decimal)
+            mock_sqlite3.register_converter.assert_any_call(
+                sqlite_mod.SQLITE_DECIMAL_TYPE, sqlite_mod._convert_decimal
             )

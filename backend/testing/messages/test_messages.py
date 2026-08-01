@@ -2,7 +2,7 @@
 
 import unittest
 from json import dumps, loads
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from messages.message import Message, MessageType, MessageAttribute
 
@@ -211,3 +211,137 @@ class Test_100_Message(unittest.IsolatedAsyncioTestCase):
                 },
             },
         )
+
+    async def test_116_serialize_with_decimal(self):
+        from decimal import Decimal
+
+        message = Message()
+        test_decimal = Decimal("123.45")
+        message.add({"decimal_field": test_decimal})
+        serialized = await message.serialize()
+        deserialized = loads(serialized)
+        # Decimal is converted to string
+        self.assertIsInstance(deserialized["decimal_field"], str)
+        self.assertEqual(deserialized["decimal_field"], "123.45")
+
+    async def test_117_serialize_reraises_value_error_and_redacts_logs(self):
+        message = Message()
+        message.add({"payload": {"secret": "top-secret"}})
+
+        with (
+            patch(
+                "messages.message._serialize",
+                new=AsyncMock(side_effect=ValueError("boom")),
+            ),
+            patch(
+                "messages.message.redact", side_effect=lambda value: "<redacted>"
+            ) as mock_redact,
+            patch("messages.message.LOG") as mock_log,
+        ):
+            mock_log.isEnabledFor.return_value = True
+            with self.assertRaises(ValueError):
+                await message.serialize()
+
+        mock_log.error.assert_called_once()
+        self.assertGreaterEqual(mock_log.log.call_count, 3)
+        self.assertEqual(
+            mock_log.error.call_args.args[0],
+            "Error serializing message (ValueError). Enable VERBOSE_DEBUG for redacted details.",
+        )
+        self.assertNotIn("boom", mock_log.error.call_args.args[0])
+        self.assertTrue(
+            any(
+                call.args and isinstance(call.args[0], ValueError)
+                for call in mock_redact.call_args_list
+            )
+        )
+        mock_redact.assert_any_call(message.message)
+        mock_redact.assert_any_call(None)
+
+    async def test_118_serialize_reraises_type_error_and_redacts_logs(self):
+        message = Message()
+        message.add({"payload": {"secret": "top-secret"}})
+
+        with (
+            patch(
+                "messages.message._serialize",
+                new=AsyncMock(side_effect=TypeError("boom")),
+            ),
+            patch(
+                "messages.message.redact", side_effect=lambda value: "<redacted>"
+            ) as mock_redact,
+            patch("messages.message.LOG") as mock_log,
+        ):
+            mock_log.isEnabledFor.return_value = True
+            with self.assertRaises(TypeError):
+                await message.serialize()
+
+        mock_log.error.assert_called_once()
+        self.assertGreaterEqual(mock_log.log.call_count, 3)
+        self.assertEqual(
+            mock_log.error.call_args.args[0],
+            "Error serializing message (TypeError). Enable VERBOSE_DEBUG for redacted details.",
+        )
+        self.assertNotIn("boom", mock_log.error.call_args.args[0])
+        self.assertTrue(
+            any(
+                call.args and isinstance(call.args[0], TypeError)
+                for call in mock_redact.call_args_list
+            )
+        )
+        mock_redact.assert_any_call(message.message)
+        mock_redact.assert_any_call(None)
+
+    async def test_119_handle_message_logs_redacted_payload(self):
+        message = Message()
+        message.add({"payload": {"password": "secret"}})
+
+        with (
+            patch("messages.message.redact", return_value="<redacted>") as mock_redact,
+            patch("messages.message.LOG") as mock_log,
+        ):
+            await message.handle_message(connection=object())
+
+        mock_redact.assert_called_once_with(message.message)
+        mock_log.error.assert_called_once_with("received unknown message (<redacted>)")
+
+    def test_120_message_constructor_debug_is_redacted(self):
+        with (
+            patch("messages.message.LOG") as mock_log,
+            patch(
+                "messages.message.redact", side_effect=lambda value: "<redacted>"
+            ) as mock_redact,
+        ):
+            messageString = dumps(
+                {
+                    MessageAttribute.WS_ATTR_TYPE: "testType",
+                    MessageAttribute.WS_ATTR_TOKEN: "token123",
+                    MessageAttribute.WS_ATTR_PAYLOAD: {"nested": {"value": 123}},
+                }
+            )
+            kwarg = {"extra": "data"}
+            message = Message(
+                messageString,
+                kwargs=kwarg,
+            )
+        mock_log.debug.assert_called_once()
+        mock_redact.assert_any_call(messageString)
+        mock_redact.assert_any_call({"kwargs": kwarg})
+
+    async def test_121_serialize_does_not_log_when_verbose_debug_disabled(self):
+        message = Message()
+        message.add({"payload": {"secret": "top-secret"}})
+
+        with (
+            patch("messages.message.LOG") as mock_log,
+            patch(
+                "messages.message._serialize",
+                new=AsyncMock(side_effect=ValueError("boom")),
+            ),
+        ):
+            mock_log.isEnabledFor.return_value = False
+            with self.assertRaises(ValueError):
+                await message.serialize()
+
+        mock_log.error.assert_called_once()
+        mock_log.log.assert_not_called()

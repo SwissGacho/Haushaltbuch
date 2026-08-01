@@ -9,7 +9,7 @@ from business_objects.bo_descriptors import (
     AttributeType,
     BOFlag,
     BOStr,
-    BOList,
+    BODescriptorList,
     BORelation,
 )
 
@@ -30,7 +30,7 @@ class MockBO(BOBase):
 
     # Really should mock attribute_descriptions instead...
     mock_str = BOStr()
-    mock_list = BOList()
+    mock_list = BODescriptorList()
     mock_relation = BORelation(OtherMockBO)
     mock_flag = BOFlag(MockBOFlag)
 

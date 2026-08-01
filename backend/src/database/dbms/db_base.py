@@ -1,6 +1,7 @@
 """Base class for DB connections"""
 
-from typing import Any, Self, Optional, Protocol, AsyncContextManager
+from typing import Any, NamedTuple, Self, Optional, Protocol, AsyncContextManager
+from decimal import Decimal, InvalidOperation, Context as DecimalContext, setcontext
 import re
 import json
 
@@ -24,19 +25,75 @@ from database.sql_statement import SQLTemplate
 from database.sql_clause import SQLColumnDefinition
 
 
+class DecimalCapabilities(NamedTuple):
+    max_total_digits: int
+    max_decimal_scale: int
+
+
 class DB(DBBaseClass):
     "application Data Base"
 
-    def __init__(self, **cfg) -> None:
+    DECIMAL_CAPABILITIES: DecimalCapabilities | None = None
+
+    def __init__(self, decimal_context: DecimalContext | None = None, **cfg) -> None:
         self._cfg = cfg
         if LOG.isEnabledFor(DEBUG):
             LOG.debug(f"DB.__init__: cfg={redact(cfg)}")
+
         self.db_connections = set()
+        if decimal_context is not None:
+            self.configure_decimal_context(decimal_context)
 
     @property
     def sql_factory(self):
         "DB specific SQL factory"
         raise NotImplementedError("sqlFactory not defined on base class")
+
+    @property
+    def decimal_capabilities(self) -> DecimalCapabilities:
+        "Decimal capabilities of the underlying DBMS"
+        caps = self.__class__.DECIMAL_CAPABILITIES
+        if caps is None:
+            raise NotImplementedError(
+                "DECIMAL_CAPABILITIES not defined on DB implementation class"
+            )
+        return caps
+
+    @classmethod
+    def validate_decimal(cls, value: Decimal) -> bool:
+        "validate a Decimal value against the DB's supported precision and scale"
+        caps = cls.DECIMAL_CAPABILITIES
+        LOG.debug(f"DB.validate_decimal: {value=}, {caps=}")
+        if caps is None:
+            LOG.error("DECIMAL_CAPABILITIES not defined on DB implementation class")
+            raise NotImplementedError(
+                "DECIMAL_CAPABILITIES not defined on DB implementation class"
+            )
+
+        quantizer = Decimal(1).scaleb(-caps.max_decimal_scale)
+        LOG.debug(f"{quantizer=}")
+        try:
+            quantized = value.quantize(quantizer)
+        except (InvalidOperation, ValueError):
+            return False
+        if quantized != value:
+            return False
+
+        LOG.debug(f"{quantized=}")
+        scaled = int(quantized * (10**caps.max_decimal_scale))
+        LOG.debug(f"{scaled=}, Max: {10 ** (caps.max_total_digits)=}")
+        return abs(scaled) < 10 ** (caps.max_total_digits)
+
+    def configure_decimal_context(self, decimal_context: DecimalContext):
+        """Configure the decimal context according to the DB's capabilities.
+        Mutates 'decimal_context' in place (e.g. decimal.DefaultContext, used as the
+        template for contexts lazily created later) *and* activates it as the current
+        context immediately via setcontext(), since a context may already have been
+        materialized for the calling thread/task before this runs, in which case
+        mutating the template alone would not affect it."""
+        caps = self.decimal_capabilities
+        decimal_context.prec = caps.max_total_digits
+        setcontext(decimal_context)
 
     def check_column(self, tab, col, name, data_type, constraint, **pars):
         "check compatibility of a DB column with a business object attribute"
@@ -113,6 +170,16 @@ class DB(DBBaseClass):
         """Open a connection, execute a query and return the Cursor instance.
         If 'close'=True close connection after fetching all rows"""
         # LOG.debug(f"DB.execute: {query=}, {params=}, {close=}, {commit=} {connection=}")
+
+        if params is not None:
+            for param in params.values():
+                if isinstance(param, Decimal):
+                    valid = self.__class__.validate_decimal(param)
+                    if not valid:
+                        raise ValueError(
+                            f"Decimal value {param} does not meet {self.__class__.__name__} decimal precision requirements."
+                        )
+
         return await (connection or await self.connect()).execute(
             query=query, params=params
         )

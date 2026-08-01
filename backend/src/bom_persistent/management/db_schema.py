@@ -13,6 +13,7 @@ class DBSchema(PersistentBusinessObject):
 
     _table = "schema_versions"
     version_nr = BOInt()
+    is_root_bo: bool = True
 
 
 log_exit(LOG)

@@ -1,5 +1,6 @@
 """Test suite for SQLite attachement"""
 
+from decimal import Decimal
 import re
 import sys, types
 import importlib
@@ -43,6 +44,7 @@ def setUpModule() -> None:
 
 
 import database.dbms.db_base
+import database.dbms.sqlite
 import database.sql_statement
 
 
@@ -113,6 +115,88 @@ class TestSQLiteDB(unittest.IsolatedAsyncioTestCase):
             self.sql.execute.assert_awaited_once_with()
             self.mockCur.fetchone.assert_awaited_once_with()
             self.assertDictEqual(reply, expected)
+
+    def test_202_decimal_capabilities(self):
+        capabilities = self.db.decimal_capabilities
+        self.assertEqual(
+            capabilities.max_total_digits,
+            database.dbms.sqlite.SQLITE_MAXIMUM_DECIMAL_DIGITS,
+            msg="SQLiteDB.decimal_capabilities should expose configured max digits",
+        )
+        self.assertEqual(
+            capabilities.max_decimal_scale,
+            database.dbms.sqlite.SQLITE_MAXIMUM_DECIMAL_SCALE,
+            msg="SQLiteDB.decimal_capabilities should expose configured max scale",
+        )
+
+    def test_203_decimal_type_map(self):
+        self.assertEqual(
+            database.dbms.sqlite.SQLiteColumnDefinition.type_map[Decimal],
+            database.dbms.sqlite.SQLITE_DECIMAL_TYPE,
+            msg="SQLite column type mapping should map Decimal to DECIMAL",
+        )
+
+
+class TestSQLiteDBDecimal(unittest.TestCase):
+
+    def test_301_adapt_decimal_error_case(self):
+        # Test that ValueError is raised if validate_decimal returns False
+        with patch.object(
+            database.dbms.db_base.DB, "validate_decimal", return_value=False
+        ):
+            with self.assertRaises(
+                ValueError, msg="Invalid decimal should raise ValueError"
+            ):
+                database.dbms.sqlite._adapt_decimal(Decimal("10.75"))
+
+    def test_302_adapt_decimal_edge_cases(self):
+        # Test _adapt_decimal with various edge cases
+        test_cases = [
+            (Decimal("0"), 0, "zero"),
+            (Decimal("10.75"), 1075, "positive decimal"),
+            (Decimal("-10.75"), -1075, "negative decimal"),
+            (Decimal("10.50"), 1050, "trailing zero preservation"),
+            (Decimal("0.01"), 1, "minimum non-zero with scale 2"),
+            (Decimal("-0.01"), -1, "negative minimum"),
+            (Decimal("100"), 10000, "integer without decimal"),
+            (Decimal("-100"), -10000, "negative integer"),
+        ]
+
+        with patch.object(
+            database.dbms.db_base.DB, "validate_decimal", return_value=True
+        ):
+            with patch("database.dbms.sqlite.SQLITE_MAXIMUM_DECIMAL_SCALE", 2):
+                for decimal_val, expected_scaled, description in test_cases:
+                    with self.subTest(description=description):
+                        result = database.dbms.sqlite._adapt_decimal(decimal_val)
+                        self.assertEqual(
+                            result,
+                            expected_scaled,
+                            msg=f"_adapt_decimal({decimal_val}) should return {expected_scaled}",
+                        )
+
+    def test_303_convert_decimal_edge_cases(self):
+        # Test _convert_decimal with various edge cases
+        test_cases = [
+            (b"0", Decimal("0.00"), "zero"),
+            (b"1075", Decimal("10.75"), "positive decimal"),
+            (b"-1075", Decimal("-10.75"), "negative decimal"),
+            (b"1050", Decimal("10.50"), "trailing zero preservation"),
+            (b"1", Decimal("0.01"), "minimum non-zero"),
+            (b"-1", Decimal("-0.01"), "negative minimum"),
+            (b"10000", Decimal("100.00"), "integer-like value"),
+            (b"-10000", Decimal("-100.00"), "negative integer-like"),
+        ]
+
+        with patch("database.dbms.sqlite.SQLITE_MAXIMUM_DECIMAL_SCALE", 2):
+            for scaled_bytes, expected_decimal, description in test_cases:
+                with self.subTest(description=description):
+                    result = database.dbms.sqlite._convert_decimal(scaled_bytes)
+                    self.assertEqual(
+                        result,
+                        expected_decimal,
+                        msg=f"_convert_decimal({scaled_bytes}) should return {expected_decimal}",
+                    )
 
 
 class TestSQLiteConnection(unittest.IsolatedAsyncioTestCase):

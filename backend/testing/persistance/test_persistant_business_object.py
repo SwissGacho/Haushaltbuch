@@ -14,7 +14,7 @@ from business_objects.persistent_business_object import (
 )
 from business_objects.bo_descriptors import (
     BOStr,
-    BOList,
+    BODescriptorList,
     BORelation,
     BOColumnConstraint,
     BOBaseBase,
@@ -31,7 +31,7 @@ class MockPersistentBO1(PersistentBusinessObject):
 class MockPersistentBO2(PersistentBusinessObject):
     mock_attr1 = BOStr()
     mock_attr2 = BORelation(MockPersistentBO1)
-    mock_attr3 = BOList()
+    mock_attr3 = BODescriptorList()
 
     def __init__(
         self,

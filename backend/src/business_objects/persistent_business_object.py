@@ -59,6 +59,28 @@ class Singleton:
     Singleton BOs are BOs of which there should only be one instance in the database.
     """
 
+    @classmethod
+    async def fetch_singleton(cls: Type[Self]) -> Self:
+        """Load the singleton instance from the database.
+        If it does not exist, create a new instance and store it in the database.
+        """
+        LOG.log(VERBOSE_DEBUG, f"Loading singleton {cls.__name__}")
+        # cls must be a subclass of PersistentBusinessObject, so we can use get_matching_ids() to check if an instance exists
+        assert issubclass(
+            cls, PersistentBusinessObject
+        ), f"Singleton.fetch_singleton() can only be called on subclasses of PersistentBusinessObject, not {cls.__name__}"
+        singleton_id = await cls.get_matching_ids()
+        if singleton_id:
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"Found existing singleton {cls.__name__} with id {singleton_id[0]}",
+            )
+            return cls(bo_id=singleton_id[0])
+        else:
+            instance = cls()
+            await instance.store()
+            return instance
+
 
 class Personal:
     """Mixin class for personal business objects.
@@ -80,6 +102,8 @@ class PersistentBusinessObject(BOBase):
     """Base class for persistent Business Objects.
     Every subclass will be registered in a table in the database."""
 
+    is_root_bo: bool = False
+
     @classmethod
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -89,6 +113,21 @@ class PersistentBusinessObject(BOBase):
     def is_specializing(cls: Type[Self]) -> bool:
         """Return True if this class is a specialization of another business object class."""
         return issubclass(cls, Specialized) and cls is not Specialized
+
+    # pylint: disable=no-self-argument
+    @_classproperty
+    def table(
+        cls: Type[Self],  # type: ignore[reportGeneralTypeIssues]
+    ) -> str:
+        "Name of the BO's DB table"
+        if cls.is_specializing():
+            for super_cls in cls.__mro__:
+                if (
+                    issubclass(super_cls, PersistentBusinessObject)
+                    and not super_cls.is_specializing()
+                ):
+                    return super_cls.table
+        return super().table
 
     @classmethod
     def register_bo_class(cls):
@@ -507,7 +546,7 @@ class PersistentBusinessObject(BOBase):
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             for k, v in self._data.items():
                 if k != "id" and v is None:
-                    LOG.log(VERBOSE_DEBUG,f"{k=}: {v}")
+                    LOG.log(VERBOSE_DEBUG, f"{k=}: {v}")
         LOG.debug(
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )

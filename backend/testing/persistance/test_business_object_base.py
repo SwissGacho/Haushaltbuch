@@ -12,7 +12,7 @@ from business_objects.bo_descriptors import (
     AttributeType,
     BOFlag,
     BOStr,
-    BOList,
+    BODescriptorList,
     BORelation,
     BOColumnConstraint,
     BOBaseBase,
@@ -35,7 +35,7 @@ class MockBO1(BOBase):
 class MockBO2(BOBase):
     mock_attr1 = BOStr()
     mock_attr2 = BORelation(MockBO1)
-    mock_attr3 = BOList()
+    mock_attr3 = BODescriptorList()
     mock_attr4 = BOFlag(MockFlag)
 
 
