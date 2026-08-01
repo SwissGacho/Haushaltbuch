@@ -29,8 +29,7 @@ class DBManager:
 
     RECONNECT_ATTEMPTS: int = 3
 
-    def __init__(self, app: type[App]):
-        self._app = app
+    def __init__(self):
         self.db: DB | None = None
 
     _db_module: ModuleType | None = None
@@ -38,17 +37,17 @@ class DBManager:
     @property
     def _db_identifiers(self) -> tuple[dict | None, str | None]:
         return (
-            get_config_item(self._app.configuration, Config.CONFIG_DB),
+            get_config_item(App.configuration, Config.CONFIG_DB),
             cast(
                 str | None,
-                get_config_item(self._app.configuration, Config.CONFIG_DB_DB),
+                get_config_item(App.configuration, Config.CONFIG_DB_DB),
             ),
         )
 
     def _valid_db_config(self) -> tuple[dict, str, type[DB]]:
         db_config, db_type = self._db_identifiers
         if not (db_config and db_type):
-            LOG.error(f"Invalid DB configuration: {redact(self._app.configuration)}")
+            LOG.error(f"Invalid DB configuration: {redact(App.configuration)}")
             raise ConfigurationError("Invalid DB configuration")
         if not isinstance(db_type, str):
             LOG.error(f"Invalid DB type: {redact(db_type)}")
@@ -74,10 +73,9 @@ class DBManager:
     async def __aenter__(self) -> DB | None:
         """Create and prepare the database connection"""
 
-        app = self._app
         db_type: str | None = None
         if (
-            app.status != Status.STATUS_DB_CFG
+            App.status != Status.STATUS_DB_CFG
         ):  # pylint: disable=comparison-with-callable
             LOG.warning("No DB configuration available")
             return None
@@ -166,7 +164,7 @@ class DBManager:
 
 def get_db() -> DBManager:
     "Create a DB connection"
-    return DBManager(App)
+    return DBManager()
 
 
 log_exit(LOG)
