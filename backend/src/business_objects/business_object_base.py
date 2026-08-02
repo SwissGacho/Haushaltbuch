@@ -472,10 +472,10 @@ class BOBase(BOBaseBase):
         self.notify_instance_subscribers()
         self.__class__.notify_change_subscribers(self)
 
-    async def _insert_self(self, session: Optional[SessionBase] = None):
+    async def insert_self(self, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
 
-    async def _update_self(self, session: Optional[SessionBase] = None):
+    async def update_self(self, session: Optional[SessionBase] = None):
         assert self.id is not None, "id must not be None for update operation"
 
     def notify_instance_subscribers(self):

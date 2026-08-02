@@ -58,13 +58,15 @@ class StoreMessage(Message):
                     f"StoreMessage.handle_message: Ignoring unknown attribute '{key}' "
                     f"for business object '{bo_type.__name__}'"
                 )
-        await affected_bo.store()
+        await affected_bo.store(connection.session if connection else None)
 
         # Send a response message back to the frontend with the new id of the stored business object
         response_message = ObjectMessage(
             object_type=bo_type,
             index=affected_bo.id,
-            payload=await affected_bo.business_values_as_dict(),
+            payload=await affected_bo.business_values_as_dict(
+                session=connection.session if connection else None
+            ),
         )
         await connection.send_message(response_message)
 

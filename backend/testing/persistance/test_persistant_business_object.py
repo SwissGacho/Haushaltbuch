@@ -5,12 +5,12 @@ import json
 import unittest
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
+from business_objects.bo_mixins.specializing import Specialized
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
 from business_objects.persistent_business_object import (
     PersistentBusinessObject,
-    Specialized,
 )
 from business_objects.bo_descriptors import (
     BOStr,
@@ -403,7 +403,13 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_sql.rows = Mock(return_value=self.mock_sql)
         self.mock_sql.returning = Mock(return_value=self.mock_sql)
         self.mock_sql.assignment = Mock(return_value=self.mock_sql)
-        self.MockSQL = Mock(name="MockSQL", return_value=self.mock_sql)
+        self.mock_subsql = Mock(name="mock_subsql")
+        self.mock_subsql.select = Mock(return_value=self.mock_subsql)
+        self.mock_subsql.from_ = Mock(return_value=self.mock_subsql)
+        self.mock_subsql.where = Mock(return_value=self.mock_subsql)
+        self.MockSQL = Mock(
+            name="MockSQL", side_effect=[self.mock_sql, self.mock_subsql]
+        )
 
         self.mock_tx = AsyncMock(name="mock_transaction")
         self.mock_tx.__aenter__ = AsyncMock(return_value=self.mock_tx)
@@ -424,13 +430,26 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             patch(
                 "business_objects.persistent_business_object." + patch_exp
             ) as MockExp,
+            patch(
+                "business_objects.persistent_business_object.SQLSubquery"
+            ) as MockSubquery,
         ):
+            mock_subselect = Mock(name="mock_subselect")
+            MockSubquery.return_value = self.mock_subsql
             if newest == DEFAULT:
                 result = await self.mock_bo.fetch()
             else:
                 result = await self.mock_bo.fetch(newest=newest)
 
-            self.MockSQL.assert_called_once_with()
+            if newest and newest is not DEFAULT:
+                MockSubquery.assert_called_once_with(self.mock_subsql)
+                self.mock_subsql.select.assert_called_once_with(["MAX(id) as max_id"])
+                self.mock_subsql.from_.assert_called_once_with(MOCK_TAB2)
+                self.mock_subsql.where.assert_not_called()
+                self.assertEqual(self.MockSQL.call_args_list, [call(), call()])
+            else:
+                MockSubquery.assert_not_called()
+                self.MockSQL.assert_called_once_with()
             self.mock_sql.__aenter__.assert_awaited_once_with()
             self.mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
             self.mock_sql.select.assert_called_once_with([], True)
@@ -466,29 +485,29 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_202_fetch_newest(self):
         await self._202_fetch(
-            "SQLExpression", (f"id = (SELECT MAX(id) FROM {MOCK_TAB2})",), newest=True
+            "Eq", (f"id = (SELECT MAX(id) FROM {MOCK_TAB2})",), newest=True
         )
 
     async def test_203_store_insert(self):
-        self.mock_bo._insert_self = AsyncMock(name="_insert_self")
-        self.mock_bo._update_self = AsyncMock(name="_update_self")
+        self.mock_bo.insert_self = AsyncMock(name="_insert_self")
+        self.mock_bo.update_self = AsyncMock(name="_update_self")
         session = Mock(name="session")
 
         await self.mock_bo.store(session=session)
 
-        self.mock_bo._insert_self.assert_awaited_once_with(session)
-        self.mock_bo._update_self.assert_not_awaited()
+        self.mock_bo.insert_self.assert_awaited_once_with(session)
+        self.mock_bo.update_self.assert_not_awaited()
 
     async def test_203_store_update_self(self):
-        self.mock_bo._insert_self = AsyncMock(name="_insert_self")
-        self.mock_bo._update_self = AsyncMock(name="_update_self")
+        self.mock_bo.insert_self = AsyncMock(name="_insert_self")
+        self.mock_bo.update_self = AsyncMock(name="_update_self")
         self.mock_bo.id = 77
         session = Mock(name="session")
 
         await self.mock_bo.store(session=session)
 
-        self.mock_bo._insert_self.assert_not_awaited()
-        self.mock_bo._update_self.assert_awaited_once_with(session)
+        self.mock_bo.insert_self.assert_not_awaited()
+        self.mock_bo.update_self.assert_awaited_once_with(session)
 
     async def _204_insert_self(
         self, mock_attr1="micki mock", mock_attr3=[], **mock_attrs
@@ -502,12 +521,12 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 new=self.MockSQLTx,
             ),
             patch(
-                "business_objects.persistent_business_object.PersistentBusinessObject._fetch_self"
+                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
             ) as mock_fetch_self,
         ):
             mock_bo = MockPersistentBO2(**mock_attrs)
 
-            await mock_bo._insert_self(session=session)
+            await mock_bo.insert_self(session=session)
 
             self.MockSQLTx.assert_called_once_with()
             self.mock_tx.__aenter__.assert_awaited_once_with()
@@ -527,7 +546,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
     async def test_204a_insert_self(self):
         with self.assertRaises(AssertionError):
             self.mock_bo.id = 77
-            await self.mock_bo._insert_self()
+            await self.mock_bo.insert_self()
 
     async def test_204b_insert_self(self):
         await self._204_insert_self()
@@ -556,7 +575,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 new=mock_convert_from_db,
             ),
             patch(
-                "business_objects.persistent_business_object.PersistentBusinessObject._fetch_self"
+                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
             ) as mock_fetch_self,
             patch(
                 "business_objects.persistent_business_object.datetime"
@@ -604,9 +623,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             if exception:
                 self.mock_sql.execute.side_effect = [Exception, None]
                 with self.assertRaises(Exception):
-                    await self.mock_bo._update_self(session=session)
+                    await self.mock_bo.update_self(session=session)
             else:
-                await self.mock_bo._update_self(session=session)
+                await self.mock_bo.update_self(session=session)
 
             self.MockSQLTx.assert_called_once_with()
             self.mock_tx.__aenter__.assert_awaited_once_with()
@@ -641,7 +660,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_205a_update_self(self):
         with self.assertRaises(AssertionError) as exp:
-            await self.mock_bo._update_self()
+            await self.mock_bo.update_self()
 
     async def test_205b_update_self(self):
         self.mock_bo = MockPersistentBO2(bo_id=55)
@@ -885,13 +904,9 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         """With specialists _filter_conditions wraps a bo_name IN expression."""
         self.SpecializedBO.register_bo_class()
         with (
-            patch("business_objects.persistent_business_object.In") as MockIn,
-            patch(
-                "business_objects.persistent_business_object.ColumnName"
-            ) as MockColumnName,
-            patch(
-                "business_objects.persistent_business_object.SQLString"
-            ) as MockSQLString,
+            patch("business_objects.bo_mixin.In") as MockIn,
+            patch("business_objects.bo_mixin.ColumnName") as MockColumnName,
+            patch("business_objects.bo_mixin.SQLString") as MockSQLString,
         ):
             result = self.GenericBO._filter_conditions(None)
         MockColumnName.assert_called_once_with("bo_name")
@@ -903,13 +918,13 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         self.SpecializedBO.register_bo_class()
         mock_cond = Mock(name="mock_condition")
         with (
-            patch("business_objects.persistent_business_object.In") as MockIn,
-            patch("business_objects.persistent_business_object.ColumnName"),
-            patch("business_objects.persistent_business_object.SQLString"),
+            patch("business_objects.bo_mixin.In") as MockIn,
+            patch("business_objects.bo_mixin.ColumnName"),
+            patch("business_objects.bo_mixin.SQLString"),
             patch("business_objects.persistent_business_object.And") as MockAnd,
         ):
             result = self.GenericBO._filter_conditions(mock_cond)
-        MockAnd.assert_called_once_with([MockIn(), mock_cond])
+        MockAnd.assert_called_once_with([mock_cond, MockIn()])
         self.assertIs(result, MockAnd())
 
     # ------------------------------------------------------------------ #
@@ -933,9 +948,9 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
             patch("business_objects.persistent_business_object.Filter"),
-            patch("business_objects.persistent_business_object.In"),
-            patch("business_objects.persistent_business_object.ColumnName"),
-            patch("business_objects.persistent_business_object.SQLString"),
+            patch("business_objects.bo_mixin.In"),
+            patch("business_objects.bo_mixin.ColumnName"),
+            patch("business_objects.bo_mixin.SQLString"),
         ):
             await self.GenericBO.get_matching_objects(
                 conditions=None, attributes=["generic_attr"]

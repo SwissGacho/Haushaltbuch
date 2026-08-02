@@ -1,6 +1,6 @@
 """Classes for building SQL expressions that can be used in SQLStatements."""
 
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 import re
 
 
@@ -41,7 +41,9 @@ class In(SQLExpression):
     def get_query(self, km: SQLKeyManager) -> str:
         """Get the SQL query for this expression."""
         if not self._values:
-            raise ValueError("IN expression requires at least one value")
+            raise ValueError(
+                f"IN expression requires at least one value. (value={self._value.get_query(km=km)}, values={self._values})"
+            )
         values_str = ", ".join([value.get_query(km=km) for value in self._values])
         return f"{self._value.get_query(km=km)} IN ({values_str})"
 
@@ -67,7 +69,7 @@ class SQLMultiExpression(SQLExpression):
     """Abstract class to combine any number of SQL expressions with an operator.
     Should not be instantiated directly."""
 
-    def __init__(self, arguments: list[SQLExpression | str]):
+    def __init__(self, arguments: Sequence[SQLExpression | str]):
         super().__init__()
         self._arguments: list[SQLExpression] = [
             arg if isinstance(arg, SQLExpression) else SQLExpression(arg)

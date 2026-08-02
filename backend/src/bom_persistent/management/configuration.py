@@ -1,20 +1,17 @@
 """Store app configuration"""
 
-from typing import Any, Optional
+from typing import Any
+from business_objects.bo_mixins.admin_only import AdminOnly
+from business_objects.bo_mixins.Personal import Personal
+from business_objects.bo_mixins.Singleton import Singleton
+from business_objects.bo_mixins.specializing import Specialized
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
-from business_objects.persistent_business_object import (
-    Specialized,
-    Singleton,
-    Personal,
-    AdminOnly,
-    PersistentBusinessObject,
-)
+from business_objects.persistent_business_object import PersistentBusinessObject
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
 from bom_persistent.management.user import GenericUser
-from server.ws_connection_base import SessionBase
 
 
 class Configuration(PersistentBusinessObject):
@@ -48,42 +45,10 @@ class ApplicationConfiguration(Specialized, Singleton, AdminOnly, Configuration)
         return "Global Configuration"
 
 
-class PersonalConfiguration(Specialized, Personal, Configuration):
+class PersonalConfiguration(Specialized, Singleton, Personal, Configuration):
     "Persistent configuration for a specific user"
 
     user_id = BORelation(GenericUser)
-
-    async def business_values_as_dict(
-        self, session: Optional[SessionBase] = None
-    ) -> dict[str, Any]:
-        """Return the business values as a dictionary, including the user_id.
-        If self.id is None, it will attempt to fetch the configuration for the current user.
-        """
-        LOG.debug(
-            f"{str(self)}.business_values_as_dict: {self.id=}, session={str(session)}, user={str(getattr(session, 'user', None))}"
-        )
-        if self.id is None:
-            user = getattr(session, "user", None)
-            # Fetch the configuration for the current user
-            if user is None:
-                raise ValueError(
-                    "Cannot fetch personal configuration without a valid session user"
-                )
-            ids = await self.get_matching_ids(session=session)
-            if len(ids) > 1:
-                raise ValueError(
-                    f"Multiple personal configurations found for user {getattr(session, 'user', 'None')}"
-                )
-            if len(ids) == 0:
-                LOG.debug(
-                    f"No personal configuration found for user {getattr(session, 'user', None)}."
-                    " Returning a new empty one."
-                )
-                self.user_id = user
-                await self.store(session=session)
-            else:
-                self.id = ids[0]
-        return await super().business_values_as_dict(session=session)
 
     @property
     def display_name(self) -> str:
