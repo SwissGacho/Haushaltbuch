@@ -108,17 +108,17 @@ class Test_100_Persistent_Business_Object_classmethods(
 ):
 
     async def test_101_convert_from_db(self):
-        none_type = await PersistentBusinessObject.convert_from_db(None, str, {})
+        converter = MockPersistentBO2()
+
+        none_type = await converter.convert_from_db(None, str, {})
         self.assertIsNone(none_type)
 
         test_date_str = "2023-08-15"
-        date_type = await PersistentBusinessObject.convert_from_db(
-            test_date_str, datetime.date, {}
-        )
+        date_type = await converter.convert_from_db(test_date_str, datetime.date, {})
         self.assertEqual(datetime.date.fromisoformat(test_date_str), date_type)
 
         test_date_time_str = "2023-08-15T14:30:00+00:00"
-        date_time_type = await PersistentBusinessObject.convert_from_db(
+        date_time_type = await converter.convert_from_db(
             test_date_time_str, datetime.datetime, {}
         )
 
@@ -130,13 +130,9 @@ class Test_100_Persistent_Business_Object_classmethods(
 
         test_dict = {"key1": "value1", "key2": 2}
         test_list = [1, 2, 3, "four"]
-        dict_type = await PersistentBusinessObject.convert_from_db(
-            json.dumps(test_dict), dict, {}
-        )
+        dict_type = await converter.convert_from_db(json.dumps(test_dict), dict, {})
         self.assertEqual(str(test_dict), str(dict_type))
-        list_type = await PersistentBusinessObject.convert_from_db(
-            json.dumps(test_list), list, {}
-        )
+        list_type = await converter.convert_from_db(json.dumps(test_list), list, {})
         self.assertEqual(str(test_list), str(list_type))
 
         relation_obj = MockPersistentBO1(bo_id=2)
@@ -145,7 +141,7 @@ class Test_100_Persistent_Business_Object_classmethods(
             "get_matching_objects",
             new=AsyncMock(return_value=[relation_obj]),
         ) as mock_get_matching_objects:
-            relation_type = await PersistentBusinessObject.convert_from_db(
+            relation_type = await converter.convert_from_db(
                 2,
                 BOBaseBase,
                 {"relation": MockPersistentBO1},
@@ -156,10 +152,27 @@ class Test_100_Persistent_Business_Object_classmethods(
         class MockFlag(BaseFlag):
             FLAG_VALUE = 1
 
-        flag_type = await PersistentBusinessObject.convert_from_db(
+        flag_type = await converter.convert_from_db(
             "flag_value", MockFlag, {"flag_type": MockFlag}
         )
         self.assertEqual(MockFlag.FLAG_VALUE, flag_type)
+
+    async def test_101_convert_from_db_self_relation_skips_lookup(self):
+        converter = MockPersistentBO2(bo_id=17)
+        with patch.object(
+            MockPersistentBO2,
+            "get_matching_objects",
+            new=AsyncMock(return_value=[]),
+        ) as mock_get_matching_objects:
+            relation_type = await converter.convert_from_db(
+                17,
+                BOBaseBase,
+                {"relation": MockPersistentBO2},
+            )
+
+        mock_get_matching_objects.assert_not_awaited()
+        self.assertIsInstance(relation_type, MockPersistentBO2)
+        self.assertEqual(relation_type.id, 17)
 
     async def test_102_sql_create_table(self):
         mock_sql = Mock(name="mock_sql")
@@ -691,7 +704,7 @@ class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
         self.mock_bo = MockPersistentBO2()
 
     async def test_01_convert_from_db_none(self):
-        self.assertIsNone(await MockPersistentBO2.convert_from_db(None, int, {}))
+        self.assertIsNone(await self.mock_bo.convert_from_db(None, int, {}))
 
     async def test_01_convert_from_db_date_time(self):
         mock_tz_cet = datetime.timezone(datetime.timedelta(hours=+1), name="CET")
@@ -703,48 +716,48 @@ class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
         mock_date = datetime.date(2031, 4, 25)
 
         # convert 'CET' datetime string
-        res = await MockPersistentBO2.convert_from_db(
+        res = await self.mock_bo.convert_from_db(
             value=mock_dt_cet.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_cet, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert 'CET' datetime object
-        res = await MockPersistentBO2.convert_from_db(
+        res = await self.mock_bo.convert_from_db(
             value=mock_dt_cet, typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_cet, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert 'EST' datetime string
-        res = await MockPersistentBO2.convert_from_db(
+        res = await self.mock_bo.convert_from_db(
             value=mock_dt_est.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_est, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert 'UTC' datetime string
-        res = await MockPersistentBO2.convert_from_db(
+        res = await self.mock_bo.convert_from_db(
             value=mock_dt_utc.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_utc, res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert naive datetime string (assume UTC)
-        res = await MockPersistentBO2.convert_from_db(
+        res = await self.mock_bo.convert_from_db(
             value=mock_dt_none.isoformat(), typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_none.replace(tzinfo=datetime.UTC), res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
         # convert naive datetime (assume UTC)
-        res = await MockPersistentBO2.convert_from_db(
+        res = await self.mock_bo.convert_from_db(
             value=mock_dt_none, typ=datetime.datetime, subtyp={}
         )
         self.assertEqual(mock_dt_none.replace(tzinfo=datetime.UTC), res)
         self.assertEqual(datetime.UTC, res.tzinfo)
 
-        res = await MockPersistentBO2.convert_from_db(
+        res = await self.mock_bo.convert_from_db(
             value=mock_date.isoformat(), typ=datetime.date, subtyp={}
         )
         self.assertEqual(mock_date, res)

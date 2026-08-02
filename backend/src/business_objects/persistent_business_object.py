@@ -144,12 +144,11 @@ class PersistentBusinessObject(BOBase):
             if issubclass(_cls, PersistentBusinessObject)
         }
 
-    @classmethod
-    async def convert_from_db(cls, value, typ, subtyp):
+    async def convert_from_db(self, value, typ, subtyp):
         "convert a value of type 'typ' read from the DB"
-        # LOG.debug(
-        #     f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})"
-        # )
+        LOG.debug(
+            f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})"
+        )
         if value is None:
             return None
         if typ == date and isinstance(value, str):
@@ -169,6 +168,12 @@ class PersistentBusinessObject(BOBase):
         if typ == BOBaseBase and isinstance(value, int):
             relation = subtyp.get("relation") if isinstance(subtyp, dict) else None
             if isinstance(relation, type) and issubclass(relation, BOBase):
+                if relation is type(self) and value == self.id:
+                    LOG.log(
+                        VERBOSE_DEBUG,
+                        "self references itself, return self to avoid fetching from DB again",
+                    )
+                    return self
                 objs = await relation.get_matching_objects({"id": value})
                 if len(objs) == 1:
                     return objs[0]
@@ -325,30 +330,34 @@ class PersistentBusinessObject(BOBase):
         }
         objects: list[BOBase] = []
         for obj in result:
-            bo_name = None
-            converted: dict[str, Any] = {}
+            target_cls: type[PersistentBusinessObject] = cls
+            if "bo_name" in obj and obj["bo_name"] is not None:
+                resolved_cls = cls.get_business_object_by_name(obj["bo_name"])
+                if not issubclass(resolved_cls, PersistentBusinessObject):
+                    raise TypeError(
+                        f"Resolved class {resolved_cls.__name__} is not a PersistentBusinessObject"
+                    )
+                target_cls = cast(type[PersistentBusinessObject], resolved_cls)
+            target_id = obj.get("id")
+            LOG.debug(f"Creating {target_cls.__name__} object with id={target_id}")
+            target_obj: Self | PersistentBusinessObject = target_cls(bo_id=target_id)
             for key, value in obj.items():
                 if key == "id":
                     continue
-                if key == "bo_name":
-                    bo_name = value
                 description = descriptions.get(key)
                 if description is None:
-                    converted[key] = value
+                    setattr(target_obj, key, value)
                     continue
-                converted[key] = await cls.convert_from_db(
-                    value,
-                    description.data_type,
-                    description.constraint_values,
+                setattr(
+                    target_obj,
+                    key,
+                    await target_obj.convert_from_db(
+                        value,
+                        description.data_type,
+                        description.constraint_values,
+                    ),
                 )
-            LOG.debug(
-                f"Creating {(cls if bo_name is None else cls.get_business_object_by_name(bo_name)).__name__} object with id={obj.get('id')}"
-            )
-            objects.append(
-                (cls if bo_name is None else cls.get_business_object_by_name(bo_name))(
-                    bo_id=obj.get("id"), **converted
-                )
-            )
+            objects.append(target_obj)
         return objects
 
     async def fetch(self, id=None, newest=None, session: Optional[SessionBase] = None):
@@ -409,12 +418,10 @@ class PersistentBusinessObject(BOBase):
                 for line in pprint_lines(self._db_data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
             for description in self.attribute_descriptions():
-                self._data[description.name] = (
-                    await PersistentBusinessObject.convert_from_db(
-                        self._db_data.get(description.name),
-                        description.data_type,
-                        description.constraint_values,
-                    )
+                self._data[description.name] = await self.convert_from_db(
+                    self._db_data.get(description.name),
+                    description.data_type,
+                    description.constraint_values,
                 )
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _data=")
@@ -496,7 +503,7 @@ class PersistentBusinessObject(BOBase):
                 if k not in (
                     "bo_name",
                     "id",
-                ) and v != await PersistentBusinessObject.convert_from_db(
+                ) and v != await self.convert_from_db(
                     self._db_data.get(k),
                     descriptions[k].data_type,
                     descriptions[k].constraint_values,
