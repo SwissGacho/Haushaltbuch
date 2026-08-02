@@ -1,9 +1,20 @@
 from typing import Optional
 
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    DEBUG,
+    VERBOSE_DEBUG,
+    redact,
+    pprint_lines,
+)
+
+LOG = getLogger(__name__)
+
 from core.exceptions import CannotStoreEmptyBO
 from database.sql import SQL
 from server.ws_connection_base import SessionBase
-from business_objects.bo_mixins.bo_mixin import LOG, MixinBase
+from business_objects.bo_mixins.bo_mixin import MixinBase
 
 
 from inspect import iscoroutinefunction

@@ -12,9 +12,6 @@ from core.app_logging import (
     pprint_lines,
 )
 
-from .admin_only import AdminOnly
-from .Personal import Personal
-
 LOG = getLogger(__name__)
 
 from server.ws_connection_base import SessionBase
@@ -40,6 +37,16 @@ class MixinBase:
         return False
 
     @classmethod
+    def is_personal(cls) -> bool:
+        """Return True if this class is a personal business object class."""
+        return False
+
+    @classmethod
+    def is_admin_only(cls) -> bool:
+        """Return True if this class is an admin-only business object class."""
+        return False
+
+    @classmethod
     def skip_create_table(cls) -> bool:
         """Return True if this class should not create a table in the database."""
         return False
@@ -58,7 +65,7 @@ class MixinBase:
                 SQLString(str(bo_type_name()))
                 for s in gen_cls.specialists
                 if callable(bo_type_name := getattr(s, "bo_type_name", None))
-                and not issubclass(s, Personal)
+                and not s.is_personal()
             ]
             if not valid_values:
                 raise ValueError(
@@ -70,11 +77,11 @@ class MixinBase:
                 Concat(
                     SQLString(str(bo_type_name())),
                     SQLString("."),
-                    (ColumnName("user_id") if issubclass(s, Personal) else Value(user)),
+                    (ColumnName("user_id") if s.is_personal() else Value(user)),
                 )
                 for s in gen_cls.specialists
                 if callable(bo_type_name := getattr(s, "bo_type_name", None))
-                and (not issubclass(s, AdminOnly) or is_admin)
+                and (not s.is_admin_only() or is_admin)
             ]
             if not valid_values:
                 LOG.warning(

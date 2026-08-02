@@ -1,8 +1,19 @@
 from typing import Sequence, Optional
 
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    DEBUG,
+    VERBOSE_DEBUG,
+    redact,
+    pprint_lines,
+)
+
+LOG = getLogger(__name__)
+
 from database.sql_expression import Eq, SQLExpression, Value
 from server.ws_connection_base import SessionBase
-from business_objects.bo_mixins.bo_mixin import LOG, MixinBase
+from business_objects.bo_mixins.bo_mixin import MixinBase
 
 
 class Personal(MixinBase):
@@ -10,6 +21,11 @@ class Personal(MixinBase):
     Personal BOs are BOs that are specific to a user and have a user_id attribute.
     Personal BOs are only accessible to the user they belong to and are not visible to other users.
     """
+
+    @classmethod
+    def is_personal(cls) -> bool:
+        """Return True if this class is a personal business object class."""
+        return True
 
     @classmethod
     def special_conditions_mixin(cls, gen_cls, user) -> Sequence[SQLExpression]:

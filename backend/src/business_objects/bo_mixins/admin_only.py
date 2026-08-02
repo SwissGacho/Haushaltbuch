@@ -1,3 +1,14 @@
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    DEBUG,
+    VERBOSE_DEBUG,
+    redact,
+    pprint_lines,
+)
+
+LOG = getLogger(__name__)
+
 from business_objects.bo_mixins.bo_mixin import MixinBase
 
 
@@ -7,4 +18,9 @@ class AdminOnly(MixinBase):
     Admin-only BOs are not visible to other users.
     """
 
-    ADMIN_ONLY = True
+    @classmethod
+    def is_admin_only(cls) -> bool:
+        """Return True if this class is an admin-only business object class."""
+        return True
+
+    # ADMIN_ONLY = True
