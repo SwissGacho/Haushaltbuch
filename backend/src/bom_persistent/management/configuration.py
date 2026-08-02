@@ -2,9 +2,9 @@
 
 from typing import Any
 from business_objects.bo_mixins.admin_only import AdminOnly
-from business_objects.bo_mixins.Personal import Personal
-from business_objects.bo_mixins.Singleton import Singleton
-from business_objects.bo_mixins.specializing import Specialized
+from business_objects.bo_mixins.personal import Personal
+from business_objects.bo_mixins.singleton import Singleton
+from business_objects.bo_mixins.specializing import Specializing
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
@@ -36,7 +36,7 @@ class Configuration(PersistentBusinessObject):
         return self.configuration
 
 
-class ApplicationConfiguration(Specialized, Singleton, AdminOnly, Configuration):
+class ApplicationConfiguration(Specializing, Singleton, AdminOnly, Configuration):
     "Persistent (non-user-specific) configuration for the whole application"
 
     @property
@@ -45,7 +45,7 @@ class ApplicationConfiguration(Specialized, Singleton, AdminOnly, Configuration)
         return "Global Configuration"
 
 
-class PersonalConfiguration(Specialized, Singleton, Personal, Configuration):
+class PersonalConfiguration(Specializing, Singleton, Personal, Configuration):
     "Persistent configuration for a specific user"
 
     user_id = BORelation(GenericUser)

@@ -231,7 +231,7 @@ class BOBase(BOBaseBase):
         "Register the Business Object."
         BOBase._business_objects |= {cls._name(): cls}
         LOG.debug(
-            f"registered {'specialized ' if 'Specialized' in [base.__name__ for base in cls.__bases__] else ''}class '{cls.__name__}' as {cls._name()}"
+            f"registered {'specialized ' if 'Specializing' in [base.__name__ for base in cls.__bases__] else ''}class '{cls.__name__}' as {cls._name()}"
         )
 
     # pylint: disable=no-self-argument

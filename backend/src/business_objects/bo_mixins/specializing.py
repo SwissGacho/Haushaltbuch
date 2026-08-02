@@ -23,9 +23,9 @@ class Specializing(MixinBase):
     Use it like this:
     class MyGenericBO(PersistentBusinessObject):
         ...
-    class MySpecializedBO(Specializing, MyGenericBO):
+    class MySpecializingBO(Specializing, MyGenericBO):
         ...
-    class MyVerySpecializedBO(MySpecializedBO):
+    class MyVerySpecializingBO(MySpecializingBO):
         ...
     """
 

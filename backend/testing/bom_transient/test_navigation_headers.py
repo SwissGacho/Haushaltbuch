@@ -32,7 +32,7 @@ class MockBOBase(BOBase):
     def all_business_objects(cls) -> dict[str, type[BOBase]]:
         return {
             "MockGenericBO": MockGenericBO,
-            "MockSpecializedBO": MockSpecializedBO,
+            "MockSpecializingBO": MockSpecializingBO,
         }
 
 
@@ -46,7 +46,7 @@ class MockGenericBO(MockBOBase):
         return {"name": "MockGenericBO", "type": "generic"}
 
 
-class MockSpecializedBO(MockBOBase):
+class MockSpecializingBO(MockBOBase):
 
     @classmethod
     def is_specializing(cls) -> bool:
@@ -55,8 +55,8 @@ class MockSpecializedBO(MockBOBase):
     @classmethod
     def navigation_header(cls, ref=None):
         if ref:
-            return {"name": "MockSpecializedBO", "type": "referer"}
-        return {"name": "MockSpecializedBO", "type": "specialized"}
+            return {"name": "MockSpecializingBO", "type": "referer"}
+        return {"name": "MockSpecializingBO", "type": "specializing"}
 
 
 class MockRefererBO(MockBOBase):
@@ -66,7 +66,7 @@ class MockRefererBO(MockBOBase):
 
     @classmethod
     def referenced_by(cls):
-        return [(MockGenericBO, "attribute1"), (MockSpecializedBO, "attribute2")]
+        return [(MockGenericBO, "attribute1"), (MockSpecializingBO, "attribute2")]
 
 
 class Test_100_NavigationHeaders(unittest.IsolatedAsyncioTestCase):
@@ -76,7 +76,7 @@ class Test_100_NavigationHeaders(unittest.IsolatedAsyncioTestCase):
             side_effect=lambda name: {
                 "mock_bo": MockGenericBO,
                 "mock_referer_bo": MockRefererBO,
-                "mock_specialized_bo": MockSpecializedBO,
+                "mock_specializing_bo": MockSpecializingBO,
             }.get(name, None),
         )
         MockBOBase.get_business_object_by_name = self.mock_get_business_object_by_name
@@ -120,7 +120,7 @@ class Test_100_NavigationHeaders(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(result["headers"], list)
         self.assertIn({"name": "MockGenericBO", "type": "generic"}, result["headers"])
         self.assertNotIn(
-            {"name": "MockSpecializedBO", "type": "specialized"}, result["headers"]
+            {"name": "MockSpecializingBO", "type": "specializing"}, result["headers"]
         )
 
     async def test_105_business_values_as_dict_with_parent(self):

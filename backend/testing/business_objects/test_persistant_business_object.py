@@ -903,28 +903,34 @@ class Test_400_Specializing(unittest.IsolatedAsyncioTestCase):
     def test_405_filter_conditions_with_specialists_no_extra_cond(self):
         """With specialists _filter_conditions wraps a bo_name IN expression."""
         self.SpecializingBO.register_bo_class()
-        with (
-            patch("business_objects.bo_mixin.In") as MockIn,
-            patch("business_objects.bo_mixin.ColumnName") as MockColumnName,
-            patch("business_objects.bo_mixin.SQLString") as MockSQLString,
-        ):
+        mock_special_cond = Mock(name="mock_special_cond")
+        with patch(
+            "business_objects.persistent_business_object.MixinBase.special_conditions",
+            return_value=[mock_special_cond],
+        ) as mock_special_conditions:
             result = self.GenericBO._filter_conditions(None)
-        MockColumnName.assert_called_once_with("bo_name")
-        MockIn.assert_called_once()
-        self.assertIs(result, MockIn())
+        mock_special_conditions.assert_called_once_with(
+            gen_cls=self.GenericBO, user=None
+        )
+        self.assertIs(result, mock_special_cond)
 
     def test_405_filter_conditions_with_specialists_and_extra_cond(self):
         """With specialists and extra conditions _filter_conditions combines both with And."""
         self.SpecializingBO.register_bo_class()
         mock_cond = Mock(name="mock_condition")
+        mock_special_cond = Mock(name="mock_special_cond")
         with (
-            patch("business_objects.bo_mixin.In") as MockIn,
-            patch("business_objects.bo_mixin.ColumnName"),
-            patch("business_objects.bo_mixin.SQLString"),
+            patch(
+                "business_objects.persistent_business_object.MixinBase.special_conditions",
+                return_value=[mock_special_cond],
+            ) as mock_special_conditions,
             patch("business_objects.persistent_business_object.And") as MockAnd,
         ):
             result = self.GenericBO._filter_conditions(mock_cond)
-        MockAnd.assert_called_once_with([mock_cond, MockIn()])
+        mock_special_conditions.assert_called_once_with(
+            gen_cls=self.GenericBO, user=None
+        )
+        MockAnd.assert_called_once_with([mock_cond, mock_special_cond])
         self.assertIs(result, MockAnd())
 
     # ------------------------------------------------------------------ #
@@ -947,10 +953,10 @@ class Test_400_Specializing(unittest.IsolatedAsyncioTestCase):
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
-            patch("business_objects.persistent_business_object.Filter"),
-            patch("business_objects.bo_mixin.In"),
-            patch("business_objects.bo_mixin.ColumnName"),
-            patch("business_objects.bo_mixin.SQLString"),
+            patch(
+                "business_objects.persistent_business_object.MixinBase.special_conditions",
+                return_value=[],
+            ),
         ):
             await self.GenericBO.get_matching_objects(
                 conditions=None, attributes=["generic_attr"]

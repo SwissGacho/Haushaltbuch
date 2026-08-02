@@ -23,7 +23,7 @@ from core.exceptions import CannotStoreEmptyBO
 from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
 from database.sql_expression import SQLExpression, And, Eq, Filter, Value
-from database.sql_statement import CreateTable, NamedValueListList
+from database.sql_statement import SQLSubquery, CreateTable, NamedValueListList
 from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
 from business_objects.bo_mixins.bo_mixin import MixinBase
