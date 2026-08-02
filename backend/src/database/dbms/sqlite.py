@@ -264,11 +264,11 @@ class SQLiteDB(DB):
     async def _get_table_info(self, table_name: str) -> dict[str, str]:
         # LOG.debug(f"SQLiteDB._get_table_info({table_name=})")
         async with SQL() as sql:
-            sql_text = (
-                await (
-                    await sql.script(SQLTemplate.TABLESQL, table=table_name).execute()
-                ).fetchone()
-            )["sql"]
+            sql_info = await (
+                await sql.script(SQLTemplate.TABLESQL, table=table_name).execute()
+            ).fetchone()
+            LOG.debug(f"SQLiteDB._get_table_info({table_name=}) -> {sql_info=}")
+            sql_text = sql_info["sql"] if sql_info else ""
         match = re.search(r"\(([^\)]*)\)", sql_text)
         info = (
             {col.split(" ")[0]: col for col in [s.strip() for s in match[1].split(",")]}
