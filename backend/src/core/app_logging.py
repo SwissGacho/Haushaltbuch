@@ -127,7 +127,7 @@ def redact(value: Any) -> Any:
 def pprint_lines(value: Any, width=120) -> list[str]:
     "Return a list of lines for pretty-printing a value in logs."
     return pprint.pformat(
-        redact(value), indent=4, width=width, compact=True
+        redact(value), indent=4, width=width, compact=True, sort_dicts=False
     ).splitlines()
 
 

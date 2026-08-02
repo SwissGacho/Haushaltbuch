@@ -5,7 +5,7 @@ import json
 import unittest
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
-from business_objects.bo_mixins.specializing import Specialized
+from business_objects.bo_mixins.specializing import Specializing
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
@@ -750,8 +750,8 @@ class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_date, res)
 
 
-class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
-    """Tests for the Specialized mixin and related PersistentBusinessObject behaviour."""
+class Test_400_Specializing(unittest.IsolatedAsyncioTestCase):
+    """Tests for the Specializing mixin and related PersistentBusinessObject behaviour."""
 
     # ------------------------------------------------------------------ #
     #  Fixture classes – defined locally so each test run is deterministic #
@@ -763,15 +763,15 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         class GenericBO(PersistentBusinessObject):
             generic_attr = BOStr()
 
-        class SpecializedBO(Specialized, GenericBO):
+        class SpecializingBO(Specializing, GenericBO):
             special_attr = BOStr()
 
-        class VerySpecializedBO(SpecializedBO):
+        class VerySpecializingBO(SpecializingBO):
             very_special_attr = BOStr()
 
         self.GenericBO = GenericBO
-        self.SpecializedBO = SpecializedBO
-        self.VerySpecializedBO = VerySpecializedBO
+        self.SpecializingBO = SpecializingBO
+        self.VerySpecializingBO = VerySpecializingBO
 
     # ------------------------------------------------------------------ #
     #  is_specializing                                                     #
@@ -781,12 +781,12 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.GenericBO.is_specializing())
 
     def test_401_is_specializing_true_for_specialized_mixin(self):
-        self.assertTrue(self.SpecializedBO.is_specializing())
+        self.assertTrue(self.SpecializingBO.is_specializing())
 
     def test_401_is_specializing_true_for_subclass_of_specialized(self):
-        """A class that inherits from a Specialized BO (without re-applying the mixin)
+        """A class that inherits from a Specializing BO (without re-applying the mixin)
         is also considered specializing."""
-        self.assertTrue(self.VerySpecializedBO.is_specializing())
+        self.assertTrue(self.VerySpecializingBO.is_specializing())
 
     def test_401_is_specializing_false_for_pbo_base(self):
         """PersistentBusinessObject itself is not a specialization."""
@@ -797,21 +797,21 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
     # ------------------------------------------------------------------ #
 
     def test_402_register_bo_class_populates_specialists_on_generic(self):
-        """Registering a Specialized BO must add it to the base BO's specialists set."""
-        self.SpecializedBO.register_bo_class()
-        self.assertIn(self.SpecializedBO, self.GenericBO.specialists)
+        """Registering a Specializing BO must add it to the base BO's specialists set."""
+        self.SpecializingBO.register_bo_class()
+        self.assertIn(self.SpecializingBO, self.GenericBO.specialists)
 
     def test_402_register_bo_class_also_adds_self_to_own_specialists(self):
         """After registration the specializing class must appear in its own specialists set."""
-        self.SpecializedBO.register_bo_class()
-        self.assertIn(self.SpecializedBO, self.SpecializedBO.specialists)
+        self.SpecializingBO.register_bo_class()
+        self.assertIn(self.SpecializingBO, self.SpecializingBO.specialists)
 
     def test_402_register_bo_class_multi_level(self):
-        """Registering VerySpecializedBO must propagate to both SpecializedBO and GenericBO."""
-        self.SpecializedBO.register_bo_class()
-        self.VerySpecializedBO.register_bo_class()
-        self.assertIn(self.VerySpecializedBO, self.GenericBO.specialists)
-        self.assertIn(self.VerySpecializedBO, self.SpecializedBO.specialists)
+        """Registering VerySpecializingBO must propagate to both SpecializingBO and GenericBO."""
+        self.SpecializingBO.register_bo_class()
+        self.VerySpecializingBO.register_bo_class()
+        self.assertIn(self.VerySpecializingBO, self.GenericBO.specialists)
+        self.assertIn(self.VerySpecializingBO, self.SpecializingBO.specialists)
 
     def test_402_register_bo_class_non_specializing_unaffected(self):
         """Registering a plain BO must not alter its (empty) specialists set."""
@@ -824,7 +824,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
 
     def test_403_attribute_descriptions_without_include_specialized(self):
         """Without include_specialized the base BO returns only its own attributes."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         names = [
             d.name
             for d in self.GenericBO.attribute_descriptions(include_specialized=False)
@@ -834,7 +834,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
 
     def test_403_attribute_descriptions_with_include_specialized(self):
         """With include_specialized=True the base BO also returns attributes of specialist BOs."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         names = [
             d.name
             for d in self.GenericBO.attribute_descriptions(include_specialized=True)
@@ -845,7 +845,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
     def test_403_attribute_descriptions_no_duplicates(self):
         """Attributes already present on the base BO must not be duplicated even if a
         specialist declares the same attribute name."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         names = [
             d.name
             for d in self.GenericBO.attribute_descriptions(include_specialized=True)
@@ -853,21 +853,21 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(names), len(set(names)))
 
     # ------------------------------------------------------------------ #
-    #  sql_create_table – skip for Specialized                             #
+    #  sql_create_table – skip for Specializing                             #
     # ------------------------------------------------------------------ #
 
     async def test_404_sql_create_table_skipped_for_specialized(self):
-        """sql_create_table must be a no-op for a Specialized BO (it shares the base table)."""
+        """sql_create_table must be a no-op for a Specializing BO (it shares the base table)."""
         MockSQLTx = Mock(name="MockSQLTx")
         with patch(
             "business_objects.persistent_business_object.SQLTransaction",
             new=MockSQLTx,
         ):
-            await self.SpecializedBO.sql_create_table()
+            await self.SpecializingBO.sql_create_table()
         MockSQLTx.assert_not_called()
 
     async def test_404_sql_create_table_executes_for_generic(self):
-        """sql_create_table must proceed normally for a non-Specialized base BO."""
+        """sql_create_table must proceed normally for a non-Specializing base BO."""
         mock_sql = Mock(name="mock_sql")
         mock_sql.create_table = Mock(return_value=mock_sql)
         mock_sql.column = Mock()
@@ -902,7 +902,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
 
     def test_405_filter_conditions_with_specialists_no_extra_cond(self):
         """With specialists _filter_conditions wraps a bo_name IN expression."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         with (
             patch("business_objects.bo_mixin.In") as MockIn,
             patch("business_objects.bo_mixin.ColumnName") as MockColumnName,
@@ -915,7 +915,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
 
     def test_405_filter_conditions_with_specialists_and_extra_cond(self):
         """With specialists and extra conditions _filter_conditions combines both with And."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         mock_cond = Mock(name="mock_condition")
         with (
             patch("business_objects.bo_mixin.In") as MockIn,
@@ -934,7 +934,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
     async def test_406_get_matching_objects_adds_bo_name_for_specialists(self):
         """When attributes are requested and specialists exist, 'bo_name' must be
         appended to the SELECT column list automatically."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         mock_cursor = Mock(name="mock_cursor")
         mock_cursor.fetchall = AsyncMock(return_value=[])
         mock_sql = Mock(name="mock_sql")

@@ -196,7 +196,7 @@ class PersistentBusinessObject(BOBase):
         LOG.log(VERBOSE_DEBUG, f"   collect attributes for {cls.__name__}")
         descriptions = cls.attribute_descriptions(include_specialized=True)
 
-        if hasattr(cls, "skip_create_table") and cls.skip_create_table():
+        if (skip := getattr(cls, "skip_create_table", None)) and skip():
             LOG.debug(
                 f"PersistentBusinessObject.sql_create_table(): {cls.__name__} has no specific table, skipping creation"
             )
