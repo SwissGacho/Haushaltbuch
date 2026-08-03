@@ -1,3 +1,5 @@
+"""Mixin class for singleton business objects."""
+
 from typing import Optional
 
 from core.app_logging import (
@@ -11,10 +13,10 @@ from core.app_logging import (
 
 LOG = getLogger(__name__)
 
+from business_objects.bo_mixins.bo_mixin import MixinBase
 from core.exceptions import CannotStoreEmptyBO
 from database.sql import SQL
 from server.ws_connection_base import SessionBase
-from business_objects.bo_mixins.bo_mixin import MixinBase
 
 
 from inspect import iscoroutinefunction
@@ -84,3 +86,6 @@ class Singleton(MixinBase):
                     f"Cannot insert {self} as it is a Singleton and already exists in the DB"
                 )
         return await super().store_mixin(session=session)
+
+
+log_exit(LOG)

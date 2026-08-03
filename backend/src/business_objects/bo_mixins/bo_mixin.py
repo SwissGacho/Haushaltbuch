@@ -1,4 +1,4 @@
-"""Mixin classes for business objects."""
+"""Baseclass for mixin classes for business objects."""
 
 from inspect import iscoroutinefunction
 from typing import Iterable, Optional, Sequence, cast
@@ -14,7 +14,8 @@ from core.app_logging import (
 
 LOG = getLogger(__name__)
 
-from server.ws_connection_base import SessionBase
+from business_objects.bo_descriptors import AttributeDescription
+from core.util import check_property
 from database.sql_expression import (
     SQLExpression,
     In,
@@ -23,6 +24,7 @@ from database.sql_expression import (
     SQLString,
     Value,
 )
+from server.ws_connection_base import SessionBase
 
 
 class MixinBase:
@@ -34,6 +36,7 @@ class MixinBase:
     @classmethod
     def is_specializing(cls) -> bool:
         """Return True if this class is a specialization of another business object class."""
+        LOG.debug(f"MixinBase.is_specializing({cls.__name__})  -> False")
         return False
 
     @classmethod
@@ -52,6 +55,40 @@ class MixinBase:
         return False
 
     @classmethod
+    def add_specialized_attributes_as_dict(
+        cls, bo_cls, attrs: dict[str, type]
+    ) -> dict[str, type]:
+        """Add specialized attributes to the given attrs dictionary.
+        The attrs dictionary maps attribute names to their types.
+        """
+        for specialized in getattr(bo_cls, "specialists", []):
+            attrs.update(
+                {
+                    a.name: a.data_type
+                    for a in specialized.attribute_descriptions(
+                        include_specialized=False
+                    )
+                    if a.name not in attrs
+                }
+            )
+        return attrs
+
+    @classmethod
+    def specialized_attribute_descriptions(
+        cls, bo_cls, descriptions: list[AttributeDescription]
+    ) -> list[AttributeDescription]:
+        """Return the list of attribute descriptions for this business object class.
+        If 'include_specialized' is True, also include the attributes of specialized BOs.
+        """
+        for specialized in getattr(bo_cls, "specialists", []):
+            descriptions += [
+                a
+                for a in specialized.attribute_descriptions(include_specialized=False)
+                if a.name not in [d.name for d in descriptions]
+            ]
+        return descriptions
+
+    @classmethod
     def _specialist_conditions(cls, gen_cls, user) -> Sequence[SQLExpression]:
         """Return a list of SQLExpression objects that restrict the selection of specialized BOs
         to those that are relevant and accessible for the given user.
@@ -65,7 +102,7 @@ class MixinBase:
                 SQLString(str(bo_type_name()))
                 for s in gen_cls.specialists
                 if callable(bo_type_name := getattr(s, "bo_type_name", None))
-                and not s.is_personal()
+                and not check_property(s, "is_personal")
             ]
             if not valid_values:
                 raise ValueError(
@@ -77,11 +114,15 @@ class MixinBase:
                 Concat(
                     SQLString(str(bo_type_name())),
                     SQLString("."),
-                    (ColumnName("user_id") if s.is_personal() else Value(user)),
+                    (
+                        ColumnName("user_id")
+                        if check_property(s, "is_personal")
+                        else Value(user)
+                    ),
                 )
                 for s in gen_cls.specialists
                 if callable(bo_type_name := getattr(s, "bo_type_name", None))
-                and (not s.is_admin_only() or is_admin)
+                and (is_admin or not check_property(s, "is_admin_only"))
             ]
             if not valid_values:
                 LOG.warning(
@@ -124,3 +165,6 @@ class MixinBase:
             await insert_self(session)
         else:
             await update_self(session)
+
+
+log_exit(LOG)

@@ -1,3 +1,5 @@
+"""Mixin class for admin-only business objects."""
+
 from core.app_logging import (
     getLogger,
     log_exit,
@@ -24,3 +26,6 @@ class AdminOnly(MixinBase):
         return True
 
     # ADMIN_ONLY = True
+
+
+log_exit(LOG)

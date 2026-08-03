@@ -1,3 +1,5 @@
+"""Mixin class for personal business objects."""
+
 from typing import Sequence, Optional
 
 from core.app_logging import (
@@ -11,9 +13,9 @@ from core.app_logging import (
 
 LOG = getLogger(__name__)
 
+from business_objects.bo_mixins.bo_mixin import MixinBase
 from database.sql_expression import Eq, SQLExpression, Value
 from server.ws_connection_base import SessionBase
-from business_objects.bo_mixins.bo_mixin import MixinBase
 
 
 class Personal(MixinBase):
@@ -78,3 +80,6 @@ class Personal(MixinBase):
             setattr(self, "user_id", session.user)
 
         return await super().store_mixin(session=session)
+
+
+log_exit(LOG)

@@ -135,8 +135,12 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
         mock_warning.assert_called_once()
 
     def test_special_conditions_collects_base_and_mixin_conditions(self):
-        with patch.object(MixinBase, "_specialist_conditions", return_value=["base_cond"]):
-            result = _CollectorBO.special_conditions(gen_cls=Mock(name="gen_cls"), user=None)
+        with patch.object(
+            MixinBase, "_specialist_conditions", return_value=["base_cond"]
+        ):
+            result = _CollectorBO.special_conditions(
+                gen_cls=Mock(name="gen_cls"), user=None
+            )
 
         self.assertEqual(["base_cond", "mixin_cond"], result)
 

@@ -14,6 +14,18 @@ class EnvironmentError(Exception):
     """Custom exception for environment requirement errors."""
 
 
+def check_property(cls: object, prop_name: str) -> bool:
+    """Check if the object has a property with the given name.
+    If the property exists, return its value, otherwise return False.
+    If the property is callable, return the call result."""
+    if not isinstance(cls, type):
+        raise TypeError(f"Expected a class type, got {type(cls).__name__}")
+    prop = getattr(cls, prop_name, None)
+    if callable(prop):
+        return bool(prop())
+    return bool(prop)
+
+
 def check_environment():
     """Check if the environment meets the requirements for running the application."""
 

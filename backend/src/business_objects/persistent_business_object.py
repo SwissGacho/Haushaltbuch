@@ -45,7 +45,9 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def is_specializing(cls: Type[Self]) -> bool:
         """Return True if this class is a specialization of another business object class."""
-        return bool((b := getattr(super(), "is_specializing", None)) and b())
+        LOG.debug(f"PersistentBusinessObject.is_specializing({cls.__name__})")
+        # Check if a specializing mixin is present in the MRO above
+        return bool(callable(b := getattr(super(), "is_specializing", None)) and b())
 
     # pylint: disable=no-self-argument
     @_classproperty
@@ -85,17 +87,8 @@ class PersistentBusinessObject(BOBase):
         If 'include_specialized' is True, also include the attributes of specialized BOs.
         """
         attrs = super().attributes_as_dict()
-        if include_specialized and getattr(cls, "specialists", None):
-            for specialized in cls.specialists:
-                attrs.update(
-                    {
-                        a.name: a.data_type
-                        for a in specialized.attribute_descriptions(
-                            include_specialized=False
-                        )
-                        if a.name not in attrs
-                    }
-                )
+        if include_specialized:
+            attrs = MixinBase.add_specialized_attributes_as_dict(cls, attrs)
         return attrs
 
     @classmethod
@@ -106,15 +99,10 @@ class PersistentBusinessObject(BOBase):
         If 'include_specialized' is True, also include the attributes of specialized BOs.
         """
         descriptions = super().attribute_descriptions()
-        if include_specialized and getattr(cls, "specialists", None):
-            for specialized in cls.specialists:
-                descriptions += [
-                    a
-                    for a in specialized.attribute_descriptions(
-                        include_specialized=False
-                    )
-                    if a.name not in [d.name for d in descriptions]
-                ]
+        if include_specialized:
+            descriptions = MixinBase.specialized_attribute_descriptions(
+                cls, descriptions
+            )
         return descriptions
 
     @classmethod

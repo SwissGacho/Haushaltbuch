@@ -1,3 +1,5 @@
+"""Mixin class for specializing business objects."""
+
 from typing import cast
 
 from core.app_logging import (
@@ -32,6 +34,7 @@ class Specializing(MixinBase):
     @classmethod
     def is_specializing(cls) -> bool:
         """Return True if this class is a specialization of another business object class."""
+        LOG.debug(f"Specializing.is_specializing({cls.__name__})  -> True")
         return True
 
     @classmethod
@@ -49,11 +52,16 @@ class Specializing(MixinBase):
                     cast(set[type[BOBase]], spec) | specialists,
                 )
                 if (
-                    not hasattr(super_cls, "is_specializing")
-                ) or not super_cls.is_specializing():
+                    not callable(
+                        is_spec := getattr(super_cls, "is_specializing", None)
+                    )
+                ) or not is_spec():
                     break
 
     @classmethod
     def skip_create_table(cls) -> bool:
         """Return True if this class should not create a table in the database."""
         return True
+
+
+log_exit(LOG)
