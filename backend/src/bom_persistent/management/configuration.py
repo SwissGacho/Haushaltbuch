@@ -1,15 +1,15 @@
 """Store app configuration"""
 
 from typing import Any
-from business_objects.bo_mixins.admin_only import AdminOnly
-from business_objects.bo_mixins.personal import Personal
-from business_objects.bo_mixins.singleton import Singleton
-from business_objects.bo_mixins.specializing import Specializing
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
 from business_objects.persistent_business_object import PersistentBusinessObject
+from business_objects.bo_mixins.admin_only import AdminOnly
+from business_objects.bo_mixins.personal import Personal
+from business_objects.bo_mixins.singleton import Singleton
+from business_objects.bo_mixins.specializing import Specializing
 from business_objects.bo_descriptors import BODict, BORelation, AttributeDescription
 from bom_persistent.management.user import GenericUser
 
