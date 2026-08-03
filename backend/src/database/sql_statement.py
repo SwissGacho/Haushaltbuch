@@ -201,10 +201,9 @@ class SQLSubquery(SQLExpression):
     def get_query(self, km: SQLKeyManager) -> str:
         """Get the SQL query for this expression."""
         if isinstance(self._subquery, str):
-            return self._subquery
+            return f"({self._subquery})"
         query_params = self._subquery.get_sql()
-        return f"({ km.merge_params(**query_params)})"
-
+        return f"({km.merge_params(**query_params)})"
 
 class Insert(SQLStatement):
     """A SQLStatement representing an INSERT statement.
