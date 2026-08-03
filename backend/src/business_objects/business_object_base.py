@@ -22,12 +22,14 @@ LOG = getLogger(__name__)
 
 from core.util import _classproperty
 from core.app import App
+from business_objects.bo_data import BOData
 from business_objects.bo_descriptors import (
     AttributeAccessLevel,
     AttributeDescription,
     AttributeType,
     BOColumnConstraint,
     BOBaseBase,
+    _PersistentAttr,
     BOStr,
     BOId,
     BODatetime,
@@ -53,6 +55,7 @@ class BOBase(BOBaseBase):
     _table = None
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, type["BOBase"]] = {}
+    _data_objects: dict[int, BOData] = {}
 
     _creation_subscribers: dict[int, BOCallback] = {}
     _change_subscribers: dict[int, BOCallback] = {}
@@ -118,7 +121,13 @@ class BOBase(BOBaseBase):
             self._init_attrs(attributes)
             return
         self._instance_subscribers: dict[int, BOCallback] = {}
-        self._data = {}
+
+        if bo_id is not None:
+            if bo_id not in self.__class__._data_objects:
+                self.__class__._data_objects[bo_id] = BOData(self.__class__)
+            self._data = self.__class__._data_objects[bo_id]
+        else:
+            self._data = BOData(self.__class__)
         self._db_data = {}
         self.id = bo_id
         self.last_updated = None
@@ -152,6 +161,28 @@ class BOBase(BOBaseBase):
             if self.id
             else f"{self.__class__.__name__}(no id)"
         )
+
+    def get_data[T](self, bo_descriptor: _PersistentAttr[T]) -> T | None:
+        """Get the data of a business object attribute.
+        This method is used to access the data of a business object attribute
+        in a type-safe way, using the attribute descriptor.
+        """
+        if not bo_descriptor.my_name:
+            raise ValueError(
+                f"Attribute descriptor {bo_descriptor} has no name assigned"
+            )
+        return self._data[bo_descriptor.my_name]
+
+    def set_data[T](self, bo_descriptor: _PersistentAttr[T], value: T | None):
+        """Set the data of a business object attribute.
+        This method is used to set the data of a business object attribute
+        in a type-safe way, using the attribute descriptor.
+        """
+        if not bo_descriptor.my_name:
+            raise ValueError(
+                f"Attribute descriptor {bo_descriptor} has no name assigned"
+            )
+        self._data[bo_descriptor.my_name] = value
 
     def json_encode(self) -> dict | None:
         "Return a JSON-serializable representation of the business object"
@@ -196,6 +227,7 @@ class BOBase(BOBaseBase):
             LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
             LOG.log(VERBOSE_DEBUG, f"   id=: {id(instance)}")
             cls._loaded_instances[instance.id] = instance  # type: ignore
+            cls._data_objects[instance.id] = BOData(cls)
             cls.subscriptions_report()
 
     @classmethod
@@ -215,6 +247,7 @@ class BOBase(BOBaseBase):
                 f"BOBase.add_attribute({cls.__name__}, {attribute_name}) already registered"
             )
             return
+        LOG.log(VERBOSE_DEBUG, f"Adding attribute {attribute_name} to {cls.__name__}")
         cls._attributes[cls.__name__].append(
             AttributeDescription(
                 name=attribute_name,
