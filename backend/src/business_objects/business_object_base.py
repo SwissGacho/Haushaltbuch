@@ -55,7 +55,6 @@ class BOBase(BOBaseBase):
     _table = None
     _attributes: dict[str, list[AttributeDescription]] = {}
     _business_objects: dict[str, type["BOBase"]] = {}
-    _data_objects: dict[int, BOData] = {}
 
     _creation_subscribers: dict[int, BOCallback] = {}
     _change_subscribers: dict[int, BOCallback] = {}
@@ -93,6 +92,9 @@ class BOBase(BOBaseBase):
         cls._loaded_instances: weakref.WeakValueDictionary[int, Self] = (
             weakref.WeakValueDictionary()
         )
+        cls._data_objects: weakref.WeakValueDictionary[int, BOData] = (
+            weakref.WeakValueDictionary()
+        )
         cls._creation_subscribers = {}
         cls._change_subscribers = {}
 
@@ -124,10 +126,16 @@ class BOBase(BOBaseBase):
 
         if bo_id is not None:
             if bo_id not in self.__class__._data_objects:
-                self.__class__._data_objects[bo_id] = BOData(self.__class__)
-            self._data = self.__class__._data_objects[bo_id]
+                bo_data = BOData(self.__class__)
+                self.__class__._data_objects[bo_id] = bo_data
+            else:
+                bo_data = self.__class__._data_objects[bo_id]
+            self._data = bo_data
         else:
             self._data = BOData(self.__class__)
+        LOG.debug(f"BOBase.__init__: cls._data_objects: {self.__class__._data_objects}")
+        for _data_object in self.__class__._data_objects.values():
+            LOG.log(VERBOSE_DEBUG, f"{_data_object=}")
         self._db_data = {}
         self.id = bo_id
         self.last_updated = None
@@ -227,7 +235,8 @@ class BOBase(BOBaseBase):
             LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
             LOG.log(VERBOSE_DEBUG, f"   id=: {id(instance)}")
             cls._loaded_instances[instance.id] = instance  # type: ignore
-            cls._data_objects[instance.id] = BOData(cls)
+            if instance.id not in cls._data_objects:
+                cls._data_objects[instance.id] = BOData(cls)
             cls.subscriptions_report()
 
     @classmethod
@@ -591,6 +600,7 @@ class BOBase(BOBaseBase):
         ]:
             subs[bo_name] = {
                 "instances": [f"count={len(bo_class._loaded_instances)}"],
+                "bo_data": [f"count={len(bo_class._data_objects)}"],
                 "creation subscribers": subs_repr(
                     bo_class._creation_subscribers, bo_name
                 ),
@@ -607,10 +617,25 @@ class BOBase(BOBaseBase):
                         + (" <" + f"{id(instance)}"[-4:] + ">" if py_id else "")
                         + ": no subscribers"
                     )
-        # LOG.debug(f"{subs=}")
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"{bo_name} data objects: {bo_class._data_objects}, len = {len(bo_class._data_objects)}",
+            )
+            if len(bo_class._data_objects) == 0:
+                subs[bo_name]["bo_data"].append("no data objects")
+            else:
+                for id, instance in bo_class._data_objects.items():
+                    subs[bo_name]["bo_data"].append(
+                        (f"{id}"[-4:] + ": ") + str(instance)
+                    )
+        LOG.debug(f"{subs=}")
         try:
+            LOG.log(VERBOSE_DEBUG, f"Writing subscription statistics to {stats_file}")
             with open(stats_file, "w", encoding="utf-8") as f:
-                f.write(f"{datetime.now().isoformat()} - Active subscriptions: \n")
+                f.write(f"{datetime.now().isoformat()} - BO load report: \n")
+                LOG.log(
+                    VERBOSE_DEBUG, f"{datetime.now().isoformat()} - BO load report: \n"
+                )
                 f.write("\n")
                 pad = LeftPadder.pad
                 f.write(" " * 23)
@@ -622,6 +647,7 @@ class BOBase(BOBaseBase):
                     f.write(pad("=+"))
                 f.write("\n")
                 items = [i for i in list(subs.values())[0].keys()]
+                LOG.log(VERBOSE_DEBUG, f"items: {items}")
                 for item in items:
                     l = 0
                     while True:

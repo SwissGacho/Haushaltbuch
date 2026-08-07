@@ -35,6 +35,9 @@ class BOData:
     def __iter__(self):
         return iter(self._data)
 
+    def __str__(self):
+        return f"BOData({self._object.__name__})"
+
     def get_data(self, bo_descriptor) -> Any:
         """Get the value of the attribute described by 'bo_descriptor'"""
         return self._get_raw_data(bo_descriptor.my_name)
