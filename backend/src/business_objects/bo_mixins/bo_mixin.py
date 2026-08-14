@@ -141,7 +141,7 @@ class MixinBase:
         ) + [
             item
             for c in MixinBase.__subclasses__()
-            if issubclass(cls, c)
+            if issubclass(gen_cls, c)
             and callable(sc := getattr(c, "special_conditions_mixin", None))
             for item in cast(Iterable, sc(gen_cls, user))
         ]
