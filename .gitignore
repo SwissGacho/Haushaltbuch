@@ -174,3 +174,6 @@ backend/src/configuration_mysql.json
 *.key.pem
 backend/playground/playground.sqlite.db
 backend/src/__configuration.json
+backend/playground/quiffer/data.json
+backend/playground/quiffer/out
+backend/playground/quiffer/quiffer.cert.pem
