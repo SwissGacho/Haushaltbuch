@@ -454,7 +454,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
             self.mock_sql.select.assert_called_once_with([], True)
             self.mock_sql.from_.assert_called_once_with(MOCK_TAB2)
-            self.mock_sql.where.assert_called_once_with(MockExp())
+            self.mock_sql.where.assert_called_once_with(MockExp.return_value)
+            MockExp.assert_called_once_with(*exp_params)
             self.mock_sql.execute.assert_awaited_once_with()
             self.mock_cursor.fetchone.assert_awaited_once_with()
             self.assertIs(result, self.mock_bo)
@@ -484,9 +485,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         await self._202_fetch("Eq", ("id", REQ_ID))
 
     async def test_202_fetch_newest(self):
-        await self._202_fetch(
-            "Eq", (f"id = (SELECT MAX(id) FROM {MOCK_TAB2})",), newest=True
-        )
+        await self._202_fetch("Eq", ("id", self.mock_subsql), newest=True)
 
     async def test_203_store_insert(self):
         self.mock_bo.insert_self = AsyncMock(name="_insert_self")
