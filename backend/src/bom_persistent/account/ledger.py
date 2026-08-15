@@ -27,7 +27,8 @@ from bom_persistent.account.account import (
 )
 
 
-class Transaction(PersistentBusinessObject):
+class LedgerEntry(PersistentBusinessObject):
+    _table = "ledger_entries"
     transaction_datetime = BODatetime()
     debit_account = BORelation(Account)
     credit_account = BORelation(Account)
@@ -48,8 +49,8 @@ class Transaction(PersistentBusinessObject):
             self.credit_account = await DefaultCreditAccount().fetch_singleton()
 
 
-class TransactionItem(PersistentBusinessObject):
-    transaction = BORelation(Transaction)
+class Posting(PersistentBusinessObject):
+    ledger_entry = BORelation(LedgerEntry)
     amount = BODecimal()
     category = BORelation(Category)
     description = BOStr()
