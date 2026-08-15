@@ -83,8 +83,6 @@ class BOSubscription(Generic[T], WSMessageSender):
             LOG.debug("BOSubscription: 'personal' index detected.")
             bo_id = None
             kwargs.pop("index")
-            asyncio.create_task(self._init_bo_and_subscribe(bo_id=bo_id, **kwargs))
-            return
         elif issubclass(self._bo_type, PersistentBusinessObject):
             if not isinstance(self._index, int):
                 raise ValueError(
@@ -97,24 +95,6 @@ class BOSubscription(Generic[T], WSMessageSender):
         bo: T = self._bo_type(bo_id=bo_id, **kwargs)
         self._subscription_id = bo.subscribe_to_instance(self._handle_event_)
         self._obj = bo
-
-    async def _init_bo_and_subscribe(self, bo_id: int | None, **kwargs):
-        if bo_id is None and self._index == "personal":
-            LOG.log(VERBOSE_DEBUG, "BOSubscription: determining bo_id")
-            bo_id = (
-                await getattr(self._bo_type, "get_single_matching_id")(
-                    session=self._session
-                )
-                if self._session
-                and getattr(self._bo_type, "get_single_matching_id", None)
-                else None
-            )
-            LOG.log(VERBOSE_DEBUG, f"BOSubscription: determined bo_id={bo_id}")
-        bo: T = self._bo_type(bo_id=bo_id, **kwargs)
-        self._subscription_id = bo.subscribe_to_instance(self._handle_event_)
-        self._obj = bo
-        if self._notify_subscribers_on_init:
-            asyncio.create_task(self.notify_subscription_subscribers())
 
     async def _get_objects_(self) -> list[T]:
         if self._bo_type is None:
