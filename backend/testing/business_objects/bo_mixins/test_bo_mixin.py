@@ -137,11 +137,10 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
     def test_special_conditions_collects_base_and_mixin_conditions(self):
         with patch.object(
             MixinBase, "_specialist_conditions", return_value=["base_cond"]
-        ):
-            result = _CollectorBO.special_conditions(
-                gen_cls=Mock(name="gen_cls"), user=None
-            )
+        ) as mock_specialist_conditions:
+            result = MixinBase.special_conditions(gen_cls=_CollectorBO, user=None)
 
+        mock_specialist_conditions.assert_called_once_with(_CollectorBO, None)
         self.assertEqual(["base_cond", "mixin_cond"], result)
 
     async def test_store_mixin_calls_insert_for_new_object(self):
