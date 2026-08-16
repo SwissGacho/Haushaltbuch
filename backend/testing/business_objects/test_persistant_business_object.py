@@ -5,12 +5,12 @@ import json
 import unittest
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
+from business_objects.bo_mixins.specializing import Specializing
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
 from business_objects.persistent_business_object import (
     PersistentBusinessObject,
-    Specialized,
 )
 from business_objects.bo_descriptors import (
     BOStr,
@@ -416,7 +416,13 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_sql.rows = Mock(return_value=self.mock_sql)
         self.mock_sql.returning = Mock(return_value=self.mock_sql)
         self.mock_sql.assignment = Mock(return_value=self.mock_sql)
-        self.MockSQL = Mock(name="MockSQL", return_value=self.mock_sql)
+        self.mock_subsql = Mock(name="mock_subsql")
+        self.mock_subsql.select = Mock(return_value=self.mock_subsql)
+        self.mock_subsql.from_ = Mock(return_value=self.mock_subsql)
+        self.mock_subsql.where = Mock(return_value=self.mock_subsql)
+        self.MockSQL = Mock(
+            name="MockSQL", side_effect=[self.mock_sql, self.mock_subsql]
+        )
 
         self.mock_tx = AsyncMock(name="mock_transaction")
         self.mock_tx.__aenter__ = AsyncMock(return_value=self.mock_tx)
@@ -437,13 +443,26 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             patch(
                 "business_objects.persistent_business_object." + patch_exp
             ) as MockExp,
+            patch(
+                "business_objects.persistent_business_object.SQLSubquery"
+            ) as MockSubquery,
         ):
+            mock_subselect = Mock(name="mock_subselect")
+            MockSubquery.return_value = self.mock_subsql
             if newest == DEFAULT:
                 result = await self.mock_bo.fetch()
             else:
                 result = await self.mock_bo.fetch(newest=newest)
 
-            self.MockSQL.assert_called_once_with()
+            if newest and newest is not DEFAULT:
+                MockSubquery.assert_called_once_with(self.mock_subsql)
+                self.mock_subsql.select.assert_called_once_with(["MAX(id) as max_id"])
+                self.mock_subsql.from_.assert_called_once_with(MOCK_TAB2)
+                self.mock_subsql.where.assert_not_called()
+                self.assertEqual(self.MockSQL.call_args_list, [call(), call()])
+            else:
+                MockSubquery.assert_not_called()
+                self.MockSQL.assert_called_once_with()
             self.mock_sql.__aenter__.assert_awaited_once_with()
             self.mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
             self.mock_sql.select.assert_called_once_with([], True)
@@ -479,29 +498,29 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_202_fetch_newest(self):
         await self._202_fetch(
-            "SQLExpression", (f"id = (SELECT MAX(id) FROM {MOCK_TAB2})",), newest=True
+            "Eq", (f"id = (SELECT MAX(id) FROM {MOCK_TAB2})",), newest=True
         )
 
     async def test_203_store_insert(self):
-        self.mock_bo._insert_self = AsyncMock(name="_insert_self")
-        self.mock_bo._update_self = AsyncMock(name="_update_self")
+        self.mock_bo.insert_self = AsyncMock(name="_insert_self")
+        self.mock_bo.update_self = AsyncMock(name="_update_self")
         session = Mock(name="session")
 
         await self.mock_bo.store(session=session)
 
-        self.mock_bo._insert_self.assert_awaited_once_with(session)
-        self.mock_bo._update_self.assert_not_awaited()
+        self.mock_bo.insert_self.assert_awaited_once_with(session)
+        self.mock_bo.update_self.assert_not_awaited()
 
     async def test_203_store_update_self(self):
-        self.mock_bo._insert_self = AsyncMock(name="_insert_self")
-        self.mock_bo._update_self = AsyncMock(name="_update_self")
+        self.mock_bo.insert_self = AsyncMock(name="_insert_self")
+        self.mock_bo.update_self = AsyncMock(name="_update_self")
         self.mock_bo.id = 77
         session = Mock(name="session")
 
         await self.mock_bo.store(session=session)
 
-        self.mock_bo._insert_self.assert_not_awaited()
-        self.mock_bo._update_self.assert_awaited_once_with(session)
+        self.mock_bo.insert_self.assert_not_awaited()
+        self.mock_bo.update_self.assert_awaited_once_with(session)
 
     async def _204_insert_self(
         self, mock_attr1="micki mock", mock_attr3=[], **mock_attrs
@@ -515,12 +534,12 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 new=self.MockSQLTx,
             ),
             patch(
-                "business_objects.persistent_business_object.PersistentBusinessObject._fetch_self"
+                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
             ) as mock_fetch_self,
         ):
             mock_bo = MockPersistentBO2(**mock_attrs)
 
-            await mock_bo._insert_self(session=session)
+            await mock_bo.insert_self(session=session)
 
             self.MockSQLTx.assert_called_once_with()
             self.mock_tx.__aenter__.assert_awaited_once_with()
@@ -540,7 +559,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
     async def test_204a_insert_self(self):
         with self.assertRaises(AssertionError):
             self.mock_bo.id = 77
-            await self.mock_bo._insert_self()
+            await self.mock_bo.insert_self()
 
     async def test_204b_insert_self(self):
         await self._204_insert_self()
@@ -569,7 +588,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 new=mock_convert_from_db,
             ),
             patch(
-                "business_objects.persistent_business_object.PersistentBusinessObject._fetch_self"
+                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
             ) as mock_fetch_self,
             patch(
                 "business_objects.persistent_business_object.datetime"
@@ -617,9 +636,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             if exception:
                 self.mock_sql.execute.side_effect = [Exception, None]
                 with self.assertRaises(Exception):
-                    await self.mock_bo._update_self(session=session)
+                    await self.mock_bo.update_self(session=session)
             else:
-                await self.mock_bo._update_self(session=session)
+                await self.mock_bo.update_self(session=session)
 
             self.MockSQLTx.assert_called_once_with()
             self.mock_tx.__aenter__.assert_awaited_once_with()
@@ -654,7 +673,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_205a_update_self(self):
         with self.assertRaises(AssertionError) as exp:
-            await self.mock_bo._update_self()
+            await self.mock_bo.update_self()
 
     async def test_205b_update_self(self):
         self.mock_bo = MockPersistentBO2(bo_id=55)
@@ -744,8 +763,8 @@ class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_date, res)
 
 
-class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
-    """Tests for the Specialized mixin and related PersistentBusinessObject behaviour."""
+class Test_400_Specializing(unittest.IsolatedAsyncioTestCase):
+    """Tests for the Specializing mixin and related PersistentBusinessObject behaviour."""
 
     # ------------------------------------------------------------------ #
     #  Fixture classes – defined locally so each test run is deterministic #
@@ -757,15 +776,15 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         class GenericBO(PersistentBusinessObject):
             generic_attr = BOStr()
 
-        class SpecializedBO(Specialized, GenericBO):
+        class SpecializingBO(Specializing, GenericBO):
             special_attr = BOStr()
 
-        class VerySpecializedBO(SpecializedBO):
+        class VerySpecializingBO(SpecializingBO):
             very_special_attr = BOStr()
 
         self.GenericBO = GenericBO
-        self.SpecializedBO = SpecializedBO
-        self.VerySpecializedBO = VerySpecializedBO
+        self.SpecializingBO = SpecializingBO
+        self.VerySpecializingBO = VerySpecializingBO
 
     # ------------------------------------------------------------------ #
     #  is_specializing                                                     #
@@ -775,12 +794,12 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.GenericBO.is_specializing())
 
     def test_401_is_specializing_true_for_specialized_mixin(self):
-        self.assertTrue(self.SpecializedBO.is_specializing())
+        self.assertTrue(self.SpecializingBO.is_specializing())
 
     def test_401_is_specializing_true_for_subclass_of_specialized(self):
-        """A class that inherits from a Specialized BO (without re-applying the mixin)
+        """A class that inherits from a Specializing BO (without re-applying the mixin)
         is also considered specializing."""
-        self.assertTrue(self.VerySpecializedBO.is_specializing())
+        self.assertTrue(self.VerySpecializingBO.is_specializing())
 
     def test_401_is_specializing_false_for_pbo_base(self):
         """PersistentBusinessObject itself is not a specialization."""
@@ -791,21 +810,21 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
     # ------------------------------------------------------------------ #
 
     def test_402_register_bo_class_populates_specialists_on_generic(self):
-        """Registering a Specialized BO must add it to the base BO's specialists set."""
-        self.SpecializedBO.register_bo_class()
-        self.assertIn(self.SpecializedBO, self.GenericBO.specialists)
+        """Registering a Specializing BO must add it to the base BO's specialists set."""
+        self.SpecializingBO.register_bo_class()
+        self.assertIn(self.SpecializingBO, self.GenericBO.specialists)
 
     def test_402_register_bo_class_also_adds_self_to_own_specialists(self):
         """After registration the specializing class must appear in its own specialists set."""
-        self.SpecializedBO.register_bo_class()
-        self.assertIn(self.SpecializedBO, self.SpecializedBO.specialists)
+        self.SpecializingBO.register_bo_class()
+        self.assertIn(self.SpecializingBO, self.SpecializingBO.specialists)
 
     def test_402_register_bo_class_multi_level(self):
-        """Registering VerySpecializedBO must propagate to both SpecializedBO and GenericBO."""
-        self.SpecializedBO.register_bo_class()
-        self.VerySpecializedBO.register_bo_class()
-        self.assertIn(self.VerySpecializedBO, self.GenericBO.specialists)
-        self.assertIn(self.VerySpecializedBO, self.SpecializedBO.specialists)
+        """Registering VerySpecializingBO must propagate to both SpecializingBO and GenericBO."""
+        self.SpecializingBO.register_bo_class()
+        self.VerySpecializingBO.register_bo_class()
+        self.assertIn(self.VerySpecializingBO, self.GenericBO.specialists)
+        self.assertIn(self.VerySpecializingBO, self.SpecializingBO.specialists)
 
     def test_402_register_bo_class_non_specializing_unaffected(self):
         """Registering a plain BO must not alter its (empty) specialists set."""
@@ -818,7 +837,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
 
     def test_403_attribute_descriptions_without_include_specialized(self):
         """Without include_specialized the base BO returns only its own attributes."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         names = [
             d.name
             for d in self.GenericBO.attribute_descriptions(include_specialized=False)
@@ -828,7 +847,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
 
     def test_403_attribute_descriptions_with_include_specialized(self):
         """With include_specialized=True the base BO also returns attributes of specialist BOs."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         names = [
             d.name
             for d in self.GenericBO.attribute_descriptions(include_specialized=True)
@@ -839,7 +858,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
     def test_403_attribute_descriptions_no_duplicates(self):
         """Attributes already present on the base BO must not be duplicated even if a
         specialist declares the same attribute name."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         names = [
             d.name
             for d in self.GenericBO.attribute_descriptions(include_specialized=True)
@@ -847,21 +866,21 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(names), len(set(names)))
 
     # ------------------------------------------------------------------ #
-    #  sql_create_table – skip for Specialized                             #
+    #  sql_create_table – skip for Specializing                             #
     # ------------------------------------------------------------------ #
 
     async def test_404_sql_create_table_skipped_for_specialized(self):
-        """sql_create_table must be a no-op for a Specialized BO (it shares the base table)."""
+        """sql_create_table must be a no-op for a Specializing BO (it shares the base table)."""
         MockSQLTx = Mock(name="MockSQLTx")
         with patch(
             "business_objects.persistent_business_object.SQLTransaction",
             new=MockSQLTx,
         ):
-            await self.SpecializedBO.sql_create_table()
+            await self.SpecializingBO.sql_create_table()
         MockSQLTx.assert_not_called()
 
     async def test_404_sql_create_table_executes_for_generic(self):
-        """sql_create_table must proceed normally for a non-Specialized base BO."""
+        """sql_create_table must proceed normally for a non-Specializing base BO."""
         mock_sql = Mock(name="mock_sql")
         mock_sql.create_table = Mock(return_value=mock_sql)
         mock_sql.column = Mock()
@@ -896,33 +915,35 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
 
     def test_405_filter_conditions_with_specialists_no_extra_cond(self):
         """With specialists _filter_conditions wraps a bo_name IN expression."""
-        self.SpecializedBO.register_bo_class()
-        with (
-            patch("business_objects.persistent_business_object.In") as MockIn,
-            patch(
-                "business_objects.persistent_business_object.ColumnName"
-            ) as MockColumnName,
-            patch(
-                "business_objects.persistent_business_object.SQLString"
-            ) as MockSQLString,
-        ):
+        self.SpecializingBO.register_bo_class()
+        mock_special_cond = Mock(name="mock_special_cond")
+        with patch(
+            "business_objects.persistent_business_object.MixinBase.special_conditions",
+            return_value=[mock_special_cond],
+        ) as mock_special_conditions:
             result = self.GenericBO._filter_conditions(None)
-        MockColumnName.assert_called_once_with("bo_name")
-        MockIn.assert_called_once()
-        self.assertIs(result, MockIn())
+        mock_special_conditions.assert_called_once_with(
+            gen_cls=self.GenericBO, user=None
+        )
+        self.assertIs(result, mock_special_cond)
 
     def test_405_filter_conditions_with_specialists_and_extra_cond(self):
         """With specialists and extra conditions _filter_conditions combines both with And."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         mock_cond = Mock(name="mock_condition")
+        mock_special_cond = Mock(name="mock_special_cond")
         with (
-            patch("business_objects.persistent_business_object.In") as MockIn,
-            patch("business_objects.persistent_business_object.ColumnName"),
-            patch("business_objects.persistent_business_object.SQLString"),
+            patch(
+                "business_objects.persistent_business_object.MixinBase.special_conditions",
+                return_value=[mock_special_cond],
+            ) as mock_special_conditions,
             patch("business_objects.persistent_business_object.And") as MockAnd,
         ):
             result = self.GenericBO._filter_conditions(mock_cond)
-        MockAnd.assert_called_once_with([MockIn(), mock_cond])
+        mock_special_conditions.assert_called_once_with(
+            gen_cls=self.GenericBO, user=None
+        )
+        MockAnd.assert_called_once_with([mock_cond, mock_special_cond])
         self.assertIs(result, MockAnd())
 
     # ------------------------------------------------------------------ #
@@ -932,7 +953,7 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
     async def test_406_get_matching_objects_adds_bo_name_for_specialists(self):
         """When attributes are requested and specialists exist, 'bo_name' must be
         appended to the SELECT column list automatically."""
-        self.SpecializedBO.register_bo_class()
+        self.SpecializingBO.register_bo_class()
         mock_cursor = Mock(name="mock_cursor")
         mock_cursor.fetchall = AsyncMock(return_value=[])
         mock_sql = Mock(name="mock_sql")
@@ -945,10 +966,10 @@ class Test_400_Specialized(unittest.IsolatedAsyncioTestCase):
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
-            patch("business_objects.persistent_business_object.Filter"),
-            patch("business_objects.persistent_business_object.In"),
-            patch("business_objects.persistent_business_object.ColumnName"),
-            patch("business_objects.persistent_business_object.SQLString"),
+            patch(
+                "business_objects.persistent_business_object.MixinBase.special_conditions",
+                return_value=[],
+            ),
         ):
             await self.GenericBO.get_matching_objects(
                 conditions=None, attributes=["generic_attr"]

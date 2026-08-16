@@ -25,7 +25,7 @@ from database.sql_expression import (
     SQLExpression,
     Value,
 )
-from database.sql_key_manager import SQL_Dict
+from database.sql_key_manager import SQLKeyManager, SQL_Dict
 from business_objects.bo_descriptors import BOColumnConstraint
 
 
@@ -186,6 +186,24 @@ class Select(TableValuedQuery):
         self._having = Having(condition, parent=self)
         return self
 
+
+class SQLSubquery(SQLExpression):
+    """Represents a SQL subquery."""
+
+    def __init__(self, subquery: str | Select):
+        if isinstance(subquery, str) or isinstance(subquery, Select):
+            self._subquery = subquery
+        else:
+            raise TypeError(
+                f"SQLSubquery.__init__: Expected str or Select, got {type(subquery)}"
+            )
+
+    def get_query(self, km: SQLKeyManager) -> str:
+        """Get the SQL query for this expression."""
+        if isinstance(self._subquery, str):
+            return f"({self._subquery})"
+        query_params = self._subquery.get_sql()
+        return f"({km.merge_params(**query_params)})"
 
 class Insert(SQLStatement):
     """A SQLStatement representing an INSERT statement.

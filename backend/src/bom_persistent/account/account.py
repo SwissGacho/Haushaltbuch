@@ -6,11 +6,9 @@ LOG = getLogger(__name__)
 
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_attribute_base import BaseFlag
-from business_objects.persistent_business_object import (
-    PersistentBusinessObject,
-    Singleton,
-    Specialized,
-)
+from business_objects.persistent_business_object import PersistentBusinessObject
+from business_objects.bo_mixins.singleton import Singleton
+from business_objects.bo_mixins.specializing import Specializing
 
 from business_objects.bo_descriptors import (
     BODatetime,
@@ -32,11 +30,11 @@ class Account(PersistentBusinessObject):
     is_root_bo: bool = True
 
 
-class DefaultDebitAccount(Specialized, Singleton, Account):
+class DefaultDebitAccount(Specializing, Singleton, Account):
     """A default debit account, used when no debit account is specified in a transaction"""
 
 
-class DefaultCreditAccount(Specialized, Singleton, Account):
+class DefaultCreditAccount(Specializing, Singleton, Account):
     """A default credit account, used when no credit account is specified in a transaction"""
 
 

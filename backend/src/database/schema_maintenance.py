@@ -77,10 +77,11 @@ async def check_db_schema():
         #     raise DBSchemaError("No tables in DB")
         LOG.debug(f"Found {table_count} tables in DB")
         if table_count > 0:
-            for line in pprint_lines(
-                [row["table_name"] for row in await cur.fetchall()]
-            ):
-                LOG.log(VERBOSE_DEBUG, line)
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                for line in pprint_lines(
+                    [row["table_name"] for row in await cur.fetchall()]
+                ):
+                    LOG.log(VERBOSE_DEBUG, line)
 
             try:
                 db_schema = await DBSchema().fetch(newest=True)
