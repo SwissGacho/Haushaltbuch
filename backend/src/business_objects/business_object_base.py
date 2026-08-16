@@ -238,9 +238,9 @@ class BOBase(BOBaseBase):
     def register_bo_class(cls):
         "Register the Business Object."
         BOBase._business_objects |= {cls._name(): cls}
-        LOG.debug(
-            f"registered {'specialized ' if 'Specialized' in [base.__name__ for base in cls.__bases__] else ''}class '{cls.__name__}' as {cls._name()}"
-        )
+        LOG.debug(f"""registered {'specialized ' 
+                            if callable(is_spec:=getattr(cls, 'is_specializing', False)) and is_spec() else ''
+                            }class '{cls.__name__}' as {cls._name()}""")
 
     # pylint: disable=no-self-argument
     @_classproperty
@@ -480,10 +480,10 @@ class BOBase(BOBaseBase):
         self.notify_instance_subscribers()
         self.__class__.notify_change_subscribers(self)
 
-    async def _insert_self(self, session: Optional[SessionBase] = None):
+    async def insert_self(self, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
 
-    async def _update_self(self, session: Optional[SessionBase] = None):
+    async def update_self(self, session: Optional[SessionBase] = None):
         assert self.id is not None, "id must not be None for update operation"
 
     def notify_instance_subscribers(self):

@@ -140,6 +140,9 @@ class DB(DBBaseClass):
             )
         LOG.debug(f"Checking table '{obj.table}'")
         tab_info = await self._get_table_info(obj.table)
+        if not tab_info:
+            LOG.error(f"No information for table '{obj.table}' found in the DB")
+            return False
         attributes = obj.attribute_descriptions(include_specialized=True)
         ok = True
         for description in attributes:
