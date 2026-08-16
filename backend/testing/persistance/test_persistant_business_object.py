@@ -54,6 +54,8 @@ class MockPersistentBO2(PersistentBusinessObject):
             k: v for k, v in other._data.items()
         }
 
+    __hash__ = PersistentBusinessObject.__hash__
+
 
 class MockAttrDesc:
     def __init__(self, name, data_type, constraint, constraint_values):

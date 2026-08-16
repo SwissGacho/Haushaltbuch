@@ -165,18 +165,24 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             "mock_attr4": MockFlag.OPTION_C,
         }
         bo_new_instance = MockBO2(
-            **{"bo_id" if k == "id" else k: v for k, v in mock_new_data.items()}
+            **{("bo_id" if k == "id" else k): v for k, v in mock_new_data.items()}
         )
-        self.assertIs(
+        self.assertIsNot(
             bo_new_instance,
             bo_instance,
             msg="Creating a new instance with the same id should return the existing instance",
         )
-        self.assertEqual(
+        self.assertIs(
+            bo_new_instance._data,
             bo_instance._data,
-            mock_new_data,
-            msg="_data should be updated with new values from instance creation",
+            msg="_data should be the same for both instances",
         )
+        for key, value in mock_new_data.items():
+            self.assertEqual(
+                bo_new_instance._data[key],
+                value,
+                msg=f"_data[{key}] should be updated with new value from instance creation",
+            )
         self.assertEqual(
             bo_instance._db_data,
             mock_db_data,
@@ -187,7 +193,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         bo_instance = MockBO1()
         bo_instance.id = 1
         MockBO1.register_instance(bo_instance)
-        self.assertEqual(bo_instance, MockBO1._loaded_instances[1])
+        self.assertIn(bo_instance, MockBO1._loaded_instances)
 
     def test_102_add_attribute(self):
         class MockBO102(BOBase):
@@ -313,6 +319,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             mock_attr4=MockFlag.OPTION_A,
         )
         expected_dict = {
+            "bo_name": None,
             "id": 1,
             "last_updated": None,
             "mock_attr1": "test attr 1",

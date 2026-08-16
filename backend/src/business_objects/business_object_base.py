@@ -61,37 +61,9 @@ class BOBase(BOBaseBase):
 
     _last_subscriber_id = itertools.count(1)
 
-    def __new__(cls, *args, bo_id: int | None = None, **attributes):
-        LOG.log(
-            VERBOSE_DEBUG,
-            f"BOBase.__new__({cls.__name__}, {args=}, {bo_id=}, {attributes})",
-        )
-        if cls is BOBase:
-            raise TypeError(
-                "BOBase is an abstract class and cannot be instantiated directly"
-            )
-        if bo_id is not None:
-            if bo_id in cls._loaded_instances:
-                obj = cls._loaded_instances[bo_id]
-                assert isinstance(
-                    obj, cls
-                ), f"Loaded instance with id {bo_id} is not of type {cls.__name__}"
-                LOG.log(
-                    VERBOSE_DEBUG,
-                    f"Found loaded instance id={id(obj)}",
-                )
-                return obj
-
-        instance = super().__new__(cls)
-        instance._initialized = False
-        LOG.log(VERBOSE_DEBUG, f"Created new instance id={id(instance)}")
-        return instance
-
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
-        cls._loaded_instances: weakref.WeakValueDictionary[int, Self] = (
-            weakref.WeakValueDictionary()
-        )
+        cls._loaded_instances: weakref.WeakSet[Self] = weakref.WeakSet()
         cls._data_objects: weakref.WeakValueDictionary[int, BOData] = (
             weakref.WeakValueDictionary()
         )
@@ -113,15 +85,8 @@ class BOBase(BOBaseBase):
             LOG.debug(f"    {line}")
         LOG.log(
             VERBOSE_DEBUG,
-            f" -  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}",
+            f" -  id={id(self)}",
         )
-        if getattr(self, "_initialized", False):
-            LOG.debug(
-                f"BOBase __init__ called again for {self} "
-                f"with id {self.id}, skipping reinitialization"
-            )
-            self._init_attrs(attributes)
-            return
         self._instance_subscribers: dict[int, BOCallback] = {}
 
         if bo_id is not None:
@@ -137,11 +102,12 @@ class BOBase(BOBaseBase):
         for _data_object in self.__class__._data_objects.values():
             LOG.log(VERBOSE_DEBUG, f"{_data_object=}")
         self._db_data = {}
-        self.id = bo_id
+        if not self.id:
+            self.id = bo_id
         self.last_updated = None
         self._instance_subscriber_id = itertools.count(1)
         self._init_attrs(attributes)
-        self._initialized = True
+        self.__class__._loaded_instances.add(self)
         BOBase.subscriptions_report()
 
     def _init_attrs(self, attributes: dict[str, Any]):
@@ -234,7 +200,7 @@ class BOBase(BOBaseBase):
         if instance.id is not None:
             LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
             LOG.log(VERBOSE_DEBUG, f"   id=: {id(instance)}")
-            cls._loaded_instances[instance.id] = instance  # type: ignore
+            cls._loaded_instances.add(instance)  # type: ignore
             if instance.id not in cls._data_objects:
                 cls._data_objects[instance.id] = BOData(cls)
             cls.subscriptions_report()
@@ -496,7 +462,7 @@ class BOBase(BOBaseBase):
     ) -> dict[str, Any]:
         "dict of BO attribute values with attribute names as keys"
 
-        value_dict = {k: v for k, v in self._data.items() if k not in ("bo_type")}
+        value_dict = {k: v for k, v in self._data.items() if k not in ("bo_type",)}
         return value_dict
 
     # removed unused code to avoid warnings in TransientBusinessObject classes
@@ -524,8 +490,25 @@ class BOBase(BOBaseBase):
         """Notify all subscribers of this instance about a change."""
         # LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
         if not self.id:
+            self.notify_my_instance_subscribers()
+        self.__class__.notify_all_instance_subscribers(self)
+
+    def notify_my_instance_subscribers(self):
+        """Notify all subscribers of this instance about a change."""
+        # LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
+        if not self.id:
             return
         BOBase.notify_bo_subscribers(self._instance_subscribers, self)
+
+    @classmethod
+    def notify_all_instance_subscribers(cls, instance: "BOBase"):
+        """Notify all subscribers of a specific instance about a change."""
+        if not instance.id:
+            return
+        for loaded_instance in cls._loaded_instances:
+            if loaded_instance.id == instance.id:
+                loaded_instance.notify_my_instance_subscribers()
+        return
 
     @classmethod
     def notify_change_subscribers(cls, changed_bo: "BOBase"):
@@ -606,7 +589,7 @@ class BOBase(BOBaseBase):
                 ),
                 "change subscribers": subs_repr(bo_class._change_subscribers, bo_name),
             }
-            for instance in bo_class._loaded_instances.values():
+            for instance in bo_class._loaded_instances:
                 if len(instance._instance_subscribers) > 0:
                     subs[bo_name]["instances"].append(
                         subs_repr(instance._instance_subscribers, bo_name)
