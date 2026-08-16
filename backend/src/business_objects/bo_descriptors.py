@@ -419,7 +419,9 @@ class BORelation(_PersistentAttr[BOBaseBase]):
                 )
         elif isinstance(value, dict) and "id" in value:
             # when the frontend updates a relation, the related object is represented as a dict
-            LOG.debug(f"Converting dict {value} to {relation} instance")
+            LOG.debug(
+                f"Converting dict with id {value.get('id')} to {relation} instance"
+            )
             value = value.get("id")
         if isinstance(value, int) and isinstance(relation, type):
             value = relation(bo_id=value)
