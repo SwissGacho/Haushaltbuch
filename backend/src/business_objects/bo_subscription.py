@@ -137,6 +137,11 @@ class BOSubscription(Generic[T], WSMessageSender):
 
         payload = await self._obj.business_values_as_dict(session=self._session)
         if self._index is None or self._index == "personal":
+            if self._obj.id is None:
+                raise ValueError(
+                    f"BOSubscription.notify_subscription_subscribers: id of {self._bo_type.__name__} is None, cannot notify"
+                )
+
             index = self._obj.id
         else:
             index = self._index
