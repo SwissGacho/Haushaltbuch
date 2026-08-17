@@ -45,7 +45,6 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def is_specializing(cls: Type[Self]) -> bool:
         """Return True if this class is a specialization of another business object class."""
-        LOG.debug(f"PersistentBusinessObject.is_specializing({cls.__name__})")
         # Check if a specializing mixin is present in the MRO above
         return bool(callable(b := getattr(super(), "is_specializing", None)) and b())
 
@@ -134,8 +133,9 @@ class PersistentBusinessObject(BOBase):
 
     async def convert_from_db(self, value, typ, subtyp):
         "convert a value of type 'typ' read from the DB"
-        LOG.debug(
-            f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})"
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})",
         )
         if value is None:
             return None
