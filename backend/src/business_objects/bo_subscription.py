@@ -12,7 +12,6 @@ from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
-from messages.bo_message import ObjectMessage
 from server.ws_connection_base import WSConnectionBase, SessionBase
 from server.ws_message_sender import WSMessageSender
 from business_objects.business_object_base import BOBase
@@ -140,6 +139,9 @@ class BOSubscription(Generic[T], WSMessageSender):
         await self.notify_subscription_subscribers()
 
     async def notify_subscription_subscribers(self):
+
+        from messages.bo_message import ObjectMessage
+
         """Notify subscribers about the current state of the list."""
         if self._obj is None:
             LOG.debug(
