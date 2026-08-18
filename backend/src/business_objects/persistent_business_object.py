@@ -460,16 +460,18 @@ class PersistentBusinessObject(BOBase):
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )
         async with SQLTransaction() as txaction:
-            self.id = (
-                await (
+            self._assign_id(
+                (
                     await (
-                        txaction.sql()
-                        .insert(self.table)
-                        .rows(values_to_store)
-                        .returning("id")
-                    ).execute()
-                ).fetchone()
-            ).get("id")
+                        await (
+                            txaction.sql()
+                            .insert(self.table)
+                            .rows(values_to_store)
+                            .returning("id")
+                        ).execute()
+                    ).fetchone()
+                ).get("id")
+            )
             # read the new row back to get any default values set by the DB
             await self.fetch_self(txaction.sql(), id=self.id, session=session)
 

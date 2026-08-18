@@ -2,11 +2,13 @@
 
 import datetime
 import unittest
+import weakref
 from unittest.mock import AsyncMock, Mock, patch
 
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import AttributeDescription, BOBase
 from business_objects.business_attribute_base import BaseFlag
+from core.exceptions import DataError
 from business_objects.bo_descriptors import (
     AttributeAccessLevel,
     AttributeType,
@@ -125,6 +127,15 @@ mock_bo3_business_as_dict = {
 
 class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
 
+    def setUp(self) -> None:
+        # MockBO1/2/3 are module-level classes, so their weak, class-level
+        # id-registries (_data_objects, _loaded_instances) would otherwise
+        # leak state across test methods. Reset them before every test so
+        # tests reusing simple literal ids (e.g. bo_id=1) stay isolated.
+        for bo_class in (MockBO1, MockBO2, MockBO3):
+            bo_class._data_objects = weakref.WeakValueDictionary()
+            bo_class._loaded_instances = weakref.WeakSet()
+
     def test_100_new_instance(self):
         bo_instance_1 = MockBO1(bo_id=1)
         self.assertIsInstance(bo_instance_1, MockBO1)
@@ -165,18 +176,24 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             "mock_attr4": MockFlag.OPTION_C,
         }
         bo_new_instance = MockBO2(
-            **{"bo_id" if k == "id" else k: v for k, v in mock_new_data.items()}
+            **{("bo_id" if k == "id" else k): v for k, v in mock_new_data.items()}
         )
-        self.assertIs(
+        self.assertIsNot(
             bo_new_instance,
             bo_instance,
             msg="Creating a new instance with the same id should return the existing instance",
         )
-        self.assertEqual(
+        self.assertIs(
+            bo_new_instance._data,
             bo_instance._data,
-            mock_new_data,
-            msg="_data should be updated with new values from instance creation",
+            msg="_data should be the same for both instances",
         )
+        for key, value in mock_new_data.items():
+            self.assertEqual(
+                bo_new_instance._data[key],
+                value,
+                msg=f"_data[{key}] should be updated with new value from instance creation",
+            )
         self.assertEqual(
             bo_instance._db_data,
             mock_db_data,
@@ -185,9 +202,9 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
 
     def test_101_register_instance(self):
         bo_instance = MockBO1()
-        bo_instance.id = 1
+        bo_instance._assign_id(1)
         MockBO1.register_instance(bo_instance)
-        self.assertEqual(bo_instance, MockBO1._loaded_instances[1])
+        self.assertIn(bo_instance, MockBO1._loaded_instances)
 
     def test_102_add_attribute(self):
         class MockBO102(BOBase):
@@ -286,7 +303,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
 
     def test_115_subscribe_to_instance(self):
         bo_instance = MockBO2()
-        bo_instance.id = 1
+        bo_instance._assign_id(1)
         callback = AsyncMock()
         subscriber_id = bo_instance.subscribe_to_instance(callback)
         self.assertEqual(
@@ -296,7 +313,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
 
     def test_116_unsubscribe_from_instance(self):
         bo_instance = MockBO2()
-        bo_instance.id = 1
+        bo_instance._assign_id(1)
         callback = AsyncMock()
         subscriber_id = bo_instance.subscribe_to_instance(callback)
         bo_instance.unsubscribe_from_instance(subscriber_id)
@@ -313,6 +330,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             mock_attr4=MockFlag.OPTION_A,
         )
         expected_dict = {
+            "bo_name": None,
             "id": 1,
             "last_updated": None,
             "mock_attr1": "test attr 1",
@@ -324,6 +342,12 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         bo_instance.mock_attr4 = MockFlag.OPTION_B
         expected_dict["mock_attr4"] = MockFlag.OPTION_B
         self.assertEqual(await bo_instance.business_values_as_dict(), expected_dict)
+
+    def test_118_get_business_object_by_name(self):
+        MockBO2.register_bo_class()
+        self.assertEqual(BOBase.get_business_object_by_name("mockbo2"), MockBO2)
+        with self.assertRaises(ValueError):
+            BOBase.get_business_object_by_name("non_existent_bo")
 
     async def test_119_store(self):
         with patch(
@@ -346,7 +370,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             "business_objects.business_object_base.BOBase.notify_bo_subscribers"
         ) as MockBOBaseNotify:
             bo_instance = MockBO2()
-            bo_instance.id = 1
+            bo_instance._assign_id(1)
             bo_instance.notify_instance_subscribers()
             MockBOBaseNotify.assert_called_once_with(
                 bo_instance._instance_subscribers, bo_instance
@@ -357,7 +381,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             "business_objects.business_object_base.BOBase.notify_bo_subscribers"
         ) as MockBOBaseNotify:
             bo_instance = MockBO2()
-            bo_instance.id = 1
+            bo_instance._assign_id(1)
             MockBO2.notify_change_subscribers(bo_instance)
             MockBOBaseNotify.assert_called_once_with(
                 bo_instance._change_subscribers, bo_instance
@@ -369,7 +393,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             MockCreateTask.return_value = mockTask
             mockTask.add_done_callback = Mock()
             bo_instance = MockBO2()
-            bo_instance.id = 1
+            bo_instance._assign_id(1)
             callback = Mock()
             callback.__name__ = "callback"
             BOBase.notify_bo_subscribers({1: callback}, bo_instance)
@@ -380,8 +404,49 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
                 bo_instance.handle_callback_result
             )
 
-    def test_118_get_business_object_by_name(self):
-        MockBO2.register_bo_class()
-        self.assertEqual(BOBase.get_business_object_by_name("mockbo2"), MockBO2)
+    def test_123_get_data_set_data(self):
+        bo_instance = MockBO2()
+
+        bo_instance.set_data(MockBO2.mock_attr1, "direct value")
+        self.assertEqual(bo_instance.get_data(MockBO2.mock_attr1), "direct value")
+
+        unnamed_descriptor = BOStr()
         with self.assertRaises(ValueError):
-            BOBase.get_business_object_by_name("non_existent_bo")
+            bo_instance.get_data(unnamed_descriptor)
+        with self.assertRaises(ValueError):
+            bo_instance.set_data(unnamed_descriptor, "value")
+
+    def test_124_register_instance_shares_data_with_deferred_id_assignment(self):
+        """When an instance's id becomes known only after construction (as happens
+        for a newly inserted object via 'self.id = <new id>'), any other instance
+        later constructed with that same bo_id must share the same underlying
+        BOData -- not a disconnected, empty one -- so that attribute values and
+        change notifications stay consistent across all instances of that id.
+        """
+        first = MockBO2()
+        first.mock_attr1 = "original value"
+        first._assign_id(424242)
+
+        second = MockBO2(bo_id=424242)
+
+        self.assertIs(second._data, first._data)
+        self.assertEqual(second.mock_attr1, "original value")
+
+        first.mock_attr1 = "updated value"
+        self.assertEqual(second.mock_attr1, "updated value")
+
+    def test_125_register_instance_conflicting_data_raises(self):
+        """If _data_objects already holds a BOData for a given id (because some
+        other instance registered it first) and the registering instance carries
+        its own, different BOData, there is no safe way to decide which data
+        should win -- this is a genuine data-consistency conflict and must raise
+        rather than silently discarding either side's values.
+        """
+        first = MockBO2()
+        first.mock_attr1 = "first value"
+        first._assign_id(555555)
+
+        second = MockBO2()
+        second.mock_attr1 = "second value, conflicts with first"
+        with self.assertRaises(DataError):
+            second._assign_id(555555)

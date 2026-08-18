@@ -1,4 +1,4 @@
-"""Connection to SQLit DB using aiosqlite"""
+"""Connection to SQLite DB using aiosqlite"""
 
 from __future__ import annotations
 
