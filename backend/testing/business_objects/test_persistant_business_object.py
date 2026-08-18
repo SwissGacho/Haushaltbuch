@@ -431,10 +431,15 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.MockSQLTx = Mock(name="MockSQL", return_value=self.mock_tx)
 
     async def test_201_fetch_none(self):
-        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
+        with (
+            patch("business_objects.persistent_business_object.SQL", new=self.MockSQL),
+            patch(
+                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
+            ) as mock_fetch_self,
+        ):
             self.mock_bo.id = None
             result = await self.mock_bo.fetch()
-            self.MockSQL.assert_not_called()
+            mock_fetch_self.assert_not_awaited()
             self.assertIs(result, self.mock_bo)
 
     async def _202_fetch(self, patch_exp, exp_params, newest=DEFAULT):

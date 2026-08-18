@@ -28,7 +28,7 @@ class Singleton(MixinBase):
     """
 
     async def fetch_mixin(
-        self, id=None, newest=None, session: Optional[SessionBase] = None
+        self, sql: SQL, id=None, newest=None, session: Optional[SessionBase] = None
     ):
         """Fetch the content for a singleton BO instance from the DB.
         If 'id' is given, fetch the identified object
@@ -37,34 +37,21 @@ class Singleton(MixinBase):
         in the DB and returned with a new id.
         """
         LOG.debug(f"Singleton.fetch({id=}, {newest=})")
-        next_mixin = getattr(super(), "fetch_mixin", None)
-        if next_mixin and not iscoroutinefunction(next_mixin):
-            raise TypeError(
-                f"Singleton.fetch_mixin: Next fetch_mixin in MRO is not a coroutine function in {type(self).__name__}"
-            )
-        fetch_self = getattr(self, "fetch_self", None)
         store = getattr(self, "store", None)
-        if not (iscoroutinefunction(fetch_self) and iscoroutinefunction(store)):
+        if not iscoroutinefunction(store):
             raise TypeError(
                 f"Singleton.fetch_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
             )
         if id is None:
-            id = getattr(self, "id", None)
-        if id is None:
             newest = True
-        async with SQL() as sql:
-            await (next_mixin or fetch_self)(sql, id=id, newest=newest, session=session)
+        await super().fetch_mixin(sql, id=id, newest=newest, session=session)
 
         if getattr(self, "id", None) is None:
             LOG.debug(
-                f"{self}.business_values_as_dict: No {type(self).__name__} found for user {getattr(session, 'user', None)}."
+                f"Singleton.fetch_mixin: No {type(self).__name__} found for user {getattr(session, 'user', None)}."
                 " Returning a new empty one."
             )
-            if hasattr(self, "user_id"):
-                self.user_id = getattr(session, "user", None)
             await store(session=session)
-
-        return self
 
     async def store_mixin(self, session: Optional[SessionBase] = None):
         """Store the business object in the database.
