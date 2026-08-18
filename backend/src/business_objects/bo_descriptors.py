@@ -251,12 +251,10 @@ class BODecimal(_PersistentAttr[Decimal]):
 
 class BOId(BOInt):
     def __set__(self, obj, value):
-        if self.my_name in obj._data and obj._data[self.my_name] is not None:
-            raise ValueError(
-                f"Cannot set id of existing object. {self.my_name=}, {obj._data[self.my_name]=}"
-            )
-        super().__set__(obj=obj, value=value)
-        obj.__class__.register_instance(obj)
+        raise ValueError(
+            f"'{self.my_name}' cannot be assigned directly; use the constructor's "
+            "bo_id= parameter to reference an existing object, or let insert/fetch assign it."
+        )
 
 
 class BOStr(_PersistentAttr[str]):

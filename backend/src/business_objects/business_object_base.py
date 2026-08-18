@@ -22,6 +22,7 @@ LOG = getLogger(__name__)
 
 from core.util import _classproperty
 from core.app import App
+from core.exceptions import DataError
 from business_objects.bo_data import BOData
 from business_objects.bo_descriptors import (
     AttributeAccessLevel,
@@ -103,12 +104,20 @@ class BOBase(BOBaseBase):
             LOG.log(VERBOSE_DEBUG, f"{_data_object=}")
         self._db_data = {}
         if not self.id:
-            self.id = bo_id
+            self._assign_id(bo_id)
         self.last_updated = None
         self._instance_subscriber_id = itertools.count(1)
         self._init_attrs(attributes)
         self.__class__._loaded_instances.add(self)
         BOBase.subscriptions_report()
+
+    def _assign_id(self, value: int | None) -> None:
+        """Internal use only. Assign 'id' directly, bypassing the public setter's
+        restriction. Must only be called from BOBase.__init__ (bo_id=...),
+        TransientBusinessObject's id generator, or PersistentBusinessObject's
+        insert flow -- never from application code."""
+        self.set_data(self.__class__.id, value)
+        self.__class__.register_instance(self)
 
     def _init_attrs(self, attributes: dict[str, Any]):
         for attribute, value in attributes.items():
@@ -202,7 +211,15 @@ class BOBase(BOBaseBase):
             LOG.log(VERBOSE_DEBUG, f"   id=: {id(instance)}")
             cls._loaded_instances.add(instance)  # type: ignore
             if instance.id not in cls._data_objects:
-                cls._data_objects[instance.id] = BOData(cls)
+                cls._data_objects[instance.id] = instance._data
+            elif cls._data_objects[instance.id] is not instance._data:
+                raise DataError(
+                    f"{cls.__name__} instance with id {instance.id} carries data "
+                    "that diverges from the data already registered for that id. "
+                    "This indicates two independently created/edited instances "
+                    "have ended up claiming the same id, and there is no safe way "
+                    "to decide which data should take precedence."
+                )
             cls.subscriptions_report()
 
     @classmethod

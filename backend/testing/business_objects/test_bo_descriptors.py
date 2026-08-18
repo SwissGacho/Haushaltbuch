@@ -8,7 +8,11 @@ import unittest
 from unittest.mock import Mock, ANY, patch
 
 import business_objects.bo_descriptors
-from business_objects.bo_descriptors import AttributeAccessLevel, BOSelf
+from business_objects.bo_descriptors import (
+    _PersistentAttr,
+    AttributeAccessLevel,
+    BOSelf,
+)
 from business_objects.bo_semantic_role import BOSemanticRole
 from core.exceptions import OperationalError
 
@@ -52,6 +56,28 @@ class MockBO:
             access_level,
             flag_values,
         )
+
+    def get_data[T](self, bo_descriptor: _PersistentAttr[T]) -> T | None:
+        """Get the data of a business object attribute.
+        This method is used to access the data of a business object attribute
+        in a type-safe way, using the attribute descriptor.
+        """
+        if not bo_descriptor.my_name:
+            raise ValueError(
+                f"Attribute descriptor {bo_descriptor} has no name assigned"
+            )
+        return self._data.get(bo_descriptor.my_name)
+
+    def set_data[T](self, bo_descriptor: _PersistentAttr[T], value: T | None):
+        """Set the data of a business object attribute.
+        This method is used to set the data of a business object attribute
+        in a type-safe way, using the attribute descriptor.
+        """
+        if not bo_descriptor.my_name:
+            raise ValueError(
+                f"Attribute descriptor {bo_descriptor} has no name assigned"
+            )
+        self._data[bo_descriptor.my_name] = value
 
 
 class Test_100__PersistentAttr(unittest.TestCase):
@@ -105,7 +131,6 @@ class MockFlag(business_objects.bo_descriptors.BaseFlag):
 
 class MockObj(business_objects.bo_descriptors.BOBaseBase):
     _attributes = {"MockObj": []}
-    _data = {}
     int_attr = business_objects.bo_descriptors.BOInt(
         business_objects.bo_descriptors.BOColumnConstraint.BOC_PK_INC
     )
@@ -125,6 +150,15 @@ class MockObj(business_objects.bo_descriptors.BOBaseBase):
     rel_self_attr = business_objects.bo_descriptors.BORelation(BOSelf)
     flag_attr = business_objects.bo_descriptors.BOFlag(flag_type=MockFlag)
     decimal_attr = business_objects.bo_descriptors.BODecimal()
+
+    def __init__(self) -> None:
+        self._data = {}
+
+    def get_data(self, bo_descriptor):
+        return self._data.get(bo_descriptor.my_name)
+
+    def set_data(self, bo_descriptor, value):
+        self._data[bo_descriptor.my_name] = value
 
     @classmethod
     def add_attribute(
@@ -389,3 +423,54 @@ class Test_200_BOAttributes(unittest.TestCase):
 
             mock_obj.decimal_attr = 3.14
             self.assertEqual(mock_obj.decimal_attr, Decimal(str(3.14)))
+
+
+class MockIdOwner(business_objects.bo_descriptors.BOBaseBase):
+    """Minimal BOBaseBase subclass exposing a BOId attribute, to test BOId's
+    own assignment restrictions in isolation from the full BOBase machinery."""
+
+    _attributes = {"MockIdOwner": []}
+    id_attr = business_objects.bo_descriptors.BOId()
+
+    def __init__(self) -> None:
+        self._data = {}
+
+    def get_data(self, bo_descriptor):
+        return self._data.get(bo_descriptor.my_name)
+
+    def set_data(self, bo_descriptor, value):
+        self._data[bo_descriptor.my_name] = value
+
+    @classmethod
+    def add_attribute(
+        cls,
+        attribute_name,
+        data_type,
+        constraint_flag,
+        attribute_type,
+        access_level=AttributeAccessLevel.AAL_READ_WRITE,
+        **flag_values,
+    ):
+        cls._attributes["MockIdOwner"].append(attribute_name)
+
+    @classmethod
+    def register_instance(cls, instance):
+        "Not expected to be exercised once BOId.__set__ rejects direct assignment"
+
+
+class Test_300_BOId(unittest.TestCase):
+    """BOId must not be directly assignable via 'obj.id_attr = value'. The only
+    legitimate ways to establish an object's id are: passing bo_id= to the
+    constructor, TransientBusinessObject's own id generator, or the DB-issued
+    id assigned right after an INSERT -- never an arbitrary direct assignment."""
+
+    def test_301_direct_assignment_is_rejected(self):
+        obj = MockIdOwner()
+        with self.assertRaises(ValueError):
+            obj.id_attr = 5
+
+    def test_302_direct_assignment_is_rejected_even_when_already_set(self):
+        obj = MockIdOwner()
+        obj._data["id_attr"] = 5
+        with self.assertRaises(ValueError):
+            obj.id_attr = 6

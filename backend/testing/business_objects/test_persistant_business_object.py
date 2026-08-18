@@ -434,7 +434,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_201_fetch_none(self):
         with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
-            self.mock_bo.id = None
+            self.mock_bo._assign_id(None)
             result = await self.mock_bo.fetch()
             self.MockSQL.assert_not_called()
             self.assertIs(result, self.mock_bo)
@@ -495,7 +495,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_202_fetch_no_param(self):
         REQ_ID = 19
-        self.mock_bo.id = REQ_ID
+        self.mock_bo._assign_id(REQ_ID)
         await self._202_fetch("Eq", ("id", REQ_ID))
 
     async def test_202_fetch_newest(self):
@@ -516,7 +516,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
     async def test_203_store_update_self(self):
         self.mock_bo.insert_self = AsyncMock(name="_insert_self")
         self.mock_bo.update_self = AsyncMock(name="_update_self")
-        self.mock_bo.id = 77
+        self.mock_bo._assign_id(77)
         session = Mock(name="session")
 
         await self.mock_bo.store(session=session)
@@ -560,7 +560,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_204a_insert_self(self):
         with self.assertRaises(AssertionError):
-            self.mock_bo.id = 77
+            self.mock_bo._assign_id(77)
             await self.mock_bo.insert_self()
 
     async def test_204b_insert_self(self):
