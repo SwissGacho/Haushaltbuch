@@ -34,7 +34,7 @@ class Singleton(MixinBase):
         If 'id' is given, fetch the identified object
         If 'id' omitted and 'newest'=True fetch the object with highest id
         If the object is not found in the DB the current instance is stored
-        in the DB and returned with a new id.
+        in the DB and update the id using the DB autoincrement.
         """
         LOG.debug(f"Singleton.fetch({id=}, {newest=})")
         store = getattr(self, "store", None)

@@ -156,14 +156,13 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
         mock_specialist_conditions.assert_called_once_with(_CollectorBO, None)
         self.assertEqual(["base_cond", "mixin_cond"], result)
 
-    async def test_fetch_mixin_forwards_arguments_and_returns_self(self):
+    async def test_fetch_mixin_forwards_arguments(self):
         target = _FetchTarget()
         sql = Mock(name="sql")
         session = Mock(name="session")
 
         result = await target.fetch_mixin(sql=sql, id=123, newest=True, session=session)
 
-        self.assertIs(target, result)
         self.assertEqual([(sql, 123, True, session)], target.fetch_calls)
 
     async def test_fetch_mixin_raises_for_non_coroutine_fetch_self(self):

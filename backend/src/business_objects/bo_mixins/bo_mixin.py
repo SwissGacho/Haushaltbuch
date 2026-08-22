@@ -161,7 +161,6 @@ class MixinBase:
                 f"MixinBase.fetch_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
             )
         await fetch_self(sql, id=id, newest=newest, session=session)
-        return self
 
     async def store_mixin(self, session: Optional[SessionBase] = None):
         """Store the business object in the database.
