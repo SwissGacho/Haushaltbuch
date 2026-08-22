@@ -12,6 +12,7 @@ from business_objects.business_attribute_base import BaseFlag
 from business_objects.persistent_business_object import (
     PersistentBusinessObject,
 )
+from business_objects.bo_mixins.bo_mixin import MixinBase
 from business_objects.bo_descriptors import (
     BOStr,
     BODescriptorList,
@@ -53,6 +54,10 @@ class MockPersistentBO2(PersistentBusinessObject):
         return {k: v for k, v in self._data.items()} == {
             k: v for k, v in other._data.items()
         }
+
+
+class MockPersistentBOWithDefaultMixin(MixinBase, PersistentBusinessObject):
+    pass
 
 
 class MockAttrDesc:
@@ -431,11 +436,26 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.MockSQLTx = Mock(name="MockSQL", return_value=self.mock_tx)
 
     async def test_201_fetch_none(self):
-        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
+        with (
+            patch("business_objects.persistent_business_object.SQL", new=self.MockSQL),
+            patch(
+                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
+            ) as mock_fetch_self,
+        ):
             self.mock_bo.id = None
             result = await self.mock_bo.fetch()
             self.MockSQL.assert_not_called()
+            mock_fetch_self.assert_not_awaited()
             self.assertIs(result, self.mock_bo)
+
+    async def test_201_fetch_none_with_default_mixin_returns_without_sql(self):
+        target = MockPersistentBOWithDefaultMixin(bo_id=None)
+        target.id = None
+        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
+            result = await target.fetch()
+
+        self.MockSQL.assert_not_called()
+        self.assertIs(result, target)
 
     async def _202_fetch(self, patch_exp, exp_params, newest=DEFAULT):
         with (

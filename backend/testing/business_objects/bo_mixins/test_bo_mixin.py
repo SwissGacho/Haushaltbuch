@@ -87,6 +87,19 @@ class _StoreTargetInvalid(MixinBase):
         return None
 
 
+class _FetchTarget(MixinBase):
+    def __init__(self):
+        self.fetch_calls = []
+
+    async def fetch_self(self, sql, id=None, newest=None, session=None):
+        self.fetch_calls.append((sql, id, newest, session))
+
+
+class _FetchTargetInvalid(MixinBase):
+    def fetch_self(self, sql, id=None, newest=None, session=None):
+        return None
+
+
 class _CollectorMixin(MixinBase):
     @classmethod
     def special_conditions_mixin(cls, gen_cls, user):
@@ -142,6 +155,19 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
 
         mock_specialist_conditions.assert_called_once_with(_CollectorBO, None)
         self.assertEqual(["base_cond", "mixin_cond"], result)
+
+    async def test_fetch_mixin_forwards_arguments(self):
+        target = _FetchTarget()
+        sql = Mock(name="sql")
+        session = Mock(name="session")
+
+        result = await target.fetch_mixin(sql=sql, id=123, newest=True, session=session)
+
+        self.assertEqual([(sql, 123, True, session)], target.fetch_calls)
+
+    async def test_fetch_mixin_raises_for_non_coroutine_fetch_self(self):
+        with self.assertRaises(TypeError):
+            await _FetchTargetInvalid().fetch_mixin(sql=Mock(name="sql"))
 
     async def test_store_mixin_calls_insert_for_new_object(self):
         target = _StoreTarget(bo_id=None)
