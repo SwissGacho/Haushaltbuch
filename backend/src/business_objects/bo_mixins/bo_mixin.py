@@ -36,7 +36,7 @@ class MixinBase:
     @classmethod
     def is_specializing(cls) -> bool:
         """Return True if this class is a specialization of another business object class."""
-        LOG.debug(f"MixinBase.is_specializing({cls.__name__})  -> False")
+        LOG.log(VERBOSE_DEBUG, f"MixinBase.is_specializing({cls.__name__})  -> False")
         return False
 
     @classmethod
