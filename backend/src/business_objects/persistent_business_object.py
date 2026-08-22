@@ -366,7 +366,10 @@ class PersistentBusinessObject(BOBase):
         if (
             id is None
             and newest is None
-            and getattr(mixin, "__func__", None) is not MixinBase.fetch_mixin
+            and (
+                mixin is None
+                or getattr(mixin, "__func__", None) is MixinBase.fetch_mixin
+            )
         ):
             LOG.debug(f"fetching {self} without id or newest")
             return self
