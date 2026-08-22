@@ -358,15 +358,23 @@ class PersistentBusinessObject(BOBase):
         if id is None:
             id = self.id
         # LOG.debug(f"fetching {self} with {id=}, {newest=}")
+        mixin = getattr(self, "fetch_mixin", None)
+        if mixin and not iscoroutinefunction(mixin):
+            raise TypeError(
+                f"PersistentBusinessObject.fetch: Expected coroutine function for fetch_mixin, got {type(mixin).__name__}"
+            )
+        if (
+            id is None
+            and newest is None
+            and getattr(mixin, "__func__", None) is not MixinBase.fetch_mixin
+        ):
+            LOG.debug(f"fetching {self} without id or newest")
+            return self
         async with SQL() as sql:
-            if (mixin := getattr(self, "fetch_mixin", None)) and iscoroutinefunction(
-                mixin
-            ):
+            if mixin:
                 await mixin(sql=sql, id=id, newest=newest, session=session)
-            elif newest or id is not None:
-                await self.fetch_self(sql=sql, id=id, newest=newest, session=session)
             else:
-                LOG.warning(f"fetching {self} without id or newest")
+                await self.fetch_self(sql=sql, id=id, newest=newest, session=session)
         return self
 
     async def fetch_self(
