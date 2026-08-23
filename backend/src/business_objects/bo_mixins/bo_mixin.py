@@ -20,6 +20,7 @@ from database.sql import SQL
 from database.sql_expression import (
     SQLExpression,
     In,
+    Eq,
     Concat,
     ColumnName,
     SQLString,
@@ -37,7 +38,7 @@ class MixinBase:
     @classmethod
     def is_specializing(cls) -> bool:
         """Return True if this class is a specialization of another business object class."""
-        LOG.log(VERBOSE_DEBUG, f"MixinBase.is_specializing({cls.__name__})  -> False")
+        # LOG.log(VERBOSE_DEBUG, f"MixinBase.is_specializing({cls.__name__})  -> False")
         return False
 
     @classmethod
@@ -133,13 +134,44 @@ class MixinBase:
         return [In(tested_value, valid_values)]
 
     @classmethod
+    def specialist_conditions(cls, gen_cls, user) -> Sequence[SQLExpression]:
+        """Return a list of SQLExpression objects that restrict the selection of specialized BOs
+        to those that are relevant and accessible for the given user.
+        """
+        conds: list[SQLExpression] = []
+        specialists = getattr(gen_cls, "specialists", None) or [gen_cls]
+        spec_names = set()
+        for specialist_cls in specialists:
+            spec_names |= {
+                str(
+                    bn()
+                    if callable((bn := getattr(specialist_cls, "bo_type_name", None)))
+                    else specialist_cls.__name__
+                )
+            }
+            conds += [
+                item
+                for c in MixinBase.__subclasses__()
+                if issubclass(specialist_cls, c)
+                and callable(sc := getattr(c, "specialist_conditions_mixin", None))
+                for item in cast(Iterable, sc(specialist_cls, user))
+            ]
+        # else:
+        #     conds += [Eq(ColumnName("bo_name"), Value(str(gen_cls.bo_type_name())))]
+        return [In(ColumnName("bo_name"), [SQLString(sn) for sn in spec_names])] + conds
+
+    @classmethod
     def special_conditions(cls, gen_cls, user) -> Sequence[SQLExpression]:
         """Return a list of SQLExpressions that restrict the selection of BOs with Mixins
         to those that are relevant and accessible for the given user.
         """
-        conds: list[SQLExpression] = list(
-            MixinBase._specialist_conditions(gen_cls, user)
-        ) + [
+        print(
+            "-----------------------------------------------------------------------------"
+        )
+        conds: list[SQLExpression] = []
+        conds += list(MixinBase.specialist_conditions(gen_cls, user))
+        conds += [Eq(SQLString("1"), SQLString("1"))]
+        conds += list(MixinBase._specialist_conditions(gen_cls, user)) + [
             item
             for c in MixinBase.__subclasses__()
             if issubclass(gen_cls, c)

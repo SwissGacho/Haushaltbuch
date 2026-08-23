@@ -45,6 +45,24 @@ class ApplicationConfiguration(Specializing, Singleton, AdminOnly, Configuration
         return "Global Configuration"
 
 
+class S(ApplicationConfiguration):
+    "Persistent (non-user-specific) configuration for the whole application"
+
+    @property
+    def display_name(self) -> str:
+        """A human-readable name for this business object instance, used in the frontend."""
+        return "Global Configuration"
+
+
+class P(Personal, ApplicationConfiguration):
+    "Persistent (non-user-specific) configuration for the whole application"
+
+    @property
+    def display_name(self) -> str:
+        """A human-readable name for this business object instance, used in the frontend."""
+        return "Global Configuration"
+
+
 class PersonalConfiguration(Specializing, Singleton, Personal, Configuration):
     "Persistent configuration for a specific user"
 
