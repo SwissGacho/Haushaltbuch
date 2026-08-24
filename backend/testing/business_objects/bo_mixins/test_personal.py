@@ -94,6 +94,21 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
             patch("business_objects.bo_mixins.personal.Not") as mock_not,
             patch("business_objects.bo_mixins.personal.And") as mock_and,
         ):
+            col_bo_name = Mock(name="col_bo_name")
+            col_user_id = Mock(name="col_user_id")
+            mock_column_name.side_effect = [col_bo_name, col_user_id]
+
+            eq_bo_name = Mock(name="eq_bo_name")
+            eq_user_id = Mock(name="eq_user_id")
+            mock_eq.side_effect = [eq_bo_name, eq_user_id]
+
+            not_user_id = Mock(name="not_user_id")
+            not_outer = Mock(name="not_outer")
+            mock_not.side_effect = [not_user_id, not_outer]
+
+            and_expr = Mock(name="and_expr")
+            mock_and.return_value = and_expr
+
             result = Personal.specialist_conditions_mixin(
                 specialist_cls=_PersonalTarget, user=mock_user
             )
@@ -104,17 +119,13 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
         mock_value.assert_called_once_with(mock_user)
         mock_eq.assert_has_calls(
             [
-                call(mock_column_name.return_value, mock_sql_string.return_value),
-                call(mock_column_name.return_value, mock_value.return_value),
+                call(col_bo_name, mock_sql_string.return_value),
+                call(col_user_id, mock_value.return_value),
             ]
         )
-        mock_and.assert_called_once_with(
-            [mock_eq.return_value, mock_not.return_value]
-        )
-        mock_not.assert_has_calls(
-            [call(mock_eq.return_value), call(mock_and.return_value)]
-        )
-        self.assertEqual([mock_not.return_value], result)
+        mock_and.assert_called_once_with([eq_bo_name, not_user_id])
+        mock_not.assert_has_calls([call(eq_user_id), call(and_expr)])
+        self.assertEqual([not_outer], result)
 
     def test_skip_create_table_raises_without_user_id_description(self):
         with self.assertRaises(TypeError):
