@@ -15,7 +15,15 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from business_objects.bo_mixins.bo_mixin import MixinBase
-from database.sql_expression import Eq, SQLExpression, Value
+from database.sql_expression import (
+    ColumnName,
+    Not,
+    And,
+    Eq,
+    SQLExpression,
+    SQLString,
+    Value,
+)
 from server.ws_connection_base import SessionBase
 
 
@@ -29,6 +37,39 @@ class Personal(MixinBase):
     def is_personal(cls) -> bool:
         """Return True if this class is a personal business object class."""
         return True
+
+    @classmethod
+    def specialist_conditions_mixin(
+        cls, specialist_cls, user
+    ) -> Sequence[SQLExpression]:
+        """Return a list of SQLExpression objects that prevent the selection of personal BOs without a user."""
+        if not user:
+            return [
+                Not(
+                    Eq(
+                        ColumnName("bo_name"),
+                        SQLString(str(specialist_cls.bo_type_name())),
+                    )
+                )
+            ]
+        return [
+            Not(
+                And(
+                    [
+                        Eq(
+                            ColumnName("bo_name"),
+                            SQLString(str(specialist_cls.bo_type_name())),
+                        ),
+                        Not(
+                            Eq(
+                                ColumnName("user_id"),
+                                Value(user),
+                            )
+                        ),
+                    ]
+                )
+            )
+        ]
 
     @classmethod
     def special_conditions_mixin(cls, gen_cls, user) -> Sequence[SQLExpression]:

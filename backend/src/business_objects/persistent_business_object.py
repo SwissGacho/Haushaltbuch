@@ -254,8 +254,18 @@ class PersistentBusinessObject(BOBase):
             )
             if filter_conditions:
                 select.where(filter_conditions)
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"PersistentBusinessObject.get_matching_ids: {cls.__name__} user={session.user if session else 'N/A'}",
+                )
+                for line in pprint_lines(select.get_sql()):
+                    LOG.log(VERBOSE_DEBUG, f"   {line}")
+
             result = await (await select.execute()).fetchall()
-        # LOG.debug(f"PersistentBusinessObject.get_matching_ids({conditions=}) -> {result=}")
+        LOG.debug(
+            f"PersistentBusinessObject.get_matching_ids(conditions={redact(conditions)}) -> {result=}"
+        )
         return [id["id"] for id in result]
 
     @classmethod
@@ -305,6 +315,13 @@ class PersistentBusinessObject(BOBase):
             )
             if filter_conditions:
                 select.where(filter_conditions)
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"PersistentBusinessObject.get_matching_objects: {cls.__name__} user={session.user if session else 'N/A'}",
+                )
+                for line in pprint_lines(select.get_sql()):
+                    LOG.log(VERBOSE_DEBUG, f"   {line}")
             result = await (await select.execute()).fetchall()
         LOG.debug(
             f"PersistentBusinessObject.get_matching_objects(conditions={redact(conditions)}, {attributes=}) "
