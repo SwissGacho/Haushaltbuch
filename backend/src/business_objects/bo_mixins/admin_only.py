@@ -34,7 +34,7 @@ class AdminOnly(MixinBase):
         cls, specialist_cls, user
     ) -> Sequence[SQLExpression]:
         """Return a list of SQLExpression objects that prevent the selection
-        of adminonly BOs for users without admin privileges."""
+        of admin-only BOs for users without admin privileges."""
         if not user or bool(getattr(user, "is_admin", False)):
             return []
         return [
