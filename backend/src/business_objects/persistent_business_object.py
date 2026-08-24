@@ -264,7 +264,7 @@ class PersistentBusinessObject(BOBase):
 
             result = await (await select.execute()).fetchall()
         LOG.debug(
-            f"PersistentBusinessObject.get_matching_ids({conditions=}) -> {result=}"
+            f"PersistentBusinessObject.get_matching_ids(conditions={redact(conditions)}) -> {result=}"
         )
         return [id["id"] for id in result]
 
