@@ -90,48 +90,48 @@ class MixinBase:
             ]
         return descriptions
 
-    @classmethod
-    def _specialist_conditions(cls, gen_cls, user) -> Sequence[SQLExpression]:
-        """Return a list of SQLExpression objects that restrict the selection of specialized BOs
-        to those that are relevant and accessible for the given user.
-        """
-        if not getattr(gen_cls, "specialists", None):
-            return []
-        is_admin = getattr(user, "is_admin", False)
-        if not user:
-            tested_value = ColumnName("bo_name")
-            valid_values: list[SQLExpression] = [
-                SQLString(str(bo_type_name()))
-                for s in gen_cls.specialists
-                if callable(bo_type_name := getattr(s, "bo_type_name", None))
-                and not check_property(s, "is_personal")
-            ]
-            if not valid_values:
-                raise ValueError(
-                    f"MixinBase._specialist_conditions: No valid specialists found for {gen_cls.__name__} with no user provided"
-                )
-        else:
-            tested_value = Concat(ColumnName("bo_name"), SQLString("."), Value(user))
-            valid_values = [
-                Concat(
-                    SQLString(str(bo_type_name())),
-                    SQLString("."),
-                    (
-                        ColumnName("user_id")
-                        if check_property(s, "is_personal")
-                        else Value(user)
-                    ),
-                )
-                for s in gen_cls.specialists
-                if callable(bo_type_name := getattr(s, "bo_type_name", None))
-                and (is_admin or not check_property(s, "is_admin_only"))
-            ]
-            if not valid_values:
-                LOG.warning(
-                    f"MixinBase._specialist_conditions: No valid specialists found for {gen_cls.__name__} and user {user}"
-                )
-                return []
-        return [In(tested_value, valid_values)]
+    # @classmethod
+    # def _specialist_conditions(cls, gen_cls, user) -> Sequence[SQLExpression]:
+    #     """Return a list of SQLExpression objects that restrict the selection of specialized BOs
+    #     to those that are relevant and accessible for the given user.
+    #     """
+    #     if not getattr(gen_cls, "specialists", None):
+    #         return []
+    #     is_admin = getattr(user, "is_admin", False)
+    #     if not user:
+    #         tested_value = ColumnName("bo_name")
+    #         valid_values: list[SQLExpression] = [
+    #             SQLString(str(bo_type_name()))
+    #             for s in gen_cls.specialists
+    #             if callable(bo_type_name := getattr(s, "bo_type_name", None))
+    #             and not check_property(s, "is_personal")
+    #         ]
+    #         if not valid_values:
+    #             raise ValueError(
+    #                 f"MixinBase._specialist_conditions: No valid specialists found for {gen_cls.__name__} with no user provided"
+    #             )
+    #     else:
+    #         tested_value = Concat(ColumnName("bo_name"), SQLString("."), Value(user))
+    #         valid_values = [
+    #             Concat(
+    #                 SQLString(str(bo_type_name())),
+    #                 SQLString("."),
+    #                 (
+    #                     ColumnName("user_id")
+    #                     if check_property(s, "is_personal")
+    #                     else Value(user)
+    #                 ),
+    #             )
+    #             for s in gen_cls.specialists
+    #             if callable(bo_type_name := getattr(s, "bo_type_name", None))
+    #             and (is_admin or not check_property(s, "is_admin_only"))
+    #         ]
+    #         if not valid_values:
+    #             LOG.warning(
+    #                 f"MixinBase._specialist_conditions: No valid specialists found for {gen_cls.__name__} and user {user}"
+    #             )
+    #             return []
+    #     return [In(tested_value, valid_values)]
 
     @classmethod
     def specialist_conditions(cls, gen_cls, user) -> Sequence[SQLExpression]:
@@ -156,22 +156,18 @@ class MixinBase:
                 and callable(sc := getattr(c, "specialist_conditions_mixin", None))
                 for item in cast(Iterable, sc(specialist_cls, user))
             ]
-        # else:
-        #     conds += [Eq(ColumnName("bo_name"), Value(str(gen_cls.bo_type_name())))]
-        return [In(ColumnName("bo_name"), [SQLString(sn) for sn in spec_names])] + conds
+        return conds + [In(ColumnName("bo_name"), [SQLString(sn) for sn in spec_names])]
 
     @classmethod
     def special_conditions(cls, gen_cls, user) -> Sequence[SQLExpression]:
         """Return a list of SQLExpressions that restrict the selection of BOs with Mixins
         to those that are relevant and accessible for the given user.
         """
-        print(
-            "-----------------------------------------------------------------------------"
-        )
         conds: list[SQLExpression] = []
         conds += list(MixinBase.specialist_conditions(gen_cls, user))
-        conds += [Eq(SQLString("1"), SQLString("1"))]
-        conds += list(MixinBase._specialist_conditions(gen_cls, user)) + [
+        # conds += [Eq(SQLString("1"), SQLString("1"))]
+        # conds += list(MixinBase._specialist_conditions(gen_cls, user))
+        conds += [
             item
             for c in MixinBase.__subclasses__()
             if issubclass(gen_cls, c)

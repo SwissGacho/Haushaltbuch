@@ -15,7 +15,15 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from business_objects.bo_mixins.bo_mixin import MixinBase
-from database.sql_expression import ColumnName, Not, Eq, SQLExpression, SQLString, Value
+from database.sql_expression import (
+    ColumnName,
+    Not,
+    And,
+    Eq,
+    SQLExpression,
+    SQLString,
+    Value,
+)
 from server.ws_connection_base import SessionBase
 
 
@@ -44,7 +52,24 @@ class Personal(MixinBase):
                     )
                 )
             ]
-        return []
+        return [
+            Not(
+                And(
+                    [
+                        Eq(
+                            ColumnName("bo_name"),
+                            SQLString(str(specialist_cls.bo_type_name())),
+                        ),
+                        Not(
+                            Eq(
+                                ColumnName("user_id"),
+                                Value(user),
+                            )
+                        ),
+                    ]
+                )
+            )
+        ]
 
     @classmethod
     def special_conditions_mixin(cls, gen_cls, user) -> Sequence[SQLExpression]:
