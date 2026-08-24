@@ -33,12 +33,20 @@ class WSHandler:
 
     counter = 0
 
+    def get_headers(self, headers):
+        "Get headers from websocket request"
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            LOG.log(VERBOSE_DEBUG, "WSHandler.get_headers(): request headers:")
+            for header, value in headers.raw_items():
+                LOG.log(VERBOSE_DEBUG, f"  {header:<40}: {value}")
+
     async def handler(self, websocket):
         "Handle a ws connection"
         sock_nbr = WSHandler.counter
         WSHandler.counter += 1
         context_log = get_context_logger(LOG, socket=f"sock #{sock_nbr}")
         context_log.debug("connection opened")
+        self.get_headers(websocket.request.headers)
         connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
             if await connection.start_connection():
