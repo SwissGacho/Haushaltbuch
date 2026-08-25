@@ -65,6 +65,8 @@ class Config(StrEnum):
     CONFIG_USR_MODE = "userMode"
     CONFIG_APP_USRMODE = "/".join([CONFIG_APP, CONFIG_USR_MODE])
     CONFIG_APP_SESSION_TIMEOUT = "/".join([CONFIG_APP, "session_timeout_hours"])
+    CONFIG_APP_AUTH_HEADER = "/".join([CONFIG_APP, "auth_header"])
+    CONFIG_APP_AUTH_USER_PATTERN = "/".join([CONFIG_APP, "auth_user_pattern"])
     CONFIG_FILECFG_FILE = CONFIG_FILECFG_FILE
     CONFIG_DB = "db_cfg"
     CONFIG_DB_DB = "/".join([CONFIG_DB, "db"])

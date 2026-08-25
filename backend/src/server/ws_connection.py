@@ -143,10 +143,16 @@ class WSConnection(WSConnectionBase):
         for conn in conns:
             await conn._send(msg)  # pylint: disable=protected-access
 
-    async def start_connection(self):
+    async def start_connection(self, authenticated_user: str | None = None):
         "say hello and expect Login"
         # self.conn_logger.debug("start login handshake, say hello")
-        await self.send_message(HelloMessage(token=self._token, status=App.status))
+        await self.send_message(
+            HelloMessage(
+                token=self._token,
+                status=App.status,
+                authenticated_user=authenticated_user,
+            )
+        )
         try:
             while json_message := await self._socket.recv():
                 if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):

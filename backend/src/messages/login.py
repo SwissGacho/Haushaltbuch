@@ -18,8 +18,17 @@ from bom_persistent.management.user import User
 class HelloMessage(Message):
     "provide connection token to client"
 
-    def __init__(self, token: WSToken, status: Optional[str] = None) -> None:
-        super().__init__(msg_type=MessageType.WS_TYPE_HELLO, token=token, status=status)
+    def __init__(
+        self, token: WSToken, status: Optional[str] = None, authenticated_user=None
+    ) -> None:
+        super().__init__(
+            msg_type=MessageType.WS_TYPE_HELLO,
+            token=token,
+            status=status,
+            **(
+                {"authenticated_user": authenticated_user} if authenticated_user else {}
+            ),
+        )
 
 
 class LoginMessage(Message):
