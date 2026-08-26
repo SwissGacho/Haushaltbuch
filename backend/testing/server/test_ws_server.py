@@ -14,8 +14,8 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         self,
         start_conn=True,
         messages=None,
-        mock_header=None,
-        mock_pattern=None,
+        mock_header="",
+        mock_pattern="",
         mock_user="mock_auth_value",
         mock_auth_user=None,
     ):
