@@ -59,12 +59,16 @@ class WSHandler:
                 LOG.log(VERBOSE_DEBUG, f"  {header:<40}: {value}")
         if auth_header_name:
             auth_header = headers.get(auth_header_name)
+            if not auth_header:
+                return None
             if auth_user_pattern:
                 try:
                     match = re.search(auth_user_pattern, auth_header)
                     auth_user = match.group(1) if match else None
-                except re.error as e:
-                    LOG.error(f"Invalid regex pattern: {auth_user_pattern}; error: {e}")
+                except (re.error, TypeError) as e:
+                    LOG.error(
+                        f"Auth user extraction failed: pattern={auth_user_pattern}; error: {e}"
+                    )
             else:
                 auth_user = auth_header
             LOG.debug(f"WSHandler.get_auth_user(): authenticated user: '{auth_user}' ")
