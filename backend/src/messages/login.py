@@ -62,6 +62,7 @@ class LoginMessage(Message):
                 WelcomeMessage(
                     token=token,
                     ses_token=session.token,
+                    authenticated_user=session.user.name,
                     version_info=(  # pylint: disable=no-member
                         App.status_object.version if connection.is_primary else None
                     ),
@@ -86,12 +87,15 @@ class WelcomeMessage(Message):
         token: WSToken,
         ses_token: WSToken | None = None,
         status: str | None = None,
+        authenticated_user: str | None = None,
         version_info: dict | None = None,
     ) -> None:
         super().__init__(
             msg_type=MessageType.WS_TYPE_WELCOME, token=token, status=status
         )
         self.message |= {MessageAttribute.WS_ATTR_SES_TOKEN: ses_token}
+        if authenticated_user:
+            self.message |= {"authenticated_user": authenticated_user}
         if version_info:
             self.message |= {MessageAttribute.WS_ATTR_VERSION_INFO: version_info}
 
