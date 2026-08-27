@@ -26,7 +26,9 @@ class HelloMessage(Message):
             token=token,
             status=status,
             **(
-                {"authenticated_user": authenticated_user} if authenticated_user else {}
+                {MessageAttribute.WS_ATTR_AUTHENTICATED_USER: authenticated_user}
+                if authenticated_user
+                else {}
             ),
         )
 
@@ -95,7 +97,9 @@ class WelcomeMessage(Message):
         )
         self.message |= {MessageAttribute.WS_ATTR_SES_TOKEN: ses_token}
         if authenticated_user:
-            self.message |= {"authenticated_user": authenticated_user}
+            self.message |= {
+                MessageAttribute.WS_ATTR_AUTHENTICATED_USER: authenticated_user
+            }
         if version_info:
             self.message |= {MessageAttribute.WS_ATTR_VERSION_INFO: version_info}
 

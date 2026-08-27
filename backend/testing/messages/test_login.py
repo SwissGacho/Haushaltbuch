@@ -24,7 +24,8 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session = Mock(token="ses-token")
+        session_user = SimpleNamespace(name="alice")
+        session = Mock(token="ses-token", user=session_user)
         connection = Mock(
             session=None,
             connection_context={"connection": "ws-1"},
@@ -35,7 +36,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "messages.login.check_login", AsyncMock(return_value=Mock(name="user"))
+                "messages.login.check_login", AsyncMock(return_value=session_user)
             ) as mock_check_login,
             patch(
                 "messages.login.Session", Mock(return_value=session)
@@ -62,6 +63,10 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             sent_message.message[MessageAttribute.WS_ATTR_SES_TOKEN], "ses-token"
         )
+        self.assertEqual(
+            sent_message.message[MessageAttribute.WS_ATTR_AUTHENTICATED_USER],
+            "alice",
+        )
         self.assertNotIn(MessageAttribute.WS_ATTR_VERSION_INFO, sent_message.message)
 
     async def test_103_handle_message_success_existing_session_primary(self):
@@ -74,7 +79,9 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session = Mock(token="ses-token")
+        session = Mock(
+            token="ses-token", user=SimpleNamespace(name="alice")
+        )
         connection = Mock(
             session=None,
             connection_context={"connection": "ws-1"},
@@ -109,6 +116,10 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         self.assertIs(connection.session, session)
         connection.send_message.assert_awaited_once()
         sent_message = connection.send_message.await_args.args[0]
+        self.assertEqual(
+            sent_message.message[MessageAttribute.WS_ATTR_AUTHENTICATED_USER],
+            "alice",
+        )
         self.assertEqual(
             sent_message.message[MessageAttribute.WS_ATTR_VERSION_INFO],
             {"version": "9.9.9"},
