@@ -7,6 +7,7 @@ from core.app_logging import get_context_logger, getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
 
+from core.base_objects import Status
 from core.validation import check_login
 from core.exceptions import TokenExpiredError
 from server.ws_token import WSToken
@@ -64,7 +65,11 @@ class LoginMessage(Message):
                 WelcomeMessage(
                     token=token,
                     ses_token=session.token,
-                    authenticated_user=session.user.name,
+                    authenticated_user=(
+                        session.user.name
+                        if App.status == Status.STATUS_MULTI_USER
+                        else None
+                    ),
                     version_info=(  # pylint: disable=no-member
                         App.status_object.version if connection.is_primary else None
                     ),
