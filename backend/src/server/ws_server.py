@@ -66,7 +66,7 @@ class WSHandler:
                 try:
                     match = re.search(auth_user_pattern, auth_header)
                     auth_user = match.group(1) if match else None
-                except (re.error, TypeError) as e:
+                except (re.error, TypeError, IndexError) as e:
                     LOG.error(
                         f"Auth user extraction failed: pattern={auth_user_pattern}; error: {e}"
                     )
