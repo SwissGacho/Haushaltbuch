@@ -68,6 +68,7 @@ class LoginMessage(Message):
                 WelcomeMessage(
                     token=token,
                     ses_token=session.token,
+                    status=App.status,
                     authenticated_user=(
                         session.user.name
                         if App.status == Status.STATUS_MULTI_USER
