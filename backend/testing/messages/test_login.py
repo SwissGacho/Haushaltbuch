@@ -31,6 +31,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
+            authenticated_user=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -53,7 +54,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         ):
             await msg.handle_message(connection)
 
-        mock_check_login.assert_awaited_once_with(msg.message)
+        mock_check_login.assert_awaited_once_with(msg.message, authenticated_user=None)
         mock_session_class.assert_called_once()
         mock_ctx_logger.assert_called_once()
         self.assertIs(connection.session, session)

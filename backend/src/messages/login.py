@@ -53,7 +53,10 @@ class LoginMessage(Message):
                     ses_token=ses_token, conn_token=conn_token
                 )
             else:
-                user: User = await check_login(self.message)
+                user: User = await check_login(
+                    self.message,
+                    authenticated_user=getattr(connection, "authenticated_user", None),
+                )
                 session = Session(user, token, connection)
             if not session:
                 raise PermissionError(

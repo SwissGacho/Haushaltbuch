@@ -115,8 +115,9 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         MockHelloMessage.assert_called_once_with(
             token="mockToken",
             status=self.MockApp.status,
-            authenticated_user=authenticated_user,
+            authenticated_user=True if authenticated_user else None,
         )
+        self.assertEqual(self.connection.authenticated_user, authenticated_user)
         self.connection._socket.recv.assert_awaited_once_with()
         MockMessage.assert_called_once_with(json_message=mock_message)
         if exp_result == "success":
