@@ -55,9 +55,18 @@ class WSHandler:
         auth_user = None
         if LOG.isEnabledFor(DEBUG):
             LOG.log(VERBOSE_DEBUG, "WSHandler.get_auth_user(): request headers:")
-            items = headers.raw_items() if hasattr(headers, "raw_items") else headers.items()
+            items = (
+                headers.raw_items()
+                if hasattr(headers, "raw_items")
+                else headers.items()
+            )
+            header_values: dict[str, list[str]] = {}
             for header, value in items:
-                LOG.log(VERBOSE_DEBUG, f"  {header:<40}: {redact(value)}")
+                header_values.setdefault(header, []).append(value)
+            for line in pprint_lines(
+                {k: v[0] if len(v) == 1 else v for k, v in header_values.items()}
+            ):
+                LOG.log(VERBOSE_DEBUG, f"  {line}")
         if auth_header_name:
             auth_header = headers.get(auth_header_name)
             if not auth_header:

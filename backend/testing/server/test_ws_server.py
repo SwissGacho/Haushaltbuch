@@ -10,6 +10,30 @@ from server.ws_server import WSHandler
 
 
 class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
+    def test_200_get_auth_user_logs_redacted_repeated_headers(self):
+        handler = WSHandler()
+        headers = Mock()
+        headers.raw_items.return_value = [
+            ("X-Api-Key", "sensitive-value"),
+            ("X-Trace-Id", "first"),
+            ("X-Trace-Id", "second"),
+        ]
+
+        with (
+            patch("server.ws_server.LOG") as mock_log,
+            patch(
+                "server.ws_server.App.get_config_item", side_effect=["", ""]
+            ),
+        ):
+            mock_log.isEnabledFor.return_value = True
+            self.assertIsNone(handler.get_auth_user(headers))
+
+        mock_log.log.assert_any_call(
+            5,
+            "  {'X-Api-Key': '***redacted***', "
+            "'X-Trace-Id': ['first', 'second']}",
+        )
+
     async def _200_handle_messages(
         self,
         start_conn=True,
