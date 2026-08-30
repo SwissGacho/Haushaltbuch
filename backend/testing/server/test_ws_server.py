@@ -10,7 +10,39 @@ from server.ws_server import WSHandler
 
 
 class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
-    async def _200_handle_messages(self, start_conn=True, messages=None):
+    def test_200_get_auth_user_logs_redacted_repeated_headers(self):
+        handler = WSHandler()
+        headers = Mock()
+        headers.raw_items.return_value = [
+            ("X-Api-Key", "sensitive-value"),
+            ("X-Trace-Id", "first"),
+            ("X-Trace-Id", "second"),
+        ]
+
+        with (
+            patch("server.ws_server.LOG") as mock_log,
+            patch(
+                "server.ws_server.App.get_config_item", side_effect=["", ""]
+            ),
+        ):
+            mock_log.isEnabledFor.return_value = True
+            self.assertIsNone(handler.get_auth_user(headers))
+
+        mock_log.log.assert_any_call(
+            5,
+            "  {'X-Api-Key': '***redacted***', "
+            "'X-Trace-Id': ['first', 'second']}",
+        )
+
+    async def _200_handle_messages(
+        self,
+        start_conn=True,
+        messages=None,
+        mock_header="",
+        mock_pattern="",
+        mock_user="mock_auth_value",
+        mock_auth_user=None,
+    ):
         if messages is None:
             messages = []
         handler = WSHandler()
@@ -23,18 +55,32 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         }
         mock_socket = MagicMock()
         mock_socket.__aiter__.return_value = messages
-        mock_path = Mock
+        mock_socket.request.headers = {
+            "mock_auth_header": mock_user,
+        }
+        mock_path = Mock()
         no_messages = len(messages) if start_conn else 0
 
         # =================================== test ==========================
         with (
             patch("server.ws_server.WSConnection", return_value=mock_connection),
             patch("server.ws_server.Message") as Mock_Msg,
+            patch(
+                "server.ws_server.App.get_config_item",
+                side_effect=[mock_header, mock_pattern],
+            ),
         ):
             await handler.handler(websocket=mock_socket)
         # =================================== test ==========================
 
-        mock_connection.start_connection.assert_awaited_once_with()
+        if not mock_header:
+            mock_connection.start_connection.assert_awaited_once_with(
+                authenticated_user=None
+            )
+        else:
+            mock_connection.start_connection.assert_awaited_once_with(
+                authenticated_user=mock_auth_user or mock_user
+            )
         self.assertEqual(Mock_Msg.call_count, no_messages, "number of Messages created")
         self.assertEqual(
             mock_connection.handle_message.await_count,
@@ -42,16 +88,38 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
             "number of Messages handled",
         )
 
-    async def test_201_ws_handler_normal_login(self):
+    async def test_201_ws_handler_failed_login(self):
+        messages = [
+            {"type": "mocktype", "text": "mocktext 1"},
+            {"type": "mocktype", "text": "mocktext 2"},
+        ]
+        await self._200_handle_messages(messages=messages, start_conn=False)
+
+    async def test_202_ws_handler_normal_login_no_user(self):
         messages = [
             {"type": "mocktype", "text": "mocktext 1"},
             {"type": "mocktype", "text": "mocktext 2"},
         ]
         await self._200_handle_messages(messages=messages)
 
-    async def test_202_ws_handler_failed_login(self):
+    async def test_203_ws_handler_normal_login_with_user_direct(self):
         messages = [
             {"type": "mocktype", "text": "mocktext 1"},
             {"type": "mocktype", "text": "mocktext 2"},
         ]
-        await self._200_handle_messages(messages=messages, start_conn=False)
+        await self._200_handle_messages(
+            messages=messages, mock_header="mock_auth_header", mock_pattern=""
+        )
+
+    async def test_204_ws_handler_normal_login_with_user_pattern(self):
+        messages = [
+            {"type": "mocktype", "text": "mocktext 1"},
+            {"type": "mocktype", "text": "mocktext 2"},
+        ]
+        await self._200_handle_messages(
+            messages=messages,
+            mock_header="mock_auth_header",
+            mock_pattern=r"CN=\s*(\w+)\s*(,|$)",
+            mock_user="O=org,CN=   mock_name ,C=CH",
+            mock_auth_user="mock_name",
+        )
