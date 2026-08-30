@@ -7,6 +7,7 @@ from core.app_logging import get_context_logger, getLogger, log_exit, Logger
 
 LOG: Logger = getLogger(__name__)
 
+from core.base_objects import Status
 from core.validation import check_login
 from core.exceptions import TokenExpiredError
 from server.ws_token import WSToken
@@ -18,8 +19,19 @@ from bom_persistent.management.user import User
 class HelloMessage(Message):
     "provide connection token to client"
 
-    def __init__(self, token: WSToken, status: Optional[str] = None) -> None:
-        super().__init__(msg_type=MessageType.WS_TYPE_HELLO, token=token, status=status)
+    def __init__(
+        self, token: WSToken, status: Optional[str] = None, authenticated_user=None
+    ) -> None:
+        super().__init__(
+            msg_type=MessageType.WS_TYPE_HELLO,
+            token=token,
+            status=status,
+            **(
+                {MessageAttribute.WS_ATTR_AUTHENTICATED_USER: authenticated_user}
+                if authenticated_user
+                else {}
+            ),
+        )
 
 
 class LoginMessage(Message):
@@ -41,7 +53,10 @@ class LoginMessage(Message):
                     ses_token=ses_token, conn_token=conn_token
                 )
             else:
-                user: User = await check_login(self.message)
+                user: User = await check_login(
+                    self.message,
+                    authenticated_user=getattr(connection, "authenticated_user", None),
+                )
                 session = Session(user, token, connection)
             if not session:
                 raise PermissionError(
@@ -53,6 +68,12 @@ class LoginMessage(Message):
                 WelcomeMessage(
                     token=token,
                     ses_token=session.token,
+                    status=App.status,
+                    authenticated_user=(
+                        session.user.name
+                        if App.status == Status.STATUS_MULTI_USER
+                        else None
+                    ),
                     version_info=(  # pylint: disable=no-member
                         App.status_object.version if connection.is_primary else None
                     ),
@@ -77,12 +98,17 @@ class WelcomeMessage(Message):
         token: WSToken,
         ses_token: WSToken | None = None,
         status: str | None = None,
+        authenticated_user: str | None = None,
         version_info: dict | None = None,
     ) -> None:
         super().__init__(
             msg_type=MessageType.WS_TYPE_WELCOME, token=token, status=status
         )
         self.message |= {MessageAttribute.WS_ATTR_SES_TOKEN: ses_token}
+        if authenticated_user:
+            self.message |= {
+                MessageAttribute.WS_ATTR_AUTHENTICATED_USER: authenticated_user
+            }
         if version_info:
             self.message |= {MessageAttribute.WS_ATTR_VERSION_INFO: version_info}
 

@@ -1,6 +1,7 @@
 """Setup a websocket server and handle connection call"""
 
 import os
+import re
 import json
 import socket
 import websockets
@@ -23,6 +24,8 @@ from core.app_logging import (
 LOG: Logger = getLogger(__name__)
 
 from core.const import WEBSOCKET_PORT
+from core.app import App
+from core.configuration.config import Config
 from server.ws_connection import WSConnection
 from messages.message import Message
 from messages.admin import LogMessage
@@ -33,15 +36,60 @@ class WSHandler:
 
     counter = 0
 
+    def get_auth_user(self, headers) -> str | None:
+        "Get headers from websocket request"
+        auth_header_name = App.get_config_item(
+            Config.CONFIG_APP_AUTH_HEADER, default=""
+        )
+        auth_user_pattern = App.get_config_item(
+            Config.CONFIG_APP_AUTH_USER_PATTERN, default=""
+        )
+        if not (
+            isinstance(auth_header_name, str) and isinstance(auth_user_pattern, str)
+        ):
+            LOG.error(
+                f"Invalid configuration for auth_header or auth_user_pattern: "
+                f"auth_header={auth_header_name}; auth_user_pattern={auth_user_pattern}"
+            )
+            return None
+        auth_user = None
+        if LOG.isEnabledFor(DEBUG):
+            LOG.log(VERBOSE_DEBUG, "WSHandler.get_auth_user(): request headers:")
+            items = headers.raw_items() if hasattr(headers, "raw_items") else headers.items()
+            for header, value in items:
+                LOG.log(VERBOSE_DEBUG, f"  {header:<40}: {redact(value)}")
+        if auth_header_name:
+            auth_header = headers.get(auth_header_name)
+            if not auth_header:
+                return None
+            if auth_user_pattern:
+                try:
+                    match = re.search(auth_user_pattern, auth_header)
+                    auth_user = match.group(1) if match else None
+                except (re.error, TypeError, IndexError) as e:
+                    LOG.error(
+                        f"Auth user extraction failed: pattern={auth_user_pattern}; error: {e}"
+                    )
+            else:
+                auth_user = auth_header
+            LOG.debug(f"WSHandler.get_auth_user(): authenticated user: '{auth_user}' ")
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"(from {auth_header_name}"
+                f"{(' using pattern ' + auth_user_pattern) if auth_user_pattern else ''})",
+            )
+        return auth_user
+
     async def handler(self, websocket):
         "Handle a ws connection"
         sock_nbr = WSHandler.counter
         WSHandler.counter += 1
         context_log = get_context_logger(LOG, socket=f"sock #{sock_nbr}")
         context_log.debug("connection opened")
+        auth_user = self.get_auth_user(websocket.request.headers)
         connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
-            if await connection.start_connection():
+            if await connection.start_connection(authenticated_user=auth_user):
                 context_log = get_context_logger(LOG, **connection.connection_context)
                 context_log.debug("Connection started.")
                 async for ws_message in websocket:
