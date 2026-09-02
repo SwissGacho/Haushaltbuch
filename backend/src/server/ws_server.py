@@ -27,14 +27,21 @@ from core.const import WEBSOCKET_PORT
 from core.app import App
 from core.configuration.config import Config
 from server.ws_connection import WSConnection
+from server.ws_token import WSToken
 from messages.message import Message
 from messages.admin import LogMessage
+
+LOGIN_SUBPROTOCOL = "mp-login"
+CLIENT_TOKEN_COOKIE_NAME = "client-token"
 
 
 class WSHandler:
     "Container for Websocket handler"
 
     counter = 0
+
+    def __init__(self):
+        self._client_token = None
 
     def get_auth_user(self, headers) -> str | None:
         "Get headers from websocket request"
@@ -53,20 +60,6 @@ class WSHandler:
             )
             return None
         auth_user = None
-        if LOG.isEnabledFor(DEBUG):
-            LOG.log(VERBOSE_DEBUG, "WSHandler.get_auth_user(): request headers:")
-            items = (
-                headers.raw_items()
-                if hasattr(headers, "raw_items")
-                else headers.items()
-            )
-            header_values: dict[str, list[str]] = {}
-            for header, value in items:
-                header_values.setdefault(header, []).append(value)
-            for line in pprint_lines(
-                {k: v[0] if len(v) == 1 else v for k, v in header_values.items()}
-            ):
-                LOG.log(VERBOSE_DEBUG, f"  {line}")
         if auth_header_name:
             auth_header = headers.get(auth_header_name)
             if not auth_header:
@@ -88,6 +81,60 @@ class WSHandler:
                 f"{(' using pattern ' + auth_user_pattern) if auth_user_pattern else ''})",
             )
         return auth_user
+
+    def process_response(self, connection, request, response):
+        "Acknowledge the login subprotocol and issue a connection token cookie for it"
+        if LOG.isEnabledFor(DEBUG):
+            LOG.log(VERBOSE_DEBUG, "WSHandler.get_auth_user(): request headers:")
+            items = (
+                request.headers.raw_items()
+                if hasattr(request.headers, "raw_items")
+                else request.headers.items()
+            )
+            header_values: dict[str, list[str]] = {}
+            for header, value in items:
+                if header.lower() == "cookie":
+                    cookies = dict(
+                        crumb.strip().split("=", 1)
+                        for crumb in value.split(";")
+                        if "=" in crumb
+                    )
+                    value = "; ".join(f"{k}={v}" for k, v in redact(cookies).items())
+                header_values.setdefault(header, []).append(value)
+            for line in pprint_lines(
+                {k: v[0] if len(v) == 1 else v for k, v in header_values.items()}
+            ):
+                LOG.log(VERBOSE_DEBUG, f"  {line}")
+        requested_protocols = [
+            protocol.strip()
+            for protocol in request.headers.get("Sec-WebSocket-Protocol", "").split(",")
+        ]
+        if requested_protocols:
+            LOG.debug(
+                f"WSHandler.process_response(): requested protocols: {requested_protocols}"
+            )
+        if LOGIN_SUBPROTOCOL not in requested_protocols:
+            return None
+        response.headers["Sec-WebSocket-Protocol"] = LOGIN_SUBPROTOCOL
+        request_cookies = dict(
+            crumb.strip().split("=", 1)
+            for crumb in request.headers.get("Cookie", "").split(";")
+            if "=" in crumb
+        )
+        if CLIENT_TOKEN_COOKIE_NAME in request_cookies:
+            self._client_token = request_cookies[CLIENT_TOKEN_COOKIE_NAME]
+            LOG.debug(
+                f"WSHandler.process_response(): found {redact({CLIENT_TOKEN_COOKIE_NAME: self._client_token})}"
+            )
+            return None
+        self._client_token = WSToken(inactive_seconds_timeout=None)
+        LOG.debug(
+            f"WSHandler.process_response(): issuing {redact({CLIENT_TOKEN_COOKIE_NAME: self._client_token})} for login"
+        )
+        response.headers["Set-Cookie"] = (
+            f"{CLIENT_TOKEN_COOKIE_NAME}={self._client_token}; Path=/; HttpOnly; SameSite=Strict"
+        )
+        return None
 
     async def handler(self, websocket):
         "Handle a ws connection"
@@ -148,6 +195,7 @@ async def get_websocket():
         handler=ws_handler.handler,
         host=bind_address,  # type: ignore[arg-type]
         port=WEBSOCKET_PORT,
+        process_response=ws_handler.process_response,
     )
     if not ws_server.is_serving():
         LOG.error("Failed to start WS server")
