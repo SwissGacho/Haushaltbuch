@@ -12,6 +12,7 @@ from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
+import core.exceptions
 from messages.bo_message import ObjectMessage
 from server.ws_connection_base import WSConnectionBase, SessionBase
 from server.ws_message_sender import WSMessageSender
@@ -73,7 +74,19 @@ class BOSubscription(Generic[T], WSMessageSender):
             raise
         connection.unregister_other_senders(self)
         if self._notify_subscribers_on_init:
-            asyncio.create_task(self.notify_subscription_subscribers())
+            task = asyncio.create_task(self.notify_subscription_subscribers())
+            task.add_done_callback(self._handle_notify_task_result)
+
+    @staticmethod
+    def _handle_notify_task_result(task: asyncio.Task):
+        """Retrieve the result of the fire-and-forget notify task so exceptions are not lost."""
+        try:
+            task.result()
+        except core.exceptions.WSConnectionClosed as e:
+            # Client disconnected before the initial notification could be sent; harmless.
+            LOG.debug(f"BOSubscription: connection closed while notifying on init: {e}")
+        except Exception:  # pylint: disable=broad-exception-caught
+            LOG.exception("BOSubscription: exception in initial notify task")
 
     def _initialize_subscriptions(self, **kwargs):
         if "index" not in kwargs:
