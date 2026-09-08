@@ -82,6 +82,8 @@ class BOSubscription(Generic[T], WSMessageSender):
         """Retrieve the result of the fire-and-forget notify task so exceptions are not lost."""
         try:
             task.result()
+        except asyncio.CancelledError:
+            return
         except core.exceptions.WSConnectionClosed as e:
             # Client disconnected before the initial notification could be sent; harmless.
             LOG.debug(f"BOSubscription: connection closed while notifying on init: {e}")
