@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import Mock, AsyncMock, patch
 import inspect
 
+import websockets.exceptions
 import core.exceptions
 from server.ws_connection import WSConnection
 from messages.message import MessageType, MessageAttribute
@@ -28,6 +29,16 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         mock_payload = Mock()
         await self.connection._send(mock_payload)
         self.connection._socket.send.assert_awaited_once_with(mock_payload)
+
+    async def test_101a__send_connection_closed_is_translated(self):
+        closed_exc = websockets.exceptions.ConnectionClosedOK(None, None)
+        self.connection._socket.send = AsyncMock(
+            name="websocket.send", side_effect=closed_exc
+        )
+        mock_payload = Mock()
+        with self.assertRaises(core.exceptions.WSConnectionClosed) as ctx:
+            await self.connection._send(mock_payload)
+        self.assertIs(ctx.exception.__cause__, closed_exc)
 
     async def _102_send_message(self, status=None):
         self.connection._send = AsyncMock(name="_send")
