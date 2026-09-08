@@ -3,6 +3,7 @@
 import unittest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
+import core.exceptions
 from server.ws_server import WSHandler
 
 # class Test_000_WS_Server(unittest.IsolatedAsyncioTestCase):
@@ -55,3 +56,29 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
             {"type": "mocktype", "text": "mocktext 2"},
         ]
         await self._200_handle_messages(messages=messages, start_conn=False)
+
+    async def test_203_ws_handler_graceful_connection_closed(self):
+        handler = WSHandler()
+        mock_connection = Mock(name="WSConnection")
+        mock_connection.start_connection = AsyncMock(return_value=True)
+        mock_connection.handle_message = AsyncMock(
+            side_effect=core.exceptions.WSConnectionClosed("peer disconnected")
+        )
+        mock_connection.connection_context = {
+            "comp": "mock_component",
+            "socket": "mock_socket",
+        }
+        mock_connection.connection_closed = Mock()
+        mock_socket = MagicMock()
+        mock_socket.__aiter__.return_value = [{"type": "mocktype", "text": "mocktext"}]
+
+        with (
+            patch("server.ws_server.WSConnection", return_value=mock_connection),
+            patch("server.ws_server.Message") as Mock_Msg,
+        ):
+            await handler.handler(websocket=mock_socket)
+
+        mock_connection.start_connection.assert_awaited_once_with()
+        mock_connection.handle_message.assert_awaited_once()
+        mock_connection.connection_closed.assert_called_once_with()
+        self.assertEqual(Mock_Msg.call_count, 1, "number of Messages created")

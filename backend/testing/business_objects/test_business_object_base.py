@@ -4,6 +4,7 @@ import datetime
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
+import core.exceptions
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import AttributeDescription, BOBase
 from business_objects.business_attribute_base import BaseFlag
@@ -385,3 +386,25 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(BOBase.get_business_object_by_name("mockbo2"), MockBO2)
         with self.assertRaises(ValueError):
             BOBase.get_business_object_by_name("non_existent_bo")
+
+    def test_123_handle_callback_result_connection_closed_logs_debug(self):
+        bo_instance = MockBO2()
+        bo_instance.id = 1
+        task = Mock()
+        task.result.side_effect = core.exceptions.WSConnectionClosed("gone")
+        task.get_name.return_value = "subscriber_callback_callback_1"
+        with patch("business_objects.business_object_base.LOG") as MockLog:
+            bo_instance.handle_callback_result(task)
+            MockLog.debug.assert_called_once()
+            MockLog.exception.assert_not_called()
+
+    def test_124_handle_callback_result_other_exception_logs_exception(self):
+        bo_instance = MockBO2()
+        bo_instance.id = 1
+        task = Mock()
+        task.result.side_effect = ValueError("boom")
+        task.get_name.return_value = "subscriber_callback_callback_1"
+        with patch("business_objects.business_object_base.LOG") as MockLog:
+            bo_instance.handle_callback_result(task)
+            MockLog.exception.assert_called_once()
+            MockLog.debug.assert_not_called()
