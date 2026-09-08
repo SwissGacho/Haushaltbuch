@@ -3,14 +3,18 @@
 import unittest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
-from server.ws_server import WSHandler
+from server.ws_server import (
+    CLIENT_TOKEN_COOKIE_NAME,
+    LOGIN_SUBPROTOCOL,
+    WSHandler,
+)
 
 # class Test_000_WS_Server(unittest.IsolatedAsyncioTestCase):
 #     async def test_001_get_websocket(self):
 
 
 class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
-    def test_200_get_auth_user_logs_redacted_repeated_headers(self):
+    def test_200_process_response_logs_redacted_repeated_headers(self):
         handler = WSHandler()
         headers = Mock()
         headers.raw_items.return_value = [
@@ -18,21 +22,81 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
             ("X-Trace-Id", "first"),
             ("X-Trace-Id", "second"),
         ]
+        headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": "",
+            "Cookie": "",
+        }.get(name, default)
+        request = Mock(headers=headers)
+        response = Mock(headers={})
 
-        with (
-            patch("server.ws_server.LOG") as mock_log,
-            patch(
-                "server.ws_server.App.get_config_item", side_effect=["", ""]
-            ),
-        ):
+        with (patch("server.ws_server.LOG") as mock_log,):
             mock_log.isEnabledFor.return_value = True
-            self.assertIsNone(handler.get_auth_user(headers))
+            self.assertIsNone(handler.process_response(None, request, response))
 
-        mock_log.log.assert_any_call(
-            5,
-            "  {'X-Api-Key': '***redacted***', "
-            "'X-Trace-Id': ['first', 'second']}",
+        logged_headers = [
+            call.args[1]
+            for call in mock_log.log.call_args_list
+            if call.args and call.args[0] == 5
+        ]
+        header_log = next(
+            log_line for log_line in logged_headers if "X-Api-Key" in log_line
         )
+        self.assertIn("  {'X-Api-Key': ", header_log)
+        self.assertNotIn("sensitive-value", header_log)
+        self.assertIn("'X-Trace-Id': ['first', 'second']", header_log)
+
+    def test_201_process_response_ignores_non_login_connection(self):
+        handler = WSHandler()
+        request = Mock()
+        request.headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": "other-protocol",
+            "Cookie": "",
+        }.get(name, default)
+        response = Mock(headers={})
+
+        handler.process_response(None, request, response)
+
+        self.assertEqual(response.headers, {})
+        self.assertIsNone(handler._client_token)
+
+    def test_202_process_response_issues_client_token_for_login_connection(self):
+        handler = WSHandler()
+        request = Mock()
+        request.headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": LOGIN_SUBPROTOCOL,
+            "Cookie": "",
+        }.get(name, default)
+        response = Mock(headers={})
+
+        with patch(
+            "server.ws_server.WSToken", return_value="issued-token"
+        ) as mock_token:
+            handler.process_response(None, request, response)
+
+        mock_token.assert_called_once_with(inactive_seconds_timeout=None)
+        self.assertEqual(handler._client_token, "issued-token")
+        self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
+        self.assertEqual(
+            response.headers["Set-Cookie"],
+            f"{CLIENT_TOKEN_COOKIE_NAME}=issued-token; Path=/; HttpOnly; SameSite=Strict",
+        )
+
+    def test_203_process_response_reuses_existing_client_token_cookie(self):
+        handler = WSHandler()
+        request = Mock()
+        request.headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": LOGIN_SUBPROTOCOL,
+            "Cookie": f"{CLIENT_TOKEN_COOKIE_NAME}=existing-token",
+        }.get(name, default)
+        response = Mock(headers={})
+
+        with patch("server.ws_server.WSToken") as mock_token:
+            handler.process_response(None, request, response)
+
+        mock_token.assert_not_called()
+        self.assertEqual(handler._client_token, "existing-token")
+        self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
+        self.assertNotIn("Set-Cookie", response.headers)
 
     async def _200_handle_messages(
         self,

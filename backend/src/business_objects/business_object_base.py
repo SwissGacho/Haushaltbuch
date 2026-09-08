@@ -22,6 +22,7 @@ LOG = getLogger(__name__)
 
 from core.util import _classproperty
 from core.app import App
+import core.exceptions
 from business_objects.bo_descriptors import (
     AttributeAccessLevel,
     AttributeDescription,
@@ -135,6 +136,11 @@ class BOBase(BOBaseBase):
         """Logs exceptions from background callback tasks."""
         try:
             task.result()  # Raise exception if one occurred during the task
+        except core.exceptions.WSConnectionClosed as e:
+            # Client disconnected before the notification could be sent; harmless.
+            LOG.debug(
+                f"Connection closed while running background callback task {task.get_name()}: {e}"
+            )
         except Exception:  # pylint: disable=broad-exception-caught
             LOG.exception(
                 f"Exception raised in background creation callback task: {task.get_name()}"

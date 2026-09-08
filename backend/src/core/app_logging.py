@@ -94,7 +94,7 @@ class ColorFormatter(logging.Formatter):
 
 
 # If True, redact sensitive values but keep last 4 chars for debugging
-_LOG_WEAK_REDACT = False
+_LOG_WEAK_REDACT = True
 
 _REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
 
