@@ -1,7 +1,6 @@
 """Handle a websocket connection"""
 
 import websockets
-import websockets.exceptions
 import json
 
 from core.app_logging import (
@@ -114,14 +113,7 @@ class WSConnection(WSConnectionBase):
         self.conn_logger = get_context_logger(LOG, **self.connection_context)
 
     async def _send(self, payload):
-        try:
-            await self._socket.send(payload)
-        except websockets.exceptions.ConnectionClosed as exc:
-            # Client vanished (e.g. tab closed) before we noticed on the read side.
-            self.conn_logger.debug(f"WSConnection._send(): send failed, connection closed: {exc}")
-            raise core.exceptions.WSConnectionClosed(
-                f"Connection closed while sending ({exc})"
-            ) from exc
+        await self._socket.send(payload)
         if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
             self.conn_logger.debug("WSConnection._send(): sent message:")
             try:

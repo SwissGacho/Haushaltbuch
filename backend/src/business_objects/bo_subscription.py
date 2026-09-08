@@ -9,7 +9,6 @@ from typing import TypeVar, Generic, Type, cast
 import asyncio
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
-import core.exceptions
 
 LOG = getLogger(__name__)
 
@@ -74,19 +73,7 @@ class BOSubscription(Generic[T], WSMessageSender):
             raise
         connection.unregister_other_senders(self)
         if self._notify_subscribers_on_init:
-            task = asyncio.create_task(self.notify_subscription_subscribers())
-            task.add_done_callback(self._handle_notify_task_result)
-
-    @staticmethod
-    def _handle_notify_task_result(task: asyncio.Task):
-        """Retrieve the result of the fire-and-forget notify task so exceptions are not lost."""
-        try:
-            task.result()
-        except core.exceptions.WSConnectionClosed as e:
-            # Client disconnected before the initial notification could be sent; harmless.
-            LOG.debug(f"BOSubscription: connection closed while notifying on init: {e}")
-        except Exception:  # pylint: disable=broad-exception-caught
-            LOG.exception("BOSubscription: exception in initial notify task")
+            asyncio.create_task(self.notify_subscription_subscribers())
 
     def _initialize_subscriptions(self, **kwargs):
         if "index" not in kwargs:
