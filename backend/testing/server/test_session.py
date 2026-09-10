@@ -31,11 +31,13 @@ class Test_100_Session(unittest.TestCase):
     def create_session(
         self, user=None, conn_token=None, connection=None, client_token=None
     ):
+        connection = connection or Mock(name="connection")
+        connection.connection_context = {"connection": "mock-connection"}
         with patch("server.session.App.get_config_item", return_value=2):
             return Session(
                 user=cast(User, user or SimpleNamespace(name="alice")),
                 conn_token=conn_token,
-                connection=connection or Mock(name="connection"),
+                connection=connection,
                 client_token=client_token,
             )
 

@@ -4,6 +4,7 @@ import os
 import re
 import json
 import socket
+from uuid import UUID
 import websockets
 import websockets.asyncio.server as websockets_server
 from contextlib import asynccontextmanager
@@ -39,10 +40,7 @@ class WSHandler:
     "Container for Websocket handler"
 
     counter = 0
-
-    def __init__(self):
-        self._client_token: WSToken | None = None
-        self._client_token_valid: bool = False
+    sockets: dict[UUID, dict[str, any]] = {}
 
     def get_auth_user(self, headers) -> str | None:
         "Get headers from websocket request"
@@ -83,8 +81,9 @@ class WSHandler:
             )
         return auth_user
 
-    def process_response(self, connection, request, response):
+    def process_response(self, websocket, request, response):
         "Acknowledge the login subprotocol and issue a connection token cookie for it"
+        WSHandler.sockets[websocket.id] = {}
         if LOG.isEnabledFor(DEBUG):
             LOG.log(VERBOSE_DEBUG, "WSHandler.get_auth_user(): request headers:")
             items = (
@@ -123,21 +122,25 @@ class WSHandler:
             if "=" in crumb
         )
         if CLIENT_TOKEN_COOKIE_NAME in request_cookies:
-            client_cookie = request_cookies[CLIENT_TOKEN_COOKIE_NAME]
+            client_token = request_cookies[CLIENT_TOKEN_COOKIE_NAME]
             LOG.debug(
-                f"WSHandler.process_response(): found {redact({CLIENT_TOKEN_COOKIE_NAME: self._client_token})}"
+                f"WSHandler.process_response(): found {redact({CLIENT_TOKEN_COOKIE_NAME: client_token})}"
             )
-            self._client_token_valid = WSToken.check_token(client_cookie)
-            if self._client_token_valid:
-                self._client_token = WSToken(client_cookie)
+            WSHandler.sockets[websocket.id]["client_token_valid"] = WSToken.check_token(
+                client_token
+            )
+            if WSHandler.sockets[websocket.id]["client_token_valid"]:
+                WSHandler.sockets[websocket.id]["client_token"] = WSToken(client_token)
             return None
-        self._client_token = WSToken(inactive_seconds_timeout=None)
+        client_token = WSToken(inactive_seconds_timeout=None)
         LOG.debug(
-            f"WSHandler.process_response(): issuing {redact({CLIENT_TOKEN_COOKIE_NAME: self._client_token})} for login"
+            f"WSHandler.process_response(): issuing {redact({CLIENT_TOKEN_COOKIE_NAME: client_token})} for login"
         )
         response.headers["Set-Cookie"] = (
-            f"{CLIENT_TOKEN_COOKIE_NAME}={self._client_token}; Path=/; HttpOnly; SameSite=Strict"
+            f"{CLIENT_TOKEN_COOKIE_NAME}={client_token}; Path=/; HttpOnly; SameSite=Strict"
         )
+        WSHandler.sockets[websocket.id]["client_token"] = client_token
+        WSHandler.sockets[websocket.id]["client_token_valid"] = False
         return None
 
     async def handler(self, websocket):
@@ -151,8 +154,10 @@ class WSHandler:
         try:
             if await connection.start_connection(
                 authenticated_user=auth_user,
-                clienttoken=self._client_token,
-                client_token_valid=self._client_token_valid,
+                clienttoken=WSHandler.sockets.get(websocket.id, {}).get("client_token"),
+                client_token_valid=WSHandler.sockets.get(websocket.id, {}).get(
+                    "client_token_valid", False
+                ),
             ):
                 context_log = get_context_logger(LOG, **connection.connection_context)
                 context_log.debug("Connection started.")

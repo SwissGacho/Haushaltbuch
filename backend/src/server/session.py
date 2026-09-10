@@ -11,7 +11,11 @@ from core.app_logging import (
     getLogger,
     log_exit,
     Logger,
+    pprint_lines,
     redact,
+    redact_str,
+    DEBUG,
+    VERBOSE_DEBUG,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -41,7 +45,7 @@ class Session(SessionBase):
     ) -> None:
         local_LOG = self.local_logger(connection)
         local_LOG.debug(
-            f"creating new session (user={user.name},  {redact({'client-token': client_token})})"
+            f"creating new session (user={user.name},  client-token': {redact_str(client_token)})"
         )
         Session._all_sessions.append(self)
         self._session_nbr = Session._next_session_nbr
@@ -56,13 +60,24 @@ class Session(SessionBase):
         if client_token:
             if client_token not in Session._client_sessions:
                 local_LOG.debug(
-                    f"detected new client with {redact({'client-token': client_token})}"
+                    f"detected new client with client-token': {redact_str(client_token)}"
                 )
                 Session._client_sessions[client_token] = []
             Session._client_sessions[client_token].append(self)
             local_LOG.debug(
-                f"added session for {redact({'client-token': client_token})}"
+                f"added session for client-token': {redact_str(client_token)}"
             )
+            if local_LOG.isEnabledFor(VERBOSE_DEBUG):
+                local_LOG.log(VERBOSE_DEBUG, "current client sessions:")
+                for line in pprint_lines(
+                    (
+                        {
+                            redact_str(k): [str(s) for s in v]
+                            for k, v in Session._client_sessions.items()
+                        }
+                    )
+                ):
+                    local_LOG.log(VERBOSE_DEBUG, f"  {line}")
         else:
             local_LOG.debug("new session without client-token provided")
 
@@ -116,17 +131,12 @@ class Session(SessionBase):
                 or session_user == cls._client_sessions[client_token][0].user
             )
         ):
-            ses = cls(
+            return cls(
                 user=cls._client_sessions[client_token][0].user,
                 conn_token=None,
                 connection=connection,
                 client_token=client_token,
             )
-            cls._client_sessions[client_token].append(ses)
-            local_LOG.debug(
-                f"created session by {redact({'client-token': client_token})}"
-            )
-            return ses
         return None
 
     @property

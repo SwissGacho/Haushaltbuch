@@ -32,7 +32,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             connection_context={"connection": "ws-1"},
             is_primary=False,
             authenticated_user=None,
-            _client_token=None,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -91,7 +91,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=True,
-            _client_token=None,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -146,7 +146,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
-            _client_token="client-token",
+            client_token="client-token",
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -201,7 +201,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             connection_context={"connection": "ws-1"},
             is_primary=False,
             authenticated_user=None,
-            _client_token="client-token",
+            client_token="client-token",
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -247,7 +247,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
-            _client_token=None,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -286,7 +286,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
-            _client_token=None,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -320,7 +320,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
-            _client_token=None,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -349,7 +349,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
-            _client_token=None,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
