@@ -45,9 +45,14 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def is_specializing(cls: Type[Self]) -> bool:
         """Return True if this class is a specialization of another business object class."""
-        LOG.debug(f"PersistentBusinessObject.is_specializing({cls.__name__})")
+        LOG.log(
+            VERBOSE_DEBUG, f"PersistentBusinessObject.is_specializing({cls.__name__})"
+        )
         # Check if a specializing mixin is present in the MRO above
-        return bool(callable(b := getattr(super(), "is_specializing", None)) and b())
+        return bool(
+            callable(b := getattr(super(), "is_specializing", None))
+            and b()  # pylint: disable=not-callable
+        )
 
     # pylint: disable=no-self-argument
     @_classproperty
@@ -56,7 +61,7 @@ class PersistentBusinessObject(BOBase):
     ) -> str:
         "Name of the BO's DB table"
         if cls.is_specializing():
-            for super_cls in cls.__mro__:
+            for super_cls in cls.__mro__:  # pylint: disable=no-member
                 if (
                     issubclass(super_cls, PersistentBusinessObject)
                     and not super_cls.is_specializing()
@@ -189,7 +194,9 @@ class PersistentBusinessObject(BOBase):
         LOG.log(VERBOSE_DEBUG, f"   collect attributes for {cls.__name__}")
         descriptions = cls.attribute_descriptions(include_specialized=True)
 
-        if (skip := getattr(cls, "skip_create_table", None)) and skip():
+        if (
+            skip := getattr(cls, "skip_create_table", None)
+        ) and skip():  # pylint: disable=not-callable
             LOG.debug(
                 f"PersistentBusinessObject.sql_create_table(): {cls.__name__} has no specific table, skipping creation"
             )
@@ -348,7 +355,9 @@ class PersistentBusinessObject(BOBase):
             objects.append(target_obj)
         return objects
 
-    async def fetch(self, id=None, newest=None, session: Optional[SessionBase] = None):
+    async def fetch(
+        self, id=None, newest: bool = False, session: Optional[SessionBase] = None
+    ):
         """Fetch the content for a business object instance from the DB.
         If 'id' is given, fetch the identified object
         If 'id' omitted and 'newest'=True fetch the object with highest id
@@ -356,10 +365,12 @@ class PersistentBusinessObject(BOBase):
         """
         LOG.log(VERBOSE_DEBUG, f"PersistentBusinessObject.fetch({id=}, {newest=})")
         if (mixin := getattr(self, "fetch_mixin", None)) and iscoroutinefunction(mixin):
-            return await mixin(id=id, newest=newest, session=session)
+            return await mixin(  # pylint: disable=not-callable
+                id=id, newest=newest, session=session
+            )
         if id is None:
             id = self.id
-        if id is None and newest is None:
+        if id is None and newest is False:
             LOG.debug(f"fetching {self} without id or newest")
             return self
         # LOG.debug(f"fetching {self} with {id=}, {newest=}")
@@ -368,8 +379,26 @@ class PersistentBusinessObject(BOBase):
         return self
 
     async def fetch_self(
-        self, sql: SQL, id=None, newest=None, session: Optional[SessionBase] = None
+        self,
+        sql: SQL,
+        id=None,
+        newest: bool = False,
+        session: Optional[SessionBase] = None,
     ):
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"PersistentBusinessObject.fetch_self: {self.__class__.__name__} {self.id=}, {id=}, {newest=}, {session.user if session else 'N/A'}",
+        )
+        if self._data is None:
+            raise RuntimeError(f"Cannot fetch {self} as it has no data")
+        if id is not None and newest is not False:
+            raise ValueError(f"Cannot specify both 'id' ({id}) and 'newest' ({newest})")
+        if id is not None and self.id is not None and id != self.id:
+            raise ValueError(
+                f"Specified 'id' ({id}) does not match the instance's id ({self.id})"
+            )
+        if id is None and newest is False:
+            raise ValueError("Either 'id' must be specified or 'newest' must be True")
         select = sql.select([], True).from_(self.table)
         if id is not None:
             filter_conditions = self._filter_conditions(
@@ -385,10 +414,6 @@ class PersistentBusinessObject(BOBase):
             if filter_conditions:
                 subselect.where(filter_conditions)
             select.where(Eq("id", SQLSubquery(subselect)))
-        else:
-            raise ValueError(
-                "PersistentBusinessObject.fetch_self: id or newest must be provided"
-            )
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(
                 VERBOSE_DEBUG,
@@ -397,7 +422,7 @@ class PersistentBusinessObject(BOBase):
             for line in pprint_lines(select.get_sql()):
                 LOG.log(VERBOSE_DEBUG, f"   {line}")
         self._db_data = await (await select.execute()).fetchone()
-
+        LOG.warning(f"{self._db_data=}")
         if self._db_data:
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(
@@ -405,17 +430,28 @@ class PersistentBusinessObject(BOBase):
                 )
                 for line in pprint_lines(self._db_data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
+            had_id = self.id is not None
+
             for description in self.attribute_descriptions():
+                LOG.log(
+                    DEBUG,
+                    f"Processing attribute {description.name}, will be converted from DB value {self._db_data.get(description.name)}",
+                )
                 self._data[description.name] = await self.convert_from_db(
                     self._db_data.get(description.name),
                     description.data_type,
                     description.constraint_values,
                 )
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"Converted attribute {description.name}",
+                )
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _data=")
                 for line in pprint_lines(self._data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
-            self.register_instance(self)
+            if not had_id and self.id is not None:
+                self.register_instance(self)
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
 
     async def store(self, session: Optional[SessionBase] = None):
@@ -428,7 +464,7 @@ class PersistentBusinessObject(BOBase):
             f"{self.__class__.__name__}.store({session.user if session else 'N/A'})",
         )
         if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(mixin):
-            await mixin(session=session)
+            await mixin(session=session)  # pylint: disable=not-callable
         elif self.id is None:
             await self.insert_self(session)
         else:
@@ -445,7 +481,15 @@ class PersistentBusinessObject(BOBase):
         return await super().business_values_as_dict(session=session)
 
     async def insert_self(self, session: Optional[SessionBase] = None):
-        assert self.id is None, "id must be None for insert operation"
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"{self.__class__.__name__}.insert_self: user={session.user if session else 'N/A'}",
+        )
+        LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.insert_self: {self._data=}")
+        if self.id is not None:
+            raise ValueError("id must be None for insert operation")
+        if self._data is None:
+            raise CannotStoreEmptyBO(f"Cannot store {self} as it has no data")
         self.bo_name = self.bo_type_name()
         values_to_store: NamedValueListList = [
             (k, v) for k, v in self._data.items() if k != "id" and v is not None
@@ -460,23 +504,25 @@ class PersistentBusinessObject(BOBase):
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )
         async with SQLTransaction() as txaction:
-            self._assign_id(
-                (
-                    await (
-                        await (
-                            txaction.sql()
-                            .insert(self.table)
-                            .rows(values_to_store)
-                            .returning("id")
-                        ).execute()
-                    ).fetchone()
-                ).get("id")
+            cursor = (
+                await txaction.sql()
+                .insert(self.table)
+                .rows(values_to_store)
+                .returning("id")
+                .execute()
             )
+            fetched = await cursor.fetchone()
+            id = fetched.get("id")
+            LOG.log(DEBUG, f"Inserted new {self} into DB with id={id}")
+            self._assign_id(id)
+            LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
             # read the new row back to get any default values set by the DB
             await self.fetch_self(txaction.sql(), id=self.id, session=session)
 
     async def update_self(self, session: Optional[SessionBase] = None):
         assert self.id is not None, "id must not be None for update operation"
+        if self._data is None:
+            raise CannotStoreEmptyBO(f"Cannot update {self} as it has no data")
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(
                 VERBOSE_DEBUG,
@@ -486,7 +532,7 @@ class PersistentBusinessObject(BOBase):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
         async with SQLTransaction() as txaction:
             value_class = Value
-            update = txaction.sql().update(self.table).where(Eq("id", self.id))
+            update = txaction.sql().update(self.table).where(Eq("id", str(self.id)))
             changes = False
             descriptions = {d.name: d for d in self.attribute_descriptions()}
             for k, v in self._data.items():

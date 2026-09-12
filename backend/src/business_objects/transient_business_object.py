@@ -28,8 +28,6 @@ class TransientBusinessObject(BOBase):
     def __init__(self, *args, bo_id=None, **attributes) -> None:
         LOG.debug(f"TransientBusinessObject.__init__({bo_id=}, {args=}, {attributes=})")
         super().__init__(bo_id=bo_id, *args, **attributes)
-        if bo_id is None:
-            self._assign_id(next(self._next_id))
         # LOG.debug(f"TransientBusinessObject.__init__: assigned id {self.id}")
         self._instances.add(self)
 
