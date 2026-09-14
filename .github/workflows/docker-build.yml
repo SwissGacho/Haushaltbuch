@@ -61,8 +61,12 @@ jobs:
           build-args: |
             APP_VERSION=${{ steps.meta.outputs.version }}
           platforms: linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=backend-arm64
+            type=registry,ref=ghcr.io/swissgacho/haushaltbuch:buildcache-arm64
+          cache-to: |
+            type=gha,mode=max,scope=backend-arm64
+            type=registry,ref=ghcr.io/swissgacho/haushaltbuch:buildcache-arm64,mode=max
           provenance: false
           sbom: false
 

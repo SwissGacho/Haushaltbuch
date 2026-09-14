@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # Nutze ein leichtgewichtiges Python Image
 FROM python:3.12-slim AS stage1
 WORKDIR /app
@@ -10,7 +11,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefix=/install -r requirements.txt
 
 FROM python:3.12-slim AS stage2
 WORKDIR /app
