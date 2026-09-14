@@ -9,6 +9,7 @@ import websockets
 import websockets.asyncio.server as websockets_server
 from contextlib import asynccontextmanager
 
+import core.exceptions
 from core.app_logging import (
     get_context_logger,
     getLogger,
@@ -189,6 +190,8 @@ class WSHandler:
                     )
         except websockets.exceptions.ConnectionClosed as exc:
             context_log.debug(f"Connection closed by peer: {exc}")
+        except core.exceptions.WSConnectionClosed as exc:
+            context_log.debug(f"Connection closed gracefully: {exc}")
         except Exception as exc:
             context_log.error(f"Connection aborted by exception {exc}")
             raise
