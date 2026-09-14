@@ -4,36 +4,116 @@ import unittest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 
 import core.exceptions
-from server.ws_server import WSHandler
+from server.ws_server import (
+    CLIENT_TOKEN_COOKIE_NAME,
+    LOGIN_SUBPROTOCOL,
+    WSHandler,
+)
 
 # class Test_000_WS_Server(unittest.IsolatedAsyncioTestCase):
 #     async def test_001_get_websocket(self):
 
 
 class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
-    def test_200_get_auth_user_logs_redacted_repeated_headers(self):
+    def setUp(self):
+        WSHandler.sockets.clear()
+
+    def test_200_process_response_logs_redacted_repeated_headers(self):
         handler = WSHandler()
+        websocket = Mock(id="ws-1")
         headers = Mock()
         headers.raw_items.return_value = [
             ("X-Api-Key", "sensitive-value"),
             ("X-Trace-Id", "first"),
             ("X-Trace-Id", "second"),
         ]
+        headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": "",
+            "Cookie": "",
+        }.get(name, default)
+        request = Mock(headers=headers)
+        response = Mock(headers={})
 
-        with (
-            patch("server.ws_server.LOG") as mock_log,
-            patch(
-                "server.ws_server.App.get_config_item", side_effect=["", ""]
-            ),
-        ):
+        with (patch("server.ws_server.LOG") as mock_log,):
             mock_log.isEnabledFor.return_value = True
-            self.assertIsNone(handler.get_auth_user(headers))
+            self.assertIsNone(handler.process_response(websocket, request, response))
 
-        mock_log.log.assert_any_call(
-            5,
-            "  {'X-Api-Key': '***redacted***', "
-            "'X-Trace-Id': ['first', 'second']}",
+        logged_headers = [
+            call.args[1]
+            for call in mock_log.log.call_args_list
+            if call.args and call.args[0] == 5
+        ]
+        header_log = next(
+            log_line for log_line in logged_headers if "X-Api-Key" in log_line
         )
+        self.assertIn("  {'X-Api-Key': ", header_log)
+        self.assertNotIn("sensitive-value", header_log)
+        self.assertIn("'X-Trace-Id': ['first', 'second']", header_log)
+
+    def test_201_process_response_ignores_non_login_connection(self):
+        handler = WSHandler()
+        websocket = Mock(id="ws-1")
+        request = Mock()
+        request.headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": "other-protocol",
+            "Cookie": "",
+        }.get(name, default)
+        response = Mock(headers={})
+
+        handler.process_response(websocket, request, response)
+
+        self.assertEqual(response.headers, {})
+        self.assertEqual(WSHandler.sockets[websocket.id], {})
+
+    def test_202_process_response_issues_client_token_for_login_connection(self):
+        handler = WSHandler()
+        websocket = Mock(id="ws-1")
+        request = Mock()
+        request.headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": LOGIN_SUBPROTOCOL,
+            "Cookie": "",
+        }.get(name, default)
+        response = Mock(headers={})
+
+        with patch(
+            "server.ws_server.WSToken", return_value="issued-token"
+        ) as mock_token:
+            handler.process_response(websocket, request, response)
+
+        mock_token.assert_called_once_with(inactive_seconds_timeout=None)
+        self.assertEqual(
+            WSHandler.sockets[websocket.id],
+            {"client_token": "issued-token", "client_token_valid": False},
+        )
+        self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
+        self.assertEqual(
+            response.headers["Set-Cookie"],
+            f"{CLIENT_TOKEN_COOKIE_NAME}=issued-token; Path=/; HttpOnly; SameSite=Strict",
+        )
+
+    def test_203_process_response_reuses_existing_client_token_cookie(self):
+        handler = WSHandler()
+        websocket = Mock(id="ws-1")
+        request = Mock()
+        request.headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": LOGIN_SUBPROTOCOL,
+            "Cookie": f"{CLIENT_TOKEN_COOKIE_NAME}=existing-token",
+        }.get(name, default)
+        response = Mock(headers={})
+
+        with patch("server.ws_server.WSToken") as mock_token:
+            mock_token.check_token.return_value = True
+            mock_token.return_value = "existing-token"
+            handler.process_response(websocket, request, response)
+
+        mock_token.check_token.assert_called_once_with("existing-token")
+        mock_token.assert_called_once_with("existing-token")
+        self.assertEqual(
+            WSHandler.sockets[websocket.id],
+            {"client_token": "existing-token", "client_token_valid": True},
+        )
+        self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
+        self.assertNotIn("Set-Cookie", response.headers)
 
     async def _200_handle_messages(
         self,
@@ -55,6 +135,7 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
             "socket": "mock_socket",
         }
         mock_socket = MagicMock()
+        mock_socket.id = "ws-1"
         mock_socket.__aiter__.return_value = messages
         mock_socket.request.headers = {
             "mock_auth_header": mock_user,
@@ -76,11 +157,15 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
 
         if not mock_header:
             mock_connection.start_connection.assert_awaited_once_with(
-                authenticated_user=None
+                authenticated_user=None,
+                clienttoken=None,
+                client_token_valid=False,
             )
         else:
             mock_connection.start_connection.assert_awaited_once_with(
-                authenticated_user=mock_auth_user or mock_user
+                authenticated_user=mock_auth_user or mock_user,
+                clienttoken=None,
+                client_token_valid=False,
             )
         self.assertEqual(Mock_Msg.call_count, no_messages, "number of Messages created")
         self.assertEqual(
@@ -144,10 +229,18 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         with (
             patch("server.ws_server.WSConnection", return_value=mock_connection),
             patch("server.ws_server.Message") as Mock_Msg,
+            patch(
+                "server.ws_server.App.get_config_item",
+                side_effect=["", ""],
+            ),
         ):
             await handler.handler(websocket=mock_socket)
 
-        mock_connection.start_connection.assert_awaited_once_with()
+        mock_connection.start_connection.assert_awaited_once_with(
+            authenticated_user=None,
+            clienttoken=None,
+            client_token_valid=False,
+        )
         mock_connection.handle_message.assert_awaited_once()
         mock_connection.connection_closed.assert_called_once_with()
         self.assertEqual(Mock_Msg.call_count, 1, "number of Messages created")

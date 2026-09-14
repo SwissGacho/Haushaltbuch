@@ -32,6 +32,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             connection_context={"connection": "ws-1"},
             is_primary=False,
             authenticated_user=None,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -85,13 +86,12 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session = Mock(
-            token="ses-token", user=SimpleNamespace(name="alice")
-        )
+        session = Mock(token="ses-token", user=SimpleNamespace(name="alice"))
         connection = Mock(
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=True,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -106,7 +106,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 "messages.login.App",
                 SimpleNamespace(
                     status=Status.STATUS_MULTI_USER,
-                    status_object=SimpleNamespace(version={"version": "9.9.9"})
+                    status_object=SimpleNamespace(version={"version": "9.9.9"}),
                 ),
             ),
             patch(
@@ -117,7 +117,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             await msg.handle_message(connection)
 
         mock_session_class.get_session_from_token.assert_called_once_with(
-            ses_token="ses-token", conn_token=""
+            ses_token="ses-token", conn_token="", client_token=None
         )
         mock_check_login.assert_not_awaited()
         self.assertIs(connection.session, session)
@@ -131,6 +131,106 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             sent_message.message[MessageAttribute.WS_ATTR_VERSION_INFO],
             {"version": "9.9.9"},
         )
+
+    async def test_104_handle_message_success_existing_session_client_token(self):
+        msg = LoginMessage(
+            dumps(
+                {
+                    MessageAttribute.WS_ATTR_TYPE: MessageType.WS_TYPE_LOGIN,
+                    MessageAttribute.WS_ATTR_TOKEN: "conn-token",
+                }
+            )
+        )
+        session = Mock(token="ses-token", user=SimpleNamespace(name="alice"))
+        connection = Mock(
+            session=None,
+            connection_context={"connection": "ws-1"},
+            is_primary=False,
+            client_token="client-token",
+        )
+        connection.send_message = AsyncMock()
+        connection.abort_connection = AsyncMock()
+
+        mock_session_class = Mock()
+        mock_session_class.get_session_from_token = Mock(return_value=session)
+
+        with (
+            patch("messages.login.Session", mock_session_class),
+            patch("messages.login.check_login", AsyncMock()) as mock_check_login,
+            patch(
+                "messages.login.App",
+                SimpleNamespace(status=Status.STATUS_MULTI_USER),
+            ),
+            patch(
+                "messages.login.get_context_logger",
+                Mock(return_value=Mock(debug=Mock())),
+            ),
+        ):
+            await msg.handle_message(connection)
+
+        mock_session_class.get_session_from_token.assert_called_once_with(
+            ses_token="", conn_token="", client_token="client-token"
+        )
+        mock_check_login.assert_not_awaited()
+        self.assertIs(connection.session, session)
+        connection.abort_connection.assert_not_awaited()
+        connection.send_message.assert_awaited_once()
+        sent_message = connection.send_message.await_args.args[0]
+        self.assertIsInstance(sent_message, WelcomeMessage)
+        self.assertEqual(
+            sent_message.message[MessageAttribute.WS_ATTR_SES_TOKEN], "ses-token"
+        )
+        self.assertEqual(
+            sent_message.message[MessageAttribute.WS_ATTR_AUTHENTICATED_USER],
+            "alice",
+        )
+
+    async def test_105_handle_message_new_session_registers_client_token(self):
+        msg = LoginMessage(
+            dumps(
+                {
+                    MessageAttribute.WS_ATTR_TYPE: MessageType.WS_TYPE_LOGIN,
+                    MessageAttribute.WS_ATTR_TOKEN: "conn-token",
+                }
+            )
+        )
+        session_user = SimpleNamespace(name="alice")
+        session = Mock(token="ses-token", user=session_user)
+        connection = Mock(
+            session=None,
+            connection_context={"connection": "ws-1"},
+            is_primary=False,
+            authenticated_user=None,
+            client_token="client-token",
+        )
+        connection.send_message = AsyncMock()
+        connection.abort_connection = AsyncMock()
+
+        mock_session_class = Mock(return_value=session)
+        mock_session_class.get_session_from_token = Mock(return_value=None)
+
+        with (
+            patch("messages.login.Session", mock_session_class),
+            patch("messages.login.check_login", AsyncMock(return_value=session_user)),
+            patch(
+                "messages.login.App",
+                SimpleNamespace(status=Status.STATUS_MULTI_USER),
+            ),
+            patch(
+                "messages.login.get_context_logger",
+                Mock(return_value=Mock(debug=Mock())),
+            ),
+        ):
+            await msg.handle_message(connection)
+
+        mock_session_class.assert_called_once()
+        session_args, session_kwargs = mock_session_class.call_args
+        self.assertIs(session_args[0], session_user)
+        self.assertEqual(session_args[1].token, "conn-token")
+        self.assertIs(session_args[2], connection)
+        self.assertEqual(session_kwargs, {"client_token": "client-token"})
+        self.assertIs(connection.session, session)
+        connection.send_message.assert_awaited_once()
 
     async def test_104_handle_message_success_new_session_single_user(self):
         msg = LoginMessage(
@@ -147,14 +247,13 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
 
         with (
-            patch(
-                "messages.login.check_login", AsyncMock(return_value=session_user)
-            ),
+            patch("messages.login.check_login", AsyncMock(return_value=session_user)),
             patch("messages.login.Session", Mock(return_value=session)),
             patch(
                 "messages.login.App",
@@ -187,6 +286,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -220,6 +320,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -248,6 +349,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
+            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()

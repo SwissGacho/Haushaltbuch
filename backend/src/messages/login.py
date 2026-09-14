@@ -48,16 +48,22 @@ class LoginMessage(Message):
         try:
             ses_token = self.get_str(MessageAttribute.WS_ATTR_SES_TOKEN)
             conn_token = self.get_str(MessageAttribute.WS_ATTR_PREV_TOKEN)
-            if ses_token or conn_token:
+            if ses_token or conn_token or connection.client_token:
                 session = Session.get_session_from_token(
-                    ses_token=ses_token, conn_token=conn_token
+                    ses_token=ses_token,
+                    conn_token=conn_token,
+                    client_token=connection.client_token,
                 )
             else:
+                session = None
+            if not session:
                 user: User = await check_login(
                     self.message,
                     authenticated_user=getattr(connection, "authenticated_user", None),
                 )
-                session = Session(user, token, connection)
+                session = Session(
+                    user, token, connection, client_token=connection.client_token
+                )
             if not session:
                 raise PermissionError(
                     f"Failed to create session for login with message {self.message}"

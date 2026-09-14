@@ -132,7 +132,7 @@ class WSConnection(WSConnectionBase):
                 LOG.log(VERBOSE_DEBUG, f"  {line}")
         elif self.conn_logger.isEnabledFor(DEBUG):
             self.conn_logger.debug(
-                f"WSConnection._send(): sent message: {redact_truncate(payload,max_length=50)}"
+                f"WSConnection._send(): sent message: {redact_truncate(payload,max_length=90)}"
             )
 
     async def send_message(self, message: Message, status=False):
@@ -157,15 +157,32 @@ class WSConnection(WSConnectionBase):
         for conn in conns:
             await conn._send(msg)  # pylint: disable=protected-access
 
-    async def start_connection(self, authenticated_user: str | None = None):
+    @property
+    def client_token(self) -> WSToken | None:
+        "get client token associated with this connection"
+        return getattr(self, "_client_token", None)
+
+    async def start_connection(
+        self,
+        authenticated_user: str | None = None,
+        clienttoken: WSToken | None = None,
+        client_token_valid: bool = False,
+    ):
         "say hello and expect Login"
-        # self.conn_logger.debug("start login handshake, say hello")
+        self.conn_logger.debug(
+            f"start_connection({authenticated_user=}, "
+            f"{redact({'clienttoken': clienttoken})}, "
+            f"{client_token_valid=}), say hello"
+        )
         self._authenticated_user = authenticated_user
+        self._client_token = clienttoken
         await self.send_message(
             HelloMessage(
                 token=self._token,
                 status=App.status,
-                authenticated_user=True if authenticated_user else None,
+                authenticated_user=(
+                    True if (authenticated_user or client_token_valid) else None
+                ),
             )
         )
         try:
