@@ -229,10 +229,18 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         with (
             patch("server.ws_server.WSConnection", return_value=mock_connection),
             patch("server.ws_server.Message") as Mock_Msg,
+            patch(
+                "server.ws_server.App.get_config_item",
+                side_effect=["", ""],
+            ),
         ):
             await handler.handler(websocket=mock_socket)
 
-        mock_connection.start_connection.assert_awaited_once_with()
+        mock_connection.start_connection.assert_awaited_once_with(
+            authenticated_user=None,
+            clienttoken=None,
+            client_token_valid=False,
+        )
         mock_connection.handle_message.assert_awaited_once()
         mock_connection.connection_closed.assert_called_once_with()
         self.assertEqual(Mock_Msg.call_count, 1, "number of Messages created")
