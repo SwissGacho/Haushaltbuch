@@ -64,6 +64,20 @@ class _GenericAdminOnly:
     specialists = {_SpecialistAdminOnly}
 
 
+class _SpecialistWithConditions(MixinBase):
+    @staticmethod
+    def bo_type_name() -> str:
+        return "conditioned_bo"
+
+    @classmethod
+    def specialist_conditions_mixin(cls, specialist_cls, user):
+        return ["specialist_cond"]
+
+
+class _GenericWithSpecialistConditions:
+    specialists = {_SpecialistWithConditions}
+
+
 class _StoreTarget(MixinBase):
     def __init__(self, bo_id=None):
         self.id = bo_id
@@ -117,9 +131,18 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(MixinBase.is_admin_only())
         self.assertFalse(MixinBase.skip_create_table())
 
-    def test_specialist_conditions_without_specialists(self):
-        result = MixinBase._specialist_conditions(_GenericNoSpecialists, user=None)
-        self.assertEqual([], result)
+    def test_specialist_conditions_without_specialists_uses_generic_class(self):
+        with (
+            patch("business_objects.bo_mixins.bo_mixin.ColumnName") as mock_column_name,
+            patch("business_objects.bo_mixins.bo_mixin.SQLString") as mock_sql_string,
+            patch("business_objects.bo_mixins.bo_mixin.In") as mock_in,
+        ):
+            result = MixinBase.specialist_conditions(_GenericNoSpecialists, user=None)
+
+        mock_column_name.assert_called_once_with("bo_name")
+        mock_sql_string.assert_called_once_with("_GenericNoSpecialists")
+        mock_in.assert_called_once()
+        self.assertEqual([mock_in.return_value], result)
 
     def test_specialist_conditions_without_user_builds_in_clause(self):
         with (
@@ -127,29 +150,24 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
             patch("business_objects.bo_mixins.bo_mixin.SQLString") as mock_sql_string,
             patch("business_objects.bo_mixins.bo_mixin.In") as mock_in,
         ):
-            result = MixinBase._specialist_conditions(_GenericPublicOnly, user=None)
+            result = MixinBase.specialist_conditions(_GenericPublicOnly, user=None)
 
         mock_column_name.assert_called_once_with("bo_name")
         mock_sql_string.assert_called_once_with("public_bo")
         mock_in.assert_called_once()
         self.assertEqual([mock_in()], result)
 
-    def test_specialist_conditions_without_user_and_no_valid_specialist_raises(self):
-        with self.assertRaises(ValueError):
-            MixinBase._specialist_conditions(_GenericPersonalOnly, user=None)
+    def test_specialist_conditions_delegates_to_specialist_mixins(self):
+        result = MixinBase.specialist_conditions(
+            _GenericWithSpecialistConditions, user=None
+        )
 
-    def test_specialist_conditions_with_non_admin_user_and_only_admin_specialists(self):
-        mock_user = Mock(name="user", is_admin=False)
-
-        with patch("business_objects.bo_mixins.bo_mixin.LOG.warning") as mock_warning:
-            result = MixinBase._specialist_conditions(_GenericAdminOnly, user=mock_user)
-
-        self.assertEqual([], result)
-        mock_warning.assert_called_once()
+        self.assertEqual(2, len(result))
+        self.assertIn("specialist_cond", result)
 
     def test_special_conditions_collects_base_and_mixin_conditions(self):
         with patch.object(
-            MixinBase, "_specialist_conditions", return_value=["base_cond"]
+            MixinBase, "specialist_conditions", return_value=["base_cond"]
         ) as mock_specialist_conditions:
             result = MixinBase.special_conditions(gen_cls=_CollectorBO, user=None)
 
