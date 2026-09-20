@@ -6,6 +6,7 @@ from core.app_logging import (
     getLogger,
     log_exit,
     DEBUG,
+    ERROR,
     VERBOSE_DEBUG,
     redact,
     pprint_lines,
@@ -73,9 +74,10 @@ class Personal(MixinBase):
                 not isinstance(session.user, type(user_id))
                 or getattr(user_id, "id", None) != session.user.id
             ):
-                LOG.error(
+                LOG.log(
+                    DEBUG if user_id is None else ERROR,
                     f"Personal.store_mixin: {type(self).__name__} user_id ({user_id}) "
-                    f"does not match session user ({session.user})"
+                    f"does not match session user ({session.user})",
                 )
             setattr(self, "user_id", session.user)
 

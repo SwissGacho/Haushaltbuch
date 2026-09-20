@@ -205,6 +205,7 @@ class SQLSubquery(SQLExpression):
         query_params = self._subquery.get_sql()
         return f"({km.merge_params(**query_params)})"
 
+
 class Insert(SQLStatement):
     """A SQLStatement representing an INSERT statement.
     Multiple rows may be inserted. It is assumed that all rows have the same columns.

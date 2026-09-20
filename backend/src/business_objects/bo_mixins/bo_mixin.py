@@ -16,6 +16,7 @@ LOG = getLogger(__name__)
 
 from business_objects.bo_descriptors import AttributeDescription
 from core.util import check_property
+from database.sql import SQL
 from database.sql_expression import (
     SQLExpression,
     In,
@@ -36,7 +37,7 @@ class MixinBase:
     @classmethod
     def is_specializing(cls) -> bool:
         """Return True if this class is a specialization of another business object class."""
-        LOG.debug(f"MixinBase.is_specializing({cls.__name__})  -> False")
+        LOG.log(VERBOSE_DEBUG, f"MixinBase.is_specializing({cls.__name__})  -> False")
         return False
 
     @classmethod
@@ -146,6 +147,20 @@ class MixinBase:
             for item in cast(Iterable, sc(gen_cls, user))
         ]
         return conds
+
+    async def fetch_mixin(
+        self, sql: SQL, id=None, newest=None, session: Optional[SessionBase] = None
+    ):
+        """Fetch the content for a BO instance from the DB."""
+        LOG.debug(
+            f"MixinBase.fetch_mixin({id=}, {newest=}, {session.user if session else 'N/A'})"
+        )
+        fetch_self = getattr(self, "fetch_self", None)
+        if not iscoroutinefunction(fetch_self):
+            raise TypeError(
+                f"MixinBase.fetch_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
+            )
+        await fetch_self(sql, id=id, newest=newest, session=session)
 
     async def store_mixin(self, session: Optional[SessionBase] = None):
         """Store the business object in the database.

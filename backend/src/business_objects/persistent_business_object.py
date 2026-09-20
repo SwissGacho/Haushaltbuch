@@ -45,9 +45,6 @@ class PersistentBusinessObject(BOBase):
     @classmethod
     def is_specializing(cls: Type[Self]) -> bool:
         """Return True if this class is a specialization of another business object class."""
-        LOG.log(
-            VERBOSE_DEBUG, f"PersistentBusinessObject.is_specializing({cls.__name__})"
-        )
         # Check if a specializing mixin is present in the MRO above
         return bool(
             callable(b := getattr(super(), "is_specializing", None))
@@ -139,8 +136,9 @@ class PersistentBusinessObject(BOBase):
 
     async def convert_from_db(self, value, typ, subtyp):
         "convert a value of type 'typ' read from the DB"
-        LOG.debug(
-            f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})"
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})",
         )
         if value is None:
             return None
@@ -364,18 +362,29 @@ class PersistentBusinessObject(BOBase):
         If the oject is not found in the DB return the instance unchanged
         """
         LOG.log(VERBOSE_DEBUG, f"PersistentBusinessObject.fetch({id=}, {newest=})")
-        if (mixin := getattr(self, "fetch_mixin", None)) and iscoroutinefunction(mixin):
-            return await mixin(  # pylint: disable=not-callable
-                id=id, newest=newest, session=session
-            )
         if id is None:
             id = self.id
-        if id is None and newest is False:
+        # LOG.debug(f"fetching {self} with {id=}, {newest=}")
+        mixin = getattr(self, "fetch_mixin", None)
+        if mixin and not iscoroutinefunction(mixin):
+            raise TypeError(
+                f"PersistentBusinessObject.fetch: Expected coroutine function for fetch_mixin, got {type(mixin).__name__}"
+            )
+        if (
+            id is None
+            and newest is None
+            and (
+                mixin is None
+                or getattr(mixin, "__func__", None) is MixinBase.fetch_mixin
+            )
+        ):
             LOG.debug(f"fetching {self} without id or newest")
             return self
-        # LOG.debug(f"fetching {self} with {id=}, {newest=}")
         async with SQL() as sql:
-            await self.fetch_self(sql, id=id, newest=newest, session=session)
+            if mixin:
+                await mixin(sql=sql, id=id, newest=newest, session=session)
+            else:
+                await self.fetch_self(sql=sql, id=id, newest=newest, session=session)
         return self
 
     async def fetch_self(
@@ -487,7 +496,15 @@ class PersistentBusinessObject(BOBase):
             f"{self}.business_values_as_dict: {self.id=}, user={getattr(session, 'user', None)}"
         )
         await self.fetch(self.id, session=session)
-        return await super().business_values_as_dict(session=session)
+        business_values = await super().business_values_as_dict(session=session)
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"PersistentBusinessObject({self}).business_values_as_dict returning:",
+            )
+            for line in pprint_lines(business_values):
+                LOG.log(VERBOSE_DEBUG, f"{  line}")
+        return business_values
 
     async def insert_self(self, session: Optional[SessionBase] = None):
         LOG.log(

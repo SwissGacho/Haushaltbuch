@@ -1,6 +1,7 @@
 """Handle a websocket connection"""
 
 import websockets
+import websockets.exceptions
 import json
 
 from core.app_logging import (
@@ -43,6 +44,7 @@ class WSConnection(WSConnectionBase):
         self._comp = None
         self.is_primary = False
         self._token = WSToken(inactive_seconds_timeout=None)
+        self._authenticated_user: str | None = None
         self.subscribers: list[WSMessageSender] = []
         self.conn_logger = get_context_logger(LOG, **self.connection_context)
         self._register_connection()
@@ -96,6 +98,11 @@ class WSConnection(WSConnectionBase):
         return descr
 
     @property
+    def authenticated_user(self) -> str | None:
+        "username authenticated out-of-band (e.g. via auth proxy header)"
+        return self._authenticated_user
+
+    @property
     def session(self):
         "session this connection is contained in"
         return self._session
@@ -107,7 +114,14 @@ class WSConnection(WSConnectionBase):
         self.conn_logger = get_context_logger(LOG, **self.connection_context)
 
     async def _send(self, payload):
-        await self._socket.send(payload)
+        try:
+            await self._socket.send(payload)
+        except websockets.exceptions.ConnectionClosed as exc:
+            # Client vanished (e.g. tab closed) before we noticed on the read side.
+            self.conn_logger.debug(f"WSConnection._send(): send failed, connection closed: {exc}")
+            raise core.exceptions.WSConnectionClosed(
+                f"Connection closed while sending ({exc})"
+            ) from exc
         if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):
             self.conn_logger.debug("WSConnection._send(): sent message:")
             try:
@@ -143,10 +157,17 @@ class WSConnection(WSConnectionBase):
         for conn in conns:
             await conn._send(msg)  # pylint: disable=protected-access
 
-    async def start_connection(self):
+    async def start_connection(self, authenticated_user: str | None = None):
         "say hello and expect Login"
         # self.conn_logger.debug("start login handshake, say hello")
-        await self.send_message(HelloMessage(token=self._token, status=App.status))
+        self._authenticated_user = authenticated_user
+        await self.send_message(
+            HelloMessage(
+                token=self._token,
+                status=App.status,
+                authenticated_user=True if authenticated_user else None,
+            )
+        )
         try:
             while json_message := await self._socket.recv():
                 if self.conn_logger.isEnabledFor(VERBOSE_DEBUG):

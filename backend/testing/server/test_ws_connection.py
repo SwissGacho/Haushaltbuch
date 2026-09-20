@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import Mock, AsyncMock, patch
 import inspect
 
+import websockets.exceptions
 import core.exceptions
 from server.ws_connection import WSConnection
 from messages.message import MessageType, MessageAttribute
@@ -28,6 +29,16 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         mock_payload = Mock()
         await self.connection._send(mock_payload)
         self.connection._socket.send.assert_awaited_once_with(mock_payload)
+
+    async def test_101a__send_connection_closed_is_translated(self):
+        closed_exc = websockets.exceptions.ConnectionClosedOK(None, None)
+        self.connection._socket.send = AsyncMock(
+            name="websocket.send", side_effect=closed_exc
+        )
+        mock_payload = Mock()
+        with self.assertRaises(core.exceptions.WSConnectionClosed) as ctx:
+            await self.connection._send(mock_payload)
+        self.assertIs(ctx.exception.__cause__, closed_exc)
 
     async def _102_send_message(self, status=None):
         self.connection._send = AsyncMock(name="_send")
@@ -60,7 +71,9 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
     async def test_102c_send_message_with_status_false(self):
         await self._102_send_message(status=False)
 
-    async def _103_start_connection(self, login_arg=""):
+    async def _103_start_connection(
+        self, login_arg="", authenticated_user="mock-authenticated-user"
+    ):
         mock_hello_message = Mock(name="mock_hello_message")
         MockHelloMessage = Mock(name="HelloMessage", return_value=mock_hello_message)
         mock_message = Mock(name="mock_message")
@@ -100,12 +113,22 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         ):
             if exp_result in ["AnyExc"]:
                 with self.assertRaises(Exception):
-                    await self.connection.start_connection()
+                    await self.connection.start_connection(
+                        authenticated_user=authenticated_user
+                    )
                 result = None
             else:
-                result = await self.connection.start_connection()
+                result = await self.connection.start_connection(
+                    authenticated_user=authenticated_user
+                )
 
         self.connection.send_message.assert_awaited_once_with(mock_hello_message)
+        MockHelloMessage.assert_called_once_with(
+            token="mockToken",
+            status=self.MockApp.status,
+            authenticated_user=True if authenticated_user else None,
+        )
+        self.assertEqual(self.connection.authenticated_user, authenticated_user)
         self.connection._socket.recv.assert_awaited_once_with()
         MockMessage.assert_called_once_with(json_message=mock_message)
         if exp_result == "success":

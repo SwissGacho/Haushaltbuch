@@ -78,14 +78,12 @@ class TestSingletonMixin(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_mixin_defaults_to_newest_when_no_id(self):
         target = _SingletonTarget(bo_id=None, count=0)
         mock_sql = Mock(name="mock_sql")
-        mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
-        mock_sql.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("business_objects.bo_mixins.singleton.SQL", return_value=mock_sql):
-            await target.fetch_mixin(id=None, newest=None, session=None)
+        await target.fetch_mixin(sql=mock_sql, id=None, newest=None, session=None)
 
         self.assertEqual(1, len(target.fetch_calls))
-        _, _, newest, _ = target.fetch_calls[0]
+        sql, _, newest, _ = target.fetch_calls[0]
+        self.assertIs(sql, mock_sql)
         self.assertTrue(newest)
 
     async def test_fetch_mixin_stores_when_not_found(self):
@@ -93,22 +91,17 @@ class TestSingletonMixin(unittest.IsolatedAsyncioTestCase):
         session = Mock(name="session")
         session.user = Mock(name="user")
         mock_sql = Mock(name="mock_sql")
-        mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
-        mock_sql.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("business_objects.bo_mixins.singleton.SQL", return_value=mock_sql):
-            await target.fetch_mixin(id=None, newest=None, session=session)
+        await target.fetch_mixin(sql=mock_sql, id=None, newest=None, session=session)
 
-        self.assertIs(target.user_id, session.user)
+        self.assertEqual(999, target.id)
         self.assertEqual([session], target.store_calls)
 
     async def test_fetch_mixin_raises_if_fetch_self_not_coroutine(self):
         with self.assertRaises(TypeError):
-            await _SingletonInvalidFetch().fetch_mixin(session=None)
-
-    async def test_fetch_mixin_raises_if_next_mixin_is_not_coroutine(self):
-        with self.assertRaises(TypeError):
-            await _SingletonWithSyncNext().fetch_mixin(session=None)
+            await _SingletonInvalidFetch().fetch_mixin(
+                sql=Mock(name="mock_sql"), session=None
+            )
 
     async def test_store_mixin_raises_if_count_rows_not_coroutine(self):
         with self.assertRaises(TypeError):

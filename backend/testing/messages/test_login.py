@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 from core.exceptions import TokenExpiredError
+from core.base_objects import Status
 from messages.login import HelloMessage, LoginMessage, WelcomeMessage, ByeMessage
 from messages.message import MessageType, MessageAttribute
 
@@ -24,22 +25,28 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session = Mock(token="ses-token")
+        session_user = SimpleNamespace(name="alice")
+        session = Mock(token="ses-token", user=session_user)
         connection = Mock(
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
+            authenticated_user=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
 
         with (
             patch(
-                "messages.login.check_login", AsyncMock(return_value=Mock(name="user"))
+                "messages.login.check_login", AsyncMock(return_value=session_user)
             ) as mock_check_login,
             patch(
                 "messages.login.Session", Mock(return_value=session)
             ) as mock_session_class,
+            patch(
+                "messages.login.App",
+                SimpleNamespace(status=Status.STATUS_MULTI_USER),
+            ),
             patch(
                 "messages.login.get_context_logger",
                 Mock(return_value=Mock(debug=Mock())),
@@ -47,7 +54,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         ):
             await msg.handle_message(connection)
 
-        mock_check_login.assert_awaited_once_with(msg.message)
+        mock_check_login.assert_awaited_once_with(msg.message, authenticated_user=None)
         mock_session_class.assert_called_once()
         mock_ctx_logger.assert_called_once()
         self.assertIs(connection.session, session)
@@ -62,6 +69,10 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             sent_message.message[MessageAttribute.WS_ATTR_SES_TOKEN], "ses-token"
         )
+        self.assertEqual(
+            sent_message.message[MessageAttribute.WS_ATTR_AUTHENTICATED_USER],
+            "alice",
+        )
         self.assertNotIn(MessageAttribute.WS_ATTR_VERSION_INFO, sent_message.message)
 
     async def test_103_handle_message_success_existing_session_primary(self):
@@ -74,7 +85,9 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session = Mock(token="ses-token")
+        session = Mock(
+            token="ses-token", user=SimpleNamespace(name="alice")
+        )
         connection = Mock(
             session=None,
             connection_context={"connection": "ws-1"},
@@ -92,6 +105,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             patch(
                 "messages.login.App",
                 SimpleNamespace(
+                    status=Status.STATUS_MULTI_USER,
                     status_object=SimpleNamespace(version={"version": "9.9.9"})
                 ),
             ),
@@ -110,11 +124,57 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         connection.send_message.assert_awaited_once()
         sent_message = connection.send_message.await_args.args[0]
         self.assertEqual(
+            sent_message.message[MessageAttribute.WS_ATTR_AUTHENTICATED_USER],
+            "alice",
+        )
+        self.assertEqual(
             sent_message.message[MessageAttribute.WS_ATTR_VERSION_INFO],
             {"version": "9.9.9"},
         )
 
-    async def test_104_handle_message_permission_error_aborts(self):
+    async def test_104_handle_message_success_new_session_single_user(self):
+        msg = LoginMessage(
+            dumps(
+                {
+                    MessageAttribute.WS_ATTR_TYPE: MessageType.WS_TYPE_LOGIN,
+                    MessageAttribute.WS_ATTR_TOKEN: "conn-token",
+                }
+            )
+        )
+        session_user = SimpleNamespace(name="alice")
+        session = Mock(token="ses-token", user=session_user)
+        connection = Mock(
+            session=None,
+            connection_context={"connection": "ws-1"},
+            is_primary=False,
+        )
+        connection.send_message = AsyncMock()
+        connection.abort_connection = AsyncMock()
+
+        with (
+            patch(
+                "messages.login.check_login", AsyncMock(return_value=session_user)
+            ),
+            patch("messages.login.Session", Mock(return_value=session)),
+            patch(
+                "messages.login.App",
+                SimpleNamespace(status=Status.STATUS_SINGLE_USER),
+            ),
+            patch(
+                "messages.login.get_context_logger",
+                Mock(return_value=Mock(debug=Mock())),
+            ),
+        ):
+            await msg.handle_message(connection)
+
+        sent_message = connection.send_message.await_args.args[0]
+        self.assertIsInstance(sent_message, WelcomeMessage)
+        self.assertNotIn(
+            MessageAttribute.WS_ATTR_AUTHENTICATED_USER,
+            sent_message.message,
+        )
+
+    async def test_105_handle_message_permission_error_aborts(self):
         msg = LoginMessage(
             dumps(
                 {
@@ -146,7 +206,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         connection.abort_connection.assert_awaited_once_with(reason="Access denied")
         connection.send_message.assert_not_awaited()
 
-    async def test_105_handle_message_token_expired_aborts(self):
+    async def test_106_handle_message_token_expired_aborts(self):
         msg = LoginMessage(
             dumps(
                 {
@@ -175,7 +235,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         connection.abort_connection.assert_awaited_once_with(reason="Session expired")
         connection.send_message.assert_not_awaited()
 
-    async def test_106_handle_message_value_error_is_wrapped(self):
+    async def test_107_handle_message_value_error_is_wrapped(self):
         msg = LoginMessage(
             dumps(
                 {

@@ -5,6 +5,7 @@ import unittest
 import weakref
 from unittest.mock import AsyncMock, Mock, patch
 
+import core.exceptions
 from business_objects.bo_semantic_role import BOSemanticRole
 from business_objects.business_object_base import AttributeDescription, BOBase
 from business_objects.business_attribute_base import BaseFlag
@@ -440,7 +441,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         first.mock_attr1 = "updated value"
         self.assertEqual(second.mock_attr1, "updated value")
 
-    def test_125_register_instance_conflicting_data_raises(self):
+    def test_126_register_instance_conflicting_data_raises(self):
         """If _data_objects already holds a BOData for a given id (because some
         other instance registered it first) and the registering instance carries
         its own, different BOData, there is no safe way to decide which data
@@ -455,3 +456,26 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         second.mock_attr1 = "second value, conflicts with first"
         with self.assertRaises(DataError):
             second._assign_id(555555)
+            BOBase.get_business_object_by_name("non_existent_bo")
+
+    def test_127_handle_callback_result_connection_closed_logs_debug(self):
+        bo_instance = MockBO2()
+        bo_instance.id = 1
+        task = Mock()
+        task.result.side_effect = core.exceptions.WSConnectionClosed("gone")
+        task.get_name.return_value = "subscriber_callback_callback_1"
+        with patch("business_objects.business_object_base.LOG") as MockLog:
+            bo_instance.handle_callback_result(task)
+            MockLog.debug.assert_called_once()
+            MockLog.exception.assert_not_called()
+
+    def test_128_handle_callback_result_other_exception_logs_exception(self):
+        bo_instance = MockBO2()
+        bo_instance.id = 1
+        task = Mock()
+        task.result.side_effect = ValueError("boom")
+        task.get_name.return_value = "subscriber_callback_callback_1"
+        with patch("business_objects.business_object_base.LOG") as MockLog:
+            bo_instance.handle_callback_result(task)
+            MockLog.exception.assert_called_once()
+            MockLog.debug.assert_not_called()

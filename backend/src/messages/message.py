@@ -57,6 +57,7 @@ class MessageAttribute(StrEnum):
     WS_ATTR_PREV_TOKEN = "prev_token"
     WS_ATTR_COMPONENT = "component"
     WS_ATTR_IS_PRIMARY = "is_primary"
+    WS_ATTR_AUTHENTICATED_USER = "authenticated_user"
 
     # Welcome
     WS_ATTR_VERSION_INFO = "version_info"

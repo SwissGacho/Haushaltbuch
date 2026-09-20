@@ -12,6 +12,7 @@ from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
+import core.exceptions
 from server.ws_connection_base import WSConnectionBase, SessionBase
 from server.ws_message_sender import WSMessageSender
 from business_objects.business_object_base import BOBase
@@ -72,7 +73,21 @@ class BOSubscription(Generic[T], WSMessageSender):
             raise
         connection.unregister_other_senders(self)
         if self._notify_subscribers_on_init:
-            asyncio.create_task(self.notify_subscription_subscribers())
+            task = asyncio.create_task(self.notify_subscription_subscribers())
+            task.add_done_callback(self._handle_notify_task_result)
+
+    @staticmethod
+    def _handle_notify_task_result(task: asyncio.Task):
+        """Retrieve the result of the fire-and-forget notify task so exceptions are not lost."""
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            return
+        except core.exceptions.WSConnectionClosed as e:
+            # Client disconnected before the initial notification could be sent; harmless.
+            LOG.debug(f"BOSubscription: connection closed while notifying on init: {e}")
+        except Exception:  # pylint: disable=broad-exception-caught
+            LOG.exception("BOSubscription: exception in initial notify task")
 
     def _initialize_subscriptions(self, **kwargs):
         if "index" not in kwargs:
@@ -82,8 +97,6 @@ class BOSubscription(Generic[T], WSMessageSender):
             LOG.debug("BOSubscription: 'personal' index detected.")
             bo_id = None
             kwargs.pop("index")
-            asyncio.create_task(self._init_bo_and_subscribe(bo_id=bo_id, **kwargs))
-            return
         elif issubclass(self._bo_type, PersistentBusinessObject):
             if not isinstance(self._index, int):
                 raise ValueError(
@@ -96,24 +109,6 @@ class BOSubscription(Generic[T], WSMessageSender):
         bo: T = self._bo_type(bo_id=bo_id, **kwargs)
         self._subscription_id = bo.subscribe_to_instance(self._handle_event_)
         self._obj = bo
-
-    async def _init_bo_and_subscribe(self, bo_id: int | None, **kwargs):
-        if bo_id is None and self._index == "personal":
-            LOG.log(VERBOSE_DEBUG, "BOSubscription: determining bo_id")
-            bo_id = (
-                await getattr(self._bo_type, "get_single_matching_id")(
-                    session=self._session
-                )
-                if self._session
-                and getattr(self._bo_type, "get_single_matching_id", None)
-                else None
-            )
-            LOG.log(VERBOSE_DEBUG, f"BOSubscription: determined bo_id={bo_id}")
-        bo: T = self._bo_type(bo_id=bo_id, **kwargs)
-        self._subscription_id = bo.subscribe_to_instance(self._handle_event_)
-        self._obj = bo
-        if self._notify_subscribers_on_init:
-            asyncio.create_task(self.notify_subscription_subscribers())
 
     async def _get_objects_(self) -> list[T]:
         if self._bo_type is None:
@@ -159,6 +154,12 @@ class BOSubscription(Generic[T], WSMessageSender):
 
         payload = await self._obj.business_values_as_dict(session=self._session)
         if self._index is None or self._index == "personal":
+            if self._obj.id is None:
+                LOG.error(
+                    f"BOSubscription.notify_subscription_subscribers: id of {self._bo_type.__name__} is None, cannot notify"
+                )
+                return
+
             index = self._obj.id
         else:
             index = self._index

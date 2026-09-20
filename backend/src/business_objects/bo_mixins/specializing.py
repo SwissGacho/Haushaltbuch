@@ -34,7 +34,7 @@ class Specializing(MixinBase):
     @classmethod
     def is_specializing(cls) -> bool:
         """Return True if this class is a specialization of another business object class."""
-        LOG.debug(f"Specializing.is_specializing({cls.__name__})  -> True")
+        LOG.log(VERBOSE_DEBUG, f"Specializing.is_specializing({cls.__name__})  -> True")
         return True
 
     @classmethod
@@ -52,9 +52,7 @@ class Specializing(MixinBase):
                     cast(set[type[BOBase]], spec) | specialists,
                 )
                 if (
-                    not callable(
-                        is_spec := getattr(super_cls, "is_specializing", None)
-                    )
+                    not callable(is_spec := getattr(super_cls, "is_specializing", None))
                 ) or not is_spec():
                     break
 

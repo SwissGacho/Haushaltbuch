@@ -104,7 +104,7 @@ class App:
         return cls._config.configuration()
 
     @classmethod
-    def get_config_item(cls, key: Config, default=None):
+    def get_config_item(cls, key: str, default=None):
         "Extract an item from global configuration"
         if not cls._config:
             raise ReferenceError("Status and Configuration not initialized")

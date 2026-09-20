@@ -12,6 +12,7 @@ from business_objects.business_attribute_base import BaseFlag
 from business_objects.persistent_business_object import (
     PersistentBusinessObject,
 )
+from business_objects.bo_mixins.bo_mixin import MixinBase
 from business_objects.bo_descriptors import (
     BOStr,
     BODescriptorList,
@@ -55,6 +56,10 @@ class MockPersistentBO2(PersistentBusinessObject):
         }
 
     __hash__ = PersistentBusinessObject.__hash__
+
+
+class MockPersistentBOWithDefaultMixin(MixinBase, PersistentBusinessObject):
+    pass
 
 
 class MockAttrDesc:
@@ -435,11 +440,26 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.MockSQLTx = Mock(name="MockSQL", return_value=self.mock_tx)
 
     async def test_201_fetch_none(self):
-        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
+        with (
+            patch("business_objects.persistent_business_object.SQL", new=self.MockSQL),
+            patch(
+                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
+            ) as mock_fetch_self,
+        ):
             self.mock_bo._assign_id(None)
             result = await self.mock_bo.fetch()
             self.MockSQL.assert_not_called()
+            mock_fetch_self.assert_not_awaited()
             self.assertIs(result, self.mock_bo)
+
+    async def test_201_fetch_none_with_default_mixin_returns_without_sql(self):
+        target = MockPersistentBOWithDefaultMixin(bo_id=None)
+        target.id = None
+        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
+            result = await target.fetch()
+
+        self.MockSQL.assert_not_called()
+        self.assertIs(result, target)
 
     async def _202_fetch(self, patch_exp, exp_params, newest=DEFAULT):
         with (
@@ -451,7 +471,6 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 "business_objects.persistent_business_object.SQLSubquery"
             ) as MockSubquery,
         ):
-            mock_subselect = Mock(name="mock_subselect")
             MockSubquery.return_value = self.mock_subsql
             if newest == DEFAULT:
                 result = await self.mock_bo.fetch()
@@ -471,7 +490,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
             self.mock_sql.select.assert_called_once_with([], True)
             self.mock_sql.from_.assert_called_once_with(MOCK_TAB2)
-            self.mock_sql.where.assert_called_once_with(MockExp())
+            self.mock_sql.where.assert_called_once_with(MockExp.return_value)
+            MockExp.assert_called_once_with(*exp_params)
             self.mock_sql.execute.assert_awaited_once_with()
             self.mock_cursor.fetchone.assert_awaited_once_with()
             self.assertIs(result, self.mock_bo)
@@ -501,9 +521,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         await self._202_fetch("Eq", ("id", REQ_ID))
 
     async def test_202_fetch_newest(self):
-        await self._202_fetch(
-            "Eq", (f"id = (SELECT MAX(id) FROM {MOCK_TAB2})",), newest=True
-        )
+        await self._202_fetch("Eq", ("id", self.mock_subsql), newest=True)
 
     async def test_203_store_insert(self):
         self.mock_bo.insert_self = AsyncMock(name="_insert_self")
