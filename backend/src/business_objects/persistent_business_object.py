@@ -389,6 +389,8 @@ class PersistentBusinessObject(BOBase):
             VERBOSE_DEBUG,
             f"PersistentBusinessObject.fetch_self: {self.__class__.__name__} {self.id=}, {id=}, {newest=}, {session.user if session else 'N/A'}",
         )
+
+        # Guards
         if self._data is None:
             raise RuntimeError(f"Cannot fetch {self} as it has no data")
         if id is not None and newest is not False:
@@ -399,6 +401,8 @@ class PersistentBusinessObject(BOBase):
             )
         if id is None and newest is False:
             raise ValueError("Either 'id' must be specified or 'newest' must be True")
+
+        # Build conditions for the SQL query based on the provided id and newest flag
         select = sql.select([], True).from_(self.table)
         if id is not None:
             filter_conditions = self._filter_conditions(
@@ -414,6 +418,7 @@ class PersistentBusinessObject(BOBase):
             if filter_conditions:
                 subselect.where(filter_conditions)
             select.where(Eq("id", SQLSubquery(subselect)))
+
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(
                 VERBOSE_DEBUG,
@@ -421,8 +426,15 @@ class PersistentBusinessObject(BOBase):
             )
             for line in pprint_lines(select.get_sql()):
                 LOG.log(VERBOSE_DEBUG, f"   {line}")
+
+        # Execute the SQL query and fetch the result
         self._db_data = await (await select.execute()).fetchone()
-        LOG.warning(f"{self._db_data=}")
+
+        # If newest is True, assign _data from cache if its already available
+        if newest and self.id in self.__class__._data_objects:
+            self.set_data_object(self.__class__._data_objects[self.id])
+
+        # Read the fetched data and populate the business object's attributes
         if self._db_data:
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(
@@ -430,7 +442,6 @@ class PersistentBusinessObject(BOBase):
                 )
                 for line in pprint_lines(self._db_data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
-            had_id = self.id is not None
 
             for description in self.attribute_descriptions():
                 LOG.log(
@@ -450,8 +461,6 @@ class PersistentBusinessObject(BOBase):
                 LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _data=")
                 for line in pprint_lines(self._data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
-            if not had_id and self.id is not None:
-                self.register_instance(self)
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
 
     async def store(self, session: Optional[SessionBase] = None):
@@ -487,9 +496,9 @@ class PersistentBusinessObject(BOBase):
         )
         LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.insert_self: {self._data=}")
         if self.id is not None:
-            raise ValueError("id must be None for insert operation")
+            raise ValueError(f"id must be None for {self} insert operation")
         if self._data is None:
-            raise CannotStoreEmptyBO(f"Cannot store {self} as it has no data")
+            raise CannotStoreEmptyBO(f"_data must be set for {self} insert operation")
         self.bo_name = self.bo_type_name()
         values_to_store: NamedValueListList = [
             (k, v) for k, v in self._data.items() if k != "id" and v is not None
@@ -513,6 +522,12 @@ class PersistentBusinessObject(BOBase):
             )
             fetched = await cursor.fetchone()
             id = fetched.get("id")
+            if id is None:
+                raise RuntimeError(f"Failed to insert {self} into DB, no id returned")
+            if id in self.__class__._data_objects:
+                raise RuntimeError(
+                    f"Failed to insert {self} into DB, id {id} already exists"
+                )
             LOG.log(DEBUG, f"Inserted new {self} into DB with id={id}")
             self._assign_id(id)
             LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
@@ -533,6 +548,7 @@ class PersistentBusinessObject(BOBase):
         async with SQLTransaction() as txaction:
             value_class = Value
             update = txaction.sql().update(self.table).where(Eq("id", str(self.id)))
+
             changes = False
             descriptions = {d.name: d for d in self.attribute_descriptions()}
             for k, v in self._data.items():
@@ -550,6 +566,7 @@ class PersistentBusinessObject(BOBase):
             if changes and not (k in self._data and self._data[k]):
                 self._data[k] = datetime.now().astimezone(UTC)
                 update.assignment(k, value_class(k, self._data[k]))
+            LOG.warning(f"{update=}, {update.get_query()=}")
             try:
                 if changes:
                     await update.execute()

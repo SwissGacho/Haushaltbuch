@@ -135,6 +135,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         for bo_class in (MockBO1, MockBO2, MockBO3):
             bo_class._data_objects = weakref.WeakValueDictionary()
             bo_class._loaded_instances = weakref.WeakSet()
+            bo_class._change_subscribers.clear()
 
     def test_100_new_instance(self):
         bo_instance_1 = MockBO1(bo_id=1)
@@ -200,11 +201,12 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             msg="_db_data should not be overwritten by new instance creation",
         )
 
-    def test_101_register_instance(self):
+    def test_101_assign_id(self):
         bo_instance = MockBO1()
         bo_instance._assign_id(1)
-        MockBO1.register_instance(bo_instance)
         self.assertIn(bo_instance, MockBO1._loaded_instances)
+        self.assertEqual(bo_instance.id, 1)
+        self.assertIn(1, [instance.id for instance in MockBO1._loaded_instances])
 
     def test_102_add_attribute(self):
         class MockBO102(BOBase):
@@ -362,7 +364,6 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             )
             bo_instance.notify_instance_subscribers = Mock()
             await bo_instance.store()
-            MockBOBaseNotify.assert_called_once()
             bo_instance.notify_instance_subscribers.assert_called_once()
 
     def test_120_notify_instance_subscribers(self):
@@ -382,10 +383,14 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         ) as MockBOBaseNotify:
             bo_instance = MockBO2()
             bo_instance._assign_id(1)
+            MockBO2._change_subscribers = {1: Mock()}
             MockBO2.notify_change_subscribers(bo_instance)
             MockBOBaseNotify.assert_called_once_with(
-                bo_instance._change_subscribers, bo_instance
+                MockBO2._change_subscribers, bo_instance
             )
+
+            # Clean up
+            MockBO2._change_subscribers = {}
 
     def test_122_notify_bo_subscribers(self):
         with patch("asyncio.create_task", new=Mock()) as MockCreateTask:

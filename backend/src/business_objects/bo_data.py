@@ -26,7 +26,6 @@ class BOData:
             )
             if attr_name == "id" and id is not None:
                 self._set_raw_data(attr_name, id)
-                object._loaded_instances.add(self)  # type: ignore
             else:
                 self._data[attr_name] = None
 

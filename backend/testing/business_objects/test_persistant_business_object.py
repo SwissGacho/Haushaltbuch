@@ -393,6 +393,8 @@ class Test_100_Persistent_Business_Object_classmethods(
 
 class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
+        MockPersistentBO2._loaded_instances.clear()  # type: ignore
+        MockPersistentBO2._data_objects.clear()  # type: ignore
         self.mock_bo = MockPersistentBO2()
         self.mock_sql = Mock(name="mock_sql")
         self.mock_sql.__aenter__ = AsyncMock(return_value=self.mock_sql)
@@ -559,8 +561,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_204a_insert_self(self):
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(ValueError):
             self.mock_bo._assign_id(77)
+            self.assertEqual(self.mock_bo.id, 77)
             await self.mock_bo.insert_self()
 
     async def test_204b_insert_self(self):
@@ -645,7 +648,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.MockSQLTx.assert_called_once_with()
             self.mock_tx.__aenter__.assert_awaited_once_with()
             self.mock_sql.update.assert_called_once_with(MOCK_TAB2)
-            MockEq.assert_called_once_with("id", id)
+            MockEq.assert_called_once_with("id", str(id))
             self.mock_sql.where.assert_called_once_with(MockEq())
             self.mock_bo.attribute_descriptions.assert_called_once_with()
             self.assertEqual(

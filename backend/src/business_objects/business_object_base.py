@@ -95,7 +95,12 @@ class BOBase(BOBaseBase):
         self._data: BOData | None = None
         self._db_data = {}
 
-        self.set_data_object(BOData(self.__class__, bo_id))
+        # Assign data object based on bo_id
+        if bo_id is not None and bo_id in self.__class__._data_objects:
+            data_object = self.__class__._data_objects[bo_id]
+        else:
+            data_object = BOData(self.__class__, bo_id)
+        self.set_data_object(data_object)
         self.last_updated = None
         self._instance_subscriber_id = itertools.count(1)
         self._init_attrs(attributes)
@@ -118,8 +123,10 @@ class BOBase(BOBaseBase):
             if attr.name == "id":
                 self._data[attr.name] = value
                 if self.id != value:
-                    raise RuntimeError("id assignment failed")
-                self.__class__.register_instance(self)
+                    raise RuntimeError(
+                        f"id assignment failed, should be {value}, but is {self.id}"
+                    )
+                self.__class__.add_class_data_object(self._data, self.id)
                 return
         raise RuntimeError(
             f"Business object {self.__class__.__name__} has no 'id' attribute to assign value {value}"
@@ -213,45 +220,6 @@ class BOBase(BOBaseBase):
         ]
         return ", ".join(bo_names) if bo_names else str(self)
 
-    @classmethod
-    def register_instance(cls, instance: "BOBase"):
-        """Register an instance of this class as being loaded from the database."""
-        if instance.id is None:
-            LOG.error(
-                f"Attempted to register instance of {cls.__name__} with no id: {instance}"
-            )
-            return
-        LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
-        LOG.log(VERBOSE_DEBUG, f"   id=: {instance.id}")
-        if (
-            instance.id in cls._data_objects
-            and cls._data_objects[instance.id] is not None
-            and instance.data_object_set
-        ):
-            LOG.debug(
-                f"Instance of {cls.__name__} with id {instance.id} is already registered."
-            )
-            return
-        elif cls._data_objects.get(instance.id) is not None:
-            LOG.log(
-                VERBOSE_DEBUG,
-                f"Using existing data object for instance of {cls.__name__} with id {instance.id}",
-            )
-            instance.set_data_object(cls._data_objects[instance.id])
-        else:
-            LOG.log(
-                VERBOSE_DEBUG,
-                f"Creating new data object for instance of {cls.__name__} with id {instance.id}",
-            )
-            cached_id = instance.id
-            if instance._data is None:
-                data_object = BOData(cls, cached_id)
-            else:
-                data_object = instance._data
-            instance.set_data_object(data_object)
-
-        cls.subscriptions_report()
-
     def set_data_object(self, data_object: BOData):
         """Set the data object for this instance. Used when loading from the database."""
         self._data = data_object
@@ -265,8 +233,11 @@ class BOBase(BOBaseBase):
             raise DataError(
                 f"Tried to overwrite existing data object for {cls.__name__} with id {id}"
             )
-        elif id not in cls._data_objects or cls._data_objects[id] is not data_object:
-            cls._data_objects[id] = data_object
+        if id in cls._data_objects and cls._data_objects[id] is data_object:
+            return
+
+        cls._data_objects[id] = data_object
+        cls.subscriptions_report()
 
     @property
     def data_object_set(self) -> bool:
@@ -567,22 +538,27 @@ class BOBase(BOBaseBase):
     def notify_my_instance_subscribers(self):
         """Notify all subscribers of this instance about a change."""
         # LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
-        if not self.id:
-            return
-        BOBase.notify_bo_subscribers(self._instance_subscribers, self)
+        self.__class__.notify_bo_subscribers(self._instance_subscribers, self)
 
     @classmethod
     def notify_all_instance_subscribers(cls, instance: "BOBase"):
         """Notify all subscribers of a specific instance about a change."""
         for loaded_instance in cls._loaded_instances:
-            if loaded_instance.id == instance.id:
-                loaded_instance.notify_my_instance_subscribers()
+            try:
+                if loaded_instance.id == instance.id:
+                    instance.notify_my_instance_subscribers()
+            except AttributeError:
+                LOG.error(
+                    f"AttributeError on {loaded_instance=}, {loaded_instance._data=}, {cls._loaded_instances=}"
+                )
         return
 
     @classmethod
     def notify_change_subscribers(cls, changed_bo: "BOBase"):
         """Notify all subscribers of this class about a change in an instance."""
         # LOG.debug(f"Notifying {len(cls._change_subscribers)} change subscribers for {changed_bo}")
+        if len(cls._change_subscribers) == 0:
+            return
         cls.notify_bo_subscribers(cls._change_subscribers, changed_bo)
 
     @classmethod
