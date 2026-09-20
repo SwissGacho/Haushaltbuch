@@ -616,7 +616,14 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             patch(
                 "business_objects.persistent_business_object.datetime"
             ) as mock_datetime,
+            patch(
+                "business_objects.persistent_business_object.ColumnName"
+            ) as MockColumnName,
         ):
+            # Mock returns
+            MockValue.return_value = "mock_value"
+            MockColumnName.return_value = "mock_column_name"
+
             convert_args = [
                 call(
                     self.mock_bo._db_data.get(a),
@@ -666,7 +673,11 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.MockSQLTx.assert_called_once_with()
             self.mock_tx.__aenter__.assert_awaited_once_with()
             self.mock_sql.update.assert_called_once_with(MOCK_TAB2)
-            MockEq.assert_called_once_with("id", str(id))
+
+            self.assertEqual(MockValue.call_args_list[0], call(id))
+            MockColumnName.assert_called_once_with("id")
+            MockEq.assert_called_once_with("mock_column_name", "mock_value")
+
             self.mock_sql.where.assert_called_once_with(MockEq())
             self.mock_bo.attribute_descriptions.assert_called_once_with()
             self.assertEqual(
@@ -678,7 +689,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 PersistentBusinessObject.convert_from_db.await_args_list, convert_args  # type: ignore
             )
             self.assertEqual(self.mock_sql.assignment.call_count, len(new_vals))
-            self.assertEqual(MockValue.call_count, len(new_vals))
+            self.assertEqual(MockValue.call_count, len(new_vals) + 1)
             for v in new_vals:
                 MockValue.assert_any_call(v[0], v[1])
                 self.mock_sql.assignment.assert_any_call(v[0], MockValue())

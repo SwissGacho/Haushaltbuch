@@ -1,14 +1,22 @@
 """Transaction, representing a single financial transaction from one account to another"""
 
+from typing import Optional
+
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
-from business_objects.bo_semantic_role import BOSemanticRole
-from business_objects.persistent_business_object import PersistentBusinessObject
 from bom_persistent.account.category import Category
+from bom_persistent.account.account import (
+    Account,
+    DefaultCreditAccount,
+    DefaultDebitAccount,
+)
+from business_objects.bo_semantic_role import (  # pylint: disable=unused-import
+    BOSemanticRole,
+)
 from business_objects.persistent_business_object import PersistentBusinessObject
-from business_objects.bo_descriptors import (
+from business_objects.bo_descriptors import (  # pylint: disable=unused-import
     BODatetime,
     BODict,
     BODescriptorList,
@@ -19,11 +27,6 @@ from business_objects.bo_descriptors import (
     BOInt,
     BODate,
     BODecimal,
-)
-from bom_persistent.account.account import (
-    Account,
-    DefaultCreditAccount,
-    DefaultDebitAccount,
 )
 from server.ws_connection_base import SessionBase
 
@@ -45,9 +48,9 @@ class LedgerEntry(PersistentBusinessObject):
                 "No debit or credit account specified. At least one must be specified."
             )
         if not self.debit_account:
-            self.debit_account = await DefaultDebitAccount().fetch_singleton()
+            self.debit_account = await DefaultDebitAccount().fetch()
         if not self.credit_account:
-            self.credit_account = await DefaultCreditAccount().fetch_singleton()
+            self.credit_account = await DefaultCreditAccount().fetch()
         await super().store(session=session)
 
 

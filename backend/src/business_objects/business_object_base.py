@@ -81,6 +81,10 @@ class BOBase(BOBaseBase):
         session: Optional[SessionBase] = None,
         **attributes,
     ) -> None:
+        if self.__class__ is BOBase:
+            raise TypeError(
+                "BOBase is an abstract class and cannot be instantiated directly"
+            )
         if LOG.isEnabledFor(DEBUG):
             LOG.debug(f"{self.__class__.__name__}.__init__({bo_id=},{session=}")
             LOG.log(VERBOSE_DEBUG, "attributes:")
@@ -118,8 +122,10 @@ class BOBase(BOBaseBase):
         )
         if self._data is None:
             raise RuntimeError("Business object has no data object set. ")
-        if self.id == value:
-            return
+        if self.id is not None:
+            raise RuntimeError(
+                f"ID is already assigned as {self.id} and cannot be changed to {value}."
+            )
         for attr in self.__class__.attribute_descriptions():
             if attr.name == "id":
                 self._data[attr.name] = value

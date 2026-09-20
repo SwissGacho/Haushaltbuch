@@ -22,7 +22,7 @@ LOG = getLogger(__name__)
 from core.exceptions import CannotStoreEmptyBO
 from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
-from database.sql_expression import SQLExpression, And, Eq, Filter, Value
+from database.sql_expression import ColumnName, SQLExpression, And, Eq, Filter, Value
 from database.sql_statement import SQLSubquery, CreateTable, NamedValueListList
 from business_objects.bo_descriptors import BOBaseBase, AttributeDescription
 from business_objects.business_object_base import BOBase
@@ -372,7 +372,7 @@ class PersistentBusinessObject(BOBase):
             )
         if (
             id is None
-            and newest is None
+            and not newest
             and (
                 mixin is None
                 or getattr(mixin, "__func__", None) is MixinBase.fetch_mixin
@@ -563,8 +563,11 @@ class PersistentBusinessObject(BOBase):
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
         async with SQLTransaction() as txaction:
-            value_class = Value
-            update = txaction.sql().update(self.table).where(Eq("id", str(self.id)))
+            update = (
+                txaction.sql()
+                .update(self.table)
+                .where(Eq(ColumnName("id"), Value(self.id)))
+            )
 
             changes = False
             descriptions = {d.name: d for d in self.attribute_descriptions()}
@@ -578,11 +581,11 @@ class PersistentBusinessObject(BOBase):
                     descriptions[k].constraint_values,
                 ):
                     changes = True
-                    update.assignment(k, value_class(k, v))
+                    update.assignment(k, Value(k, v))
             k = "last_updated"
             if changes and not (k in self._data and self._data[k]):
                 self._data[k] = datetime.now().astimezone(UTC)
-                update.assignment(k, value_class(k, self._data[k]))
+                update.assignment(k, Value(k, self._data[k]))
             LOG.warning(f"{update=}, {update.get_query()=}")
             try:
                 if changes:
