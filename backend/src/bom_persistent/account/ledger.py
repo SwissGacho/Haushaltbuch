@@ -25,6 +25,7 @@ from bom_persistent.account.account import (
     DefaultCreditAccount,
     DefaultDebitAccount,
 )
+from server.ws_connection_base import SessionBase
 
 
 class LedgerEntry(PersistentBusinessObject):
@@ -35,7 +36,7 @@ class LedgerEntry(PersistentBusinessObject):
     counterparty = BOStr()
     balance = BODecimal()
 
-    async def store(self) -> None:
+    async def store(self, session: Optional[SessionBase] = None) -> None:
         "Store the object in the database"
 
         # If credit or debit account is not set, set it to the default account
@@ -47,7 +48,7 @@ class LedgerEntry(PersistentBusinessObject):
             self.debit_account = await DefaultDebitAccount().fetch_singleton()
         if not self.credit_account:
             self.credit_account = await DefaultCreditAccount().fetch_singleton()
-        await super().store()
+        await super().store(session=session)
 
 
 class Posting(PersistentBusinessObject):

@@ -183,7 +183,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         self.assertIsNot(
             bo_new_instance,
             bo_instance,
-            msg="Creating a new instance with the same id should return the existing instance",
+            msg="Creating a new instance with the same id should create a distinct instance",
         )
         self.assertIs(
             bo_new_instance._data,

@@ -402,13 +402,13 @@ class PersistentBusinessObject(BOBase):
         # Guards
         if self._data is None:
             raise RuntimeError(f"Cannot fetch {self} as it has no data")
-        if id is not None and newest is not False:
+        if id is not None and newest:
             raise ValueError(f"Cannot specify both 'id' ({id}) and 'newest' ({newest})")
         if id is not None and self.id is not None and id != self.id:
             raise ValueError(
                 f"Specified 'id' ({id}) does not match the instance's id ({self.id})"
             )
-        if id is None and newest is False:
+        if id is None and not newest:
             raise ValueError("Either 'id' must be specified or 'newest' must be True")
 
         # Build conditions for the SQL query based on the provided id and newest flag
@@ -419,7 +419,7 @@ class PersistentBusinessObject(BOBase):
             )
             if filter_conditions:
                 select.where(filter_conditions)
-        elif newest:
+        else:
             subselect = SQL().select(["MAX(id) as max_id"]).from_(self.table)
             filter_conditions = self._filter_conditions(
                 user=session.user if session else None,

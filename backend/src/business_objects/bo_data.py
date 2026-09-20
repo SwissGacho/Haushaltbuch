@@ -1,4 +1,4 @@
-"""Data objects containing the data of a business object (BO). Unique per BO instance"""
+"""Data objects containing the data of a business object (BO). Unique per business-object id (bo_id)."""
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 

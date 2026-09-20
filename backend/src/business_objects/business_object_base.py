@@ -107,7 +107,7 @@ class BOBase(BOBaseBase):
         self._init_attrs(attributes)
         self.__class__._loaded_instances.add(self)
         BOBase.subscriptions_report()
-        self.__class__.notify_change_subscribers(self)
+        # Construction does not change persisted state; store() emits change notifications.
 
     def _assign_id(self, value: int | None) -> None:
         """Internal use only. Assign 'id' directly, bypassing the public setter's

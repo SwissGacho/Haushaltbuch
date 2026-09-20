@@ -134,10 +134,8 @@ class BOSubscription(Generic[T], WSMessageSender):
         await self.notify_subscription_subscribers()
 
     async def notify_subscription_subscribers(self):
-
-        from messages.bo_message import ObjectMessage
-
         """Notify subscribers about the current state of the list."""
+        from messages.bo_message import ObjectMessage
         if self._obj is None:
             LOG.debug(
                 "BOSubscription.notify_subscription_subscribers: _obj is None, nothing to notify"
