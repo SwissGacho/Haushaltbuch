@@ -71,6 +71,8 @@ class AttributeDescription:
 class BOBaseBase:
     "Base for BOBase to circumvent circular import"
 
+    _attributes: dict[str, list[AttributeDescription]]
+
     def __init__(self, *args, bo_id: int | None = None, **attributes) -> None:
         pass
 
@@ -106,8 +108,21 @@ class BOBaseBase:
         return cls._name()
 
     @classmethod
+    def attributes_as_dict(cls) -> dict[str, type]:
+        "Get the attributes of this business object as a dictionary"
+        raise NotImplementedError
+
+    @classmethod
     def _name(cls) -> str:
         return cls.__name__.lower()
+
+    def get_data[T](self, bo_descriptor: "_PersistentAttr[T]") -> T | None:
+        "Get the value of an attribute from the business object data"
+        raise NotImplementedError
+
+    def set_data[T](self, bo_descriptor: "_PersistentAttr[T]", value: T) -> None:
+        "Set the value of an attribute in the business object data"
+        raise NotImplementedError
 
 
 class _PersistentAttr[T]:
@@ -121,7 +136,7 @@ class _PersistentAttr[T]:
             constraint_values["semantic_role"] = BOSemanticRole.RAW
         self._constraint = constraint
         self._constraint_values = constraint_values
-        self.my_name = None
+        self.my_name: str | None = None
         self.access_level: AttributeAccessLevel = access_level
 
     @classmethod
@@ -159,7 +174,7 @@ class _PersistentAttr[T]:
     def __get__(self, obj, objtype=None) -> T:
         if obj is None:
             return self  # type: ignore[return-value]
-        return obj._data.get(self.my_name)
+        return obj.get_data(self)
 
     def __set__(self, obj, value) -> None:
         if not self.validate(value):
@@ -167,7 +182,7 @@ class _PersistentAttr[T]:
                 f"'{value}' invalid to set attribute {self.my_name} "
                 f"of type {self.__class__.__name__}"
             )
-        obj._data[self.my_name] = value
+        obj.set_data(self, value)
 
     def validate(self, value) -> bool:
         "Validate 'value' for assignability."
@@ -236,10 +251,10 @@ class BODecimal(_PersistentAttr[Decimal]):
 
 class BOId(BOInt):
     def __set__(self, obj, value):
-        if self.my_name in obj._data and obj._data[self.my_name] is not None:
-            raise ValueError("Cannot set id of existing object")
-        super().__set__(obj=obj, value=value)
-        obj.__class__.register_instance(obj)
+        raise ValueError(
+            f"'{self.my_name}' cannot be assigned directly; use the constructor's "
+            "bo_id= parameter to reference an existing object, or let insert/fetch assign it."
+        )
 
 
 class BOStr(_PersistentAttr[str]):

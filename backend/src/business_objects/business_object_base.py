@@ -14,6 +14,7 @@ from core.app_logging import (
     getLogger,
     log_exit,
     VERBOSE_DEBUG,
+    DEBUG,
     pprint_lines,
     callable_name,
 )
@@ -23,12 +24,15 @@ LOG = getLogger(__name__)
 from core.util import _classproperty
 from core.app import App
 import core.exceptions
+from core.exceptions import DataError
+from business_objects.bo_data import BOData
 from business_objects.bo_descriptors import (
     AttributeAccessLevel,
     AttributeDescription,
     AttributeType,
     BOColumnConstraint,
     BOBaseBase,
+    _PersistentAttr,
     BOStr,
     BOId,
     BODatetime,
@@ -60,35 +64,10 @@ class BOBase(BOBaseBase):
 
     _last_subscriber_id = itertools.count(1)
 
-    def __new__(cls, *args, bo_id: int | None = None, **attributes):
-        LOG.log(
-            VERBOSE_DEBUG,
-            f"BOBase.__new__({cls.__name__}, {args=}, {bo_id=}, {attributes})",
-        )
-        if cls is BOBase:
-            raise TypeError(
-                "BOBase is an abstract class and cannot be instantiated directly"
-            )
-        if bo_id is not None:
-            if bo_id in cls._loaded_instances:
-                obj = cls._loaded_instances[bo_id]
-                assert isinstance(
-                    obj, cls
-                ), f"Loaded instance with id {bo_id} is not of type {cls.__name__}"
-                LOG.log(
-                    VERBOSE_DEBUG,
-                    f"Found loaded instance id={id(obj)}",
-                )
-                return obj
-
-        instance = super().__new__(cls)
-        instance._initialized = False
-        LOG.log(VERBOSE_DEBUG, f"Created new instance id={id(instance)}")
-        return instance
-
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()
-        cls._loaded_instances: weakref.WeakValueDictionary[int, Self] = (
+        cls._loaded_instances: weakref.WeakSet[Self] = weakref.WeakSet()
+        cls._data_objects: weakref.WeakValueDictionary[int, BOData] = (
             weakref.WeakValueDictionary()
         )
         cls._creation_subscribers = {}
@@ -102,31 +81,63 @@ class BOBase(BOBaseBase):
         session: Optional[SessionBase] = None,
         **attributes,
     ) -> None:
-        LOG.debug(
-            f"{self.__class__.__name__}.__init__({bo_id=},{session=},attributes:)"
-        )
-        for line in pprint_lines(attributes):
-            LOG.debug(f"    {line}")
-        LOG.log(
-            VERBOSE_DEBUG,
-            f" -  id={id(self)}, self._initialized={getattr(self, '_initialized', None)}",
-        )
-        if getattr(self, "_initialized", False):
-            LOG.debug(
-                f"BOBase __init__ called again for {self} "
-                f"with id {self.id}, skipping reinitialization"
+        if self.__class__ is BOBase:
+            raise TypeError(
+                "BOBase is an abstract class and cannot be instantiated directly"
             )
-            self._init_attrs(attributes)
-            return
+        if LOG.isEnabledFor(DEBUG):
+            LOG.debug(f"{self.__class__.__name__}.__init__({bo_id=},{session=}")
+            LOG.log(VERBOSE_DEBUG, "attributes:")
+            for line in pprint_lines(attributes):
+                LOG.log(VERBOSE_DEBUG, f"    {line}")
+            LOG.log(
+                VERBOSE_DEBUG,
+                f" -  id={id(self)}",
+            )
+
+        # Initialize instance-specific attributes
         self._instance_subscribers: dict[int, BOCallback] = {}
-        self._data = {}
+        self._data: BOData | None = None
         self._db_data = {}
-        self.id = bo_id
+
+        # Assign data object based on bo_id
+        if bo_id is not None and bo_id in self.__class__._data_objects:
+            data_object = self.__class__._data_objects[bo_id]
+        else:
+            data_object = BOData(self.__class__, bo_id)
+        self.set_data_object(data_object)
         self.last_updated = None
         self._instance_subscriber_id = itertools.count(1)
         self._init_attrs(attributes)
-        self._initialized = True
+        self.__class__._loaded_instances.add(self)
         BOBase.subscriptions_report()
+        # Construction does not change persisted state; store() emits change notifications.
+
+    def _assign_id(self, value: int | None) -> None:
+        """Internal use only. Assign 'id' directly, bypassing the public setter's
+        restriction."""
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"BOBase._assign_id: {self.__class__.__name__} assigning id={value}",
+        )
+        if self._data is None:
+            raise RuntimeError("Business object has no data object set. ")
+        if self.id is not None:
+            raise RuntimeError(
+                f"ID is already assigned as {self.id} and cannot be changed to {value}."
+            )
+        for attr in self.__class__.attribute_descriptions():
+            if attr.name == "id":
+                self._data[attr.name] = value
+                if self.id != value:
+                    raise RuntimeError(
+                        f"id assignment failed, should be {value}, but is {self.id}"
+                    )
+                self.__class__.add_class_data_object(self._data, self.id)
+                return
+        raise RuntimeError(
+            f"Business object {self.__class__.__name__} has no 'id' attribute to assign value {value}"
+        )
 
     def _init_attrs(self, attributes: dict[str, Any]):
         for attribute, value in attributes.items():
@@ -149,7 +160,7 @@ class BOBase(BOBaseBase):
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__} "
-            f"({', '.join([a+': '+str(v) for a,v in self._data.items()if v is not None])})"
+            f"({', '.join([a+': '+str(v) for a,v in self._data.items() if v is not None]) if self._data is not None else ''})"
         )
 
     def __str__(self) -> str:
@@ -158,6 +169,32 @@ class BOBase(BOBaseBase):
             if self.id
             else f"{self.__class__.__name__}(no id)"
         )
+
+    def get_data[T](self, bo_descriptor: _PersistentAttr[T]) -> T | None:
+        """Get the data of a business object attribute.
+        This method is used to access the data of a business object attribute
+        in a type-safe way, using the attribute descriptor.
+        """
+        if not bo_descriptor.my_name:
+            raise ValueError(
+                f"Attribute descriptor {bo_descriptor} has no name assigned"
+            )
+        if self._data is None:
+            raise RuntimeError("Business object has no data object set. ")
+        return self._data[bo_descriptor.my_name]
+
+    def set_data[T](self, bo_descriptor: _PersistentAttr[T], value: T | None):
+        """Set the data of a business object attribute.
+        This method is used to set the data of a business object attribute
+        in a type-safe way, using the attribute descriptor.
+        """
+        if not bo_descriptor.my_name:
+            raise ValueError(
+                f"Attribute descriptor {bo_descriptor} has no name assigned"
+            )
+        if self._data is None:
+            raise RuntimeError("Business object has no data object set. ")
+        self._data[bo_descriptor.my_name] = value
 
     def json_encode(self) -> dict | None:
         "Return a JSON-serializable representation of the business object"
@@ -195,14 +232,29 @@ class BOBase(BOBaseBase):
         ]
         return ", ".join(bo_names) if bo_names else str(self)
 
+    def set_data_object(self, data_object: BOData):
+        """Set the data object for this instance. Used when loading from the database."""
+        self._data = data_object
+        if self.id is not None:
+            self.__class__.add_class_data_object(data_object, self.id)
+
     @classmethod
-    def register_instance(cls, instance: "BOBase"):
-        """Register an instance of this class as being loaded from the database."""
-        if instance.id is not None:
-            LOG.debug(f"registering instance of {cls.__name__} with id {instance.id}")
-            LOG.log(VERBOSE_DEBUG, f"   id=: {id(instance)}")
-            cls._loaded_instances[instance.id] = instance  # type: ignore
-            cls.subscriptions_report()
+    def add_class_data_object(cls, data_object: BOData, id: int):
+        """Add a data object for this class. Used when loading from the database."""
+        if id in cls._data_objects and cls._data_objects[id] is not data_object:
+            raise DataError(
+                f"Tried to overwrite existing data object for {cls.__name__} with id {id}"
+            )
+        if id in cls._data_objects and cls._data_objects[id] is data_object:
+            return
+
+        cls._data_objects[id] = data_object
+        cls.subscriptions_report()
+
+    @property
+    def data_object_set(self) -> bool:
+        """Return True if this instance has a data object set, False otherwise."""
+        return self._data is not None
 
     @classmethod
     def add_attribute(
@@ -221,6 +273,7 @@ class BOBase(BOBaseBase):
                 f"BOBase.add_attribute({cls.__name__}, {attribute_name}) already registered"
             )
             return
+        LOG.log(VERBOSE_DEBUG, f"Adding attribute {attribute_name} to {cls.__name__}")
         cls._attributes[cls.__name__].append(
             AttributeDescription(
                 name=attribute_name,
@@ -237,7 +290,7 @@ class BOBase(BOBaseBase):
         "Register the Business Object."
         BOBase._business_objects |= {cls._name(): cls}
         LOG.debug(f"""registered {'specialized ' 
-                            if callable(is_spec:=getattr(cls, 'is_specializing', False)) and is_spec() else ''
+                            if callable(is_spec:=getattr(cls, 'is_specializing', False)) and is_spec() else '' # pylint: disable=not-callable
                             }class '{cls.__name__}' as {cls._name()}""")
 
     # pylint: disable=no-self-argument
@@ -459,8 +512,10 @@ class BOBase(BOBaseBase):
         self, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         "dict of BO attribute values with attribute names as keys"
+        if self._data is None:
+            raise RuntimeError(f"Cannot convert {self} to dict as it has no data")
 
-        value_dict = {k: v for k, v in self._data.items() if k not in ("bo_type")}
+        value_dict = {k: v for k, v in self._data.items() if k not in ("bo_type",)}
         return value_dict
 
     # removed unused code to avoid warnings in TransientBusinessObject classes
@@ -488,14 +543,41 @@ class BOBase(BOBaseBase):
         """Notify all subscribers of this instance about a change."""
         # LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
         if not self.id:
-            return
-        BOBase.notify_bo_subscribers(self._instance_subscribers, self)
+            self.notify_my_instance_subscribers()
+        else:
+            self.__class__.notify_all_instance_subscribers(self)
+
+    def notify_my_instance_subscribers(self):
+        """Notify all subscribers of this instance about a change."""
+        # LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
+        self.__class__.notify_bo_subscribers(self._instance_subscribers, self)
+
+    @classmethod
+    def notify_all_instance_subscribers(cls, instance: "BOBase"):
+        """Notify all subscribers of a specific instance about a change."""
+        for loaded_instance in cls._loaded_instances:
+            try:
+                if loaded_instance.id == instance.id:
+                    instance.notify_my_instance_subscribers()
+            except AttributeError:
+                LOG.error(
+                    f"AttributeError on {loaded_instance=}, {loaded_instance._data=}, {cls._loaded_instances=}"
+                )
+        return
 
     @classmethod
     def notify_change_subscribers(cls, changed_bo: "BOBase"):
         """Notify all subscribers of this class about a change in an instance."""
         # LOG.debug(f"Notifying {len(cls._change_subscribers)} change subscribers for {changed_bo}")
+        if len(cls._change_subscribers) == 0:
+            return
         cls.notify_bo_subscribers(cls._change_subscribers, changed_bo)
+
+    @classmethod
+    def notify_creation_subscribers(cls, new_bo: "BOBase"):
+        """Notify all subscribers of this class about the creation of a new instance."""
+        # LOG.debug(f"Notifying {len(cls._creation_subscribers)} creation subscribers for {new_bo}")
+        cls.notify_bo_subscribers(cls._creation_subscribers, new_bo)
 
     @classmethod
     def notify_bo_subscribers(
@@ -526,10 +608,10 @@ class BOBase(BOBaseBase):
             for sub in subs.values():
                 s = ""
                 if hasattr(sub, "__self__") and hasattr(sub.__self__, "_obj"):
-                    s += f"{str(sub.__self__._obj)}{('<'+str(id(sub.__self__._obj))[-4:]+'>') if py_id else ''}: "
+                    s += f"{str(sub.__self__._obj)}{('<'+str(id(sub.__self__._obj))[-4:]+'>') if py_id else ''}: "  # type: ignore[reportCallIssue]
                     s += f"{sub.__self__._connection.connection_context.get('comp',sub.__self__._connection.connection_context.get('socket','unknown'))}"
                 elif hasattr(sub, "__self__") and isinstance(sub.__self__, BOBase):
-                    s += f"{str(sub.__self__)}{('<'+str(id(sub.__self__))[-4:]+'>') if py_id else ''}"
+                    s += f"{str(sub.__self__)}{('<'+str(id(sub.__self__))[-4:]+'>') if py_id else ''}"  # type: ignore[reportCallIssue]
                 elif hasattr(sub, "__name__"):
                     s += f"{sub.__name__}"
                 else:
@@ -539,7 +621,7 @@ class BOBase(BOBaseBase):
 
         try:
             subs_rep_cfg = App.configuration.get("subscriptions_report", {})
-        except:
+        except:  # pylint: disable=bare-except
             return
         if not isinstance(subs_rep_cfg, dict):
             return
@@ -564,12 +646,13 @@ class BOBase(BOBaseBase):
         ]:
             subs[bo_name] = {
                 "instances": [f"count={len(bo_class._loaded_instances)}"],
+                "bo_data": [f"count={len(bo_class._data_objects)}"],
                 "creation subscribers": subs_repr(
                     bo_class._creation_subscribers, bo_name
                 ),
                 "change subscribers": subs_repr(bo_class._change_subscribers, bo_name),
             }
-            for instance in bo_class._loaded_instances.values():
+            for instance in bo_class._loaded_instances:
                 if len(instance._instance_subscribers) > 0:
                     subs[bo_name]["instances"].append(
                         subs_repr(instance._instance_subscribers, bo_name)
@@ -577,13 +660,28 @@ class BOBase(BOBaseBase):
                 else:
                     subs[bo_name]["instances"].append(
                         f"{str(instance)}"
-                        + (" <" + f"{id(instance)}"[-4:] + ">" if py_id else "")
+                        + (" <" + f"{id(instance)}"[-4:] + ">" if py_id else "")  # type: ignore[reportCallIssue]
                         + ": no subscribers"
                     )
-        # LOG.debug(f"{subs=}")
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"{bo_name} data objects: {bo_class._data_objects}, len = {len(bo_class._data_objects)}",
+            )
+            if len(bo_class._data_objects) == 0:
+                subs[bo_name]["bo_data"].append("no data objects")
+            else:
+                for id, instance in bo_class._data_objects.items():
+                    subs[bo_name]["bo_data"].append(
+                        (f"{id}"[-4:] + ": ") + str(instance)
+                    )
+        LOG.debug(f"{subs=}")
         try:
+            LOG.log(VERBOSE_DEBUG, f"Writing subscription statistics to {stats_file}")
             with open(stats_file, "w", encoding="utf-8") as f:
-                f.write(f"{datetime.now().isoformat()} - Active subscriptions: \n")
+                f.write(f"{datetime.now().isoformat()} - BO load report: \n")
+                LOG.log(
+                    VERBOSE_DEBUG, f"{datetime.now().isoformat()} - BO load report: \n"
+                )
                 f.write("\n")
                 pad = LeftPadder.pad
                 f.write(" " * 23)
@@ -595,6 +693,7 @@ class BOBase(BOBaseBase):
                     f.write(pad("=+"))
                 f.write("\n")
                 items = [i for i in list(subs.values())[0].keys()]
+                LOG.log(VERBOSE_DEBUG, f"items: {items}")
                 for item in items:
                     l = 0
                     while True:
