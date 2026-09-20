@@ -460,7 +460,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
 
     def test_127_handle_callback_result_connection_closed_logs_debug(self):
         bo_instance = MockBO2()
-        bo_instance.id = 1
+        bo_instance._assign_id(1)
         task = Mock()
         task.result.side_effect = core.exceptions.WSConnectionClosed("gone")
         task.get_name.return_value = "subscriber_callback_callback_1"
@@ -471,7 +471,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
 
     def test_128_handle_callback_result_other_exception_logs_exception(self):
         bo_instance = MockBO2()
-        bo_instance.id = 1
+        bo_instance._assign_id(1)
         task = Mock()
         task.result.side_effect = ValueError("boom")
         task.get_name.return_value = "subscriber_callback_callback_1"

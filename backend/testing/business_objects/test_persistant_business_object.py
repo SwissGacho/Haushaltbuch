@@ -454,7 +454,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_201_fetch_none_with_default_mixin_returns_without_sql(self):
         target = MockPersistentBOWithDefaultMixin(bo_id=None)
-        target.id = None
+        target._assign_id(None)
         with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
             result = await target.fetch()
 
