@@ -27,7 +27,7 @@ DB_TYPE_MAP: dict[str, tuple[str, str]] = {
 class DBManager:
     "Initialize and configure the app database"
 
-    RECONNECT_ATTEMPTS: int = 3
+    RECONNECT_ATTEMPTS: int = 1
 
     def __init__(self):
         self.db: DB | None = None
