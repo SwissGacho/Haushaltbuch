@@ -33,6 +33,13 @@ class WSToken(BaseObject):
             self._all_tokens.add(self)
 
     @classmethod
+    def get_token(cls, tok: str) -> Optional["WSToken"]:
+        for tkn in cls._all_tokens:
+            if tkn.token == tok:
+                return tkn
+        return None
+
+    @classmethod
     def check_token(cls, tok: str) -> bool:
         "check if token is valid"
         now = datetime.now()

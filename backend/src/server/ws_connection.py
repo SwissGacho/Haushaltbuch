@@ -118,7 +118,9 @@ class WSConnection(WSConnectionBase):
             await self._socket.send(payload)
         except websockets.exceptions.ConnectionClosed as exc:
             # Client vanished (e.g. tab closed) before we noticed on the read side.
-            self.conn_logger.debug(f"WSConnection._send(): send failed, connection closed: {exc}")
+            self.conn_logger.debug(
+                f"WSConnection._send(): send failed, connection closed: {exc}"
+            )
             raise core.exceptions.WSConnectionClosed(
                 f"Connection closed while sending ({exc})"
             ) from exc
@@ -181,7 +183,15 @@ class WSConnection(WSConnectionBase):
                 token=self._token,
                 status=App.status,
                 authenticated_user=(
-                    True if (authenticated_user or client_token_valid) else None
+                    True
+                    if (
+                        authenticated_user
+                        or (
+                            client_token_valid
+                            and clienttoken in Session.session_clients
+                        )
+                    )
+                    else None
                 ),
             )
         )

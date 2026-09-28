@@ -117,7 +117,10 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             await msg.handle_message(connection)
 
         mock_session_class.get_session_from_token.assert_called_once_with(
-            ses_token="ses-token", conn_token="", client_token=None
+            ses_token="ses-token",
+            conn_token="",
+            client_token=None,
+            connection=connection,
         )
         mock_check_login.assert_not_awaited()
         self.assertIs(connection.session, session)
@@ -169,7 +172,10 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             await msg.handle_message(connection)
 
         mock_session_class.get_session_from_token.assert_called_once_with(
-            ses_token="", conn_token="", client_token="client-token"
+            ses_token="",
+            conn_token="",
+            client_token="client-token",
+            connection=connection,
         )
         mock_check_login.assert_not_awaited()
         self.assertIs(connection.session, session)

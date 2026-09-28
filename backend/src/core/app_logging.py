@@ -99,8 +99,10 @@ _LOG_WEAK_REDACT = False
 _REDACT_PATTERN = re.compile(r"(pass|secret|token|key)", re.IGNORECASE)
 
 
-def redact_str(value: str) -> str:
-    "Return string."
+def redact_str(value: str | None) -> str:
+    "Return a log-safe string representation of the value, redacted if necessary."
+    if value is None:
+        return "" if _LOG_WEAK_REDACT else "***redacted***"
     return (
         "..." + str(value)[-4:]
         if _LOG_WEAK_REDACT and len(str(value)) > 8

@@ -21,6 +21,7 @@ from core.app_logging import (
     VERBOSE_DEBUG,
     pprint_lines,
     redact_truncate,
+    redact_str,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -29,6 +30,7 @@ from core.const import WEBSOCKET_PORT
 from core.app import App
 from core.configuration.config import Config
 from server.ws_connection import WSConnection
+from server.session import Session
 from server.ws_token import WSToken
 from messages.message import Message
 from messages.admin import LogMessage
@@ -125,20 +127,27 @@ class WSHandler:
         if CLIENT_TOKEN_COOKIE_NAME in request_cookies:
             client_token = request_cookies[CLIENT_TOKEN_COOKIE_NAME]
             LOG.debug(
-                f"WSHandler.process_response(): found {redact({CLIENT_TOKEN_COOKIE_NAME: client_token})}"
+                f"WSHandler.process_response(): found {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(client_token)})"
             )
             WSHandler.sockets[websocket.id]["client_token_valid"] = WSToken.check_token(
                 client_token
             )
+            Session.cleanup_expired_client_tokens()
             if WSHandler.sockets[websocket.id]["client_token_valid"]:
-                WSHandler.sockets[websocket.id]["client_token"] = WSToken(client_token)
-            return None
+                WSHandler.sockets[websocket.id]["client_token"] = WSToken.get_token(
+                    client_token
+                )
+                return None
         client_token = WSToken(inactive_seconds_timeout=None)
         LOG.debug(
-            f"WSHandler.process_response(): issuing {redact({CLIENT_TOKEN_COOKIE_NAME: client_token})} for login"
+            f"WSHandler.process_response(): issuing {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(str(client_token))} for login"
         )
+        is_secure = request.headers.get("Forwarded-Proto", "").lower() == "https"
+        cookie_flags = "; Path=/; HttpOnly; SameSite=Strict"
+        if is_secure:
+            cookie_flags += "; Secure"
         response.headers["Set-Cookie"] = (
-            f"{CLIENT_TOKEN_COOKIE_NAME}={client_token}; Path=/; HttpOnly; SameSite=Strict"
+            f"{CLIENT_TOKEN_COOKIE_NAME}={client_token}{cookie_flags}"
         )
         WSHandler.sockets[websocket.id]["client_token"] = client_token
         WSHandler.sockets[websocket.id]["client_token_valid"] = False
@@ -197,6 +206,7 @@ class WSHandler:
             raise
         finally:
             context_log.debug("Connection ended.")
+            WSHandler.sockets.pop(websocket.id, None)
             connection.connection_closed()
 
 

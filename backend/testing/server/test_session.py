@@ -15,17 +15,19 @@ class Test_100_Session(unittest.TestCase):
     def setUp(self):
         self.all_sessions = list(Session._all_sessions)
         self.client_sessions = {
-            token: list(sessions)
-            for token, sessions in Session._client_sessions.items()
+            token: user for token, user in Session.session_clients.items()
         }
         self.all_tokens = set(WSToken._all_tokens)
         Session._all_sessions.clear()
-        Session._client_sessions.clear()
+        Session.session_clients.clear()
         WSToken._all_tokens.clear()
 
     def tearDown(self):
+        Session._all_sessions.clear()
         Session._all_sessions.extend(self.all_sessions)
-        Session._client_sessions.update(self.client_sessions)
+        Session.session_clients.clear()
+        Session.session_clients.update(self.client_sessions)
+        WSToken._all_tokens.clear()
         WSToken._all_tokens.update(self.all_tokens)
 
     def create_session(
@@ -58,7 +60,7 @@ class Test_100_Session(unittest.TestCase):
 
         session = self.create_session(client_token=client_token)
 
-        self.assertEqual(Session._client_sessions[client_token], [session])
+        self.assertIs(Session.session_clients[client_token], session.user)
 
     def test_103_get_session_from_session_token(self):
         session = self.create_session()
@@ -103,9 +105,7 @@ class Test_100_Session(unittest.TestCase):
         assert found is not None
         self.assertIs(found.user, user)
         self.assertEqual(found.connections, [connection])
-        self.assertEqual(
-            Session._client_sessions[client_token.token], [existing_session, found]
-        )
+        self.assertIs(Session.session_clients[client_token.token], user)
 
     def test_106_get_session_from_client_token_rejects_other_user(self):
         client_token = WSToken(inactive_seconds_timeout=None)
@@ -137,7 +137,21 @@ class Test_100_Session(unittest.TestCase):
 
         self.assertIsNone(found)
 
-    def test_109_add_connection_and_token(self):
+    def test_109_cleanup_expired_client_tokens(self):
+        expired_token = WSToken(inactive_seconds_timeout=None)
+        valid_token = WSToken(inactive_seconds_timeout=None)
+        user = cast(User, SimpleNamespace(name="alice"))
+        Session.session_clients.update(
+            {expired_token.token: user, valid_token.token: user}
+        )
+        expired_token.invalidate()
+
+        Session.cleanup_expired_client_tokens()
+
+        self.assertNotIn(expired_token.token, Session.session_clients)
+        self.assertIs(Session.session_clients[valid_token.token], user)
+
+    def test_110_add_connection_and_token(self):
         session = self.create_session()
         connection = Mock(name="second-connection")
         connection_token = WSToken(inactive_seconds_timeout=None)

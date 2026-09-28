@@ -23,7 +23,7 @@ LOG: Logger = getLogger(__name__)
 from core.app import App
 from core.base_objects import Config
 from core.exceptions import TokenExpiredError
-from server.ws_connection_base import SessionBase
+from server.ws_connection_base import SessionBase, WSConnectionBase
 from server.ws_token import WSToken
 
 # from server.ws_connection import WS_Connection
@@ -34,13 +34,13 @@ class Session(SessionBase):
 
     _all_sessions: list[Self] = []
     _next_session_nbr = 0
-    _client_sessions: dict[str, list[Self]] = {}
+    session_clients: dict[str, User] = {}
 
     def __init__(
         self,
         user: User,
         conn_token: Optional[WSToken],
-        connection,  #: "WS_Connection"
+        connection: WSConnectionBase | None,
         client_token: str | None = None,
     ) -> None:
         local_LOG = self.local_logger(connection)
@@ -50,32 +50,24 @@ class Session(SessionBase):
         Session._all_sessions.append(self)
         self._session_nbr = Session._next_session_nbr
         Session._next_session_nbr += 1
-        self.connections = [connection]
-        inactive_seconds_timeout = (
-            (App.get_config_item(Config.CONFIG_APP_SESSION_TIMEOUT) or 2) * 60 * 60
+        self.connections = [connection] if connection else []
+        hours = App.get_config_item(Config.CONFIG_APP_SESSION_TIMEOUT, default=2)
+        inactive_seconds_timeout = int(
+            (hours if isinstance(hours, (int, float)) else 2) * 60 * 60
         )  # default: 2 hours
         self.token = WSToken(inactive_seconds_timeout=inactive_seconds_timeout)
         self._user: User = user
         self._tokens: set[WSToken] = {conn_token} if conn_token else set()
         if client_token:
-            if client_token not in Session._client_sessions:
+            if client_token not in Session.session_clients:
                 local_LOG.debug(
                     f"detected new client with client-token': {redact_str(client_token)}"
                 )
-                Session._client_sessions[client_token] = []
-            Session._client_sessions[client_token].append(self)
-            local_LOG.debug(
-                f"added session for client-token': {redact_str(client_token)}"
-            )
+                Session.session_clients[client_token] = user
             if local_LOG.isEnabledFor(VERBOSE_DEBUG):
-                local_LOG.log(VERBOSE_DEBUG, "current client sessions:")
+                local_LOG.log(VERBOSE_DEBUG, "current clients:")
                 for line in pprint_lines(
-                    (
-                        {
-                            redact_str(k): [str(s) for s in v]
-                            for k, v in Session._client_sessions.items()
-                        }
-                    )
+                    {redact_str(k): str(v) for k, v in Session.session_clients.items()}
                 ):
                     local_LOG.log(VERBOSE_DEBUG, f"  {line}")
         else:
@@ -87,12 +79,21 @@ class Session(SessionBase):
         return f"ses #{self._session_nbr}"
 
     @classmethod
-    def local_logger(self, connection=None) -> ContextLogger | Logger:
+    def local_logger(
+        cls, connection: WSConnectionBase | None = None
+    ) -> ContextLogger | Logger:
         return (
             get_context_logger(LOG, **connection.connection_context)
             if connection
             else LOG
         )
+
+    @classmethod
+    def cleanup_expired_client_tokens(cls) -> None:
+        """Remove client-token mappings whose tokens are no longer valid."""
+        for client_token in tuple(cls.session_clients):
+            if not WSToken.check_token(client_token):
+                del cls.session_clients[client_token]
 
     @classmethod
     def get_session_from_token(
@@ -101,7 +102,7 @@ class Session(SessionBase):
         conn_token: str | None,
         client_token: str | None = None,
         session_user: User | None = None,
-        connection=None,
+        connection: WSConnectionBase | None = None,
     ):
         "find session by session or any connection token"
         local_LOG = cls.local_logger(connection)
@@ -124,15 +125,15 @@ class Session(SessionBase):
             local_LOG.debug("no session found for given tokens")
             return None
         if (
-            client_token in cls._client_sessions
-            and cls._client_sessions[client_token]
+            client_token in cls.session_clients
+            and cls.session_clients[client_token]
             and (
                 session_user is None
-                or session_user == cls._client_sessions[client_token][0].user
+                or session_user == cls.session_clients[client_token]
             )
         ):
             return cls(
-                user=cls._client_sessions[client_token][0].user,
+                user=cls.session_clients[client_token],
                 conn_token=None,
                 connection=connection,
                 client_token=client_token,

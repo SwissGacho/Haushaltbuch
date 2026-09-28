@@ -101,19 +101,72 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         }.get(name, default)
         response = Mock(headers={})
 
-        with patch("server.ws_server.WSToken") as mock_token:
+        with (
+            patch("server.ws_server.WSToken") as mock_token,
+            patch("server.ws_server.Session.cleanup_expired_client_tokens") as cleanup,
+        ):
             mock_token.check_token.return_value = True
-            mock_token.return_value = "existing-token"
+            mock_token.get_token.return_value = "existing-token"
             handler.process_response(websocket, request, response)
 
         mock_token.check_token.assert_called_once_with("existing-token")
-        mock_token.assert_called_once_with("existing-token")
+        mock_token.get_token.assert_called_once_with("existing-token")
+        mock_token.assert_not_called()
+        cleanup.assert_called_once_with()
         self.assertEqual(
             WSHandler.sockets[websocket.id],
             {"client_token": "existing-token", "client_token_valid": True},
         )
         self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
         self.assertNotIn("Set-Cookie", response.headers)
+
+    def test_204_process_response_replaces_expired_client_token_cookie(self):
+        handler = WSHandler()
+        websocket = Mock(id="ws-1")
+        request = Mock()
+        request.headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": LOGIN_SUBPROTOCOL,
+            "Cookie": f"{CLIENT_TOKEN_COOKIE_NAME}=expired-token",
+        }.get(name, default)
+        response = Mock(headers={})
+
+        with patch("server.ws_server.WSToken") as mock_token:
+            mock_token.check_token.return_value = False
+            mock_token.return_value = "replacement-token"
+            handler.process_response(websocket, request, response)
+
+        mock_token.check_token.assert_called_once_with("expired-token")
+        mock_token.assert_called_once_with(inactive_seconds_timeout=None)
+        self.assertEqual(
+            WSHandler.sockets[websocket.id],
+            {"client_token_valid": False, "client_token": "replacement-token"},
+        )
+        self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
+        self.assertEqual(
+            response.headers["Set-Cookie"],
+            f"{CLIENT_TOKEN_COOKIE_NAME}=replacement-token; Path=/; HttpOnly; SameSite=Strict",
+        )
+
+    def test_205_process_response_sets_secure_flag_when_forwarded_https(self):
+        handler = WSHandler()
+        websocket = Mock(id="ws-1")
+        request = Mock()
+        request.headers.get.side_effect = lambda name, default="": {
+            "Sec-WebSocket-Protocol": LOGIN_SUBPROTOCOL,
+            "Cookie": "",
+            "Forwarded-Proto": "https",
+        }.get(name, default)
+        response = Mock(headers={})
+
+        with patch(
+            "server.ws_server.WSToken", return_value="issued-token"
+        ):
+            handler.process_response(websocket, request, response)
+
+        self.assertEqual(
+            response.headers["Set-Cookie"],
+            f"{CLIENT_TOKEN_COOKIE_NAME}=issued-token; Path=/; HttpOnly; SameSite=Strict; Secure",
+        )
 
     async def _200_handle_messages(
         self,
@@ -225,6 +278,7 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         mock_connection.connection_closed = Mock()
         mock_socket = MagicMock()
         mock_socket.__aiter__.return_value = [{"type": "mocktype", "text": "mocktext"}]
+        WSHandler.sockets[mock_socket.id] = {"client_token": "mock-token"}
 
         with (
             patch("server.ws_server.WSConnection", return_value=mock_connection),
@@ -238,9 +292,10 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
 
         mock_connection.start_connection.assert_awaited_once_with(
             authenticated_user=None,
-            clienttoken=None,
+            clienttoken="mock-token",
             client_token_valid=False,
         )
         mock_connection.handle_message.assert_awaited_once()
         mock_connection.connection_closed.assert_called_once_with()
+        self.assertNotIn(mock_socket.id, WSHandler.sockets)
         self.assertEqual(Mock_Msg.call_count, 1, "number of Messages created")

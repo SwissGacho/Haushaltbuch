@@ -12,6 +12,7 @@ from core.validation import check_login
 from core.exceptions import TokenExpiredError
 from server.ws_token import WSToken
 from server.session import Session
+from server.ws_connection_base import WSConnectionBase
 from messages.message import Message, MessageType, MessageAttribute
 from bom_persistent.management.user import User
 
@@ -41,18 +42,20 @@ class LoginMessage(Message):
     def message_type(cls):
         return MessageType.WS_TYPE_LOGIN
 
-    async def handle_message(self, connection):
+    async def handle_message(self, connection: WSConnectionBase):
         "handle login message"
         local_LOG = LOG
         token = WSToken(self.get_str(MessageAttribute.WS_ATTR_TOKEN))
         try:
             ses_token = self.get_str(MessageAttribute.WS_ATTR_SES_TOKEN)
             conn_token = self.get_str(MessageAttribute.WS_ATTR_PREV_TOKEN)
-            if ses_token or conn_token or connection.client_token:
+            client_token = getattr(connection, "client_token", None)
+            if ses_token or conn_token or client_token:
                 session = Session.get_session_from_token(
                     ses_token=ses_token,
                     conn_token=conn_token,
-                    client_token=connection.client_token,
+                    client_token=client_token,
+                    connection=connection,
                 )
             else:
                 session = None
@@ -61,9 +64,7 @@ class LoginMessage(Message):
                     self.message,
                     authenticated_user=getattr(connection, "authenticated_user", None),
                 )
-                session = Session(
-                    user, token, connection, client_token=connection.client_token
-                )
+                session = Session(user, token, connection, client_token=client_token)
             if not session:
                 raise PermissionError(
                     f"Failed to create session for login with message {self.message}"
