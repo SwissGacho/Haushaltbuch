@@ -88,7 +88,7 @@ class WSHandler:
         "Acknowledge the login subprotocol and issue a connection token cookie for it"
         WSHandler.sockets[websocket.id] = {}
         if LOG.isEnabledFor(DEBUG):
-            LOG.log(VERBOSE_DEBUG, "WSHandler.get_auth_user(): request headers:")
+            LOG.log(VERBOSE_DEBUG, "WSHandler.process_response(): request headers:")
             items = (
                 request.headers.raw_items()
                 if hasattr(request.headers, "raw_items")
@@ -127,7 +127,7 @@ class WSHandler:
         if CLIENT_TOKEN_COOKIE_NAME in request_cookies:
             client_token = request_cookies[CLIENT_TOKEN_COOKIE_NAME]
             LOG.debug(
-                f"WSHandler.process_response(): found {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(client_token)})"
+                f"WSHandler.process_response(): found {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(client_token)}"
             )
             WSHandler.sockets[websocket.id]["client_token_valid"] = WSToken.check_token(
                 client_token
@@ -138,14 +138,17 @@ class WSHandler:
                     client_token
                 )
                 return None
+            LOG.debug(
+                f"WSHandler.process_response(): {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(client_token)} was rejected"
+            )
         client_token = WSToken(inactive_seconds_timeout=None)
-        LOG.debug(
-            f"WSHandler.process_response(): issuing {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(str(client_token))} for login"
-        )
         is_secure = request.headers.get("Forwarded-Proto", "").lower() == "https"
         cookie_flags = "; Path=/; HttpOnly; SameSite=Strict"
         if is_secure:
             cookie_flags += "; Secure"
+        LOG.debug(
+            f"WSHandler.process_response(): issuing {CLIENT_TOKEN_COOKIE_NAME}={redact_str(str(client_token))}{cookie_flags} for login"
+        )
         response.headers["Set-Cookie"] = (
             f"{CLIENT_TOKEN_COOKIE_NAME}={client_token}{cookie_flags}"
         )
