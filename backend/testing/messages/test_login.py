@@ -55,7 +55,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         ):
             await msg.handle_message(connection)
 
-        mock_check_login.assert_awaited_once_with(msg.message, authenticated_user=None)
+        mock_check_login.assert_awaited_once_with(None)
         mock_session_class.assert_called_once()
         mock_ctx_logger.assert_called_once()
         self.assertIs(connection.session, session)
@@ -149,6 +149,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
+            authenticated_user=None,
             client_token="client-token",
         )
         connection.send_message = AsyncMock()
@@ -190,6 +191,54 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             sent_message.message[MessageAttribute.WS_ATTR_AUTHENTICATED_USER],
             "alice",
         )
+
+    async def test_104b_handle_message_rejects_client_token_for_other_user(self):
+        msg = LoginMessage(
+            dumps(
+                {
+                    MessageAttribute.WS_ATTR_TYPE: MessageType.WS_TYPE_LOGIN,
+                    MessageAttribute.WS_ATTR_TOKEN: "conn-token",
+                    MessageAttribute.WS_ATTR_USER: "bob",
+                }
+            )
+        )
+        cached_session = Mock(token="ses-token", user=SimpleNamespace(name="alice"))
+        new_session_user = SimpleNamespace(name="bob")
+        new_session = Mock(token="new-ses-token", user=new_session_user)
+        connection = Mock(
+            session=None,
+            connection_context={"connection": "ws-1"},
+            is_primary=False,
+            authenticated_user=None,
+            client_token="alice-client-token",
+        )
+        connection.send_message = AsyncMock()
+        connection.abort_connection = AsyncMock()
+
+        mock_session_class = Mock(return_value=new_session)
+        mock_session_class.get_session_from_token = Mock(return_value=cached_session)
+
+        with (
+            patch("messages.login.Session", mock_session_class),
+            patch(
+                "messages.login.check_login",
+                AsyncMock(return_value=new_session_user),
+            ) as mock_check_login,
+            patch(
+                "messages.login.App",
+                SimpleNamespace(status=Status.STATUS_MULTI_USER),
+            ),
+            patch(
+                "messages.login.get_context_logger",
+                Mock(return_value=Mock(debug=Mock())),
+            ),
+        ):
+            await msg.handle_message(connection)
+
+        # cached "alice" session must not be reused for a login requesting "bob"
+        mock_check_login.assert_awaited_once_with("bob")
+        mock_session_class.assert_called_once()
+        self.assertIs(connection.session, new_session)
 
     async def test_105_handle_message_new_session_registers_client_token(self):
         msg = LoginMessage(

@@ -3,7 +3,7 @@ A session is created by a WS connection without session token.
 """
 
 from typing import Self, Optional
-from bom_persistent.management.user import User
+from bom_persistent.management.user import GenericUser
 
 from core.app_logging import (
     ContextLogger,
@@ -34,11 +34,11 @@ class Session(SessionBase):
 
     _all_sessions: list[Self] = []
     _next_session_nbr = 0
-    session_clients: dict[str, User] = {}
+    session_clients: dict[str, GenericUser] = {}
 
     def __init__(
         self,
-        user: User,
+        user: GenericUser,
         conn_token: Optional[WSToken],
         connection: WSConnectionBase | None,
         client_token: str | None = None,
@@ -56,7 +56,7 @@ class Session(SessionBase):
             (hours if isinstance(hours, (int, float)) else 2) * 60 * 60
         )  # default: 2 hours
         self.token = WSToken(inactive_seconds_timeout=inactive_seconds_timeout)
-        self._user: User = user
+        self._user: GenericUser = user
         self._tokens: set[WSToken] = {conn_token} if conn_token else set()
         if client_token:
             if client_token not in Session.session_clients:
@@ -101,7 +101,7 @@ class Session(SessionBase):
         ses_token: str | None,
         conn_token: str | None,
         client_token: str | None = None,
-        session_user: User | None = None,
+        session_user: GenericUser | None = None,
         connection: WSConnectionBase | None = None,
     ):
         "find session by session or any connection token"
@@ -146,7 +146,7 @@ class Session(SessionBase):
         return {token.token for token in self._tokens}
 
     @property
-    def user(self) -> User:
+    def user(self) -> GenericUser:
         "get user associated with session"
         return self._user
 

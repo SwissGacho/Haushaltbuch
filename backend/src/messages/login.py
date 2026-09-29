@@ -14,7 +14,7 @@ from server.ws_token import WSToken
 from server.session import Session
 from server.ws_connection_base import WSConnectionBase
 from messages.message import Message, MessageType, MessageAttribute
-from bom_persistent.management.user import User
+from bom_persistent.management.user import GenericUser
 
 
 class HelloMessage(Message):
@@ -50,6 +50,10 @@ class LoginMessage(Message):
             ses_token = self.get_str(MessageAttribute.WS_ATTR_SES_TOKEN)
             conn_token = self.get_str(MessageAttribute.WS_ATTR_PREV_TOKEN)
             client_token = getattr(connection, "client_token", None)
+            authenticated_user = getattr(connection, "authenticated_user", None)
+            requested_user = (
+                self.get_str(MessageAttribute.WS_ATTR_USER) or authenticated_user
+            )
             if ses_token or conn_token or client_token:
                 session = Session.get_session_from_token(
                     ses_token=ses_token,
@@ -57,13 +61,18 @@ class LoginMessage(Message):
                     client_token=client_token,
                     connection=connection,
                 )
+                if (
+                    session
+                    and not (ses_token or conn_token)
+                    and requested_user
+                    and getattr(session.user, "name", None) != requested_user
+                ):
+                    # client-token cookie belongs to a different identity than this login request
+                    session = None
             else:
                 session = None
             if not session:
-                user: User = await check_login(
-                    self.message,
-                    authenticated_user=getattr(connection, "authenticated_user", None),
-                )
+                user: GenericUser = await check_login(requested_user)
                 session = Session(user, token, connection, client_token=client_token)
             if not session:
                 raise PermissionError(
