@@ -149,7 +149,11 @@ class MixinBase:
         return conds
 
     async def fetch_mixin(
-        self, sql: SQL, id=None, newest=None, session: Optional[SessionBase] = None
+        self,
+        sql: SQL,
+        id=None,
+        newest: bool = False,
+        session: Optional[SessionBase] = None,
     ):
         """Fetch the content for a BO instance from the DB."""
         LOG.debug(

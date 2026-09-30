@@ -28,7 +28,11 @@ class Singleton(MixinBase):
     """
 
     async def fetch_mixin(
-        self, sql: SQL, id=None, newest=None, session: Optional[SessionBase] = None
+        self,
+        sql: SQL,
+        id=None,
+        newest: bool = False,
+        session: Optional[SessionBase] = None,
     ):
         """Fetch the content for a singleton BO instance from the DB.
         If 'id' is given, fetch the identified object
