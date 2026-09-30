@@ -558,7 +558,7 @@ class BOBase(BOBaseBase):
         for loaded_instance in cls._loaded_instances:
             try:
                 if loaded_instance.id == instance.id:
-                    instance.notify_my_instance_subscribers()
+                    loaded_instance.notify_my_instance_subscribers()
             except AttributeError:
                 LOG.error(
                     f"AttributeError on {loaded_instance=}, {loaded_instance._data=}, {cls._loaded_instances=}"

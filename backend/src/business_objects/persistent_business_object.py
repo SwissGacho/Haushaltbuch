@@ -440,8 +440,13 @@ class PersistentBusinessObject(BOBase):
         self._db_data = await (await select.execute()).fetchone()
 
         # If newest is True, assign _data from cache if its already available
-        if newest and self.id in self.__class__._data_objects:
-            self.set_data_object(self.__class__._data_objects[self.id])
+        if (
+            newest
+            and self._db_data
+            and self._db_data.get("id")
+            and self._db_data.get("id") in self.__class__._data_objects
+        ):
+            self.set_data_object(self.__class__._data_objects[self._db_data.get("id")])
 
         # Read the fetched data and populate the business object's attributes
         if self._db_data:

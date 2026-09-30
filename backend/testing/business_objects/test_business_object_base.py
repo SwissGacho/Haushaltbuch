@@ -441,6 +441,28 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         first.mock_attr1 = "updated value"
         self.assertEqual(second.mock_attr1, "updated value")
 
+    def test_125_notify_instance_subscribers_notifies_all_instances_sharing_id(self):
+        """When several instances share the same underlying BOData (because they
+        were constructed with the same id), notifying one of them of a change
+        must also notify subscribers registered on the other instances -- not
+        just repeatedly notify the originating instance's own subscribers.
+        """
+        first = MockBO2()
+        first._assign_id(300001)
+        second = MockBO2(bo_id=300001)
+        self.assertIs(second._data, first._data)
+
+        first_callback = AsyncMock()
+        second_callback = AsyncMock()
+        first.subscribe_to_instance(first_callback)
+        second.subscribe_to_instance(second_callback)
+
+        with patch(
+            "business_objects.business_object_base.BOBase.notify_bo_subscribers"
+        ) as MockBOBaseNotify:
+            first.notify_instance_subscribers()
+            MockBOBaseNotify.assert_any_call(second._instance_subscribers, second)
+
     def test_126_register_instance_conflicting_data_raises(self):
         """If _data_objects already holds a BOData for a given id (because some
         other instance registered it first) and the registering instance carries
