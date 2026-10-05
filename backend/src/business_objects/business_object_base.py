@@ -105,9 +105,10 @@ class BOBase(BOBaseBase):
         self._data: BOData | None = None
 
         # Assign data object based on bo_id
-        if bo_id is not None and self.__class__.get_data_object(bo_id) is not None:
-            data_object = self.__class__.get_data_object(bo_id)
-        else:
+        data_object = (
+            self.__class__.get_data_object(bo_id) if bo_id is not None else None
+        )
+        if data_object is None:
             data_object = BOData(self.__class__, bo_id)
         self.set_data_object(data_object)
         self.last_updated = None
