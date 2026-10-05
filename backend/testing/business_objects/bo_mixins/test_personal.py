@@ -1,7 +1,7 @@
 """Tests for business_objects.bo_mixins.personal."""
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from business_objects.bo_mixins.personal import Personal
 
@@ -21,6 +21,10 @@ class _PersonalTarget(Personal):
         self.id = bo_id
         self.user_id = user_id
         self.calls = []
+
+    @staticmethod
+    def bo_type_name():
+        return "personal_target"
 
     async def insert_self(self, session=None):
         self.calls.append(("insert", session))
@@ -62,6 +66,66 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
         mock_value.assert_called_once_with(mock_user)
         mock_eq.assert_called_once_with("user_id", mock_value())
         self.assertEqual([mock_eq()], result)
+
+    def test_specialist_conditions_without_user_excludes_personal_specialist(self):
+        with (
+            patch("business_objects.bo_mixins.personal.ColumnName") as mock_column_name,
+            patch("business_objects.bo_mixins.personal.SQLString") as mock_sql_string,
+            patch("business_objects.bo_mixins.personal.Eq") as mock_eq,
+            patch("business_objects.bo_mixins.personal.Not") as mock_not,
+        ):
+            result = Personal.specialist_conditions_mixin(
+                specialist_cls=_PersonalTarget, user=None
+            )
+
+        mock_column_name.assert_called_once_with("bo_name")
+        mock_sql_string.assert_called_once_with("personal_target")
+        mock_eq.assert_called_once_with(mock_column_name.return_value, mock_sql_string())
+        mock_not.assert_called_once_with(mock_eq())
+        self.assertEqual([mock_not()], result)
+
+    def test_specialist_conditions_with_user_excludes_other_users(self):
+        mock_user = Mock(name="user")
+        with (
+            patch("business_objects.bo_mixins.personal.ColumnName") as mock_column_name,
+            patch("business_objects.bo_mixins.personal.SQLString") as mock_sql_string,
+            patch("business_objects.bo_mixins.personal.Value") as mock_value,
+            patch("business_objects.bo_mixins.personal.Eq") as mock_eq,
+            patch("business_objects.bo_mixins.personal.Not") as mock_not,
+            patch("business_objects.bo_mixins.personal.And") as mock_and,
+        ):
+            col_bo_name = Mock(name="col_bo_name")
+            col_user_id = Mock(name="col_user_id")
+            mock_column_name.side_effect = [col_bo_name, col_user_id]
+
+            eq_bo_name = Mock(name="eq_bo_name")
+            eq_user_id = Mock(name="eq_user_id")
+            mock_eq.side_effect = [eq_bo_name, eq_user_id]
+
+            not_user_id = Mock(name="not_user_id")
+            not_outer = Mock(name="not_outer")
+            mock_not.side_effect = [not_user_id, not_outer]
+
+            and_expr = Mock(name="and_expr")
+            mock_and.return_value = and_expr
+
+            result = Personal.specialist_conditions_mixin(
+                specialist_cls=_PersonalTarget, user=mock_user
+            )
+
+        self.assertEqual(2, mock_column_name.call_count)
+        mock_column_name.assert_has_calls([call("bo_name"), call("user_id")])
+        mock_sql_string.assert_called_once_with("personal_target")
+        mock_value.assert_called_once_with(mock_user)
+        mock_eq.assert_has_calls(
+            [
+                call(col_bo_name, mock_sql_string.return_value),
+                call(col_user_id, mock_value.return_value),
+            ]
+        )
+        mock_and.assert_called_once_with([eq_bo_name, not_user_id])
+        mock_not.assert_has_calls([call(eq_user_id), call(and_expr)])
+        self.assertEqual([not_outer], result)
 
     def test_skip_create_table_raises_without_user_id_description(self):
         with self.assertRaises(TypeError):
