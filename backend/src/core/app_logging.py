@@ -111,7 +111,7 @@ def redact_str(value: str | None) -> str:
 
 
 def redact(value: Any) -> Any:
-    "Return a log-safe copy with sensitive values redacted."
+    """Redact a sensitive value for logging, optionally exposing its last four characters."""
     if isinstance(value, list):
         return [redact(item) for item in value]
     if isinstance(value, dict):
