@@ -473,7 +473,7 @@ class PersistentBusinessObject(BOBase):
                 )
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _data=")
-                for line in pprint_lines(self._data.db_data):
+                for line in pprint_lines(self._data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
 
