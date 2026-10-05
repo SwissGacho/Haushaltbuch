@@ -40,9 +40,7 @@ from business_objects.bo_descriptors import (
 from business_objects.bo_semantic_role import BOSemanticRole
 from server.ws_connection_base import SessionBase
 
-BOCallback: TypeAlias = Callable[
-    ["BOBase", dict[str, tuple[Any, Any]]], Coroutine[Any, Any, None]
-]
+BOCallback: TypeAlias = Callable[["BOBase", dict[str, Any]], Coroutine[Any, Any, None]]
 
 
 class BOBase(BOBaseBase):
@@ -528,16 +526,14 @@ class BOBase(BOBaseBase):
     #     """
     #     raise NotImplementedError("fetch not implemented")
 
-    async def store(
-        self, session: Optional[SessionBase] = None
-    ) -> dict[str, tuple[Any, Any]]:
+    async def store(self, session: Optional[SessionBase] = None) -> dict[str, Any]:
         """Store pending changes to the business object.
         In addition, the instance subscribers are notified.
         """
-        updated_values = {}
-        self.notify_instance_subscribers(updated_values)
-        self.__class__.notify_change_subscribers(self, updated_values)
-        return updated_values
+        old_values = {}
+        self.notify_instance_subscribers(old_values)
+        self.__class__.notify_change_subscribers(self, old_values)
+        return old_values
 
     async def insert_self(self, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
@@ -545,32 +541,30 @@ class BOBase(BOBaseBase):
     async def update_self(self, session: Optional[SessionBase] = None):
         assert self.id is not None, "id must not be None for update operation"
 
-    def notify_instance_subscribers(self, updated_values: dict[str, tuple[Any, Any]]):
+    def notify_instance_subscribers(self, old_values: dict[str, Any]):
         """Notify all subscribers of this instance about a change."""
         # LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
         if not self.id:
-            self.notify_my_instance_subscribers(updated_values)
+            self.notify_my_instance_subscribers(old_values)
         else:
-            self.__class__.notify_all_instance_subscribers(self, updated_values)
+            self.__class__.notify_all_instance_subscribers(self, old_values)
 
-    def notify_my_instance_subscribers(
-        self, updated_values: dict[str, tuple[Any, Any]]
-    ):
+    def notify_my_instance_subscribers(self, old_values: dict[str, Any]):
         """Notify all subscribers of this instance about a change."""
         # LOG.debug(f"Notifying {len(self._instance_subscribers)} subscribers for {self}")
         self.__class__.notify_bo_subscribers(
-            self._instance_subscribers, self, updated_values
+            self._instance_subscribers, self, old_values
         )
 
     @classmethod
     def notify_all_instance_subscribers(
-        cls, instance: "BOBase", updated_values: dict[str, tuple[Any, Any]]
+        cls, instance: "BOBase", old_values: dict[str, Any]
     ):
         """Notify all subscribers of a specific instance about a change."""
         for loaded_instance in cls._loaded_instances:
             try:
                 if loaded_instance.id == instance.id:
-                    loaded_instance.notify_my_instance_subscribers(updated_values)
+                    loaded_instance.notify_my_instance_subscribers(old_values)
             except AttributeError:
                 LOG.error(
                     f"AttributeError on {loaded_instance=}, {loaded_instance._data=}, {cls._loaded_instances=}"
@@ -579,13 +573,13 @@ class BOBase(BOBaseBase):
 
     @classmethod
     def notify_change_subscribers(
-        cls, changed_bo: "BOBase", updated_values: dict[str, tuple[Any, Any]]
+        cls, changed_bo: "BOBase", old_values: dict[str, Any]
     ):
         """Notify all subscribers of this class about a change in an instance."""
         # LOG.debug(f"Notifying {len(cls._change_subscribers)} change subscribers for {changed_bo}")
         if len(cls._change_subscribers) == 0:
             return
-        cls.notify_bo_subscribers(cls._change_subscribers, changed_bo, updated_values)
+        cls.notify_bo_subscribers(cls._change_subscribers, changed_bo, old_values)
 
     @classmethod
     def notify_creation_subscribers(cls, new_bo: "BOBase"):
@@ -598,14 +592,14 @@ class BOBase(BOBaseBase):
         cls,
         subscriptions: dict[int, BOCallback],
         changed_bo: "BOBase",
-        updated_values: dict[str, tuple[Any, Any]],
+        old_values: dict[str, Any],
     ):
         """Notify all subscribers about a change in a business object."""
         # LOG.debug(f"Notifying {len(subscriptions)} subscribers for {changed_bo} with {changed_bo.id=}")
         for callback in subscriptions.values():
             try:
                 task = asyncio.create_task(
-                    callback(changed_bo, updated_values),
+                    callback(changed_bo, old_values),
                     name=f"subscriber_callback_{callback.__name__}_{changed_bo.id}",
                 )
                 task.add_done_callback(changed_bo.handle_callback_result)

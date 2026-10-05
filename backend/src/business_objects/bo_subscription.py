@@ -123,9 +123,7 @@ class BOSubscription(Generic[T], WSMessageSender):
             return []
         return [self._obj] if self._obj is not None else []
 
-    async def _handle_event_(
-        self, _: BOBase, updated_values: dict[str, tuple[Any, Any]]
-    ):
+    async def _handle_event_(self, _: BOBase, old_values: dict[str, Any]):
         """Should be called when the underlying information of the list changes.
         This method will update the list of objects and notify subscribers."""
         # LOG.debug(f"BOSubscription._handle_event_({changed_bo}) - {self._bo_type=}")
@@ -133,11 +131,9 @@ class BOSubscription(Generic[T], WSMessageSender):
             LOG.debug("BOSubscription._handle_event_: _bo_type is None, nothing to do")
             return
 
-        await self.notify_subscription_subscribers(updated_values)
+        await self.notify_subscription_subscribers(old_values)
 
-    async def notify_subscription_subscribers(
-        self, updated_values: dict[str, tuple[Any, Any]]
-    ):
+    async def notify_subscription_subscribers(self, old_values: dict[str, Any]):
         """Notify subscribers about the current state of the list."""
         from messages.bo_message import ObjectMessage
 

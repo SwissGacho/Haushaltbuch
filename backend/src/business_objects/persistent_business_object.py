@@ -3,6 +3,7 @@
 Persistent Business Objects are stored in the database and represent the
 application's data model."""
 
+from ast import Await
 import copy
 import json
 from inspect import iscoroutinefunction
@@ -558,7 +559,9 @@ class PersistentBusinessObject(BOBase):
             # read the new row back to get any default values set by the DB
             await self.fetch_self(txaction.sql(), id=self.id, session=session)
 
-    async def update_self(self, session: Optional[SessionBase] = None):
+    async def update_self(
+        self, session: Optional[SessionBase] = None
+    ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
         if self._data is None:
             raise CannotStoreEmptyBO(f"Cannot update {self} as it has no data")
@@ -569,7 +572,7 @@ class PersistentBusinessObject(BOBase):
             )
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
-        updated_values: dict[str, tuple[Any, Any]] = {}
+        old_values: dict[str, Any] = {}
         async with SQLTransaction() as txaction:
             update = (
                 txaction.sql()
@@ -580,17 +583,16 @@ class PersistentBusinessObject(BOBase):
             changes = False
             descriptions = {d.name: d for d in self.attribute_descriptions()}
             for k, v in self._data.items():
-                if k not in (
-                    "bo_name",
-                    "id",
-                ) and v != await self.convert_from_db(
-                    self._db_data.get(k),
-                    descriptions[k].data_type,
-                    descriptions[k].constraint_values,
-                ):
-                    changes = True
-                    update.assignment(k, Value(k, v))
-                    updated_values[k] = (self._db_data.get(k), v)
+                if k not in ("bo_name", "id"):
+                    old_value = await self.convert_from_db(
+                        self._db_data.get(k),
+                        descriptions[k].data_type,
+                        descriptions[k].constraint_values,
+                    )
+                    old_values[k] = old_value
+                    if old_value != v:
+                        changes = True
+                        update.assignment(k, Value(k, v))
             k = "last_updated"
             if changes and not (k in self._data and self._data[k]):
                 self._data[k] = datetime.now().astimezone(UTC)
@@ -602,12 +604,11 @@ class PersistentBusinessObject(BOBase):
             finally:
                 # read the row back to get any changes made by the DB (e.g. triggers)
                 await self.fetch_self(txaction.sql(), id=self.id, session=session)
-                # update the updated_values dictionary with the final values from the DB
-                for k, v in self._data.items():
-                    updated_values[k] = (
-                        updated_values[k][0] if k in updated_values else None
-                    ), v
-            return updated_values
+            return {
+                k: old_value
+                for k, old_value in old_values.items()
+                if old_value != self._data[k]
+            }
 
 
 log_exit(LOG)
