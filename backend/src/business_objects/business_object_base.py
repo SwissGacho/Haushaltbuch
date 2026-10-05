@@ -73,6 +73,11 @@ class BOBase(BOBaseBase):
         cls._creation_subscribers = {}
         cls._change_subscribers = {}
 
+    @classmethod
+    def get_data_object(cls, bo_id: int) -> BOData | None:
+        """Retrieve the data object for the given ID, if it exists."""
+        return cls._data_objects.get(bo_id)
+
     # pylint: disable=redefined-builtin, unused-argument
     def __init__(
         self,
@@ -98,12 +103,12 @@ class BOBase(BOBaseBase):
         # Initialize instance-specific attributes
         self._instance_subscribers: dict[int, BOCallback] = {}
         self._data: BOData | None = None
-        self._db_data = {}
 
         # Assign data object based on bo_id
-        if bo_id is not None and bo_id in self.__class__._data_objects:
-            data_object = self.__class__._data_objects[bo_id]
-        else:
+        data_object = (
+            self.__class__.get_data_object(bo_id) if bo_id is not None else None
+        )
+        if data_object is None:
             data_object = BOData(self.__class__, bo_id)
         self.set_data_object(data_object)
         self.last_updated = None
@@ -241,11 +246,13 @@ class BOBase(BOBaseBase):
     @classmethod
     def add_class_data_object(cls, data_object: BOData, id: int):
         """Add a data object for this class. Used when loading from the database."""
-        if id in cls._data_objects and cls._data_objects[id] is not data_object:
-            raise DataError(
-                f"Tried to overwrite existing data object for {cls.__name__} with id {id}"
-            )
-        if id in cls._data_objects and cls._data_objects[id] is data_object:
+        existing = cls.get_data_object(id)
+        if existing is not None:
+            if existing is not data_object:
+                raise DataError(
+                    f"Tried to overwrite existing data object for {cls.__name__} with id {id}"
+                )
+            # If the existing data object is the same as the one being added, do nothing
             return
 
         cls._data_objects[id] = data_object

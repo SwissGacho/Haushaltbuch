@@ -437,33 +437,33 @@ class PersistentBusinessObject(BOBase):
                 LOG.log(VERBOSE_DEBUG, f"   {line}")
 
         # Execute the SQL query and fetch the result
-        self._db_data = await (await select.execute()).fetchone()
+        db_data = await (await select.execute()).fetchone()
 
         # If newest is True, assign _data from cache if its already available
-        if (
-            newest
-            and self._db_data
-            and self._db_data.get("id")
-            and self._db_data.get("id") in self.__class__._data_objects
-        ):
-            self.set_data_object(self.__class__._data_objects[self._db_data.get("id")])
+        if newest and db_data:
+            raw_id = db_data.get("id")
+            if isinstance(raw_id, int):
+                data_object = self.__class__.get_data_object(raw_id)
+                if data_object is not None:
+                    self.set_data_object(data_object)
 
         # Read the fetched data and populate the business object's attributes
-        if self._db_data:
+        if db_data:
+            self._data.db_data = db_data
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(
                     VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _db_data="
                 )
-                for line in pprint_lines(self._db_data):
+                for line in pprint_lines(self._data.db_data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
 
             for description in self.attribute_descriptions():
                 LOG.log(
                     DEBUG,
-                    f"Processing attribute {description.name}, will be converted from DB value {self._db_data.get(description.name)}",
+                    f"Processing attribute {description.name}, will be converted from DB value {self._data.db_data.get(description.name)}",
                 )
                 self._data[description.name] = await self.convert_from_db(
-                    self._db_data.get(description.name),
+                    self._data.db_data.get(description.name),
                     description.data_type,
                     description.constraint_values,
                 )
@@ -546,7 +546,7 @@ class PersistentBusinessObject(BOBase):
             id = fetched.get("id")
             if id is None:
                 raise RuntimeError(f"Failed to insert {self} into DB, no id returned")
-            if id in self.__class__._data_objects:
+            if self.__class__.get_data_object(id) is not None:
                 raise RuntimeError(
                     f"Failed to insert {self} into DB, id {id} already exists"
                 )
@@ -581,7 +581,7 @@ class PersistentBusinessObject(BOBase):
                     "bo_name",
                     "id",
                 ) and v != await self.convert_from_db(
-                    self._db_data.get(k),
+                    self._data.db_data.get(k),
                     descriptions[k].data_type,
                     descriptions[k].constraint_values,
                 ):
