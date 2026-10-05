@@ -5,7 +5,7 @@ subscribes to change events of one concrete business object instance and
 forwards updates to connected clients via WebSocket messages.
 """
 
-from typing import TypeVar, Generic, Type, cast
+from typing import Any, TypeVar, Generic, Type, cast
 import asyncio
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
@@ -73,7 +73,7 @@ class BOSubscription(Generic[T], WSMessageSender):
             raise
         connection.unregister_other_senders(self)
         if self._notify_subscribers_on_init:
-            task = asyncio.create_task(self.notify_subscription_subscribers())
+            task = asyncio.create_task(self.notify_subscription_subscribers({}))
             task.add_done_callback(self._handle_notify_task_result)
 
     @staticmethod
@@ -123,7 +123,9 @@ class BOSubscription(Generic[T], WSMessageSender):
             return []
         return [self._obj] if self._obj is not None else []
 
-    async def _handle_event_(self, _: BOBase):
+    async def _handle_event_(
+        self, _: BOBase, updated_values: dict[str, tuple[Any, Any]]
+    ):
         """Should be called when the underlying information of the list changes.
         This method will update the list of objects and notify subscribers."""
         # LOG.debug(f"BOSubscription._handle_event_({changed_bo}) - {self._bo_type=}")
@@ -131,11 +133,14 @@ class BOSubscription(Generic[T], WSMessageSender):
             LOG.debug("BOSubscription._handle_event_: _bo_type is None, nothing to do")
             return
 
-        await self.notify_subscription_subscribers()
+        await self.notify_subscription_subscribers(updated_values)
 
-    async def notify_subscription_subscribers(self):
+    async def notify_subscription_subscribers(
+        self, updated_values: dict[str, tuple[Any, Any]]
+    ):
         """Notify subscribers about the current state of the list."""
         from messages.bo_message import ObjectMessage
+
         if self._obj is None:
             LOG.debug(
                 "BOSubscription.notify_subscription_subscribers: _obj is None, nothing to notify"

@@ -482,6 +482,7 @@ class PersistentBusinessObject(BOBase):
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
+        updated_values: dict[str, tuple[Any, Any]] = {}
         LOG.log(
             VERBOSE_DEBUG,
             f"{self.__class__.__name__}.store({session.user if session else 'N/A'})",
@@ -491,8 +492,9 @@ class PersistentBusinessObject(BOBase):
         elif self.id is None:
             await self.insert_self(session)
         else:
-            await self.update_self(session)
+            updated_values = await self.update_self(session)
         await super().store(session)
+        return updated_values
 
     async def business_values_as_dict(
         self, session: Optional[SessionBase] = None
@@ -567,6 +569,7 @@ class PersistentBusinessObject(BOBase):
             )
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
+        updated_values: dict[str, tuple[Any, Any]] = {}
         async with SQLTransaction() as txaction:
             update = (
                 txaction.sql()
@@ -587,6 +590,7 @@ class PersistentBusinessObject(BOBase):
                 ):
                     changes = True
                     update.assignment(k, Value(k, v))
+                    updated_values[k] = (self._db_data.get(k), v)
             k = "last_updated"
             if changes and not (k in self._data and self._data[k]):
                 self._data[k] = datetime.now().astimezone(UTC)
@@ -598,6 +602,12 @@ class PersistentBusinessObject(BOBase):
             finally:
                 # read the row back to get any changes made by the DB (e.g. triggers)
                 await self.fetch_self(txaction.sql(), id=self.id, session=session)
+                # update the updated_values dictionary with the final values from the DB
+                for k, v in self._data.items():
+                    updated_values[k] = (
+                        updated_values[k][0] if k in updated_values else None
+                    ), v
+            return updated_values
 
 
 log_exit(LOG)

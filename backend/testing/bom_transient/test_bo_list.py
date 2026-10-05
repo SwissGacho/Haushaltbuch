@@ -60,7 +60,7 @@ class Test_200__BOList(unittest.IsolatedAsyncioTestCase):
         MockConcreteBO.subscribe_to_all_changes = Mock(return_value=99)
         bo_list = BOList(index="mock_bo", bo_type=MockConcreteBO, connection=con)
 
-        async def callback(_):
+        async def callback(_, __):
             return None
 
         callback_id = bo_list.subscribe_to_instance(callback)

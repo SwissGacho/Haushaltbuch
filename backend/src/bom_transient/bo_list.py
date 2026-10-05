@@ -34,8 +34,10 @@ class BOList(TransientBusinessObject):
         self._session: Optional[SessionBase] = kwargs.get("session")
         super().__init__(**kwargs)
 
-    async def _on_change(self, _: BOBase) -> None:
-        self.notify_instance_subscribers()
+    async def _on_change(
+        self, _: BOBase, updated_values: dict[str, tuple[Any, Any]]
+    ) -> None:
+        self.notify_instance_subscribers(updated_values)
 
     def subscribe_to_instance(self, callback: BOCallback) -> int:
         LOG.debug(

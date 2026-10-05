@@ -38,7 +38,7 @@ class AppConfiguration(ConfigurationBaseClass):
         self._file_configuration: Optional[FileConfiguration] = None
         self._global_configuration: Optional[ApplicationConfiguration] = None
 
-    async def config_change_handler(self, _: BOBase):
+    async def config_change_handler(self, _: BOBase, __: dict[str, tuple[Any, Any]]):
         """Handle events from the configuration business objects.
         This is needed to react to changes in the configuration,
         e.g. to reconfigure logging when the log level is changed in the configuration.
