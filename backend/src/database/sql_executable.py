@@ -3,6 +3,10 @@
 from abc import ABC, abstractmethod
 
 from core.app_logging import getLogger, log_exit
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from database.dbms.db_base import Cursor
 
 LOG = getLogger(__name__)
 
@@ -33,7 +37,7 @@ class SQLExecutable(object):
         actual_object = super().__new__(actual_class)  # type: ignore
         return actual_object
 
-    async def execute(self):
+    async def execute(self) -> "Cursor":
         """Execute the current SQL statement on the database."""
         # LOG.debug(f"SQLExecutable.execute()")
         if self._parent is None:
