@@ -513,7 +513,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                             self.FETCH_RESULT[attr],
                             "structured attribute result",
                         )
-            self.assertIs(result._db_data, self.FETCH_RESULT, "_db_data")
+            self.assertIs(result._data._db_data, self.FETCH_RESULT, "_db_data")
 
     async def test_202_fetch_no_param(self):
         REQ_ID = 19
@@ -595,7 +595,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         mock_convert_from_db = AsyncMock(
             name="convert_from_db",
             side_effect=[
-                self.mock_bo._db_data.get(a) for a in mock_bo2_as_dict if a != "id"
+                self.mock_bo._data._db_data.get(a)
+                for a in mock_bo2_as_dict
+                if a != "id"
             ],
         )
         session = Mock(name="session")
@@ -626,7 +628,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
             convert_args = [
                 call(
-                    self.mock_bo._db_data.get(a),
+                    self.mock_bo._data.db_data.get(a),
                     mock_bo2_as_dict[a],
                     mock_bo2_constr_vals[a],
                 )
@@ -643,7 +645,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 (a, self.mock_bo._data[a])
                 for a in self.mock_bo._data
                 if a not in ("bo_name", "id")
-                and self.mock_bo._data[a] != self.mock_bo._db_data.get(a)
+                and self.mock_bo._data[a] != self.mock_bo._data.db_data.get(a)
             ]
             last_updated_present = (
                 "last_updated" in self.mock_bo._data
