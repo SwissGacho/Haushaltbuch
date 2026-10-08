@@ -61,7 +61,10 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
             bo_subscription = BOSubscription(
                 bo_type=MockConcreteBO, connection=con, index=42
             )
-            await bo_subscription._handle_event_(MockConcreteBO(bo_id=1))
+            mock_updated_values = {"id": (None, 1)}
+            await bo_subscription._handle_event_(
+                MockConcreteBO(bo_id=1), mock_updated_values
+            )
             mock_notify.assert_awaited_once()
 
     async def test_104_notify_subscription_subscribers(self):
@@ -73,7 +76,8 @@ class Test_100__BOSubscription(unittest.IsolatedAsyncioTestCase):
             bo_subscription = BOSubscription(
                 bo_type=MockConcreteBO, connection=con, index=42
             )
-            await bo_subscription.notify_subscription_subscribers()
+            mock_updated_values = {"id": (None, 1)}
+            await bo_subscription.notify_subscription_subscribers(mock_updated_values)
             mock_send_message.assert_awaited_once()
 
     async def test_105_cleanup(self):
