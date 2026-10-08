@@ -538,8 +538,11 @@ class BOBase(BOBaseBase):
     async def insert_self(self, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
 
-    async def update_self(self, session: Optional[SessionBase] = None):
+    async def update_self(
+        self, session: Optional[SessionBase] = None
+    ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
+        return {}
 
     def notify_instance_subscribers(self, old_values: dict[str, Any]):
         """Notify all subscribers of this instance about a change."""
@@ -567,7 +570,7 @@ class BOBase(BOBaseBase):
                     loaded_instance.notify_my_instance_subscribers(old_values)
             except AttributeError:
                 LOG.error(
-                    f"AttributeError on {loaded_instance=}, {loaded_instance._data=}, {cls._loaded_instances=}"
+                    f"AttributeError on notifying instance subscribers for {loaded_instance=}"
                 )
         return
 
