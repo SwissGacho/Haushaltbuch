@@ -55,15 +55,12 @@ class Personal(MixinBase):
         return super().skip_create_table()
 
     async def store_mixin(
-        self,
-        session: Optional[SessionBase] = None,
-        old_values: dict[str, Any] | None = None,
+        self, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
-        old_values = old_values or {}
         LOG.debug(
             f"Personal.store({session.user if session else 'N/A'})",
         )
@@ -88,9 +85,7 @@ class Personal(MixinBase):
                 )
             setattr(self, "user_id", session.user)
 
-        return old_values | await super().store_mixin(
-            session=session, old_values=old_values
-        )
+        return await super().store_mixin(session=session)
 
 
 log_exit(LOG)

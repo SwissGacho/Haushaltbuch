@@ -169,15 +169,12 @@ class MixinBase:
         )
 
     async def store_mixin(
-        self,
-        session: Optional[SessionBase] = None,
-        old_values: dict[str, Any] | None = None,
+        self, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
-        old_values = old_values or {}
         LOG.debug(
             f"MixinBase.store({session.user if session else 'N/A'})",
         )
@@ -189,11 +186,9 @@ class MixinBase:
             )
         if getattr(self, "id", None) is None:
             await insert_self(session)  # pylint: disable=not-callable
-            return old_values | {}
+            return {}
         else:
-            return old_values | await update_self(  # pylint: disable=not-callable
-                session
-            )
+            return await update_self(session)  # pylint: disable=not-callable
 
 
 log_exit(LOG)

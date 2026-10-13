@@ -477,32 +477,23 @@ class PersistentBusinessObject(BOBase):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
 
-    async def store(
-        self,
-        session: Optional[SessionBase] = None,
-        old_values: dict[str, Any] | None = None,
-    ):
+    async def store(self, session: Optional[SessionBase] = None):
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
-        old_values = old_values or {}
+        old_values: dict[str, Any] = {}
         LOG.log(
             VERBOSE_DEBUG,
             f"{self.__class__.__name__}.store({session.user if session else 'N/A'})",
         )
         if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(mixin):
-            old_values = old_values | (
-                await mixin(  # pylint: disable=not-callable
-                    session=session, old_values=old_values
-                )
-            )
+            old_values = await mixin(session=session)  # pylint: disable=not-callable
         elif self.id is None:
             await self.insert_self(session)
         else:
-            old_values = old_values | await self.update_self(session)
-        await super().store(session, old_values=old_values)
-        return old_values
+            old_values = await self.update_self(session)
+        await self._notify_store(session, old_values=old_values)
 
     async def business_values_as_dict(
         self, session: Optional[SessionBase] = None

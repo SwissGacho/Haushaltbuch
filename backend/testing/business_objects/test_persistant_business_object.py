@@ -538,18 +538,20 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_bo.update_self = AsyncMock(
             name="_update_self", return_value=expected_old_values
         )
+        self.mock_bo._notify_store = AsyncMock(name="_notify_store")
         self.mock_bo._assign_id(77)
         session = Mock(name="session")
-
-        result = await self.mock_bo.store(session=session)
+        await self.mock_bo.store(session=session)
 
         self.mock_bo.insert_self.assert_not_awaited()
         self.mock_bo.update_self.assert_awaited_once_with(session)
-        self.assertEqual(expected_old_values, result)
+        self.mock_bo._notify_store.assert_awaited_once_with(
+            session, old_values=expected_old_values
+        )
 
     async def test_203a_store_with_mixin_propagates_old_values(self):
         """Regression test: when a store_mixin is present, store() must capture its
-        awaited return value and merge it into old_values - not discard it."""
+        awaited return value"""
         target = MockPersistentBOWithDefaultMixin(bo_id=77)
         expected_old_values = {"some_attr": "old value"}
         target.store_mixin = AsyncMock(
@@ -557,14 +559,18 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         )
         target.insert_self = AsyncMock(name="_insert_self")
         target.update_self = AsyncMock(name="_update_self")
+        target._notify_store = AsyncMock(name="_notify_store")
+
         session = Mock(name="session")
 
-        result = await target.store(session=session)
+        await target.store(session=session)
 
-        target.store_mixin.assert_awaited_once_with(session=session, old_values={})
+        target.store_mixin.assert_awaited_once_with(session=session)
         target.insert_self.assert_not_awaited()
         target.update_self.assert_not_awaited()
-        self.assertEqual(expected_old_values, result)
+        target._notify_store.assert_awaited_once_with(
+            session, old_values=expected_old_values
+        )
 
     async def _204_insert_self(
         self, mock_attr1="micki mock", mock_attr3=[], **mock_attrs

@@ -186,7 +186,7 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
         target = _StoreTarget(bo_id=123, update_return_value=expected_old_values)
         session = Mock(name="session")
 
-        actual_old_values = await target.store_mixin(session=session, old_values={})
+        actual_old_values = await target.store_mixin(session=session)
 
         self.assertEqual([("update", session)], target.calls)
         self.assertEqual(expected_old_values, actual_old_values)
