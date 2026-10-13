@@ -526,11 +526,14 @@ class BOBase(BOBaseBase):
     #     """
     #     raise NotImplementedError("fetch not implemented")
 
-    async def store(self, session: Optional[SessionBase] = None) -> dict[str, Any]:
+    async def store(
+        self, session: Optional[SessionBase] = None, old_values: dict[str, Any] = None
+    ) -> dict[str, Any]:
         """Store pending changes to the business object.
         In addition, the instance subscribers are notified.
         """
-        old_values = {}
+        if old_values is None:
+            old_values = {}
         self.notify_instance_subscribers(old_values)
         self.__class__.notify_change_subscribers(self, old_values)
         return old_values
