@@ -534,7 +534,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_203_store_update_self(self):
         self.mock_bo.insert_self = AsyncMock(name="_insert_self")
-        self.mock_bo.update_self = AsyncMock(name="_update_self")
+        self.mock_bo.update_self = AsyncMock(name="_update_self", return_value={})
         self.mock_bo._assign_id(77)
         session = Mock(name="session")
 
