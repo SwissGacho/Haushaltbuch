@@ -534,14 +534,37 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_203_store_update_self(self):
         self.mock_bo.insert_self = AsyncMock(name="_insert_self")
-        self.mock_bo.update_self = AsyncMock(name="_update_self", return_value={})
+        expected_old_values = {"some_attr": "old value"}
+        self.mock_bo.update_self = AsyncMock(
+            name="_update_self", return_value=expected_old_values
+        )
         self.mock_bo._assign_id(77)
         session = Mock(name="session")
 
-        await self.mock_bo.store(session=session)
+        result = await self.mock_bo.store(session=session)
 
         self.mock_bo.insert_self.assert_not_awaited()
         self.mock_bo.update_self.assert_awaited_once_with(session)
+        self.assertEqual(expected_old_values, result)
+
+    async def test_203a_store_with_mixin_propagates_old_values(self):
+        """Regression test: when a store_mixin is present, store() must capture its
+        awaited return value and merge it into old_values - not discard it."""
+        target = MockPersistentBOWithDefaultMixin(bo_id=77)
+        expected_old_values = {"some_attr": "old value"}
+        target.store_mixin = AsyncMock(
+            name="_store_mixin", return_value=expected_old_values
+        )
+        target.insert_self = AsyncMock(name="_insert_self")
+        target.update_self = AsyncMock(name="_update_self")
+        session = Mock(name="session")
+
+        result = await target.store(session=session)
+
+        target.store_mixin.assert_awaited_once_with(session=session, old_values={})
+        target.insert_self.assert_not_awaited()
+        target.update_self.assert_not_awaited()
+        self.assertEqual(expected_old_values, result)
 
     async def _204_insert_self(
         self, mock_attr1="micki mock", mock_attr3=[], **mock_attrs

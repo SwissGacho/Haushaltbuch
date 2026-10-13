@@ -1,6 +1,6 @@
 """Mixin class for singleton business objects."""
 
-from typing import Optional
+from typing import Any, Optional
 
 from core.app_logging import (
     getLogger,
@@ -55,13 +55,18 @@ class Singleton(MixinBase):
                 f"Singleton.fetch_mixin: No {type(self).__name__} found for user {getattr(session, 'user', None)}."
                 " Returning a new empty one."
             )
-            await store(session=session)
+            await store(session=session)  # pylint: disable=not-callable
 
-    async def store_mixin(self, session: Optional[SessionBase] = None):
+    async def store_mixin(
+        self,
+        session: Optional[SessionBase] = None,
+        old_values: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
+        old_values = old_values or {}
         LOG.debug(
             f"Singleton.store({session.user if session else 'N/A'})",
         )
@@ -71,12 +76,16 @@ class Singleton(MixinBase):
                 raise TypeError(
                     f"Singleton.store_mixin: Expected PersistentBusinessObject with count_rows method, got {type(self).__name__}"
                 )
-            existing_count = await count_rows(session=session)
+            existing_count = await count_rows(  # pylint: disable=not-callable
+                session=session
+            )
             if existing_count > 0:
                 raise CannotStoreEmptyBO(
                     f"Cannot insert {self} as it is a Singleton and already exists in the DB"
                 )
-        return await super().store_mixin(session=session)
+        return old_values | await super().store_mixin(
+            session=session, old_values=old_values
+        )
 
 
 log_exit(LOG)

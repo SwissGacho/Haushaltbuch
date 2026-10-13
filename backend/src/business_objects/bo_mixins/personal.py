@@ -1,6 +1,6 @@
 """Mixin class for personal business objects."""
 
-from typing import Sequence, Optional
+from typing import Any, Sequence, Optional
 
 from core.app_logging import (
     getLogger,
@@ -46,17 +46,24 @@ class Personal(MixinBase):
         """Return True if this class should not create a table in the database."""
         if (
             desc := getattr(cls, "attribute_descriptions", None)
-        ) is None or "user_id" not in [d.name for d in desc()]:
+        ) is None or "user_id" not in [
+            d.name for d in desc()  # pylint: disable=not-callable
+        ]:
             raise TypeError(
                 f"PersistentBusinessObject.sql_create_table(): {cls.__name__} is a Personal BO but has no 'user_id' attribute"
             )
         return super().skip_create_table()
 
-    async def store_mixin(self, session: Optional[SessionBase] = None):
+    async def store_mixin(
+        self,
+        session: Optional[SessionBase] = None,
+        old_values: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
+        old_values = old_values or {}
         LOG.debug(
             f"Personal.store({session.user if session else 'N/A'})",
         )
@@ -81,7 +88,9 @@ class Personal(MixinBase):
                 )
             setattr(self, "user_id", session.user)
 
-        return await super().store_mixin(session=session)
+        return old_values | await super().store_mixin(
+            session=session, old_values=old_values
+        )
 
 
 log_exit(LOG)

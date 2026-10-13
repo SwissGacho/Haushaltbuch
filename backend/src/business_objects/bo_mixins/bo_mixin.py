@@ -1,7 +1,7 @@
 """Baseclass for mixin classes for business objects."""
 
 from inspect import iscoroutinefunction
-from typing import Iterable, Optional, Sequence, cast
+from typing import Any, Coroutine, Iterable, Optional, Sequence, cast
 
 from core.app_logging import (
     getLogger,
@@ -164,13 +164,20 @@ class MixinBase:
             raise TypeError(
                 f"MixinBase.fetch_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
             )
-        await fetch_self(sql, id=id, newest=newest, session=session)
+        await fetch_self(  # pylint: disable=not-callable
+            sql, id=id, newest=newest, session=session
+        )
 
-    async def store_mixin(self, session: Optional[SessionBase] = None):
+    async def store_mixin(
+        self,
+        session: Optional[SessionBase] = None,
+        old_values: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
+        old_values = old_values or {}
         LOG.debug(
             f"MixinBase.store({session.user if session else 'N/A'})",
         )
@@ -181,9 +188,12 @@ class MixinBase:
                 f"MixinBase.store_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
             )
         if getattr(self, "id", None) is None:
-            await insert_self(session)
+            await insert_self(session)  # pylint: disable=not-callable
+            return old_values | {}
         else:
-            await update_self(session)
+            return old_values | await update_self(  # pylint: disable=not-callable
+                session
+            )
 
 
 log_exit(LOG)

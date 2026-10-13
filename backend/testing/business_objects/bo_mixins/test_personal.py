@@ -17,16 +17,20 @@ class _User:
 
 
 class _PersonalTarget(Personal):
-    def __init__(self, bo_id=None, user_id=None):
+    def __init__(self, bo_id=None, user_id=None, update_return_value=None):
         self.id = bo_id
         self.user_id = user_id
         self.calls = []
+        self.update_return_value = (
+            {} if update_return_value is None else update_return_value
+        )
 
     async def insert_self(self, session=None):
         self.calls.append(("insert", session))
 
     async def update_self(self, session=None):
         self.calls.append(("update", session))
+        return self.update_return_value
 
 
 class _PersonalNoUserIdDesc(Personal):
@@ -88,17 +92,22 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
         session = Mock(name="session")
         session.user = _User(7)
 
-        await target.store_mixin(session=session)
+        result = await target.store_mixin(session=session)
 
         self.assertIs(target.user_id, session.user)
         self.assertEqual([("insert", session)], target.calls)
+        self.assertEqual({}, result)
 
     async def test_store_mixin_assigns_user_and_updates_when_existing(self):
-        target = _PersonalTarget(bo_id=55, user_id=_User(99))
+        expected_old_values = {"some_attr": "old value"}
+        target = _PersonalTarget(
+            bo_id=55, user_id=_User(99), update_return_value=expected_old_values
+        )
         session = Mock(name="session")
         session.user = _User(7)
 
-        await target.store_mixin(session=session)
+        result = await target.store_mixin(session=session)
 
         self.assertIs(target.user_id, session.user)
         self.assertEqual([("update", session)], target.calls)
+        self.assertEqual(expected_old_values, result)

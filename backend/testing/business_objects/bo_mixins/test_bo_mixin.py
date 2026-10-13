@@ -65,15 +65,19 @@ class _GenericAdminOnly:
 
 
 class _StoreTarget(MixinBase):
-    def __init__(self, bo_id=None):
+    def __init__(self, bo_id=None, update_return_value=None):
         self.id = bo_id
         self.calls = []
+        self.update_return_value = (
+            {} if update_return_value is None else update_return_value
+        )
 
     async def insert_self(self, session=None):
         self.calls.append(("insert", session))
 
     async def update_self(self, session=None):
         self.calls.append(("update", session))
+        return self.update_return_value
 
 
 class _StoreTargetInvalid(MixinBase):
@@ -178,13 +182,25 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([("insert", session)], target.calls)
 
     async def test_store_mixin_calls_update_for_existing_object(self):
-        target = _StoreTarget(bo_id=123)
+        expected_old_values = {"some_attr": "old value"}
+        target = _StoreTarget(bo_id=123, update_return_value=expected_old_values)
         session = Mock(name="session")
 
-        await target.store_mixin(session=session)
+        actual_old_values = await target.store_mixin(session=session, old_values={})
 
         self.assertEqual([("update", session)], target.calls)
+        self.assertEqual(expected_old_values, actual_old_values)
 
     async def test_store_mixin_raises_for_non_coroutines(self):
         with self.assertRaises(TypeError):
             await _StoreTargetInvalid().store_mixin(session=None)
+
+    async def test_store_mixin_returns_update_self_result(self):
+        expected_old_values = {"name": "old name", "amount": 42}
+        target = _StoreTarget(bo_id=123, update_return_value=expected_old_values)
+        session = Mock(name="session")
+
+        result = await target.store_mixin(session=session)
+
+        self.assertEqual([("update", session)], target.calls)
+        self.assertEqual(expected_old_values, result)
