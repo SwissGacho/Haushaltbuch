@@ -597,7 +597,6 @@ class PersistentBusinessObject(BOBase):
             if changes and not (k in self._data and self._data[k]):
                 self._data[k] = datetime.now().astimezone(UTC)
                 update.assignment(k, Value(k, self._data[k]))
-            LOG.warning(f"{update=}, {update.get_query()=}")
             try:
                 if changes:
                     await update.execute()
