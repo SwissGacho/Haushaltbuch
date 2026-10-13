@@ -61,7 +61,7 @@ class FileConfiguration(TransientBusinessObject):
             ).splitlines():
                 LOG.debug(f" - {line}")
         FileConfig.write_file_config_file(self.configuration or {})
-        await super().store()
+        await super().store(session=session)
 
 
 log_exit(LOG)

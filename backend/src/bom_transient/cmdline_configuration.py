@@ -50,7 +50,7 @@ class CmdlineConfiguration(TransientBusinessObject):
             ).splitlines():
                 LOG.debug(f" - {line}")
         CommandLine.set_commandline_config(self.configuration)
-        await super().store()
+        await super().store(session=session)
 
 
 log_exit(LOG)

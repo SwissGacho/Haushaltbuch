@@ -482,17 +482,18 @@ class PersistentBusinessObject(BOBase):
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
         """
+        old_values: dict[str, Any] = {}
         LOG.log(
             VERBOSE_DEBUG,
             f"{self.__class__.__name__}.store({session.user if session else 'N/A'})",
         )
         if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(mixin):
-            await mixin(session=session)  # pylint: disable=not-callable
+            old_values = await mixin(session=session)  # pylint: disable=not-callable
         elif self.id is None:
             await self.insert_self(session)
         else:
-            await self.update_self(session)
-        await super().store(session)
+            old_values = await self.update_self(session)
+        await self._notify_store(session, old_values=old_values)
 
     async def business_values_as_dict(
         self, session: Optional[SessionBase] = None
@@ -556,7 +557,9 @@ class PersistentBusinessObject(BOBase):
             # read the new row back to get any default values set by the DB
             await self.fetch_self(txaction.sql(), id=self.id, session=session)
 
-    async def update_self(self, session: Optional[SessionBase] = None):
+    async def update_self(
+        self, session: Optional[SessionBase] = None
+    ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
         if self._data is None:
             raise CannotStoreEmptyBO(f"Cannot update {self} as it has no data")
@@ -567,6 +570,7 @@ class PersistentBusinessObject(BOBase):
             )
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
+        old_values: dict[str, Any] = {}
         async with SQLTransaction() as txaction:
             update = (
                 txaction.sql()
@@ -577,27 +581,37 @@ class PersistentBusinessObject(BOBase):
             changes = False
             descriptions = {d.name: d for d in self.attribute_descriptions()}
             for k, v in self._data.items():
-                if k not in (
-                    "bo_name",
-                    "id",
-                ) and v != await self.convert_from_db(
-                    self._db_data.get(k),
-                    descriptions[k].data_type,
-                    descriptions[k].constraint_values,
-                ):
-                    changes = True
-                    update.assignment(k, Value(k, v))
+                if k not in ("bo_name", "id"):
+                    old_value = await self.convert_from_db(
+                        self._db_data.get(k),
+                        descriptions[k].data_type,
+                        descriptions[k].constraint_values,
+                    )
+                    old_values[k] = old_value
+                    if old_value != v:
+                        changes = True
+                        update.assignment(k, Value(k, v))
             k = "last_updated"
             if changes and not (k in self._data and self._data[k]):
                 self._data[k] = datetime.now().astimezone(UTC)
                 update.assignment(k, Value(k, self._data[k]))
-            LOG.warning(f"{update=}, {update.get_query()=}")
             try:
                 if changes:
                     await update.execute()
             finally:
                 # read the row back to get any changes made by the DB (e.g. triggers)
                 await self.fetch_self(txaction.sql(), id=self.id, session=session)
+            return {
+                k: old_value
+                for k, old_value in old_values.items()
+                if (
+                    (  # pylint: disable=protected-access
+                        old_value._data != self._data[k]._data
+                    )
+                    if isinstance(old_value, BOBase)
+                    else old_value != self._data[k]
+                )
+            }
 
 
 log_exit(LOG)

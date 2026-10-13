@@ -7,7 +7,6 @@ from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
 from business_objects.bo_mixins.specializing import Specializing
 from business_objects.bo_semantic_role import BOSemanticRole
-from business_objects.business_object_base import BOBase
 from business_objects.business_attribute_base import BaseFlag
 from business_objects.persistent_business_object import (
     PersistentBusinessObject,
@@ -535,14 +534,43 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
     async def test_203_store_update_self(self):
         self.mock_bo.insert_self = AsyncMock(name="_insert_self")
-        self.mock_bo.update_self = AsyncMock(name="_update_self")
+        expected_old_values = {"some_attr": "old value"}
+        self.mock_bo.update_self = AsyncMock(
+            name="_update_self", return_value=expected_old_values
+        )
+        self.mock_bo._notify_store = AsyncMock(name="_notify_store")
         self.mock_bo._assign_id(77)
         session = Mock(name="session")
-
         await self.mock_bo.store(session=session)
 
         self.mock_bo.insert_self.assert_not_awaited()
         self.mock_bo.update_self.assert_awaited_once_with(session)
+        self.mock_bo._notify_store.assert_awaited_once_with(
+            session, old_values=expected_old_values
+        )
+
+    async def test_203a_store_with_mixin_propagates_old_values(self):
+        """Regression test: when a store_mixin is present, store() must capture its
+        awaited return value"""
+        target = MockPersistentBOWithDefaultMixin(bo_id=77)
+        expected_old_values = {"some_attr": "old value"}
+        target.store_mixin = AsyncMock(
+            name="_store_mixin", return_value=expected_old_values
+        )
+        target.insert_self = AsyncMock(name="_insert_self")
+        target.update_self = AsyncMock(name="_update_self")
+        target._notify_store = AsyncMock(name="_notify_store")
+
+        session = Mock(name="session")
+
+        await target.store(session=session)
+
+        target.store_mixin.assert_awaited_once_with(session=session)
+        target.insert_self.assert_not_awaited()
+        target.update_self.assert_not_awaited()
+        target._notify_store.assert_awaited_once_with(
+            session, old_values=expected_old_values
+        )
 
     async def _204_insert_self(
         self, mock_attr1="micki mock", mock_attr3=[], **mock_attrs
