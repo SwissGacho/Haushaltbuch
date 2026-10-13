@@ -604,7 +604,13 @@ class PersistentBusinessObject(BOBase):
             return {
                 k: old_value
                 for k, old_value in old_values.items()
-                if old_value != self._data[k]
+                if (
+                    (  # pylint: disable=protected-access
+                        old_value._data != self._data[k]._data
+                    )
+                    if isinstance(old_value, BOBase)
+                    else old_value != self._data[k]
+                )
             }
 
 
