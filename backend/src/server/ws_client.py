@@ -16,6 +16,7 @@ LOG: Logger = getLogger(__name__)
 
 from core.exceptions import ClientNotFoundError
 from server.ws_token import WSToken
+from bom_persistent.management.user import GenericUser
 
 
 class WSClient:
@@ -24,7 +25,7 @@ class WSClient:
     clients: dict[str, "WSClient"] = {}
 
     def __init__(self, client_token: str | None = None):
-        self.user = None
+        self.user: GenericUser | None = None
         self.client_token: str | None = client_token
         self.websockets: list = []
 
@@ -38,6 +39,7 @@ class WSClient:
         """
 
         if not WSToken.check_token(client_token):
+            # client token is not valid, remove it from the clients dictionary if it exists
             if client_token in cls.clients:
                 cls.clients.pop(client_token)
             return None

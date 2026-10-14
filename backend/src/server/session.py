@@ -34,14 +34,12 @@ class Session(SessionBase):
 
     _all_sessions: list[Self] = []
     _next_session_nbr = 0
-    session_clients: dict[str, GenericUser] = {}
 
     def __init__(
         self,
         user: GenericUser,
         conn_token: Optional[WSToken],
         connection: WSConnectionBase | None,
-        client_token: str | None = None,
     ) -> None:
         local_LOG = self.local_logger(connection)
         local_LOG.debug(
@@ -58,20 +56,6 @@ class Session(SessionBase):
         self.token = WSToken(inactive_seconds_timeout=inactive_seconds_timeout)
         self._user: GenericUser = user
         self._tokens: set[WSToken] = {conn_token} if conn_token else set()
-        if client_token:
-            if client_token not in Session.session_clients:
-                local_LOG.debug(
-                    f"detected new client with client-token': {redact_str(client_token)}"
-                )
-                Session.session_clients[client_token] = user
-            if local_LOG.isEnabledFor(VERBOSE_DEBUG):
-                local_LOG.log(VERBOSE_DEBUG, "current clients:")
-                for line in pprint_lines(
-                    {redact_str(k): str(v) for k, v in Session.session_clients.items()}
-                ):
-                    local_LOG.log(VERBOSE_DEBUG, f"  {line}")
-        else:
-            local_LOG.debug("new session without client-token provided")
 
     @property
     def session_id(self):
@@ -93,7 +77,6 @@ class Session(SessionBase):
         cls,
         ses_token: str | None,
         conn_token: str | None,
-        client_token: str | None = None,
         session_user: GenericUser | None = None,
         connection: WSConnectionBase | None = None,
     ):
@@ -103,34 +86,16 @@ class Session(SessionBase):
             raise TokenExpiredError("Session expired.")
         if conn_token and not WSToken.check_token(conn_token):
             raise TokenExpiredError("Previous connection expired.")
-        if client_token and not WSToken.check_token(client_token):
-            client_token = None
         if ses_token or conn_token:
             for ses in cls._all_sessions:
                 if (ses.token == ses_token or conn_token in ses.conn_tokens) and (
                     session_user is None or ses.user == session_user
                 ):
                     local_LOG.debug(
-                        f"got session by {'session'if ses.token == ses_token else 'connection'} token"
+                        f"got session by '{'session'if ses.token == ses_token else 'connection'} token'"
                     )
                     return ses
-        if not client_token:
-            local_LOG.debug("no session found for given tokens")
-            return None
-        if (
-            client_token in cls.session_clients
-            and cls.session_clients[client_token]
-            and (
-                session_user is None
-                or session_user == cls.session_clients[client_token]
-            )
-        ):
-            return cls(
-                user=cls.session_clients[client_token],
-                conn_token=None,
-                connection=connection,
-                client_token=client_token,
-            )
+        local_LOG.debug("no session found for given tokens")
         return None
 
     @property
