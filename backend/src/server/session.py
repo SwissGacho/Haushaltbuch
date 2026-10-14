@@ -89,13 +89,6 @@ class Session(SessionBase):
         )
 
     @classmethod
-    def cleanup_expired_client_tokens(cls) -> None:
-        """Remove client-token mappings whose tokens are no longer valid."""
-        for client_token in tuple(cls.session_clients):
-            if not WSToken.check_token(client_token):
-                del cls.session_clients[client_token]
-
-    @classmethod
     def get_session_from_token(
         cls,
         ses_token: str | None,

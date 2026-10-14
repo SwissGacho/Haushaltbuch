@@ -29,6 +29,7 @@ LOG: Logger = getLogger(__name__)
 from core.const import WEBSOCKET_PORT
 from core.app import App
 from core.configuration.config import Config
+from server.ws_client import WSClient
 from server.ws_connection import WSConnection
 from server.session import Session
 from server.ws_token import WSToken
@@ -85,7 +86,9 @@ class WSHandler:
         return auth_user
 
     def process_response(self, websocket, request, response):
-        "Acknowledge the login subprotocol and issue a connection token cookie for it"
+        """Detect the login subprotocol and check for a client-token cookie
+        - issue a client-token cookie for it if none exists and set appropriate response headers
+        - register client-token for this websocket connection"""
         WSHandler.sockets[websocket.id] = {}
         if LOG.isEnabledFor(DEBUG):
             LOG.log(VERBOSE_DEBUG, "WSHandler.process_response(): request headers:")
@@ -129,14 +132,12 @@ class WSHandler:
             LOG.debug(
                 f"WSHandler.process_response(): found {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(client_token)}"
             )
-            WSHandler.sockets[websocket.id]["client_token_valid"] = WSToken.check_token(
+            WSHandler.sockets[websocket.id]["client"] = WSClient.get_client(
                 client_token
             )
             Session.cleanup_expired_client_tokens()
-            if WSHandler.sockets[websocket.id]["client_token_valid"]:
-                WSHandler.sockets[websocket.id]["client_token"] = WSToken.get_token(
-                    client_token
-                )
+            if WSHandler.sockets[websocket.id]["client"]:
+                WSHandler.sockets[websocket.id]["client_token"] = client_token
                 return None
             LOG.debug(
                 f"WSHandler.process_response(): {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(client_token)} was rejected"
