@@ -373,9 +373,10 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         ) as MockBOBaseNotify:
             bo_instance = MockBO2()
             bo_instance._assign_id(1)
-            bo_instance.notify_instance_subscribers()
+            mock_updated_values = {"id": (None, 1)}
+            bo_instance.notify_instance_subscribers(mock_updated_values)
             MockBOBaseNotify.assert_called_once_with(
-                bo_instance._instance_subscribers, bo_instance
+                bo_instance._instance_subscribers, bo_instance, mock_updated_values
             )
 
     def test_121_notify_change_subscribers(self):
@@ -385,9 +386,10 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             bo_instance = MockBO2()
             bo_instance._assign_id(1)
             MockBO2._change_subscribers = {1: Mock()}
-            MockBO2.notify_change_subscribers(bo_instance)
+            mock_updated_values = {"id": (None, 1)}
+            MockBO2.notify_change_subscribers(bo_instance, mock_updated_values)
             MockBOBaseNotify.assert_called_once_with(
-                MockBO2._change_subscribers, bo_instance
+                MockBO2._change_subscribers, bo_instance, mock_updated_values
             )
 
             # Clean up
@@ -402,7 +404,10 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
             bo_instance._assign_id(1)
             callback = Mock()
             callback.__name__ = "callback"
-            BOBase.notify_bo_subscribers({1: callback}, bo_instance)
+            mock_updated_values = {"id": (None, 1)}
+            BOBase.notify_bo_subscribers(
+                {1: callback}, bo_instance, mock_updated_values
+            )
             MockCreateTask.assert_called_once_with(
                 callback(bo_instance), name="subscriber_callback_callback_1"
             )
@@ -460,8 +465,11 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         with patch(
             "business_objects.business_object_base.BOBase.notify_bo_subscribers"
         ) as MockBOBaseNotify:
-            first.notify_instance_subscribers()
-            MockBOBaseNotify.assert_any_call(second._instance_subscribers, second)
+            mock_updated_values = {"id": (None, 300001)}
+            first.notify_instance_subscribers(mock_updated_values)
+            MockBOBaseNotify.assert_any_call(
+                second._instance_subscribers, second, mock_updated_values
+            )
 
     def test_126_register_instance_conflicting_data_raises(self):
         """If _data_objects already holds a BOData for a given id (because some
