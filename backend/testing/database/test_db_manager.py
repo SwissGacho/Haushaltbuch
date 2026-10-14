@@ -280,14 +280,11 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
         self.mock_db_type_map["MockDBMS"] = ("mockdbms", "MockDBMSDB")
         self.MockApp.configuration = {Config.CONFIG_DB: self.db_config}
 
-        mock_check_db_schema = AsyncMock(
-            name="check_db_schema",
-            side_effect=[
-                RuntimeError("transient-1"),
-                RuntimeError("transient-2"),
-                None,
-            ],
-        )
+        mock_check_db_schema = AsyncMock(name="check_db_schema")
+        mock_check_db_schema.side_effect = [
+            RuntimeError(f"mock-transient-error-{i+1}")
+            for i in range(database.db_manager.DBManager.RECONNECT_ATTEMPTS - 1)
+        ] + [None]
 
         with self.patch, patch(
             "database.db_manager.check_db_schema", mock_check_db_schema
@@ -306,7 +303,12 @@ class DB_ContextManager(unittest.IsolatedAsyncioTestCase):
             reply = await ctx_mgr.__aexit__(None, None, None)
             self.assertEqual(reply, False)
 
-            mock_check_db_schema.assert_has_awaits([call(), call(), call()])
-            self.assertEqual(mock_check_db_schema.await_count, 3)
+            mock_check_db_schema.assert_has_awaits(
+                [call()] * database.db_manager.DBManager.RECONNECT_ATTEMPTS
+            )
+            self.assertEqual(
+                mock_check_db_schema.await_count,
+                database.db_manager.DBManager.RECONNECT_ATTEMPTS,
+            )
             self.assertEqual(self.MockApp.status, Status.STATUS_DB_CFG)
             self.mock_db.close.assert_called_once_with()
