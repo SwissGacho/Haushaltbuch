@@ -583,7 +583,7 @@ class PersistentBusinessObject(BOBase):
             for k, v in self._data.items():
                 if k not in ("bo_name", "id"):
                     old_value = await self.convert_from_db(
-                        self._db_data.get(k),
+                        self._data.db_data.get(k),
                         descriptions[k].data_type,
                         descriptions[k].constraint_values,
                     )
