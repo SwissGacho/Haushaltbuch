@@ -513,7 +513,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                             self.FETCH_RESULT[attr],
                             "structured attribute result",
                         )
-            self.assertIs(result._data._db_data, self.FETCH_RESULT, "_db_data")
+            self.assertIs(result.)
+            self.assertIs(result._data.db_data, self.FETCH_RESULT, "_db_data")
 
     async def test_202_fetch_no_param(self):
         REQ_ID = 19
