@@ -6,20 +6,14 @@ LOG = getLogger(__name__)
 
 from core.app import App
 from core.status import Status
-from bom_persistent.management.user import SingleUser, User
-from messages.message import MessageAttribute
+from bom_persistent.management.user import GenericUser, SingleUser, User
 from database.sql_expression import ColumnName
 
 
-async def check_login(login_message: dict, authenticated_user: str | None = None) -> User:
-    """Check login permission for for user and return User object.
-
-    If the login message does not carry a username, `authenticated_user`
-    (established out-of-band, e.g. via an auth proxy header) is used instead.
-    """
+async def check_login(username: str | None) -> GenericUser:
+    """Check login permission for username and return User object."""
     multi = App.status == Status.STATUS_MULTI_USER
     if multi:
-        username = login_message.get(MessageAttribute.WS_ATTR_USER) or authenticated_user
         # LOG.debug(f"check_login() for {username}")
         matching_users = await User.get_matching_ids({ColumnName("name"): username})
         matching_count = len(matching_users)

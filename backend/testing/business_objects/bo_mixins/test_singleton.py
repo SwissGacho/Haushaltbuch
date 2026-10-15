@@ -8,13 +8,18 @@ from business_objects.bo_mixins.singleton import Singleton
 
 
 class _SingletonTarget(Singleton):
-    def __init__(self, bo_id=None, count=0, has_user_id=False):
+    def __init__(
+        self, bo_id=None, count=0, has_user_id=False, update_return_value=None
+    ):
         self.id = bo_id
         self._count = count
         self.fetch_calls = []
         self.store_calls = []
         self.insert_calls = []
         self.update_calls = []
+        self.update_return_value = (
+            {} if update_return_value is None else update_return_value
+        )
         if has_user_id:
             self.user_id = None
 
@@ -34,6 +39,7 @@ class _SingletonTarget(Singleton):
 
     async def update_self(self, session=None):
         self.update_calls.append(session)
+        return self.update_return_value
 
 
 class _SingletonInvalidFetch(Singleton):
@@ -117,16 +123,21 @@ class TestSingletonMixin(unittest.IsolatedAsyncioTestCase):
         target = _SingletonTarget(bo_id=None, count=0)
         session = Mock(name="session")
 
-        await target.store_mixin(session=session)
+        result = await target.store_mixin(session=session)
 
         self.assertEqual([session], target.insert_calls)
         self.assertEqual([], target.update_calls)
+        self.assertEqual({}, result)
 
     async def test_store_mixin_updates_when_id_exists(self):
-        target = _SingletonTarget(bo_id=5, count=1)
+        expected_old_values = {"some_attr": "old value"}
+        target = _SingletonTarget(
+            bo_id=5, count=1, update_return_value=expected_old_values
+        )
         session = Mock(name="session")
 
-        await target.store_mixin(session=session)
+        result = await target.store_mixin(session=session)
 
         self.assertEqual([], target.insert_calls)
         self.assertEqual([session], target.update_calls)
+        self.assertEqual(expected_old_values, result)
