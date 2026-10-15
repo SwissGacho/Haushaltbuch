@@ -74,8 +74,10 @@ class BOBase(BOBaseBase):
         cls._change_subscribers = {}
 
     @classmethod
-    def get_data_object(cls, bo_id: int) -> BOData | None:
+    def get_data_object(cls, bo_id: int | None) -> BOData | None:
         """Retrieve the data object for the given ID, if it exists."""
+        if bo_id is None:
+            return None
         return cls._data_objects.get(bo_id)
 
     # pylint: disable=redefined-builtin, unused-argument
