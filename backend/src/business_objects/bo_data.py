@@ -18,6 +18,7 @@ class BOData:
         """Initialize the BOData object with the given BO class. If an ID is provided, it is set for any attribute named 'id'."""
         self._object = object
         self._data: dict[str, Any] = {}
+        self._db_data: dict[str, Any] = {}
         attributes = object.attributes_as_dict()
         for attr_name in attributes:
             LOG.log(
@@ -70,6 +71,14 @@ class BOData:
     def items(self):
         """Return an iterator over the attribute names and their values"""
         return self._data.items()
+
+    @property
+    def db_data(self) -> dict[str, Any]:
+        return self._db_data
+
+    @db_data.setter
+    def db_data(self, value: dict[str, Any]) -> None:
+        self._db_data = value
 
 
 log_exit(LOG)
