@@ -4,7 +4,14 @@ from typing import Optional
 from datetime import datetime, timedelta
 from secrets import token_hex as token
 
-from core.app_logging import getLogger, log_exit, Logger, redact, VERBOSE_DEBUG
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    Logger,
+    redact,
+    VERBOSE_DEBUG,
+    redact_str,
+)
 
 LOG: Logger = getLogger(__name__)
 
@@ -20,10 +27,14 @@ class WSToken(BaseObject):
     _all_tokens = set()
 
     def __init__(
-        self, tok: str | None = None, inactive_seconds_timeout: Optional[int] = 300
+        self,
+        tok: str | None = None,
+        inactive_seconds_timeout: Optional[int] = 300,
+        auto_extend: bool = True,
     ) -> None:
         self.token = tok or token(16)
         self._valid_for_seconds = inactive_seconds_timeout
+        self._auto_extend = auto_extend
         self._expires = (
             datetime.now() + timedelta(seconds=inactive_seconds_timeout)
             if inactive_seconds_timeout
@@ -49,13 +60,14 @@ class WSToken(BaseObject):
                 if not tkn._valid_for_seconds:
                     return True
                 if tkn._expires > now:
-                    tkn._expires = datetime.now() + timedelta(
-                        seconds=tkn._valid_for_seconds
-                    )
-                    LOG.log(
-                        VERBOSE_DEBUG,
-                        f"{redact({'Token': tkn.token})} is valid until {tkn._expires}",
-                    )
+                    if tkn._auto_extend:
+                        tkn._expires = datetime.now() + timedelta(
+                            seconds=tkn._valid_for_seconds
+                        )
+                        LOG.log(
+                            VERBOSE_DEBUG,
+                            f"Token {redact_str( tkn.token)} extended until {tkn._expires}",
+                        )
                     return True
         return False
 

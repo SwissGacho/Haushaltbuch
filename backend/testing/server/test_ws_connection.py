@@ -7,7 +7,6 @@ import inspect
 import websockets.exceptions
 import core.exceptions
 from server.ws_connection import WSConnection
-from server.session import Session
 from messages.message import MessageType, MessageAttribute
 from messages.login import HelloMessage, ByeMessage, LoginMessage
 
@@ -74,8 +73,6 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
 
     async def _103_start_connection(
         self, login_arg="", authenticated_user="mock-authenticated-user",
-        clienttoken=None,
-        client_token_valid=False,
         expected_authenticated_user=None,
     ):
         mock_hello_message = Mock(name="mock_hello_message")
@@ -110,6 +107,8 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
                 login_arg if exp_result in ["ConnCloseExc", "AnyExc"] else None
             ),
         )
+        if exp_result == "success":
+            self.connection.set_connection_user(Mock(name="authorized-user"))
         with (
             patch("server.ws_connection.HelloMessage", MockHelloMessage),
             patch("server.ws_connection.App", self.MockApp),
@@ -119,26 +118,16 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(Exception):
                     await self.connection.start_connection(
                         authenticated_user=authenticated_user,
-                        clienttoken=clienttoken,
-                        client_token_valid=client_token_valid,
                     )
                 result = None
             else:
                 result = await self.connection.start_connection(
                     authenticated_user=authenticated_user,
-                    clienttoken=clienttoken,
-                    client_token_valid=client_token_valid,
                 )
 
         self.connection.send_message.assert_awaited_once_with(mock_hello_message)
         if expected_authenticated_user is None:
-            expected_authenticated_user = bool(
-                authenticated_user
-                or (
-                    client_token_valid
-                    and clienttoken in Session.session_clients
-                )
-            )
+            expected_authenticated_user = bool(authenticated_user)
         MockHelloMessage.assert_called_once_with(
             token="mockToken",
             status=self.MockApp.status,
@@ -184,21 +173,6 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
 
     async def test_103d_start_connection_exception(self):
         await self._103_start_connection(Exception)
-
-    async def test_103e_start_connection_with_valid_known_client_token(self):
-        with patch.dict(Session.session_clients, {"known-client-token": Mock()}):
-            await self._103_start_connection(
-                clienttoken="known-client-token",
-                client_token_valid=True,
-                authenticated_user=None,
-            )
-
-    async def test_103f_start_connection_with_valid_unknown_client_token(self):
-        await self._103_start_connection(
-            clienttoken="unknown-client-token",
-            client_token_valid=True,
-            authenticated_user=None,
-        )
 
     async def _104_abort_connection(self, args={}):
         mock_bye_message = Mock(name="mock_bye_message")

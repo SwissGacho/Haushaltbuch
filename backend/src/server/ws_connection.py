@@ -29,6 +29,7 @@ from server.ws_connection_base import WSConnectionBase
 from server.ws_message_sender import WSMessageSender
 from server.ws_token import WSToken
 from server.session import Session
+from bom_persistent.management.user import GenericUser
 
 
 class WSConnection(WSConnectionBase):
@@ -45,6 +46,7 @@ class WSConnection(WSConnectionBase):
         self.is_primary = False
         self._token = WSToken(inactive_seconds_timeout=None)
         self._authenticated_user: str | None = None
+        self._authorized_user: GenericUser | None = None
         self.subscribers: list[WSMessageSender] = []
         self.conn_logger = get_context_logger(LOG, **self.connection_context)
         self._register_connection()
@@ -164,20 +166,24 @@ class WSConnection(WSConnectionBase):
         "get client token associated with this connection"
         return getattr(self, "_client_token", None)
 
+    def set_connection_user(self, user: GenericUser) -> None:
+        "set the authorized user for this connection"
+        self._authorized_user = user
+
     async def start_connection(
         self,
         authenticated_user: str | None = None,
-        clienttoken: WSToken | None = None,
-        client_token_valid: bool = False,
-    ):
+        # clienttoken: WSToken | None = None,
+        # client_token_valid: bool = False,
+    ) -> GenericUser | None:
         "say hello and expect Login"
         self.conn_logger.debug(
-            f"start_connection({authenticated_user=}, "
-            f"{redact({'clienttoken': clienttoken})}, "
-            f"{client_token_valid=}), say hello"
+            f"start_connection({authenticated_user=}"
+            # f", {redact({'clienttoken': clienttoken})}"
+            # f", {client_token_valid=}), say hello"
         )
         self._authenticated_user = authenticated_user
-        self._client_token = clienttoken
+        # self._client_token = clienttoken
         await self.send_message(
             HelloMessage(
                 token=self._token,
@@ -186,10 +192,10 @@ class WSConnection(WSConnectionBase):
                     True
                     if (
                         authenticated_user
-                        or (
-                            client_token_valid
-                            and clienttoken in Session.session_clients
-                        )
+                        # or (
+                        #     client_token_valid
+                        #     and clienttoken in Session.session_clients
+                        # )
                     )
                     else None
                 ),
@@ -237,16 +243,16 @@ class WSConnection(WSConnectionBase):
                 await self.abort_connection("Login expected")
         except websockets.exceptions.ConnectionClosed as exc:
             self.conn_logger.debug(f"Connection closed by socket: {exc}")
-            return False
+            return None
         except core.exceptions.WSConnectionClosed as exc:
             self.conn_logger.debug(f"Connection closed by handler: {exc}")
-            return False
+            return None
         except Exception as exc:
             self.conn_logger.error(f"Start connection failed in handler ({exc})")
             raise WSConnectionError("Connection start failed") from exc
         else:
             # self.conn_logger.debug("connection started")
-            return True
+            return self._authorized_user
 
     async def abort_connection(
         self, reason: str | None = None, token: WSToken | None = None

@@ -26,14 +26,16 @@ from core.app_logging import (
 
 LOG: Logger = getLogger(__name__)
 
-from core.const import WEBSOCKET_PORT
+from core.const import WEBSOCKET_PORT, CLIENT_TOKEN_COOKIE_MAX_AGE
 from core.app import App
 from core.configuration.config import Config
+from server.ws_client import WSClient
 from server.ws_connection import WSConnection
 from server.session import Session
 from server.ws_token import WSToken
 from messages.message import Message
 from messages.admin import LogMessage
+from bom_persistent.management.user import GenericUser
 
 LOGIN_SUBPROTOCOL = "mp-login"
 CLIENT_TOKEN_COOKIE_NAME = "client-token"
@@ -43,10 +45,10 @@ class WSHandler:
     "Container for Websocket handler"
 
     counter = 0
-    sockets: dict[UUID, dict[str, any]] = {}
+    sockets: dict[UUID, dict[str, WSClient | str | bool | None]] = {}
 
-    def get_auth_user(self, headers) -> str | None:
-        "Get headers from websocket request"
+    def get_auth_user_from_header(self, headers) -> str | None:
+        "Get authenticated user from websocket request headers"
         auth_header_name = App.get_config_item(
             Config.CONFIG_APP_AUTH_HEADER, default=""
         )
@@ -71,7 +73,7 @@ class WSHandler:
                     match = re.search(auth_user_pattern, auth_header)
                     auth_user = match.group(1) if match else None
                 except (re.error, TypeError, IndexError) as e:
-                    LOG.error(
+                    LOG.exception(
                         f"Auth user extraction failed: pattern={auth_user_pattern}; error: {e}"
                     )
             else:
@@ -84,8 +86,24 @@ class WSHandler:
             )
         return auth_user
 
+    def get_auth_user(self, websocket) -> str | None:
+        "Get authenticated user from websocket request headers or from client-token cookie"
+        auth_user = self.get_auth_user_from_header(websocket.request.headers)
+        if auth_user:
+            # Return the authenticated user from the request header if available
+            return auth_user
+        client = WSHandler.sockets.get(websocket.id, {})
+        if client.get("client_token_valid", False):
+            # Return the authenticated user from the client-token if available and authenticated
+            ws_client = client.get("client", {})
+            if isinstance(ws_client, WSClient):
+                return ws_client.user
+        return None
+
     def process_response(self, websocket, request, response):
-        "Acknowledge the login subprotocol and issue a connection token cookie for it"
+        """Detect the login subprotocol and check for a client-token cookie
+        - issue a client-token cookie for it if none exists and set appropriate response headers
+        - register client-token for this websocket connection"""
         WSHandler.sockets[websocket.id] = {}
         if LOG.isEnabledFor(DEBUG):
             LOG.log(VERBOSE_DEBUG, "WSHandler.process_response(): request headers:")
@@ -117,7 +135,7 @@ class WSHandler:
                 f"WSHandler.process_response(): requested protocols: {requested_protocols}"
             )
         if LOGIN_SUBPROTOCOL not in requested_protocols:
-            return None
+            return
         response.headers["Sec-WebSocket-Protocol"] = LOGIN_SUBPROTOCOL
         request_cookies: dict[str, str] = dict(
             crumb.strip().split("=", 1)
@@ -129,19 +147,16 @@ class WSHandler:
             LOG.debug(
                 f"WSHandler.process_response(): found {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(client_token)}"
             )
-            WSHandler.sockets[websocket.id]["client_token_valid"] = WSToken.check_token(
+            WSHandler.sockets[websocket.id]["client"] = WSClient.get_client(
                 client_token
             )
-            Session.cleanup_expired_client_tokens()
-            if WSHandler.sockets[websocket.id]["client_token_valid"]:
-                WSHandler.sockets[websocket.id]["client_token"] = WSToken.get_token(
-                    client_token
-                )
-                return None
+            if WSHandler.sockets[websocket.id]["client"]:
+                WSHandler.sockets[websocket.id]["client_token"] = client_token
+                return
             LOG.debug(
                 f"WSHandler.process_response(): {CLIENT_TOKEN_COOKIE_NAME}: {redact_str(client_token)} was rejected"
             )
-        client_token = WSToken(inactive_seconds_timeout=None)
+        client_token = WSToken(inactive_seconds_timeout=CLIENT_TOKEN_COOKIE_MAX_AGE)
         is_secure = request.headers.get("Forwarded-Proto", "").lower() == "https"
         cookie_flags = "; Path=/; HttpOnly; SameSite=Strict"
         if is_secure:
@@ -154,7 +169,7 @@ class WSHandler:
         )
         WSHandler.sockets[websocket.id]["client_token"] = client_token
         WSHandler.sockets[websocket.id]["client_token_valid"] = False
-        return None
+        return
 
     async def handler(self, websocket):
         "Handle a ws connection"
@@ -162,16 +177,22 @@ class WSHandler:
         WSHandler.counter += 1
         context_log = get_context_logger(LOG, socket=f"sock #{sock_nbr}")
         context_log.debug("connection opened")
-        auth_user = self.get_auth_user(websocket.request.headers)
+        client = WSHandler.sockets.get(websocket.id, {})
+        auth_user = self.get_auth_user(websocket)
         connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
-            if await connection.start_connection(
+            authorized_user: GenericUser | None = await connection.start_connection(
                 authenticated_user=auth_user,
-                clienttoken=WSHandler.sockets.get(websocket.id, {}).get("client_token"),
-                client_token_valid=WSHandler.sockets.get(websocket.id, {}).get(
-                    "client_token_valid", False
-                ),
-            ):
+                # clienttoken=WSHandler.sockets.get(websocket.id, {}).get("client_token"),
+                # client_token_valid=WSHandler.sockets.get(websocket.id, {}).get(
+                #     "client_token_valid", False
+                # ),
+            )
+            if authorized_user:
+                client["client_token_valid"] = True
+                ws_client = client.get("client", {})
+                if isinstance(ws_client, WSClient):
+                    ws_client.user = authorized_user
                 context_log = get_context_logger(LOG, **connection.connection_context)
                 context_log.debug("Connection started.")
                 async for ws_message in websocket:
