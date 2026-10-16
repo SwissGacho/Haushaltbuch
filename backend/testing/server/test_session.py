@@ -14,25 +14,17 @@ from server.ws_token import WSToken
 class Test_100_Session(unittest.TestCase):
     def setUp(self):
         self.all_sessions = list(Session._all_sessions)
-        self.client_sessions = {
-            token: user for token, user in Session.session_clients.items()
-        }
         self.all_tokens = set(WSToken._all_tokens)
         Session._all_sessions.clear()
-        Session.session_clients.clear()
         WSToken._all_tokens.clear()
 
     def tearDown(self):
         Session._all_sessions.clear()
         Session._all_sessions.extend(self.all_sessions)
-        Session.session_clients.clear()
-        Session.session_clients.update(self.client_sessions)
         WSToken._all_tokens.clear()
         WSToken._all_tokens.update(self.all_tokens)
 
-    def create_session(
-        self, user=None, conn_token=None, connection=None, client_token=None
-    ):
+    def create_session(self, user=None, conn_token=None, connection=None):
         connection = connection or Mock(name="connection")
         connection.connection_context = {"connection": "mock-connection"}
         with patch("server.session.App.get_config_item", return_value=2):
@@ -40,7 +32,6 @@ class Test_100_Session(unittest.TestCase):
                 user=cast(User, user or SimpleNamespace(name="alice")),
                 conn_token=conn_token,
                 connection=connection,
-                client_token=client_token,
             )
 
     def test_101_constructor_registers_session_and_creates_token(self):
@@ -54,13 +45,6 @@ class Test_100_Session(unittest.TestCase):
         self.assertEqual(session.connections, [connection])
         self.assertIsInstance(session.token, WSToken)
         self.assertEqual(session.conn_tokens, set())
-
-    def test_102_constructor_registers_session_for_client_token(self):
-        client_token = "client-token"
-
-        session = self.create_session(client_token=client_token)
-
-        self.assertIs(Session.session_clients[client_token], session.user)
 
     def test_103_get_session_from_session_token(self):
         session = self.create_session()
@@ -82,42 +66,27 @@ class Test_100_Session(unittest.TestCase):
         self.assertIs(found, session)
         self.assertEqual(session.conn_tokens, {connection_token.token})
 
-    def test_105_get_session_from_client_token_creates_session_for_user(self):
+    def test_105_get_session_from_connection_token_filters_by_user(self):
         user = cast(User, SimpleNamespace(name="alice"))
-        client_token = WSToken(inactive_seconds_timeout=None)
-        existing_session = self.create_session(
-            user=user, client_token=client_token.token
+        connection_token = WSToken(inactive_seconds_timeout=None)
+        session = self.create_session(user=user, conn_token=connection_token)
+        found = Session.get_session_from_token(
+            ses_token="",
+            conn_token=connection_token.token,
+            session_user=user,
         )
 
-        connection = Mock(name="new-connection")
-        connection.connection_context = {"connection": "ws-2"}
-        with patch("server.session.App.get_config_item", return_value=2):
-            found = Session.get_session_from_token(
-                ses_token="",
-                conn_token="",
-                client_token=client_token.token,
-                session_user=user,
-                connection=connection,
-            )
+        self.assertIs(found, session)
 
-        self.assertIsNot(found, existing_session)
-        self.assertIsNotNone(found)
-        assert found is not None
-        self.assertIs(found.user, user)
-        self.assertEqual(found.connections, [connection])
-        self.assertIs(Session.session_clients[client_token.token], user)
-
-    def test_106_get_session_from_client_token_rejects_other_user(self):
-        client_token = WSToken(inactive_seconds_timeout=None)
+    def test_106_get_session_from_connection_token_rejects_other_user(self):
+        connection_token = WSToken(inactive_seconds_timeout=None)
         self.create_session(
-            user=cast(User, SimpleNamespace(name="alice")),
-            client_token=client_token.token,
+            user=cast(User, SimpleNamespace(name="alice")), conn_token=connection_token
         )
 
         found = Session.get_session_from_token(
             ses_token="",
-            conn_token="",
-            client_token=client_token.token,
+            conn_token=connection_token.token,
             session_user=cast(User, SimpleNamespace(name="bob")),
         )
 
@@ -130,28 +99,15 @@ class Test_100_Session(unittest.TestCase):
         with self.assertRaises(TokenExpiredError):
             Session.get_session_from_token(ses_token=session.token.token, conn_token="")
 
-    def test_108_get_session_from_invalid_client_token_returns_none(self):
+    def test_108_get_session_from_unknown_connection_token_returns_none(self):
+        connection_token = WSToken(inactive_seconds_timeout=None)
         found = Session.get_session_from_token(
-            ses_token="", conn_token="", client_token="unknown-client-token"
+            ses_token="", conn_token=connection_token.token
         )
 
         self.assertIsNone(found)
 
-    def test_109_cleanup_expired_client_tokens(self):
-        expired_token = WSToken(inactive_seconds_timeout=None)
-        valid_token = WSToken(inactive_seconds_timeout=None)
-        user = cast(User, SimpleNamespace(name="alice"))
-        Session.session_clients.update(
-            {expired_token.token: user, valid_token.token: user}
-        )
-        expired_token.invalidate()
-
-        Session.cleanup_expired_client_tokens()
-
-        self.assertNotIn(expired_token.token, Session.session_clients)
-        self.assertIs(Session.session_clients[valid_token.token], user)
-
-    def test_110_add_connection_and_token(self):
+    def test_109_add_connection_and_token(self):
         session = self.create_session()
         connection = Mock(name="second-connection")
         connection_token = WSToken(inactive_seconds_timeout=None)
