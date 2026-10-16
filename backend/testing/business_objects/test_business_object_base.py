@@ -159,7 +159,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(bo_instance.mock_attr3, [0, 1])
         self.assertIsNone(bo_instance.mock_attr4)
 
-        bo_instance._db_data = mock_db_data
+        bo_instance._data.db_data = mock_db_data
         bo_instance.mock_attr1 = "new mock attribute 1"
         bo_instance.mock_attr2 = bo_instance_1
         bo_instance.mock_attr3 = [1, 2, 3]
@@ -197,7 +197,7 @@ class Test_100_BOBase_classmethods(unittest.IsolatedAsyncioTestCase):
                 msg=f"_data[{key}] should be updated with new value from instance creation",
             )
         self.assertEqual(
-            bo_instance._db_data,
+            bo_instance._data.db_data,
             mock_db_data,
             msg="_db_data should not be overwritten by new instance creation",
         )
