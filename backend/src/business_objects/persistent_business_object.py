@@ -625,6 +625,7 @@ class PersistentBusinessObject(BOBase):
                         old_value._data != self._data[k]._data
                     )
                     if isinstance(old_value, BOBase)
+                    and isinstance(self._data[k], BOBase)
                     else old_value != self._data[k]
                 ):
                     changes[k] = self._data[k]
