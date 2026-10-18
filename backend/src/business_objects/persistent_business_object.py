@@ -592,7 +592,8 @@ class PersistentBusinessObject(BOBase):
             finally:
                 # read the row back to get any changes made by the DB (e.g. triggers)
                 await self.fetch_self(txaction.sql(), id=self.id, session=session)
-            return self._detect_changes(old_values=previous_values)
+            changes = self._detect_changes(old_values=previous_values)
+            return {k: v for k, v in previous_values.items() if k in changes}
 
     async def _convert_db_data_from_db(self) -> dict[str, Any]:
         if self._data is None:
