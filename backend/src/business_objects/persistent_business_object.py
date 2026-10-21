@@ -259,8 +259,18 @@ class PersistentBusinessObject(BOBase):
             )
             if filter_conditions:
                 select.where(filter_conditions)
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"PersistentBusinessObject.get_matching_ids: {cls.__name__} user={session.user if session else 'N/A'}",
+                )
+                for line in pprint_lines(select.get_sql()):
+                    LOG.log(VERBOSE_DEBUG, f"   {line}")
+
             result = await (await select.execute()).fetchall()
-        # LOG.debug(f"PersistentBusinessObject.get_matching_ids({conditions=}) -> {result=}")
+        LOG.debug(
+            f"PersistentBusinessObject.get_matching_ids(conditions={redact(conditions)}) -> {result=}"
+        )
         return [id["id"] for id in result]
 
     @classmethod
@@ -310,6 +320,13 @@ class PersistentBusinessObject(BOBase):
             )
             if filter_conditions:
                 select.where(filter_conditions)
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"PersistentBusinessObject.get_matching_objects: {cls.__name__} user={session.user if session else 'N/A'}",
+                )
+                for line in pprint_lines(select.get_sql()):
+                    LOG.log(VERBOSE_DEBUG, f"   {line}")
             result = await (await select.execute()).fetchall()
         LOG.debug(
             f"PersistentBusinessObject.get_matching_objects(conditions={redact(conditions)}, {attributes=}) "
@@ -570,48 +587,66 @@ class PersistentBusinessObject(BOBase):
             )
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
-        old_values: dict[str, Any] = {}
         async with SQLTransaction() as txaction:
             update = (
                 txaction.sql()
                 .update(self.table)
                 .where(Eq(ColumnName("id"), Value(self.id)))
             )
+            previous_values = await self._convert_db_data_from_db()
+            changed_values = self._detect_changes(previous_values)
+            if changed_values:
+                for k, v in changed_values.items():
+                    update.assignment(k, Value(k, v))
 
-            changes = False
-            descriptions = {d.name: d for d in self.attribute_descriptions()}
-            for k, v in self._data.items():
-                if k not in ("bo_name", "id"):
-                    old_value = await self.convert_from_db(
-                        self._data.db_data.get(k),
-                        descriptions[k].data_type,
-                        descriptions[k].constraint_values,
-                    )
-                    old_values[k] = old_value
-                    if old_value != v:
-                        changes = True
-                        update.assignment(k, Value(k, v))
             k = "last_updated"
-            if changes and not (k in self._data and self._data[k]):
+            if changed_values and not (k in self._data and self._data[k]):
                 self._data[k] = datetime.now().astimezone(UTC)
                 update.assignment(k, Value(k, self._data[k]))
             try:
-                if changes:
+                if changed_values:
                     await update.execute()
             finally:
                 # read the row back to get any changes made by the DB (e.g. triggers)
                 await self.fetch_self(txaction.sql(), id=self.id, session=session)
-            return {
-                k: old_value
-                for k, old_value in old_values.items()
+            changes = self._detect_changes(old_values=previous_values)
+            return {k: v for k, v in previous_values.items() if k in changes}
+
+    async def _convert_db_data_from_db(self) -> dict[str, Any]:
+        if self._data is None:
+            raise RuntimeError(f"Cannot convert DB data for {self} as it has no data")
+        descriptions = {d.name: d for d in self.attribute_descriptions()}
+        converted: dict[str, Any] = {}
+        for k, _ in self._data.items():
+            if k not in ("bo_name", "id"):
+                converted[k] = await self.convert_from_db(
+                    self._data.db_data.get(k),
+                    descriptions[k].data_type,
+                    descriptions[k].constraint_values,
+                )
+        return converted
+
+    def _detect_changes(
+        self, old_values: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        if self._data is None:
+            return {}
+        if old_values is None or old_values == {}:
+            return {k: v for k, v in self._data.items() if k not in ("bo_name", "id")}
+
+        changes: dict[str, Any] = {}
+        for k, old_value in old_values.items():
+            if k not in ("bo_name", "id"):
                 if (
                     (  # pylint: disable=protected-access
                         old_value._data != self._data[k]._data
                     )
                     if isinstance(old_value, BOBase)
+                    and isinstance(self._data[k], BOBase)
                     else old_value != self._data[k]
-                )
-            }
+                ):
+                    changes[k] = self._data[k]
+        return changes
 
 
 log_exit(LOG)

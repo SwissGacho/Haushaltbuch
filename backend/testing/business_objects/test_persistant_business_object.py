@@ -232,6 +232,10 @@ class Test_100_Persistent_Business_Object_classmethods(
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
             patch("business_objects.persistent_business_object.Filter") as MockFilter,
+            patch(
+                "business_objects.persistent_business_object.MixinBase.specialist_conditions",
+                return_value=[],
+            ),
         ):
             result = await MockPersistentBO2.count_rows(mock_conditions)
         MockSQL.assert_called_once_with()
@@ -263,6 +267,10 @@ class Test_100_Persistent_Business_Object_classmethods(
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
             patch("business_objects.persistent_business_object.Filter") as MockFilter,
+            patch(
+                "business_objects.persistent_business_object.MixinBase.specialist_conditions",
+                return_value=[],
+            ),
         ):
             result = await MockPersistentBO2.get_matching_ids(mock_conditions)
         MockSQL.assert_called_once_with()
@@ -356,6 +364,10 @@ class Test_100_Persistent_Business_Object_classmethods(
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
             patch("business_objects.persistent_business_object.Filter") as MockFilter,
+            patch(
+                "business_objects.persistent_business_object.MixinBase.specialist_conditions",
+                return_value=[],
+            ),
             patch(
                 "business_objects.persistent_business_object.PersistentBusinessObject.convert_from_db",
                 new=mock_convert_from_db,
@@ -469,6 +481,10 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             patch(
                 "business_objects.persistent_business_object.SQLSubquery"
             ) as MockSubquery,
+            patch(
+                "business_objects.persistent_business_object.MixinBase.specialist_conditions",
+                return_value=[],
+            ),
         ):
             MockSubquery.return_value = self.mock_subsql
             if newest == DEFAULT:
@@ -512,7 +528,6 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                             self.FETCH_RESULT[attr],
                             "structured attribute result",
                         )
-            self.assertIs(result.)
             self.assertIs(result._data.db_data, self.FETCH_RESULT, "_db_data")
 
     async def test_202_fetch_no_param(self):
@@ -970,12 +985,20 @@ class Test_400_Specializing(unittest.IsolatedAsyncioTestCase):
     def test_405_filter_conditions_no_specialists(self):
         """Without specialists _filter_conditions returns the given conditions unchanged."""
         mock_cond = Mock(name="mock_condition")
-        result = self.GenericBO._filter_conditions(mock_cond)
+        with patch(
+            "business_objects.persistent_business_object.MixinBase.specialist_conditions",
+            return_value=[],
+        ):
+            result = self.GenericBO._filter_conditions(mock_cond)
         self.assertIs(result, mock_cond)
 
     def test_405_filter_conditions_no_specialists_none(self):
         """Without specialists and no conditions _filter_conditions returns None."""
-        result = self.GenericBO._filter_conditions(None)
+        with patch(
+            "business_objects.persistent_business_object.MixinBase.specialist_conditions",
+            return_value=[],
+        ):
+            result = self.GenericBO._filter_conditions(None)
         self.assertIsNone(result)
 
     def test_405_filter_conditions_with_specialists_no_extra_cond(self):
@@ -983,13 +1006,11 @@ class Test_400_Specializing(unittest.IsolatedAsyncioTestCase):
         self.SpecializingBO.register_bo_class()
         mock_special_cond = Mock(name="mock_special_cond")
         with patch(
-            "business_objects.persistent_business_object.MixinBase.special_conditions",
+            "business_objects.persistent_business_object.MixinBase.specialist_conditions",
             return_value=[mock_special_cond],
-        ) as mock_special_conditions:
+        ) as mock_specialist_conditions:
             result = self.GenericBO._filter_conditions(None)
-        mock_special_conditions.assert_called_once_with(
-            gen_cls=self.GenericBO, user=None
-        )
+        mock_specialist_conditions.assert_called_once_with(self.GenericBO, None)
         self.assertIs(result, mock_special_cond)
 
     def test_405_filter_conditions_with_specialists_and_extra_cond(self):
@@ -999,15 +1020,13 @@ class Test_400_Specializing(unittest.IsolatedAsyncioTestCase):
         mock_special_cond = Mock(name="mock_special_cond")
         with (
             patch(
-                "business_objects.persistent_business_object.MixinBase.special_conditions",
+                "business_objects.persistent_business_object.MixinBase.specialist_conditions",
                 return_value=[mock_special_cond],
-            ) as mock_special_conditions,
+            ) as mock_specialist_conditions,
             patch("business_objects.persistent_business_object.And") as MockAnd,
         ):
             result = self.GenericBO._filter_conditions(mock_cond)
-        mock_special_conditions.assert_called_once_with(
-            gen_cls=self.GenericBO, user=None
-        )
+        mock_specialist_conditions.assert_called_once_with(self.GenericBO, None)
         MockAnd.assert_called_once_with([mock_cond, mock_special_cond])
         self.assertIs(result, MockAnd())
 
@@ -1032,7 +1051,7 @@ class Test_400_Specializing(unittest.IsolatedAsyncioTestCase):
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
             patch(
-                "business_objects.persistent_business_object.MixinBase.special_conditions",
+                "business_objects.persistent_business_object.MixinBase.specialist_conditions",
                 return_value=[],
             ),
         ):

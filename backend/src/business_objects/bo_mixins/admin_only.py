@@ -1,5 +1,7 @@
 """Mixin class for admin-only business objects."""
 
+from typing import Sequence
+
 from core.app_logging import (
     getLogger,
     log_exit,
@@ -8,6 +10,8 @@ from core.app_logging import (
     redact,
     pprint_lines,
 )
+
+from database.sql_expression import ColumnName, Eq, Not, SQLExpression, SQLString
 
 LOG = getLogger(__name__)
 
@@ -25,7 +29,22 @@ class AdminOnly(MixinBase):
         """Return True if this class is an admin-only business object class."""
         return True
 
-    # ADMIN_ONLY = True
+    @classmethod
+    def specialist_conditions_mixin(
+        cls, specialist_cls, user
+    ) -> Sequence[SQLExpression]:
+        """Return a list of SQLExpression objects that prevent the selection
+        of admin-only BOs for users without admin privileges."""
+        if not user or bool(getattr(user, "is_admin", False)):
+            return []
+        return [
+            Not(
+                Eq(
+                    ColumnName("bo_name"),
+                    SQLString(str(specialist_cls.bo_type_name())),
+                )
+            )
+        ]
 
 
 log_exit(LOG)
