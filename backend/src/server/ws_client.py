@@ -10,6 +10,7 @@ from core.app_logging import (
     redact,
     VERBOSE_DEBUG,
     redact_str,
+    pprint_lines,
 )
 
 LOG: Logger = getLogger(__name__)
@@ -24,10 +25,46 @@ class WSClient:
 
     clients: dict[str, "WSClient"] = {}
 
-    def __init__(self, client_token: str | None = None):
-        self.user: GenericUser | None = None
-        self.client_token: str | None = client_token
+    def __init__(self, client_token: str):
+        self._user: GenericUser | None = None
+        self.client_token: str = client_token
+        self._authorized: bool = False
         self.websockets: list = []
+        WSClient.clients[client_token] = self
+        LOG.debug(f"Initialized WSClient with client_token: {redact_str(client_token)}")
+        LOG.log(VERBOSE_DEBUG, "WSClient.clients:")
+        for line in pprint_lines(
+            {
+                redact_str(k): v.user.display_name if v.user else "<no user>"
+                for k, v in WSClient.clients.items()
+            }
+        ):
+            LOG.log(VERBOSE_DEBUG, f"  {line}")
+
+    @property
+    def user(self) -> GenericUser | None:
+        return self._user
+
+    @user.setter
+    def user(self, value: GenericUser | None) -> None:
+        LOG.log(
+            VERBOSE_DEBUG,
+            "Setting user"
+            f" from: {self._user.display_name if self._user else '<no user>'}"
+            f" to: {value.display_name if value else '<no user>'}",
+        )
+        self._user = value
+
+    @property
+    def authorized(self) -> bool:
+        return self._authorized
+
+    @authorized.setter
+    def authorized(self, value: bool) -> None:
+        LOG.log(
+            VERBOSE_DEBUG, f"Setting authorized from: {self._authorized} to: {value}"
+        )
+        self._authorized = value
 
     @classmethod
     def get_client(cls, client_token: str) -> Union["WSClient", None]:
