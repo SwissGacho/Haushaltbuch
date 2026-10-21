@@ -9,7 +9,6 @@ import websockets
 import websockets.asyncio.server as websockets_server
 from contextlib import asynccontextmanager
 
-import core.exceptions
 from core.app_logging import (
     get_context_logger,
     getLogger,
@@ -27,6 +26,7 @@ from core.app_logging import (
 LOG: Logger = getLogger(__name__)
 
 from core.const import WEBSOCKET_PORT, CLIENT_TOKEN_COOKIE_MAX_AGE
+from core.exceptions import ClientNotFoundError
 from core.app import App
 from core.configuration.config import Config
 from server.ws_client import WSClient
@@ -45,7 +45,7 @@ class WSHandler:
     "Container for Websocket handler"
 
     counter = 0
-    sockets: dict[UUID, dict[str, WSClient | str | bool | None]] = {}
+    sockets: dict[UUID, dict[str, WSClient | WSToken | str | bool | None]] = {}
 
     def get_auth_user_from_header(self, headers) -> str | None:
         "Get authenticated user from websocket request headers"
@@ -93,11 +93,10 @@ class WSHandler:
             # Return the authenticated user from the request header if available
             return auth_user
         client = WSHandler.sockets.get(websocket.id, {})
-        if client.get("client_token_valid", False):
-            # Return the authenticated user from the client-token if available and authenticated
-            ws_client = client.get("client", {})
-            if isinstance(ws_client, WSClient):
-                return ws_client.user
+        # Return the authenticated user from the client-token if available and authenticated
+        ws_client = client.get("client", {})
+        if isinstance(ws_client, WSClient) and ws_client.authorized:
+            return ws_client.user
         return None
 
     def process_response(self, websocket, request, response):
@@ -167,8 +166,8 @@ class WSHandler:
         response.headers["Set-Cookie"] = (
             f"{CLIENT_TOKEN_COOKIE_NAME}={client_token}{cookie_flags}"
         )
+        WSHandler.sockets[websocket.id]["client"] = WSClient(str(client_token))
         WSHandler.sockets[websocket.id]["client_token"] = client_token
-        WSHandler.sockets[websocket.id]["client_token_valid"] = False
         return
 
     async def handler(self, websocket):
@@ -177,24 +176,24 @@ class WSHandler:
         WSHandler.counter += 1
         context_log = get_context_logger(LOG, socket=f"sock #{sock_nbr}")
         context_log.debug("connection opened")
-        client = WSHandler.sockets.get(websocket.id, {})
-        auth_user = self.get_auth_user(websocket)
+        authenticated_user = self.get_auth_user(websocket)
         connection = WSConnection(websocket, sock_nbr=f"sock #{sock_nbr}")
         try:
-            authorized_user: GenericUser | None = await connection.start_connection(
-                authenticated_user=auth_user,
-                # clienttoken=WSHandler.sockets.get(websocket.id, {}).get("client_token"),
-                # client_token_valid=WSHandler.sockets.get(websocket.id, {}).get(
-                #     "client_token_valid", False
-                # ),
+            session: Session | None = await connection.start_connection(
+                authenticated_user=authenticated_user
             )
-            if authorized_user:
-                client["client_token_valid"] = True
-                ws_client = client.get("client", {})
-                if isinstance(ws_client, WSClient):
+            if session:
+                authorized_user = session.user
+                ws_client = WSHandler.sockets.get(websocket.id, {}).get("client", None)
+                if ws_client:
+                    if not isinstance(ws_client, WSClient):
+                        raise ClientNotFoundError(
+                            "No valid WSClient associated with this connection."
+                        )
+                    ws_client.authorized = True
                     ws_client.user = authorized_user
                 context_log = get_context_logger(LOG, **connection.connection_context)
-                context_log.debug("Connection started.")
+                context_log.debug("Connection started, awaiting messages.")
                 async for ws_message in websocket:
                     if context_log.isEnabledFor(DEBUG):
                         context_log.debug(

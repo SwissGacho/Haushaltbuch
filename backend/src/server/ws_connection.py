@@ -175,10 +175,10 @@ class WSConnection(WSConnectionBase):
         authenticated_user: str | None = None,
         # clienttoken: WSToken | None = None,
         # client_token_valid: bool = False,
-    ) -> GenericUser | None:
+    ) -> Session | None:
         "say hello and expect Login"
         self.conn_logger.debug(
-            f"start_connection({authenticated_user=}"
+            f"start_connection({authenticated_user=})"
             # f", {redact({'clienttoken': clienttoken})}"
             # f", {client_token_valid=}), say hello"
         )
@@ -251,8 +251,12 @@ class WSConnection(WSConnectionBase):
             self.conn_logger.error(f"Start connection failed in handler ({exc})")
             raise WSConnectionError("Connection start failed") from exc
         else:
-            # self.conn_logger.debug("connection started")
-            return self._authorized_user
+            self.conn_logger.log(
+                VERBOSE_DEBUG,
+                "start connection handshake completed"
+                f'(user={self._authorized_user.display_name if self._authorized_user else "<no user>"})',
+            )
+            return self._session
 
     async def abort_connection(
         self, reason: str | None = None, token: WSToken | None = None
