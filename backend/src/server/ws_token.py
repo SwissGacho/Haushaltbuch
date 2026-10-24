@@ -51,7 +51,7 @@ class WSToken(BaseObject):
         return None
 
     @classmethod
-    def check_token(cls, tok: str) -> bool:
+    def token_is_valid(cls, tok: str, auto_extend: bool = False) -> bool:
         "check if token is valid"
         now = datetime.now()
         for tkn in cls._all_tokens:
@@ -60,7 +60,7 @@ class WSToken(BaseObject):
                 if not tkn._valid_for_seconds:
                     return True
                 if tkn._expires > now:
-                    if tkn._auto_extend:
+                    if auto_extend and tkn._auto_extend:
                         tkn._expires = datetime.now() + timedelta(
                             seconds=tkn._valid_for_seconds
                         )
@@ -69,7 +69,12 @@ class WSToken(BaseObject):
                             f"Token {redact_str( tkn.token)} extended until {tkn._expires}",
                         )
                     return True
+                cls._all_tokens.discard(tkn)
         return False
+
+    @classmethod
+    def check_token(cls, tok: str) -> bool:
+        return cls.token_is_valid(tok, auto_extend=True)
 
     def invalidate(self):
         "invalidate the token"

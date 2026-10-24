@@ -25,7 +25,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session_user = SimpleNamespace(name="alice")
+        session_user = SimpleNamespace(name="alice", display_name="Alice")
         session = Mock(token="ses-token", user=session_user)
         connection = Mock(
             session=None,
@@ -56,7 +56,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
 
         mock_check_login.assert_awaited_once_with(None)
         mock_session_class.assert_called_once()
-        mock_ctx_logger.assert_called_once()
+        self.assertEqual(mock_ctx_logger.call_count, 2)
         self.assertIs(connection.session, session)
         connection.abort_connection.assert_not_awaited()
         connection.send_message.assert_awaited_once()
@@ -132,7 +132,9 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             {"version": "9.9.9"},
         )
 
-    async def test_104_handle_message_success_existing_session_previous_connection_token(self):
+    async def test_104_handle_message_success_existing_session_previous_connection_token(
+        self,
+    ):
         msg = LoginMessage(
             dumps(
                 {
@@ -197,7 +199,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session_user = SimpleNamespace(name="alice")
+        session_user = SimpleNamespace(name="alice", display_name="Alice")
         session = Mock(token="ses-token", user=session_user)
         connection = Mock(
             session=None,
@@ -242,7 +244,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session_user = SimpleNamespace(name="alice")
+        session_user = SimpleNamespace(name="alice", display_name="Alice")
         session = Mock(token="ses-token", user=session_user)
         connection = Mock(
             session=None,

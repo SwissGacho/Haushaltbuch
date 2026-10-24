@@ -188,17 +188,7 @@ class WSConnection(WSConnectionBase):
             HelloMessage(
                 token=self._token,
                 status=App.status,
-                authenticated_user=(
-                    True
-                    if (
-                        authenticated_user
-                        # or (
-                        #     client_token_valid
-                        #     and clienttoken in Session.session_clients
-                        # )
-                    )
-                    else None
-                ),
+                authenticated_user=(True if (authenticated_user) else None),
             )
         )
         try:

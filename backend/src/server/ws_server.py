@@ -7,6 +7,7 @@ import socket
 from uuid import UUID
 import websockets
 import websockets.asyncio.server as websockets_server
+import core.exceptions
 from contextlib import asynccontextmanager
 
 from core.app_logging import (
@@ -26,7 +27,7 @@ from core.app_logging import (
 LOG: Logger = getLogger(__name__)
 
 from core.const import WEBSOCKET_PORT, CLIENT_TOKEN_COOKIE_MAX_AGE
-from core.exceptions import ClientNotFoundError
+from core.exceptions import ClientNotFoundError, WSConnectionClosed
 from core.app import App
 from core.configuration.config import Config
 from server.ws_client import WSClient
@@ -96,7 +97,7 @@ class WSHandler:
         # Return the authenticated user from the client-token if available and authenticated
         ws_client = client.get("client", {})
         if isinstance(ws_client, WSClient) and ws_client.authorized:
-            return ws_client.user
+            return getattr(ws_client.user, "name", None)
         return None
 
     def process_response(self, websocket, request, response):
@@ -222,7 +223,7 @@ class WSHandler:
                     )
         except websockets.exceptions.ConnectionClosed as exc:
             context_log.debug(f"Connection closed by peer: {exc}")
-        except core.exceptions.WSConnectionClosed as exc:
+        except WSConnectionClosed as exc:
             context_log.debug(f"Connection closed gracefully: {exc}")
         except Exception as exc:
             context_log.error(f"Connection aborted by exception {exc}")

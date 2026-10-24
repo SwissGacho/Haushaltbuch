@@ -87,7 +87,10 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             WSHandler.sockets[websocket.id],
-            {"client_token": "issued-token", "client_token_valid": False},
+            {
+                "client": WSClient.clients["issued-token"],
+                "client_token": "issued-token",
+            },
         )
         self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
         self.assertEqual(
@@ -145,8 +148,7 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             WSHandler.sockets[websocket.id],
             {
-                "client": None,
-                "client_token_valid": False,
+                "client": WSClient.clients["replacement-token"],
                 "client_token": "replacement-token",
             },
         )
@@ -188,7 +190,11 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
             messages = []
         handler = WSHandler()
         mock_connection = Mock(name="WSConnection")
-        mock_connection.start_connection = AsyncMock(return_value=start_conn)
+        mock_session = Mock(name="Session")
+        mock_session.user = Mock(name="authorized-user")
+        mock_connection.start_connection = AsyncMock(
+            return_value=mock_session if start_conn else None
+        )
         mock_connection.handle_message = AsyncMock()
         mock_connection.connection_context = {
             "comp": "mock_component",
@@ -270,7 +276,9 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
     async def test_205_ws_handler_graceful_connection_closed(self):
         handler = WSHandler()
         mock_connection = Mock(name="WSConnection")
-        mock_connection.start_connection = AsyncMock(return_value=True)
+        authorized_user = Mock(name="authorized-user")
+        mock_session = Mock(name="Session", user=authorized_user)
+        mock_connection.start_connection = AsyncMock(return_value=mock_session)
         mock_connection.handle_message = AsyncMock(
             side_effect=core.exceptions.WSConnectionClosed("peer disconnected")
         )
@@ -281,9 +289,8 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         mock_connection.connection_closed = Mock()
         mock_socket = MagicMock()
         mock_socket.__aiter__.return_value = [{"type": "mocktype", "text": "mocktext"}]
-        authorized_user = Mock(name="authorized-user")
         client = WSClient("mock-token")
-        mock_connection.start_connection = AsyncMock(return_value=authorized_user)
+        mock_connection.start_connection = AsyncMock(return_value=mock_session)
         WSHandler.sockets[mock_socket.id] = {"client": client}
 
         with (

@@ -9,6 +9,7 @@ from core.app_logging import (
     Logger,
     redact,
     VERBOSE_DEBUG,
+    DEBUG,
     redact_str,
     pprint_lines,
 )
@@ -67,6 +68,16 @@ class WSClient:
         self._authorized = value
 
     @classmethod
+    def remove_invalid_clients(cls) -> None:
+        """Remove all clients with invalid tokens from the clients dictionary"""
+        invalid_tokens = [
+            k for k in cls.clients if not WSToken.token_is_valid(k, auto_extend=False)
+        ]
+        for token in invalid_tokens:
+            cls.clients.pop(token)
+            LOG.debug(f"Removed invalid client with token: {redact_str(token)}")
+
+    @classmethod
     def get_client(cls, client_token: str) -> Union["WSClient", None]:
         """This method returns a WSClient instance associated
             with the given client_token if it is valid.
@@ -75,16 +86,17 @@ class WSClient:
             client is found for the given valid client_token.
         """
         LOG.debug(f" WSClient.get_client(client_token={redact_str(client_token)})")
-        LOG.log(VERBOSE_DEBUG, "WSClient.clients:")
-        for line in pprint_lines(
-            {
-                redact_str(k): (v.user.display_name if v.user else "<no user>")
-                + f" ({'valid' if WSToken.check_token(k) else 'invalid'})"
-                for k, v in WSClient.clients.items()
-            }
-        ):
-            LOG.log(VERBOSE_DEBUG, f"  {line}")
-
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            LOG.log(VERBOSE_DEBUG, "WSClient.clients:")
+            for line in pprint_lines(
+                {
+                    redact_str(k): (v.user.display_name if v.user else "<no user>")
+                    + f" ({'valid' if WSToken.token_is_valid(k, auto_extend=False) else 'invalid'})"
+                    for k, v in WSClient.clients.items()
+                }
+            ):
+                LOG.log(VERBOSE_DEBUG, f"  {line}")
+        cls.remove_invalid_clients()
         if not WSToken.check_token(client_token):
             # client token is not valid, remove it from the clients dictionary if it exists
             if client_token in cls.clients:

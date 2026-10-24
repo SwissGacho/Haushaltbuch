@@ -72,7 +72,9 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
         await self._102_send_message(status=False)
 
     async def _103_start_connection(
-        self, login_arg="", authenticated_user="mock-authenticated-user",
+        self,
+        login_arg="",
+        authenticated_user="mock-authenticated-user",
         expected_authenticated_user=None,
     ):
         mock_hello_message = Mock(name="mock_hello_message")
@@ -108,7 +110,9 @@ class Test_100_WS_Connection(unittest.IsolatedAsyncioTestCase):
             ),
         )
         if exp_result == "success":
-            self.connection.set_connection_user(Mock(name="authorized-user"))
+            user = Mock(name="authorized-user")
+            self.connection.set_connection_user(user)
+            self.connection._session = Mock(user=user)
         with (
             patch("server.ws_connection.HelloMessage", MockHelloMessage),
             patch("server.ws_connection.App", self.MockApp),
