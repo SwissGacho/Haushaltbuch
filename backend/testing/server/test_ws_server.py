@@ -9,6 +9,8 @@ from server.ws_server import (
     LOGIN_SUBPROTOCOL,
     WSHandler,
 )
+from server.ws_client import WSClient
+from core.const import CLIENT_TOKEN_COOKIE_MAX_AGE
 
 # class Test_000_WS_Server(unittest.IsolatedAsyncioTestCase):
 #     async def test_001_get_websocket(self):
@@ -80,10 +82,15 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         ) as mock_token:
             handler.process_response(websocket, request, response)
 
-        mock_token.assert_called_once_with(inactive_seconds_timeout=None)
+        mock_token.assert_called_once_with(
+            inactive_seconds_timeout=CLIENT_TOKEN_COOKIE_MAX_AGE
+        )
         self.assertEqual(
             WSHandler.sockets[websocket.id],
-            {"client_token": "issued-token", "client_token_valid": False},
+            {
+                "client": WSClient.clients["issued-token"],
+                "client_token": "issued-token",
+            },
         )
         self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
         self.assertEqual(
@@ -101,21 +108,16 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         }.get(name, default)
         response = Mock(headers={})
 
-        with (
-            patch("server.ws_server.WSToken") as mock_token,
-            patch("server.ws_server.Session.cleanup_expired_client_tokens") as cleanup,
-        ):
-            mock_token.check_token.return_value = True
-            mock_token.get_token.return_value = "existing-token"
+        client = WSClient("existing-token")
+        with patch(
+            "server.ws_server.WSClient.get_client", return_value=client
+        ) as get_client:
             handler.process_response(websocket, request, response)
 
-        mock_token.check_token.assert_called_once_with("existing-token")
-        mock_token.get_token.assert_called_once_with("existing-token")
-        mock_token.assert_not_called()
-        cleanup.assert_called_once_with()
+        get_client.assert_called_once_with("existing-token")
         self.assertEqual(
             WSHandler.sockets[websocket.id],
-            {"client_token": "existing-token", "client_token_valid": True},
+            {"client": client, "client_token": "existing-token"},
         )
         self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
         self.assertNotIn("Set-Cookie", response.headers)
@@ -130,16 +132,25 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         }.get(name, default)
         response = Mock(headers={})
 
-        with patch("server.ws_server.WSToken") as mock_token:
-            mock_token.check_token.return_value = False
+        with (
+            patch(
+                "server.ws_server.WSClient.get_client", return_value=None
+            ) as get_client,
+            patch("server.ws_server.WSToken") as mock_token,
+        ):
             mock_token.return_value = "replacement-token"
             handler.process_response(websocket, request, response)
 
-        mock_token.check_token.assert_called_once_with("expired-token")
-        mock_token.assert_called_once_with(inactive_seconds_timeout=None)
+        get_client.assert_called_once_with("expired-token")
+        mock_token.assert_called_once_with(
+            inactive_seconds_timeout=CLIENT_TOKEN_COOKIE_MAX_AGE
+        )
         self.assertEqual(
             WSHandler.sockets[websocket.id],
-            {"client_token_valid": False, "client_token": "replacement-token"},
+            {
+                "client": WSClient.clients["replacement-token"],
+                "client_token": "replacement-token",
+            },
         )
         self.assertEqual(response.headers["Sec-WebSocket-Protocol"], LOGIN_SUBPROTOCOL)
         self.assertEqual(
@@ -158,9 +169,7 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         }.get(name, default)
         response = Mock(headers={})
 
-        with patch(
-            "server.ws_server.WSToken", return_value="issued-token"
-        ):
+        with patch("server.ws_server.WSToken", return_value="issued-token"):
             handler.process_response(websocket, request, response)
 
         self.assertEqual(
@@ -181,7 +190,11 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
             messages = []
         handler = WSHandler()
         mock_connection = Mock(name="WSConnection")
-        mock_connection.start_connection = AsyncMock(return_value=start_conn)
+        mock_session = Mock(name="Session")
+        mock_session.user = Mock(name="authorized-user")
+        mock_connection.start_connection = AsyncMock(
+            return_value=mock_session if start_conn else None
+        )
         mock_connection.handle_message = AsyncMock()
         mock_connection.connection_context = {
             "comp": "mock_component",
@@ -210,15 +223,11 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
 
         if not mock_header:
             mock_connection.start_connection.assert_awaited_once_with(
-                authenticated_user=None,
-                clienttoken=None,
-                client_token_valid=False,
+                authenticated_user=None
             )
         else:
             mock_connection.start_connection.assert_awaited_once_with(
-                authenticated_user=mock_auth_user or mock_user,
-                clienttoken=None,
-                client_token_valid=False,
+                authenticated_user=mock_auth_user or mock_user
             )
         self.assertEqual(Mock_Msg.call_count, no_messages, "number of Messages created")
         self.assertEqual(
@@ -267,7 +276,9 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
     async def test_205_ws_handler_graceful_connection_closed(self):
         handler = WSHandler()
         mock_connection = Mock(name="WSConnection")
-        mock_connection.start_connection = AsyncMock(return_value=True)
+        authorized_user = Mock(name="authorized-user")
+        mock_session = Mock(name="Session", user=authorized_user)
+        mock_connection.start_connection = AsyncMock(return_value=mock_session)
         mock_connection.handle_message = AsyncMock(
             side_effect=core.exceptions.WSConnectionClosed("peer disconnected")
         )
@@ -278,7 +289,9 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
         mock_connection.connection_closed = Mock()
         mock_socket = MagicMock()
         mock_socket.__aiter__.return_value = [{"type": "mocktype", "text": "mocktext"}]
-        WSHandler.sockets[mock_socket.id] = {"client_token": "mock-token"}
+        client = WSClient("mock-token")
+        mock_connection.start_connection = AsyncMock(return_value=mock_session)
+        WSHandler.sockets[mock_socket.id] = {"client": client}
 
         with (
             patch("server.ws_server.WSConnection", return_value=mock_connection),
@@ -291,11 +304,10 @@ class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
             await handler.handler(websocket=mock_socket)
 
         mock_connection.start_connection.assert_awaited_once_with(
-            authenticated_user=None,
-            clienttoken="mock-token",
-            client_token_valid=False,
+            authenticated_user=None
         )
         mock_connection.handle_message.assert_awaited_once()
         mock_connection.connection_closed.assert_called_once_with()
         self.assertNotIn(mock_socket.id, WSHandler.sockets)
         self.assertEqual(Mock_Msg.call_count, 1, "number of Messages created")
+        self.assertIs(client.user, authorized_user)
