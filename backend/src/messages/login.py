@@ -44,7 +44,7 @@ class LoginMessage(Message):
 
     async def handle_message(self, connection: WSConnectionBase):
         "handle login message"
-        local_LOG = LOG
+        local_LOG = get_context_logger(LOG, **connection.connection_context)
         token = WSToken(self.get_str(MessageAttribute.WS_ATTR_TOKEN))
         try:
             ses_token = self.get_str(MessageAttribute.WS_ATTR_SES_TOKEN)
@@ -69,8 +69,10 @@ class LoginMessage(Message):
             else:
                 session = None
             if not session:
+                local_LOG.debug(f"Checking login for requested user: {requested_user}")
                 user: GenericUser = await check_login(requested_user)
                 if user:
+                    local_LOG.debug(f"Login successful for user: {user.display_name}")
                     connection.set_connection_user(user)
                     session = Session(user, conn_token=token, connection=connection)
             if not session:
