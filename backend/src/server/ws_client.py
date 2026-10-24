@@ -74,6 +74,16 @@ class WSClient:
         A ClientNotFoundError exception is raised if no existing
             client is found for the given valid client_token.
         """
+        LOG.debug(f" WSClient.get_client(client_token={redact_str(client_token)})")
+        LOG.log(VERBOSE_DEBUG, "WSClient.clients:")
+        for line in pprint_lines(
+            {
+                redact_str(k): (v.user.display_name if v.user else "<no user>")
+                + f" ({'valid' if WSToken.check_token(k) else 'invalid'})"
+                for k, v in WSClient.clients.items()
+            }
+        ):
+            LOG.log(VERBOSE_DEBUG, f"  {line}")
 
         if not WSToken.check_token(client_token):
             # client token is not valid, remove it from the clients dictionary if it exists
