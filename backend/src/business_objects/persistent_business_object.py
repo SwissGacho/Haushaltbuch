@@ -6,6 +6,8 @@ application's data model."""
 import copy
 import json
 from inspect import iscoroutinefunction
+from contextlib import nullcontext
+from multiprocessing import context
 from typing import Any, Type, Self, Optional, cast
 from datetime import date, datetime, UTC
 from core.app_logging import (
@@ -371,7 +373,11 @@ class PersistentBusinessObject(BOBase):
         return objects
 
     async def fetch(
-        self, id=None, newest: bool = False, session: Optional[SessionBase] = None
+        self,
+        id=None,
+        newest: bool = False,
+        session: Optional[SessionBase] = None,
+        transaction: Optional[SQLTransaction] = None,
     ):
         """Fetch the content for a business object instance from the DB.
         If 'id' is given, fetch the identified object
@@ -397,7 +403,8 @@ class PersistentBusinessObject(BOBase):
         ):
             LOG.debug(f"fetching {self} without id or newest")
             return self
-        async with SQL() as sql:
+        sql: SQL = transaction.sql() if transaction else SQL()
+        async with sql:
             if mixin:
                 await mixin(sql=sql, id=id, newest=newest, session=session)
             else:
@@ -494,7 +501,11 @@ class PersistentBusinessObject(BOBase):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
 
-    async def store(self, session: Optional[SessionBase] = None):
+    async def store(
+        self,
+        session: Optional[SessionBase] = None,
+        transaction: Optional[SQLTransaction] = None,
+    ):
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
@@ -504,16 +515,25 @@ class PersistentBusinessObject(BOBase):
             VERBOSE_DEBUG,
             f"{self.__class__.__name__}.store({session.user if session else 'N/A'})",
         )
-        if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(mixin):
-            old_values = await mixin(session=session)  # pylint: disable=not-callable
-        elif self.id is None:
-            await self.insert_self(session)
-        else:
-            old_values = await self.update_self(session)
-        await self._notify_store(session, old_values=old_values)
+        context = nullcontext(transaction) if transaction else SQLTransaction()
+        async with context as txaction:
+            sql = txaction.sql()
+            if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(
+                mixin
+            ):
+                old_values = await mixin(
+                    sql=sql, session=session
+                )  # pylint: disable=not-callable
+            elif self.id is None:
+                await self.insert_self(sql=sql, session=session)
+            else:
+                old_values = await self.update_self(sql=sql, session=session)
+            await self._notify_store(session, old_values=old_values)
 
     async def business_values_as_dict(
-        self, session: Optional[SessionBase] = None
+        self,
+        session: Optional[SessionBase] = None,
+        transaction: Optional[SQLTransaction] = None,
     ) -> dict[str, Any]:
         LOG.debug(
             f"{self}.business_values_as_dict: {self.id=}, user={getattr(session, 'user', None)}"
@@ -529,7 +549,7 @@ class PersistentBusinessObject(BOBase):
                 LOG.log(VERBOSE_DEBUG, f"{  line}")
         return business_values
 
-    async def insert_self(self, session: Optional[SessionBase] = None):
+    async def insert_self(self, sql: SQL, session: Optional[SessionBase] = None):
         LOG.log(
             VERBOSE_DEBUG,
             f"{self.__class__.__name__}.insert_self: user={session.user if session else 'N/A'}",
@@ -552,30 +572,25 @@ class PersistentBusinessObject(BOBase):
         LOG.debug(
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )
-        async with SQLTransaction() as txaction:
-            cursor = (
-                await txaction.sql()
-                .insert(self.table)
-                .rows(values_to_store)
-                .returning("id")
-                .execute()
+        cursor = (
+            await sql.insert(self.table).rows(values_to_store).returning("id").execute()
+        )
+        fetched = await cursor.fetchone()
+        id = fetched.get("id")
+        if id is None:
+            raise RuntimeError(f"Failed to insert {self} into DB, no id returned")
+        if self.__class__.get_data_object(id) is not None:
+            raise RuntimeError(
+                f"Failed to insert {self} into DB, id {id} already exists"
             )
-            fetched = await cursor.fetchone()
-            id = fetched.get("id")
-            if id is None:
-                raise RuntimeError(f"Failed to insert {self} into DB, no id returned")
-            if self.__class__.get_data_object(id) is not None:
-                raise RuntimeError(
-                    f"Failed to insert {self} into DB, id {id} already exists"
-                )
-            LOG.log(DEBUG, f"Inserted new {self} into DB with id={id}")
-            self._assign_id(id)
-            LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
-            # read the new row back to get any default values set by the DB
-            await self.fetch_self(txaction.sql(), id=self.id, session=session)
+        LOG.log(DEBUG, f"Inserted new {self} into DB with id={id}")
+        self._assign_id(id)
+        LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
+        # read the new row back to get any default values set by the DB
+        await self.fetch_self(sql, id=self.id, session=session)
 
     async def update_self(
-        self, session: Optional[SessionBase] = None
+        self, sql: SQL, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
         if self._data is None:
@@ -587,30 +602,25 @@ class PersistentBusinessObject(BOBase):
             )
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
-        async with SQLTransaction() as txaction:
-            update = (
-                txaction.sql()
-                .update(self.table)
-                .where(Eq(ColumnName("id"), Value(self.id)))
-            )
-            previous_values = await self._convert_db_data_from_db()
-            changed_values = self._detect_changes(previous_values)
-            if changed_values:
-                for k, v in changed_values.items():
-                    update.assignment(k, Value(k, v))
+        update = sql.update(self.table).where(Eq(ColumnName("id"), Value(self.id)))
+        previous_values = await self._convert_db_data_from_db()
+        changed_values = self._detect_changes(previous_values)
+        if changed_values:
+            for k, v in changed_values.items():
+                update.assignment(k, Value(k, v))
 
-            k = "last_updated"
-            if changed_values and not (k in self._data and self._data[k]):
-                self._data[k] = datetime.now().astimezone(UTC)
-                update.assignment(k, Value(k, self._data[k]))
-            try:
-                if changed_values:
-                    await update.execute()
-            finally:
-                # read the row back to get any changes made by the DB (e.g. triggers)
-                await self.fetch_self(txaction.sql(), id=self.id, session=session)
-            changes = self._detect_changes(old_values=previous_values)
-            return {k: v for k, v in previous_values.items() if k in changes}
+        k = "last_updated"
+        if changed_values and not (k in self._data and self._data[k]):
+            self._data[k] = datetime.now().astimezone(UTC)
+            update.assignment(k, Value(k, self._data[k]))
+        try:
+            if changed_values:
+                await update.execute()
+        finally:
+            # read the row back to get any changes made by the DB (e.g. triggers)
+            await self.fetch_self(sql, id=self.id, session=session)
+        changes = self._detect_changes(old_values=previous_values)
+        return {k: v for k, v in previous_values.items() if k in changes}
 
     async def _convert_db_data_from_db(self) -> dict[str, Any]:
         if self._data is None:

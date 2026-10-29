@@ -15,6 +15,7 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from business_objects.bo_mixins.bo_mixin import MixinBase
+from database.sql import SQL
 from database.sql_expression import (
     ColumnName,
     Not,
@@ -96,7 +97,7 @@ class Personal(MixinBase):
         return super().skip_create_table()
 
     async def store_mixin(
-        self, session: Optional[SessionBase] = None
+        self, sql: SQL, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
@@ -126,7 +127,7 @@ class Personal(MixinBase):
                 )
             setattr(self, "user_id", session.user)
 
-        return await super().store_mixin(session=session)
+        return await super().store_mixin(sql=sql, session=session)
 
 
 log_exit(LOG)
