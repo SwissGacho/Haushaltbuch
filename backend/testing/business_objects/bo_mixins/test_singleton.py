@@ -34,11 +34,11 @@ class _SingletonTarget(Singleton):
     async def count_rows(self, session=None):
         return self._count
 
-    async def insert_self(self, session=None):
-        self.insert_calls.append(session)
+    async def insert_self(self, sql, session=None):
+        self.insert_calls.append((sql, session))
 
-    async def update_self(self, session=None):
-        self.update_calls.append(session)
+    async def update_self(self, sql, session=None):
+        self.update_calls.append((sql, session))
         return self.update_return_value
 
 
@@ -60,10 +60,10 @@ class _SingletonInvalidCountRows(Singleton):
     def count_rows(self, session=None):
         return 0
 
-    async def insert_self(self, session=None):
+    async def insert_self(self, sql, session=None):
         return None
 
-    async def update_self(self, session=None):
+    async def update_self(self, sql, session=None):
         return None
 
 
@@ -111,21 +111,24 @@ class TestSingletonMixin(unittest.IsolatedAsyncioTestCase):
 
     async def test_store_mixin_raises_if_count_rows_not_coroutine(self):
         with self.assertRaises(TypeError):
-            await _SingletonInvalidCountRows().store_mixin(session=None)
+            await _SingletonInvalidCountRows().store_mixin(
+                sql=Mock(name="mock_sql"), session=None
+            )
 
     async def test_store_mixin_raises_if_singleton_already_exists(self):
         target = _SingletonTarget(bo_id=None, count=1)
 
         with self.assertRaises(CannotStoreEmptyBO):
-            await target.store_mixin(session=None)
+            await target.store_mixin(sql=Mock(name="mock_sql"), session=None)
 
     async def test_store_mixin_inserts_when_new_and_none_exists(self):
         target = _SingletonTarget(bo_id=None, count=0)
+        mock_sql = Mock(name="mock_sql")
         session = Mock(name="session")
 
-        result = await target.store_mixin(session=session)
+        result = await target.store_mixin(sql=mock_sql, session=session)
 
-        self.assertEqual([session], target.insert_calls)
+        self.assertEqual([(mock_sql, session)], target.insert_calls)
         self.assertEqual([], target.update_calls)
         self.assertEqual({}, result)
 
@@ -134,10 +137,11 @@ class TestSingletonMixin(unittest.IsolatedAsyncioTestCase):
         target = _SingletonTarget(
             bo_id=5, count=1, update_return_value=expected_old_values
         )
+        mock_sql = Mock(name="mock_sql")
         session = Mock(name="session")
 
-        result = await target.store_mixin(session=session)
+        result = await target.store_mixin(sql=mock_sql, session=session)
 
         self.assertEqual([], target.insert_calls)
-        self.assertEqual([session], target.update_calls)
+        self.assertEqual([(mock_sql, session)], target.update_calls)
         self.assertEqual(expected_old_values, result)
