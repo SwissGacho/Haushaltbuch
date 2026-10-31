@@ -548,7 +548,7 @@ class PersistentBusinessObject(BOBase):
         LOG.debug(
             f"{self}.business_values_as_dict: {self.id=}, user={getattr(session, 'user', None)}"
         )
-        await self.fetch(self.id, session=session)
+        await self.fetch(self.id, session=session, transaction=transaction)
         business_values = await super().business_values_as_dict(session=session)
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(

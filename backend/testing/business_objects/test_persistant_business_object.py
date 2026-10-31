@@ -561,6 +561,26 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
     async def test_202_fetch_newest(self):
         await self._202_fetch("Eq", ("id", self.mock_subsql), newest=True)
 
+    async def test_202_business_values_as_dict_with_transaction(self):
+        session = Mock(name="session")
+        transaction = Mock(name="transaction")
+        expected_values = {"mock_attr1": "value"}
+        self.mock_bo.fetch = AsyncMock(name="fetch")
+
+        with patch(
+            "business_objects.business_object_base.BOBase.business_values_as_dict",
+            new=AsyncMock(return_value=expected_values),
+        ) as mock_business_values_as_dict:
+            result = await self.mock_bo.business_values_as_dict(
+                session=session, transaction=transaction
+            )
+
+        self.mock_bo.fetch.assert_awaited_once_with(
+            self.mock_bo.id, session=session, transaction=transaction
+        )
+        mock_business_values_as_dict.assert_awaited_once_with(session=session)
+        self.assertIs(expected_values, result)
+
     async def test_203_store_insert(self):
         self.mock_bo.insert_self = AsyncMock(name="_insert_self")
         self.mock_bo.update_self = AsyncMock(name="_update_self")
