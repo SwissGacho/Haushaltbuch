@@ -45,7 +45,7 @@ class Session(SessionBase):
     ) -> None:
         local_LOG = self.local_logger(connection)
         local_LOG.debug(
-            f"creating new session (user={user.name},  client-token': {redact_str(client_token)})"
+            f"creating new session (user={user._name},  client-token': {redact_str(client_token)})"
         )
         Session._all_sessions.append(self)
         self._session_nbr = Session._next_session_nbr
