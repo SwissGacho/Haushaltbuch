@@ -152,7 +152,7 @@ class Test_100_Persistent_Business_Object_classmethods(
                 BOBaseBase,
                 {"relation": MockPersistentBO1},
             )
-        mock_get_matching_objects.assert_awaited_once_with({"id": 2})
+        mock_get_matching_objects.assert_awaited_once_with({"id": 2}, db_conn=None)
         self.assertIs(relation_obj, relation_type)
 
         class MockFlag(BaseFlag):

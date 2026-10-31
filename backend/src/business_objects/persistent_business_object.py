@@ -7,7 +7,6 @@ import copy
 import json
 from inspect import iscoroutinefunction
 from contextlib import nullcontext
-from multiprocessing import context
 from typing import Any, Type, Self, Optional, cast
 from datetime import date, datetime, UTC
 from core.app_logging import (
@@ -22,6 +21,7 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from core.exceptions import CannotStoreEmptyBO
+from core.base_objects import ConnectionBaseClass
 from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
 from database.sql_expression import ColumnName, SQLExpression, And, Eq, Filter, Value
@@ -136,12 +136,21 @@ class PersistentBusinessObject(BOBase):
             if issubclass(_cls, PersistentBusinessObject)
         }
 
-    async def convert_from_db(self, value, typ, subtyp):
+    async def convert_from_db(
+        self, value, typ, subtyp, db_conn: Optional[ConnectionBaseClass] = None
+    ):
         "convert a value of type 'typ' read from the DB"
-        LOG.log(
-            VERBOSE_DEBUG,
-            f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})",
-        )
+        # if LOG.isEnabledFor(VERBOSE_DEBUG):
+        #     LOG.log(VERBOSE_DEBUG, "PersistentBusinessObject.convert_from_db:")
+        #     for line in pprint_lines(
+        #         {
+        #             "value": value,
+        #             "type(value)": type(value),
+        #             "typ": typ,
+        #             "subtyp": subtyp,
+        #         }
+        #     ):
+        #         LOG.log(VERBOSE_DEBUG, f"  {line}")
         if value is None:
             return None
         if typ == date and isinstance(value, str):
@@ -167,7 +176,9 @@ class PersistentBusinessObject(BOBase):
                         "self references itself, return self to avoid fetching from DB again",
                     )
                     return self
-                objs = await relation.get_matching_objects({"id": value})
+                objs = await relation.get_matching_objects(
+                    {"id": value}, db_conn=db_conn
+                )
                 if len(objs) == 1:
                     return objs[0]
                 LOG.error(
@@ -300,6 +311,7 @@ class PersistentBusinessObject(BOBase):
         conditions: dict | None = None,
         attributes: list[str] | None = None,
         session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> list[BOBase]:
         """Get the business objects matching the conditions"""
         if attributes:
@@ -314,7 +326,7 @@ class PersistentBusinessObject(BOBase):
                 cols.append("bo_name")
         else:
             cols = None
-        async with SQL() as sql:
+        async with SQL(db_conn) as sql:
             select = sql.select(cols).from_(cls.table)
             filter_conditions: SQLExpression | None = cls._filter_conditions(
                 Filter(conditions) if conditions else None,
@@ -453,10 +465,7 @@ class PersistentBusinessObject(BOBase):
             select.where(Eq("id", SQLSubquery(subselect)))
 
         if LOG.isEnabledFor(VERBOSE_DEBUG):
-            LOG.log(
-                VERBOSE_DEBUG,
-                f"PersistentBusinessObject.fetch_self: {self.__class__.__name__} {self.id=}, {id=}, {newest=}, {session.user if session else 'N/A'}",
-            )
+            LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: fetching")
             for line in pprint_lines(select.get_sql()):
                 LOG.log(VERBOSE_DEBUG, f"   {line}")
 
@@ -479,22 +488,22 @@ class PersistentBusinessObject(BOBase):
                     VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _db_data="
                 )
                 for line in pprint_lines(self._data.db_data):
-                    LOG.log(VERBOSE_DEBUG, f" -  {line}")
+                    LOG.log(VERBOSE_DEBUG, f"  {line}")
 
             for description in self.attribute_descriptions():
-                LOG.log(
-                    DEBUG,
-                    f"Processing attribute {description.name}, will be converted from DB value {self._data.db_data.get(description.name)}",
-                )
+                # LOG.log(
+                #     DEBUG,
+                #     f"Processing attribute {description.name}, will be converted from DB value {self._data.db_data.get(description.name)}",
+                # )
                 self._data[description.name] = await self.convert_from_db(
                     self._data.db_data.get(description.name),
                     description.data_type,
                     description.constraint_values,
                 )
-                LOG.log(
-                    VERBOSE_DEBUG,
-                    f"Converted attribute {description.name}",
-                )
+                # LOG.log(
+                #     VERBOSE_DEBUG,
+                #     f"Converted attribute {description.name}",
+                # )
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _data=")
                 for line in pprint_lines(self._data):
@@ -565,10 +574,10 @@ class PersistentBusinessObject(BOBase):
         ]
         if not values_to_store:
             raise CannotStoreEmptyBO(f"Cannot store {self._data=} as it has no values")
-        if LOG.isEnabledFor(VERBOSE_DEBUG):
-            for k, v in self._data.items():
-                if k != "id" and v is None:
-                    LOG.log(VERBOSE_DEBUG, f"{k=}: {v}")
+        # if LOG.isEnabledFor(VERBOSE_DEBUG):
+        #     for k, v in self._data.items():
+        #         if k != "id" and v is None:
+        #             LOG.log(VERBOSE_DEBUG, f"{k=}: {v}")
         LOG.debug(
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )
@@ -583,7 +592,7 @@ class PersistentBusinessObject(BOBase):
             raise RuntimeError(
                 f"Failed to insert {self} into DB, id {id} already exists"
             )
-        LOG.log(DEBUG, f"Inserted new {self} into DB with id={id}")
+        LOG.log(DEBUG, f"Inserted new {self} into DB returning id={id}")
         self._assign_id(id)
         LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
         # read the new row back to get any default values set by the DB
