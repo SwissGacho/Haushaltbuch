@@ -142,6 +142,7 @@ class Test_100_Persistent_Business_Object_classmethods(
         self.assertEqual(str(test_list), str(list_type))
 
         relation_obj = MockPersistentBO1(bo_id=2)
+        db_conn = Mock(name="db_conn")
         with patch.object(
             MockPersistentBO1,
             "get_matching_objects",
@@ -151,8 +152,11 @@ class Test_100_Persistent_Business_Object_classmethods(
                 2,
                 BOBaseBase,
                 {"relation": MockPersistentBO1},
+                db_conn=db_conn,
             )
-        mock_get_matching_objects.assert_awaited_once_with({"id": 2}, db_conn=None)
+        mock_get_matching_objects.assert_awaited_once_with(
+            {"id": 2}, db_conn=db_conn
+        )
         self.assertIs(relation_obj, relation_type)
 
         class MockFlag(BaseFlag):
@@ -284,7 +288,7 @@ class Test_100_Persistent_Business_Object_classmethods(
         mock_cursor.fetchall.assert_awaited_once_with()
         self.assertEqual(result, mock_result)
 
-    async def _104_get_matching_objects(self, attributes=None):
+    async def _104_get_matching_objects(self, attributes=None, db_conn=None):
         mock_conditions = "{mock conditions}"
         if attributes:
             mock_cols = [a for a in attributes if a in mock_bo2_as_dict]
@@ -350,7 +354,8 @@ class Test_100_Persistent_Business_Object_classmethods(
         mock_sql.from_ = Mock(return_value=mock_sql)
         mock_sql.where = Mock(return_value=mock_sql)
         mock_convert_from_db = AsyncMock(
-            name="convert_from_db", side_effect=lambda value, typ, subtyp: value
+            name="convert_from_db",
+            side_effect=lambda value, typ, subtyp, db_conn=None: value,
         )
 
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
@@ -378,9 +383,9 @@ class Test_100_Persistent_Business_Object_classmethods(
             ),
         ):
             result = await MockPersistentBO2.get_matching_objects(
-                mock_conditions, mock_cols
+                mock_conditions, mock_cols, db_conn=db_conn
             )
-        MockSQL.assert_called_once_with()
+        MockSQL.assert_called_once_with(db_conn)
         mock_sql.__aenter__.assert_awaited_once_with()
         mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
         mock_sql.select.assert_called_once_with(mock_cols if mock_cols else None)
@@ -390,7 +395,12 @@ class Test_100_Persistent_Business_Object_classmethods(
         mock_sql.execute.assert_awaited_once_with()
         mock_cursor.fetchall.assert_awaited_once_with()
         convert_args = [
-            call(value, mock_bo2_as_dict[key], mock_bo2_constr_vals[key])
+            call(
+                value,
+                mock_bo2_as_dict[key],
+                mock_bo2_constr_vals[key],
+                db_conn=db_conn,
+            )
             for row in mock_fetch_result
             for key, value in row.items()
             if key != "id"
@@ -405,6 +415,7 @@ class Test_100_Persistent_Business_Object_classmethods(
         await self._104_get_matching_objects()
         await self._104_get_matching_objects([])
         await self._104_get_matching_objects(["mock_attr1", "mock_attr3"])
+        await self._104_get_matching_objects(db_conn=Mock(name="db_conn"))
 
 
 class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):

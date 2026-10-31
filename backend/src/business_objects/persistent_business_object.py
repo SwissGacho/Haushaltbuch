@@ -379,6 +379,7 @@ class PersistentBusinessObject(BOBase):
                         value,
                         description.data_type,
                         description.constraint_values,
+                        db_conn=db_conn,
                     ),
                 )
             objects.append(target_obj)
