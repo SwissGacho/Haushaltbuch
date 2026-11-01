@@ -76,7 +76,7 @@ class Singleton(MixinBase):
                     f"Singleton.store_mixin: Expected PersistentBusinessObject with count_rows method, got {type(self).__name__}"
                 )
             existing_count = await count_rows(  # pylint: disable=not-callable
-                session=session
+                session=session, db_conn=sql.connection
             )
             if existing_count > 0:
                 raise CannotStoreEmptyBO(

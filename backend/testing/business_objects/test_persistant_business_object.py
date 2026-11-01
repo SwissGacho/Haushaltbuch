@@ -154,9 +154,7 @@ class Test_100_Persistent_Business_Object_classmethods(
                 {"relation": MockPersistentBO1},
                 db_conn=db_conn,
             )
-        mock_get_matching_objects.assert_awaited_once_with(
-            {"id": 2}, db_conn=db_conn
-        )
+        mock_get_matching_objects.assert_awaited_once_with({"id": 2}, db_conn=db_conn)
         self.assertIs(relation_obj, relation_type)
 
         class MockFlag(BaseFlag):
@@ -232,6 +230,7 @@ class Test_100_Persistent_Business_Object_classmethods(
         mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
         mock_sql.__aexit__ = AsyncMock(return_value=None)
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
+        db_conn = Mock(name="db_conn")
 
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
@@ -241,8 +240,10 @@ class Test_100_Persistent_Business_Object_classmethods(
                 return_value=[],
             ),
         ):
-            result = await MockPersistentBO2.count_rows(mock_conditions)
-        MockSQL.assert_called_once_with()
+            result = await MockPersistentBO2.count_rows(
+                mock_conditions, db_conn=db_conn
+            )
+        MockSQL.assert_called_once_with(db_conn)
         mock_sql.__aenter__.assert_awaited_once_with()
         mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
         mock_sql.select.assert_called_once_with(["count(*) as count"])
@@ -267,6 +268,7 @@ class Test_100_Persistent_Business_Object_classmethods(
         mock_sql.__aenter__ = AsyncMock(return_value=mock_sql)
         mock_sql.__aexit__ = AsyncMock(return_value=None)
         MockSQL = Mock(name="MockSQL", return_value=mock_sql)
+        db_conn = Mock(name="db_conn")
 
         with (
             patch("business_objects.persistent_business_object.SQL", new=MockSQL),
@@ -276,8 +278,10 @@ class Test_100_Persistent_Business_Object_classmethods(
                 return_value=[],
             ),
         ):
-            result = await MockPersistentBO2.get_matching_ids(mock_conditions)
-        MockSQL.assert_called_once_with()
+            result = await MockPersistentBO2.get_matching_ids(
+                mock_conditions, db_conn=db_conn
+            )
+        MockSQL.assert_called_once_with(db_conn)
         mock_sql.__aenter__.assert_awaited_once_with()
         mock_sql.__aexit__.assert_awaited_once_with(None, None, None)
         mock_sql.select.assert_called_once_with(["id"])
@@ -423,10 +427,10 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         MockPersistentBO2._loaded_instances.clear()  # type: ignore
         MockPersistentBO2._data_objects.clear()  # type: ignore
         self.mock_bo = MockPersistentBO2()
-        self.mock_sql = Mock(name="mock_sql")
+        self.mock_sql = AsyncMock(name="mock_sql")
         self.mock_sql.__aenter__ = AsyncMock(return_value=self.mock_sql)
         self.mock_sql.__aexit__ = AsyncMock(return_value=None)
-        self.mock_cursor = Mock(name="mock_cursor")
+        self.mock_cursor = AsyncMock(name="mock_cursor")
         self.FETCH_RESULT = {
             "bo_name": "mock persistent bo 2",
             "id": 33,
@@ -500,7 +504,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             ),
         ):
             MockSubquery.return_value = self.mock_subsql
-            fetch_kwargs = {"transaction": self.mock_tx} if transaction else {}
+            fetch_kwargs = {"transaction_or_sql": self.mock_tx} if transaction else {}
             if newest == DEFAULT:
                 result = await self.mock_bo.fetch(**fetch_kwargs)
             else:
@@ -576,7 +580,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             )
 
         self.mock_bo.fetch.assert_awaited_once_with(
-            self.mock_bo.id, session=session, transaction=transaction
+            self.mock_bo.id, session=session, transaction_or_sql=transaction
         )
         mock_business_values_as_dict.assert_awaited_once_with(session=session)
         self.assertIs(expected_values, result)

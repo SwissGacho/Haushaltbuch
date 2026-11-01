@@ -82,10 +82,9 @@ class _SQLBase(SQLExecutable):
         return self._my_connection
 
     async def close(self, rollback: bool = False):
-        "Close the connection to the database."
+        "Close the context and the connection to the database if owned."
         LOG.log(
-            VERBOSE_DEBUG,
-            f"Closing {self.__class__.__name__} connection to the database (context {self._ctx_id})",
+            VERBOSE_DEBUG, f"Closing {self.__class__.__name__} context {self._ctx_id}"
         )
         _ = rollback  # not used here
         if self._my_connection is not None and self._connection is None:
@@ -111,10 +110,14 @@ class _SQLBase(SQLExecutable):
         if self._my_connection is not None:
             await self._my_connection.rollback()
 
+    def sql(self) -> "SQL":
+        "Create a new SQL statement object"
+        return SQL(connection=self.connection)
+
 
 class SQL(_SQLBase):
     """Usage:
-    sql = SQL_statement().create_table(
+    sql = SQL().create_table(
         "users",
         [
             ("name", SQL_data_type.TEXT),
@@ -123,9 +126,13 @@ class SQL(_SQLBase):
     ).execute()"""
 
     def __init__(
-        self, connection: ConnectionBaseClass | None = None, auto_commit: bool = True
+        self,
+        connection: Optional[ConnectionBaseClass] = None,
+        auto_commit: Optional[bool] = None,
     ) -> None:
         # LOG.debug(f"SQL.__init__({connection=})")
+        if auto_commit is None:
+            auto_commit = connection is None
         super().__init__(connection=connection)
         self._sql_statement: SQLStatement | None = None
         self._auto_commit: bool = auto_commit
@@ -279,20 +286,12 @@ class SQLTransaction(_SQLBase):
         LOG.log(VERBOSE_DEBUG, f"SQL transaction context {self._ctx_id} closed.")
         return False
 
-    def sql(self) -> SQL:
-        "Create a new SQL statement object"
-        return SQL(connection=self.connection, auto_commit=False)
-
 
 class SQLConnection(_SQLBase):
     """SQL connection context manager."""
 
     def __init__(self) -> None:
         super().__init__(None)
-
-    def sql(self) -> SQL:
-        "Create a new SQL statement object"
-        return SQL(connection=self.connection)
 
     def transaction(self) -> SQLTransaction:
         "Create a new SQL transaction object"

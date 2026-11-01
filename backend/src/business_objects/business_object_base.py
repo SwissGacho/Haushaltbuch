@@ -551,11 +551,11 @@ class BOBase(BOBaseBase):
         self.__class__.notify_change_subscribers(self, old_values)
         return old_values
 
-    async def insert_self(self, session: Optional[SessionBase] = None):
+    async def insert_self(self, sql, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
 
     async def update_self(
-        self, session: Optional[SessionBase] = None
+        self, sql, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
         return {}

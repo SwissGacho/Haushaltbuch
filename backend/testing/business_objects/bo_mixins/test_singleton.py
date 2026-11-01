@@ -26,12 +26,12 @@ class _SingletonTarget(Singleton):
     async def fetch_self(self, sql, id=None, newest=None, session=None):
         self.fetch_calls.append((sql, id, newest, session))
 
-    async def store(self, session=None):
-        self.store_calls.append(session)
+    async def store(self, session=None, trx=None):
+        self.store_calls.append((session, trx))
         if self.id is None:
             self.id = 999
 
-    async def count_rows(self, session=None):
+    async def count_rows(self, session=None, db_conn=None):
         return self._count
 
     async def insert_self(self, sql, session=None):
@@ -57,7 +57,7 @@ class _SingletonInvalidCountRows(Singleton):
     def __init__(self):
         self.id = None
 
-    def count_rows(self, session=None):
+    def count_rows(self, session=None, db_conn=None):
         return 0
 
     async def insert_self(self, sql, session=None):
@@ -101,7 +101,7 @@ class TestSingletonMixin(unittest.IsolatedAsyncioTestCase):
         await target.fetch_mixin(sql=mock_sql, id=None, newest=None, session=session)
 
         self.assertEqual(999, target.id)
-        self.assertEqual([session], target.store_calls)
+        self.assertEqual([(session, None)], target.store_calls)
 
     async def test_fetch_mixin_raises_if_fetch_self_not_coroutine(self):
         with self.assertRaises(TypeError):

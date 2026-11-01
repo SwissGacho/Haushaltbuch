@@ -241,10 +241,13 @@ class PersistentBusinessObject(BOBase):
 
     @classmethod
     async def count_rows(
-        cls, conditions: Optional[dict] = None, session: Optional[SessionBase] = None
+        cls,
+        conditions: Optional[dict] = None,
+        session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
-        async with SQL() as sql:
+        async with SQL(db_conn) as sql:
             select = sql.select(["count(*) as count"]).from_(cls.table)
             filter_conditions: SQLExpression | None = cls._filter_conditions(
                 Filter(conditions) if conditions else None,
@@ -261,10 +264,13 @@ class PersistentBusinessObject(BOBase):
 
     @classmethod
     async def get_matching_ids(
-        cls, conditions: dict | None = None, session: Optional[SessionBase] = None
+        cls,
+        conditions: dict | None = None,
+        session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> list[int]:
         """Get the ids of business objects matching the conditions"""
-        async with SQL() as sql:
+        async with SQL(db_conn) as sql:
             select = sql.select(["id"]).from_(cls.table)
             filter_conditions: SQLExpression | None = cls._filter_conditions(
                 Filter(conditions) if conditions else None,
@@ -288,10 +294,13 @@ class PersistentBusinessObject(BOBase):
 
     @classmethod
     async def get_single_matching_id(
-        cls, conditions: dict | None = None, session: Optional[SessionBase] = None
+        cls,
+        conditions: dict | None = None,
+        session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> int | None:
         """Get the id of a single business object matching the conditions. Raises ValueError if more than one id matches conditions."""
-        ids = await cls.get_matching_ids(conditions, session)
+        ids = await cls.get_matching_ids(conditions, session=session, db_conn=db_conn)
         LOG.log(
             VERBOSE_DEBUG,
             f"PersistentBusinessObject.get_single_matching_id({conditions=}) -> {ids=}",
@@ -390,7 +399,7 @@ class PersistentBusinessObject(BOBase):
         id=None,
         newest: bool = False,
         session: Optional[SessionBase] = None,
-        transaction: Optional[SQLTransaction] = None,
+        transaction_or_sql: Optional[SQL | SQLTransaction] = None,
     ):
         """Fetch the content for a business object instance from the DB.
         If 'id' is given, fetch the identified object
@@ -416,7 +425,7 @@ class PersistentBusinessObject(BOBase):
         ):
             LOG.debug(f"fetching {self} without id or newest")
             return self
-        sql: SQL = transaction.sql() if transaction else SQL()
+        sql: SQL = transaction_or_sql.sql() if transaction_or_sql else SQL()
         async with sql:
             if mixin:
                 await mixin(sql=sql, id=id, newest=newest, session=session)
@@ -500,6 +509,7 @@ class PersistentBusinessObject(BOBase):
                     self._data.db_data.get(description.name),
                     description.data_type,
                     description.constraint_values,
+                    db_conn=sql.connection,
                 )
                 # LOG.log(
                 #     VERBOSE_DEBUG,
@@ -526,8 +536,8 @@ class PersistentBusinessObject(BOBase):
             f"{self.__class__.__name__}.store({session.user if session else 'N/A'})",
         )
         context = nullcontext(transaction) if transaction else SQLTransaction()
-        async with context as txaction:
-            sql = txaction.sql()
+        async with context as sql_ctxt:
+            sql = sql_ctxt.sql()
             if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(
                 mixin
             ):
@@ -548,7 +558,7 @@ class PersistentBusinessObject(BOBase):
         LOG.debug(
             f"{self}.business_values_as_dict: {self.id=}, user={getattr(session, 'user', None)}"
         )
-        await self.fetch(self.id, session=session, transaction=transaction)
+        await self.fetch(self.id, session=session, transaction_or_sql=transaction)
         business_values = await super().business_values_as_dict(session=session)
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(
@@ -597,7 +607,7 @@ class PersistentBusinessObject(BOBase):
         self._assign_id(id)
         LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
         # read the new row back to get any default values set by the DB
-        await self.fetch_self(sql, id=self.id, session=session)
+        await self.fetch(transaction_or_sql=sql, id=self.id, session=session)
 
     async def update_self(
         self, sql: SQL, session: Optional[SessionBase] = None
@@ -613,7 +623,7 @@ class PersistentBusinessObject(BOBase):
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
         update = sql.update(self.table).where(Eq(ColumnName("id"), Value(self.id)))
-        previous_values = await self._convert_db_data_from_db()
+        previous_values = await self._convert_db_data_from_db(db_conn=sql.connection)
         changed_values = self._detect_changes(previous_values)
         if changed_values:
             for k, v in changed_values.items():
@@ -628,11 +638,13 @@ class PersistentBusinessObject(BOBase):
                 await update.execute()
         finally:
             # read the row back to get any changes made by the DB (e.g. triggers)
-            await self.fetch_self(sql, id=self.id, session=session)
+            await self.fetch(transaction_or_sql=sql, id=self.id, session=session)
         changes = self._detect_changes(old_values=previous_values)
         return {k: v for k, v in previous_values.items() if k in changes}
 
-    async def _convert_db_data_from_db(self) -> dict[str, Any]:
+    async def _convert_db_data_from_db(
+        self, db_conn: Optional[ConnectionBaseClass] = None
+    ) -> dict[str, Any]:
         if self._data is None:
             raise RuntimeError(f"Cannot convert DB data for {self} as it has no data")
         descriptions = {d.name: d for d in self.attribute_descriptions()}
@@ -643,6 +655,7 @@ class PersistentBusinessObject(BOBase):
                     self._data.db_data.get(k),
                     descriptions[k].data_type,
                     descriptions[k].constraint_values,
+                    db_conn=db_conn,
                 )
         return converted
 
