@@ -36,7 +36,7 @@ class GenericUser(PersistentBusinessObject):
     @property
     def is_admin(self) -> bool:
         """Check if the user has admin role"""
-        return UserRole.ADMIN in self.role
+        return self.role is not None and UserRole.ADMIN in self.role
 
 
 class SingleUser(Specializing, Singleton, GenericUser):
