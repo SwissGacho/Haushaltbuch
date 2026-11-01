@@ -691,11 +691,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 "business_objects.persistent_business_object.SQLTransaction",
                 new=self.MockSQLTx,
             ),
-            patch(
-                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
-            ) as mock_fetch_self,
         ):
             mock_bo = MockPersistentBO2(**mock_attrs)
+            mock_bo.fetch = AsyncMock(name="fetch")
 
             await mock_bo.insert_self(sql=self.mock_sql, session=session)
 
@@ -708,8 +706,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_sql.execute.assert_awaited_once_with()
             self.mock_cursor.fetchone.assert_awaited_once_with()
             self.assertEqual(mock_bo.id, self.FETCH_RESULT["id"])
-            mock_fetch_self.assert_awaited_once_with(
-                self.mock_sql, id=mock_bo.id, session=session
+            mock_bo.fetch.assert_awaited_once_with(
+                transaction_or_sql=self.mock_sql, id=mock_bo.id, session=session
             )
 
     async def test_204a_insert_self(self):
@@ -747,9 +745,6 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 new=mock_convert_from_db,
             ),
             patch(
-                "business_objects.persistent_business_object.PersistentBusinessObject.fetch_self"
-            ) as mock_fetch_self,
-            patch(
                 "business_objects.persistent_business_object.datetime"
             ) as mock_datetime,
             patch(
@@ -765,6 +760,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                     self.mock_bo._data.db_data.get(a),
                     mock_bo2_as_dict[a],
                     mock_bo2_constr_vals[a],
+                    db_conn=self.mock_sql.connection,
                 )
                 for a in mock_bo2_as_dict
                 if a not in ("bo_name", "id")
@@ -832,8 +828,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 mock_datetime.now.assert_called_once_with()
                 mock_dt.astimezone.assert_called_once_with(datetime.UTC)
             self.mock_sql.execute.assert_awaited_once_with()
-            mock_fetch_self.assert_awaited_once_with(
-                self.mock_sql, id=id, session=session
+            self.mock_bo.fetch.assert_awaited_once_with(
+                transaction_or_sql=self.mock_sql, id=id, session=session
             )
 
     async def test_205a_update_self(self):

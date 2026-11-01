@@ -537,18 +537,18 @@ class PersistentBusinessObject(BOBase):
         )
         context = nullcontext(transaction) if transaction else SQLTransaction()
         async with context as sql_ctxt:
-            sql = sql_ctxt.sql()
-            if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(
-                mixin
-            ):
-                old_values = await mixin(
-                    sql=sql, session=session
-                )  # pylint: disable=not-callable
-            elif self.id is None:
-                await self.insert_self(sql=sql, session=session)
-            else:
-                old_values = await self.update_self(sql=sql, session=session)
-            await self._notify_store(session, old_values=old_values)
+            async with sql_ctxt.sql() as sql:
+                if (
+                    mixin := getattr(self, "store_mixin", None)
+                ) and iscoroutinefunction(mixin):
+                    old_values = await mixin(
+                        sql=sql, session=session
+                    )  # pylint: disable=not-callable
+                elif self.id is None:
+                    await self.insert_self(sql=sql, session=session)
+                else:
+                    old_values = await self.update_self(sql=sql, session=session)
+        await self._notify_store(session, old_values=old_values)
 
     async def business_values_as_dict(
         self,

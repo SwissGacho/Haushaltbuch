@@ -48,6 +48,12 @@ class _SQLBase(SQLExecutable):
         self._connection = connection
         self._my_connection = connection
         self._ctx_id = next(self._id_counter)
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"New {self.__class__.__name__}"
+            f"({'in'if connection is not None else 'no'} connection)"
+            f" context {self._ctx_id}",
+        )
 
     async def __aenter__(self) -> Self:
         """Enter the runtime context related to this object."""
