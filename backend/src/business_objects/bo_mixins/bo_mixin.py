@@ -152,7 +152,7 @@ class MixinBase:
         )
 
     async def store_mixin(
-        self, session: Optional[SessionBase] = None
+        self, sql: SQL, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
@@ -168,10 +168,10 @@ class MixinBase:
                 f"MixinBase.store_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
             )
         if getattr(self, "id", None) is None:
-            await insert_self(session)  # pylint: disable=not-callable
+            await insert_self(sql, session)  # pylint: disable=not-callable
             return {}
         else:
-            return await update_self(session)  # pylint: disable=not-callable
+            return await update_self(sql, session)  # pylint: disable=not-callable
 
 
 log_exit(LOG)

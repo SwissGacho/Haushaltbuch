@@ -22,6 +22,7 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from core.util import _classproperty
+from core.base_objects import ConnectionBaseClass
 from core.app import App
 import core.exceptions
 from core.exceptions import DataError
@@ -416,6 +417,7 @@ class BOBase(BOBaseBase):
         conditions: dict | None = None,
         attributes: list[str] | None = None,
         session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> list["BOBase"]:
         """Get the business objects matching the conditions"""
         raise NotImplementedError("get_matching_objects not implemented")
@@ -549,11 +551,11 @@ class BOBase(BOBaseBase):
         self.__class__.notify_change_subscribers(self, old_values)
         return old_values
 
-    async def insert_self(self, session: Optional[SessionBase] = None):
+    async def insert_self(self, sql, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
 
     async def update_self(
-        self, session: Optional[SessionBase] = None
+        self, sql, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
         return {}

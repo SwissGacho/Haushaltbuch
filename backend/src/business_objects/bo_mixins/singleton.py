@@ -59,6 +59,7 @@ class Singleton(MixinBase):
 
     async def store_mixin(
         self,
+        sql: SQL,
         session: Optional[SessionBase] = None,
     ) -> dict[str, Any]:
         """Store the business object in the database.
@@ -75,13 +76,13 @@ class Singleton(MixinBase):
                     f"Singleton.store_mixin: Expected PersistentBusinessObject with count_rows method, got {type(self).__name__}"
                 )
             existing_count = await count_rows(  # pylint: disable=not-callable
-                session=session
+                session=session, db_conn=sql.connection
             )
             if existing_count > 0:
                 raise CannotStoreEmptyBO(
                     f"Cannot insert {self} as it is a Singleton and already exists in the DB"
                 )
-        return await super().store_mixin(session=session)
+        return await super().store_mixin(sql=sql, session=session)
 
 
 log_exit(LOG)

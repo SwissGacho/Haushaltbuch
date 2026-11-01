@@ -2,8 +2,9 @@
 This module provides functionality to create, execute, and manage SQL statements."""
 
 from typing import Self, Optional
+import itertools
 
-from core.app_logging import getLogger, log_exit
+from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
 
 LOG = getLogger(__name__)
 
@@ -35,6 +36,8 @@ class _SQLBase(SQLExecutable):
 
     Should not be instantiated directly."""
 
+    _id_counter = itertools.count()
+
     def __new__(cls, *args, **kwargs):
         factory = cls._get_db().sql_factory  # pylint: disable=no-member
         actual_class = factory.get_sql_class(cls)
@@ -44,16 +47,27 @@ class _SQLBase(SQLExecutable):
         super().__init__(None)
         self._connection = connection
         self._my_connection = connection
+        self._ctx_id = next(self._id_counter)
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"New {self.__class__.__name__}"
+            f"({'in'if connection is not None else 'no'} connection)"
+            f" context {self._ctx_id}",
+        )
 
     async def __aenter__(self) -> Self:
         """Enter the runtime context related to this object."""
-        # LOG.debug(f"Entering {self.__class__.__name__} context")
+        LOG.log(
+            VERBOSE_DEBUG, f"Entering {self.__class__.__name__} context {self._ctx_id}"
+        )
         await self.connect()
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         """Exit the runtime context related to this object."""
-        # LOG.debug(f"Exiting {self.__class__.__name__} context")
+        LOG.log(
+            VERBOSE_DEBUG, f"Exiting {self.__class__.__name__} context {self._ctx_id}"
+        )
         await self.close(rollback=exc_type is not None)
         return False
 
@@ -62,7 +76,10 @@ class _SQLBase(SQLExecutable):
         if self._my_connection is None:
             # pylint: disable=no-member
             self._my_connection = await SQLExecutable._get_db().connect()
-            # LOG.debug("New connection created")
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"New {self.__class__.__name__} connection created (context {self._ctx_id})",
+            )
         return self._my_connection
 
     @property
@@ -71,29 +88,42 @@ class _SQLBase(SQLExecutable):
         return self._my_connection
 
     async def close(self, rollback: bool = False):
-        "Close the connection to the database."
+        "Close the context and the connection to the database if owned."
+        LOG.log(
+            VERBOSE_DEBUG, f"Closing {self.__class__.__name__} context {self._ctx_id}"
+        )
         _ = rollback  # not used here
         if self._my_connection is not None and self._connection is None:
             await self._my_connection.close()
             self._my_connection = None
-            # LOG.debug("Connection closed")
+            LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__} connection closed")
 
     async def commit(self):
         "commit current transaction"
-        # LOG.debug("commit connection")
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"Committing {self.__class__.__name__} connection (context {self._ctx_id})",
+        )
         if self._my_connection is not None:
             await self._my_connection.commit()
 
     async def rollback(self):
         "rollback current transaction"
-        # LOG.debug("rollback connection")
+        LOG.log(
+            VERBOSE_DEBUG,
+            f"Rolling back {self.__class__.__name__} connection (context {self._ctx_id})",
+        )
         if self._my_connection is not None:
             await self._my_connection.rollback()
+
+    def sql(self) -> "SQL":
+        "Create a new SQL statement object"
+        return SQL(connection=self.connection)
 
 
 class SQL(_SQLBase):
     """Usage:
-    sql = SQL_statement().create_table(
+    sql = SQL().create_table(
         "users",
         [
             ("name", SQL_data_type.TEXT),
@@ -102,9 +132,13 @@ class SQL(_SQLBase):
     ).execute()"""
 
     def __init__(
-        self, connection: ConnectionBaseClass | None = None, auto_commit: bool = True
+        self,
+        connection: Optional[ConnectionBaseClass] = None,
+        auto_commit: Optional[bool] = None,
     ) -> None:
         # LOG.debug(f"SQL.__init__({connection=})")
+        if auto_commit is None:
+            auto_commit = connection is None
         super().__init__(connection=connection)
         self._sql_statement: SQLStatement | None = None
         self._auto_commit: bool = auto_commit
@@ -118,10 +152,16 @@ class SQL(_SQLBase):
     async def close(self, rollback: bool = False):
         if self._auto_commit:
             if rollback:
-                # LOG.debug("Rolling back connection due to auto-commit")
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"Rolling back {self.__class__.__name__} connection due to auto-commit (context {self._ctx_id})",
+                )
                 await self.rollback()
             else:
-                # LOG.debug("auto-committing connection")
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"Auto-committing {self.__class__.__name__} connection (context {self._ctx_id})",
+                )
                 await self.commit()
         await super().close()
 
@@ -213,10 +253,8 @@ class SQL(_SQLBase):
 
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
-        # LOG.debug(
-        #     f"SQL.execute(): {self.get_sql()=}; {self._my_connection=}"
-        # )
         sql = self.get_sql()
+        # LOG.log(VERBOSE_DEBUG, f"SQL.execute(): {sql=}; context {self._ctx_id}")
         # pylint: disable=no-member
         return await SQL._get_db().execute(
             query=sql["query"], params=sql["params"], connection=await self.connect()
@@ -228,7 +266,7 @@ class SQLTransaction(_SQLBase):
 
     async def __aenter__(self) -> Self:
         """Enter the SQL transaction context."""
-        # LOG.debug("Entering SQL transaction context")
+        LOG.log(VERBOSE_DEBUG, f"Entering SQL transaction context {self._ctx_id}")
         await self.connect()
         if self._my_connection is None:
             raise ConnectionError("No connection available for transaction.")
@@ -236,11 +274,14 @@ class SQLTransaction(_SQLBase):
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        # LOG.debug("Exiting SQL transaction context")
+        LOG.log(VERBOSE_DEBUG, f"Exiting SQL transaction context {self._ctx_id}")
         if exc_type is None:
             try:
                 await self.commit()
-                # LOG.debug("Transaction committed successfully.")
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"Transaction committed successfully (context {self._ctx_id}).",
+                )
             except OperationalError as exc:
                 await self.rollback()
                 await self.close()
@@ -248,11 +289,8 @@ class SQLTransaction(_SQLBase):
         else:
             await self.rollback()
         await self.close()
+        LOG.log(VERBOSE_DEBUG, f"SQL transaction context {self._ctx_id} closed.")
         return False
-
-    def sql(self) -> SQL:
-        "Create a new SQL statement object"
-        return SQL(connection=self.connection, auto_commit=False)
 
 
 class SQLConnection(_SQLBase):
@@ -260,10 +298,6 @@ class SQLConnection(_SQLBase):
 
     def __init__(self) -> None:
         super().__init__(None)
-
-    def sql(self) -> SQL:
-        "Create a new SQL statement object"
-        return SQL(connection=self.connection)
 
     def transaction(self) -> SQLTransaction:
         "Create a new SQL transaction object"

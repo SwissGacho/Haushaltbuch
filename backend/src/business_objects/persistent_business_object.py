@@ -6,6 +6,7 @@ application's data model."""
 import copy
 import json
 from inspect import iscoroutinefunction
+from contextlib import nullcontext
 from typing import Any, Type, Self, Optional, cast
 from datetime import date, datetime, UTC
 from core.app_logging import (
@@ -20,6 +21,7 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from core.exceptions import CannotStoreEmptyBO
+from core.base_objects import ConnectionBaseClass
 from core.util import _classproperty
 from database.sql import SQL, SQLTransaction
 from database.sql_expression import ColumnName, SQLExpression, And, Eq, Filter, Value
@@ -134,12 +136,21 @@ class PersistentBusinessObject(BOBase):
             if issubclass(_cls, PersistentBusinessObject)
         }
 
-    async def convert_from_db(self, value, typ, subtyp):
+    async def convert_from_db(
+        self, value, typ, subtyp, db_conn: Optional[ConnectionBaseClass] = None
+    ):
         "convert a value of type 'typ' read from the DB"
-        LOG.log(
-            VERBOSE_DEBUG,
-            f"PersistentBusinessObject.convert_from_db({value=}, {type(value)=}, {typ=}, {subtyp=})",
-        )
+        # if LOG.isEnabledFor(VERBOSE_DEBUG):
+        #     LOG.log(VERBOSE_DEBUG, "PersistentBusinessObject.convert_from_db:")
+        #     for line in pprint_lines(
+        #         {
+        #             "value": value,
+        #             "type(value)": type(value),
+        #             "typ": typ,
+        #             "subtyp": subtyp,
+        #         }
+        #     ):
+        #         LOG.log(VERBOSE_DEBUG, f"  {line}")
         if value is None:
             return None
         if typ == date and isinstance(value, str):
@@ -165,7 +176,9 @@ class PersistentBusinessObject(BOBase):
                         "self references itself, return self to avoid fetching from DB again",
                     )
                     return self
-                objs = await relation.get_matching_objects({"id": value})
+                objs = await relation.get_matching_objects(
+                    {"id": value}, db_conn=db_conn
+                )
                 if len(objs) == 1:
                     return objs[0]
                 LOG.error(
@@ -228,10 +241,13 @@ class PersistentBusinessObject(BOBase):
 
     @classmethod
     async def count_rows(
-        cls, conditions: Optional[dict] = None, session: Optional[SessionBase] = None
+        cls,
+        conditions: Optional[dict] = None,
+        session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> int:
         """Count the number of existing business objects in the DB table matching the conditions"""
-        async with SQL() as sql:
+        async with SQL(db_conn) as sql:
             select = sql.select(["count(*) as count"]).from_(cls.table)
             filter_conditions: SQLExpression | None = cls._filter_conditions(
                 Filter(conditions) if conditions else None,
@@ -248,10 +264,13 @@ class PersistentBusinessObject(BOBase):
 
     @classmethod
     async def get_matching_ids(
-        cls, conditions: dict | None = None, session: Optional[SessionBase] = None
+        cls,
+        conditions: dict | None = None,
+        session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> list[int]:
         """Get the ids of business objects matching the conditions"""
-        async with SQL() as sql:
+        async with SQL(db_conn) as sql:
             select = sql.select(["id"]).from_(cls.table)
             filter_conditions: SQLExpression | None = cls._filter_conditions(
                 Filter(conditions) if conditions else None,
@@ -275,10 +294,13 @@ class PersistentBusinessObject(BOBase):
 
     @classmethod
     async def get_single_matching_id(
-        cls, conditions: dict | None = None, session: Optional[SessionBase] = None
+        cls,
+        conditions: dict | None = None,
+        session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> int | None:
         """Get the id of a single business object matching the conditions. Raises ValueError if more than one id matches conditions."""
-        ids = await cls.get_matching_ids(conditions, session)
+        ids = await cls.get_matching_ids(conditions, session=session, db_conn=db_conn)
         LOG.log(
             VERBOSE_DEBUG,
             f"PersistentBusinessObject.get_single_matching_id({conditions=}) -> {ids=}",
@@ -298,6 +320,7 @@ class PersistentBusinessObject(BOBase):
         conditions: dict | None = None,
         attributes: list[str] | None = None,
         session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> list[BOBase]:
         """Get the business objects matching the conditions"""
         if attributes:
@@ -312,7 +335,7 @@ class PersistentBusinessObject(BOBase):
                 cols.append("bo_name")
         else:
             cols = None
-        async with SQL() as sql:
+        async with SQL(db_conn) as sql:
             select = sql.select(cols).from_(cls.table)
             filter_conditions: SQLExpression | None = cls._filter_conditions(
                 Filter(conditions) if conditions else None,
@@ -365,13 +388,18 @@ class PersistentBusinessObject(BOBase):
                         value,
                         description.data_type,
                         description.constraint_values,
+                        db_conn=db_conn,
                     ),
                 )
             objects.append(target_obj)
         return objects
 
     async def fetch(
-        self, id=None, newest: bool = False, session: Optional[SessionBase] = None
+        self,
+        id=None,
+        newest: bool = False,
+        session: Optional[SessionBase] = None,
+        transaction_or_sql: Optional[SQL | SQLTransaction] = None,
     ):
         """Fetch the content for a business object instance from the DB.
         If 'id' is given, fetch the identified object
@@ -397,7 +425,8 @@ class PersistentBusinessObject(BOBase):
         ):
             LOG.debug(f"fetching {self} without id or newest")
             return self
-        async with SQL() as sql:
+        sql: SQL = transaction_or_sql.sql() if transaction_or_sql else SQL()
+        async with sql:
             if mixin:
                 await mixin(sql=sql, id=id, newest=newest, session=session)
             else:
@@ -446,10 +475,7 @@ class PersistentBusinessObject(BOBase):
             select.where(Eq("id", SQLSubquery(subselect)))
 
         if LOG.isEnabledFor(VERBOSE_DEBUG):
-            LOG.log(
-                VERBOSE_DEBUG,
-                f"PersistentBusinessObject.fetch_self: {self.__class__.__name__} {self.id=}, {id=}, {newest=}, {session.user if session else 'N/A'}",
-            )
+            LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: fetching")
             for line in pprint_lines(select.get_sql()):
                 LOG.log(VERBOSE_DEBUG, f"   {line}")
 
@@ -472,29 +498,34 @@ class PersistentBusinessObject(BOBase):
                     VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _db_data="
                 )
                 for line in pprint_lines(self._data.db_data):
-                    LOG.log(VERBOSE_DEBUG, f" -  {line}")
+                    LOG.log(VERBOSE_DEBUG, f"  {line}")
 
             for description in self.attribute_descriptions():
-                LOG.log(
-                    DEBUG,
-                    f"Processing attribute {description.name}, will be converted from DB value {self._data.db_data.get(description.name)}",
-                )
+                # LOG.log(
+                #     DEBUG,
+                #     f"Processing attribute {description.name}, will be converted from DB value {self._data.db_data.get(description.name)}",
+                # )
                 self._data[description.name] = await self.convert_from_db(
                     self._data.db_data.get(description.name),
                     description.data_type,
                     description.constraint_values,
+                    db_conn=sql.connection,
                 )
-                LOG.log(
-                    VERBOSE_DEBUG,
-                    f"Converted attribute {description.name}",
-                )
+                # LOG.log(
+                #     VERBOSE_DEBUG,
+                #     f"Converted attribute {description.name}",
+                # )
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.fetch_self: _data=")
                 for line in pprint_lines(self._data):
                     LOG.log(VERBOSE_DEBUG, f" -  {line}")
         # LOG.debug(f"Fetched {self} from DB: {self._data=}")
 
-    async def store(self, session: Optional[SessionBase] = None):
+    async def store(
+        self,
+        session: Optional[SessionBase] = None,
+        transaction: Optional[SQLTransaction] = None,
+    ):
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
         Else the existing row is updated
@@ -504,21 +535,30 @@ class PersistentBusinessObject(BOBase):
             VERBOSE_DEBUG,
             f"{self.__class__.__name__}.store({session.user if session else 'N/A'})",
         )
-        if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(mixin):
-            old_values = await mixin(session=session)  # pylint: disable=not-callable
-        elif self.id is None:
-            await self.insert_self(session)
-        else:
-            old_values = await self.update_self(session)
+        context = nullcontext(transaction) if transaction else SQLTransaction()
+        async with context as sql_ctxt:
+            async with sql_ctxt.sql() as sql:
+                if (
+                    mixin := getattr(self, "store_mixin", None)
+                ) and iscoroutinefunction(mixin):
+                    old_values = await mixin(
+                        sql=sql, session=session
+                    )  # pylint: disable=not-callable
+                elif self.id is None:
+                    await self.insert_self(sql=sql, session=session)
+                else:
+                    old_values = await self.update_self(sql=sql, session=session)
         await self._notify_store(session, old_values=old_values)
 
     async def business_values_as_dict(
-        self, session: Optional[SessionBase] = None
+        self,
+        session: Optional[SessionBase] = None,
+        transaction: Optional[SQLTransaction] = None,
     ) -> dict[str, Any]:
         LOG.debug(
             f"{self}.business_values_as_dict: {self.id=}, user={getattr(session, 'user', None)}"
         )
-        await self.fetch(self.id, session=session)
+        await self.fetch(self.id, session=session, transaction_or_sql=transaction)
         business_values = await super().business_values_as_dict(session=session)
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             LOG.log(
@@ -529,7 +569,7 @@ class PersistentBusinessObject(BOBase):
                 LOG.log(VERBOSE_DEBUG, f"{  line}")
         return business_values
 
-    async def insert_self(self, session: Optional[SessionBase] = None):
+    async def insert_self(self, sql: SQL, session: Optional[SessionBase] = None):
         LOG.log(
             VERBOSE_DEBUG,
             f"{self.__class__.__name__}.insert_self: user={session.user if session else 'N/A'}",
@@ -545,37 +585,32 @@ class PersistentBusinessObject(BOBase):
         ]
         if not values_to_store:
             raise CannotStoreEmptyBO(f"Cannot store {self._data=} as it has no values")
-        if LOG.isEnabledFor(VERBOSE_DEBUG):
-            for k, v in self._data.items():
-                if k != "id" and v is None:
-                    LOG.log(VERBOSE_DEBUG, f"{k=}: {v}")
+        # if LOG.isEnabledFor(VERBOSE_DEBUG):
+        #     for k, v in self._data.items():
+        #         if k != "id" and v is None:
+        #             LOG.log(VERBOSE_DEBUG, f"{k=}: {v}")
         LOG.debug(
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )
-        async with SQLTransaction() as txaction:
-            cursor = (
-                await txaction.sql()
-                .insert(self.table)
-                .rows(values_to_store)
-                .returning("id")
-                .execute()
+        cursor = (
+            await sql.insert(self.table).rows(values_to_store).returning("id").execute()
+        )
+        fetched = await cursor.fetchone()
+        id = fetched.get("id")
+        if id is None:
+            raise RuntimeError(f"Failed to insert {self} into DB, no id returned")
+        if self.__class__.get_data_object(id) is not None:
+            raise RuntimeError(
+                f"Failed to insert {self} into DB, id {id} already exists"
             )
-            fetched = await cursor.fetchone()
-            id = fetched.get("id")
-            if id is None:
-                raise RuntimeError(f"Failed to insert {self} into DB, no id returned")
-            if self.__class__.get_data_object(id) is not None:
-                raise RuntimeError(
-                    f"Failed to insert {self} into DB, id {id} already exists"
-                )
-            LOG.log(DEBUG, f"Inserted new {self} into DB with id={id}")
-            self._assign_id(id)
-            LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
-            # read the new row back to get any default values set by the DB
-            await self.fetch_self(txaction.sql(), id=self.id, session=session)
+        LOG.log(DEBUG, f"Inserted new {self} into DB returning id={id}")
+        self._assign_id(id)
+        LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
+        # read the new row back to get any default values set by the DB
+        await self.fetch(transaction_or_sql=sql, id=self.id, session=session)
 
     async def update_self(
-        self, session: Optional[SessionBase] = None
+        self, sql: SQL, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
         if self._data is None:
@@ -587,32 +622,29 @@ class PersistentBusinessObject(BOBase):
             )
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
-        async with SQLTransaction() as txaction:
-            update = (
-                txaction.sql()
-                .update(self.table)
-                .where(Eq(ColumnName("id"), Value(self.id)))
-            )
-            previous_values = await self._convert_db_data_from_db()
-            changed_values = self._detect_changes(previous_values)
+        update = sql.update(self.table).where(Eq(ColumnName("id"), Value(self.id)))
+        previous_values = await self._convert_db_data_from_db(db_conn=sql.connection)
+        changed_values = self._detect_changes(previous_values)
+        if changed_values:
+            for k, v in changed_values.items():
+                update.assignment(k, Value(k, v))
+
+        k = "last_updated"
+        if changed_values and not (k in self._data and self._data[k]):
+            self._data[k] = datetime.now().astimezone(UTC)
+            update.assignment(k, Value(k, self._data[k]))
+        try:
             if changed_values:
-                for k, v in changed_values.items():
-                    update.assignment(k, Value(k, v))
+                await update.execute()
+        finally:
+            # read the row back to get any changes made by the DB (e.g. triggers)
+            await self.fetch(transaction_or_sql=sql, id=self.id, session=session)
+        changes = self._detect_changes(old_values=previous_values)
+        return {k: v for k, v in previous_values.items() if k in changes}
 
-            k = "last_updated"
-            if changed_values and not (k in self._data and self._data[k]):
-                self._data[k] = datetime.now().astimezone(UTC)
-                update.assignment(k, Value(k, self._data[k]))
-            try:
-                if changed_values:
-                    await update.execute()
-            finally:
-                # read the row back to get any changes made by the DB (e.g. triggers)
-                await self.fetch_self(txaction.sql(), id=self.id, session=session)
-            changes = self._detect_changes(old_values=previous_values)
-            return {k: v for k, v in previous_values.items() if k in changes}
-
-    async def _convert_db_data_from_db(self) -> dict[str, Any]:
+    async def _convert_db_data_from_db(
+        self, db_conn: Optional[ConnectionBaseClass] = None
+    ) -> dict[str, Any]:
         if self._data is None:
             raise RuntimeError(f"Cannot convert DB data for {self} as it has no data")
         descriptions = {d.name: d for d in self.attribute_descriptions()}
@@ -623,6 +655,7 @@ class PersistentBusinessObject(BOBase):
                     self._data.db_data.get(k),
                     descriptions[k].data_type,
                     descriptions[k].constraint_values,
+                    db_conn=db_conn,
                 )
         return converted
 

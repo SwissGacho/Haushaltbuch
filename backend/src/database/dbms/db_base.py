@@ -240,7 +240,7 @@ class Connection(ConnectionBaseClass):
 
     async def begin(self):
         "begin a transaction"
-        # LOG.debug("Connection.begin: begin transaction")
+        LOG.log(VERBOSE_DEBUG, "Connection.begin(): begin transaction")
         # No implementation required, assuming either a transaction is started at all times
         # or with the first execute call. auto_commit should be False.
         return
@@ -269,7 +269,7 @@ class Connection(ConnectionBaseClass):
 
     async def commit(self):
         "commit current transaction"
-        # LOG.debug("commit connection")
+        LOG.log(VERBOSE_DEBUG, "Connection.commit(): commit connection")
         if not self._connection:
             raise OperationalError("No DB connection to commit.")
         try:
@@ -279,7 +279,7 @@ class Connection(ConnectionBaseClass):
 
     async def rollback(self):
         "rollback current transaction"
-        # LOG.debug("rollback connection")
+        LOG.log(VERBOSE_DEBUG, "Connection.rollback(): rollback connection")
         if not self._connection:
             raise OperationalError("No DB connection to rollback.")
         try:

@@ -29,11 +29,11 @@ class _PersonalTarget(Personal):
     def bo_type_name():
         return "personal_target"
 
-    async def insert_self(self, session=None):
-        self.calls.append(("insert", session))
+    async def insert_self(self, sql, session=None):
+        self.calls.append(("insert", sql, session))
 
-    async def update_self(self, session=None):
-        self.calls.append(("update", session))
+    async def update_self(self, sql, session=None):
+        self.calls.append(("update", sql, session))
         return self.update_return_value
 
 
@@ -140,7 +140,7 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
 
     async def test_store_mixin_requires_session_user(self):
         with self.assertRaises(ValueError):
-            await _PersonalTarget().store_mixin(session=None)
+            await _PersonalTarget().store_mixin(sql=Mock(name="sql"), session=None)
 
     async def test_store_mixin_requires_user_id_attribute(self):
         target = _PersonalTarget()
@@ -149,17 +149,18 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
         session.user = _User(1)
 
         with self.assertRaises(ValueError):
-            await target.store_mixin(session=session)
+            await target.store_mixin(sql=Mock(name="sql"), session=session)
 
     async def test_store_mixin_assigns_user_and_inserts_when_new(self):
         target = _PersonalTarget(bo_id=None, user_id=None)
+        sql = Mock(name="sql")
         session = Mock(name="session")
         session.user = _User(7)
 
-        result = await target.store_mixin(session=session)
+        result = await target.store_mixin(sql=sql, session=session)
 
         self.assertIs(target.user_id, session.user)
-        self.assertEqual([("insert", session)], target.calls)
+        self.assertEqual([("insert", sql, session)], target.calls)
         self.assertEqual({}, result)
 
     async def test_store_mixin_assigns_user_and_updates_when_existing(self):
@@ -167,11 +168,12 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
         target = _PersonalTarget(
             bo_id=55, user_id=_User(99), update_return_value=expected_old_values
         )
+        sql = Mock(name="sql")
         session = Mock(name="session")
         session.user = _User(7)
 
-        result = await target.store_mixin(session=session)
+        result = await target.store_mixin(sql=sql, session=session)
 
         self.assertIs(target.user_id, session.user)
-        self.assertEqual([("update", session)], target.calls)
+        self.assertEqual([("update", sql, session)], target.calls)
         self.assertEqual(expected_old_values, result)

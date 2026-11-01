@@ -86,11 +86,11 @@ class _StoreTarget(MixinBase):
             {} if update_return_value is None else update_return_value
         )
 
-    async def insert_self(self, session=None):
-        self.calls.append(("insert", session))
+    async def insert_self(self, sql, session=None):
+        self.calls.append(("insert", sql, session))
 
-    async def update_self(self, session=None):
-        self.calls.append(("update", session))
+    async def update_self(self, sql, session=None):
+        self.calls.append(("update", sql, session))
         return self.update_return_value
 
 
@@ -98,10 +98,10 @@ class _StoreTargetInvalid(MixinBase):
     def __init__(self):
         self.id = None
 
-    def insert_self(self, session=None):
+    def insert_self(self, sql, session=None):
         return None
 
-    def update_self(self, session=None):
+    def update_self(self, sql, session=None):
         return None
 
 
@@ -193,32 +193,35 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
 
     async def test_store_mixin_calls_insert_for_new_object(self):
         target = _StoreTarget(bo_id=None)
+        sql = Mock(name="sql")
         session = Mock(name="session")
 
-        await target.store_mixin(session=session)
+        await target.store_mixin(sql=sql, session=session)
 
-        self.assertEqual([("insert", session)], target.calls)
+        self.assertEqual([("insert", sql, session)], target.calls)
 
     async def test_store_mixin_calls_update_for_existing_object(self):
         expected_old_values = {"some_attr": "old value"}
         target = _StoreTarget(bo_id=123, update_return_value=expected_old_values)
+        sql = Mock(name="sql")
         session = Mock(name="session")
 
-        actual_old_values = await target.store_mixin(session=session)
+        actual_old_values = await target.store_mixin(sql=sql, session=session)
 
-        self.assertEqual([("update", session)], target.calls)
+        self.assertEqual([("update", sql, session)], target.calls)
         self.assertEqual(expected_old_values, actual_old_values)
 
     async def test_store_mixin_raises_for_non_coroutines(self):
         with self.assertRaises(TypeError):
-            await _StoreTargetInvalid().store_mixin(session=None)
+            await _StoreTargetInvalid().store_mixin(sql=Mock(name="sql"), session=None)
 
     async def test_store_mixin_returns_update_self_result(self):
         expected_old_values = {"name": "old name", "amount": 42}
         target = _StoreTarget(bo_id=123, update_return_value=expected_old_values)
+        sql = Mock(name="sql")
         session = Mock(name="session")
 
-        result = await target.store_mixin(session=session)
+        result = await target.store_mixin(sql=sql, session=session)
 
-        self.assertEqual([("update", session)], target.calls)
+        self.assertEqual([("update", sql, session)], target.calls)
         self.assertEqual(expected_old_values, result)
