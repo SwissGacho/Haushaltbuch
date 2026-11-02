@@ -1,16 +1,18 @@
 """Test suite for websocket server"""
 
+import asyncio
 import unittest
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
+from unittest.mock import Mock, MagicMock, AsyncMock, patch, call
 
 import core.exceptions
 from server.ws_server import (
     CLIENT_TOKEN_COOKIE_NAME,
     LOGIN_SUBPROTOCOL,
     WSHandler,
+    _remove_invalid_clients_periodically,
 )
 from server.ws_client import WSClient
-from core.const import CLIENT_TOKEN_COOKIE_MAX_AGE
+from core.const import CLIENT_TOKEN_COOKIE_MAX_AGE, SCHEDULED_TASK_INTERVAL
 
 # class Test_000_WS_Server(unittest.IsolatedAsyncioTestCase):
 #     async def test_001_get_websocket(self):
@@ -19,6 +21,33 @@ from core.const import CLIENT_TOKEN_COOKIE_MAX_AGE
 class Test_200_WSHandler(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         WSHandler.sockets.clear()
+
+    async def test_199_removes_invalid_clients_on_each_scheduled_interval(self):
+        with (
+            patch(
+                "server.ws_server.asyncio.sleep",
+                new=AsyncMock(
+                    side_effect=[
+                        None,
+                        None,
+                        asyncio.CancelledError,
+                    ]
+                ),
+            ) as sleep,
+            patch("server.ws_server.WSClient.remove_invalid_clients") as remove,
+        ):
+            with self.assertRaises(asyncio.CancelledError):
+                await _remove_invalid_clients_periodically()
+
+        self.assertEqual(
+            sleep.call_args_list,
+            [
+                call(SCHEDULED_TASK_INTERVAL),
+                call(SCHEDULED_TASK_INTERVAL),
+                call(SCHEDULED_TASK_INTERVAL),
+            ],
+        )
+        self.assertEqual(remove.call_count, 2)
 
     def test_200_process_response_logs_redacted_repeated_headers(self):
         handler = WSHandler()

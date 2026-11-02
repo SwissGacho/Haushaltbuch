@@ -14,3 +14,5 @@ CONFIG_FILECFG_FILE = "filecfg_file"
 WEBSOCKET_PORT = 8765
 
 CLIENT_TOKEN_COOKIE_MAX_AGE = 4 * 3600  # 4 hours in seconds
+
+SCHEDULED_TASK_INTERVAL = 60  # in seconds

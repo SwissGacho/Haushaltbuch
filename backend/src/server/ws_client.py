@@ -96,7 +96,6 @@ class WSClient:
                 }
             ):
                 LOG.log(VERBOSE_DEBUG, f"  {line}")
-        cls.remove_invalid_clients()
         if not WSToken.check_token(client_token):
             # client token is not valid, remove it from the clients dictionary if it exists
             if client_token in cls.clients:

@@ -1,5 +1,6 @@
 """Setup a websocket server and handle connection call"""
 
+import asyncio
 import os
 import re
 import json
@@ -7,7 +8,6 @@ import socket
 from uuid import UUID
 import websockets
 import websockets.asyncio.server as websockets_server
-import core.exceptions
 from contextlib import asynccontextmanager
 
 from core.app_logging import (
@@ -26,7 +26,11 @@ from core.app_logging import (
 
 LOG: Logger = getLogger(__name__)
 
-from core.const import WEBSOCKET_PORT, CLIENT_TOKEN_COOKIE_MAX_AGE
+from core.const import (
+    WEBSOCKET_PORT,
+    CLIENT_TOKEN_COOKIE_MAX_AGE,
+    SCHEDULED_TASK_INTERVAL,
+)
 from core.exceptions import ClientNotFoundError, WSConnectionClosed
 from core.app import App
 from core.configuration.config import Config
@@ -234,6 +238,12 @@ class WSHandler:
             connection.connection_closed()
 
 
+async def _remove_invalid_clients_periodically() -> None:
+    while True:
+        await asyncio.sleep(SCHEDULED_TASK_INTERVAL)
+        WSClient.remove_invalid_clients()
+
+
 @asynccontextmanager
 async def get_websocket():
     "Context manager for Websockets"
@@ -249,9 +259,17 @@ async def get_websocket():
     )
     if not ws_server.is_serving():
         LOG.error("Failed to start WS server")
+    cleanup_task = asyncio.create_task(
+        _remove_invalid_clients_periodically(), name="remove_invalid_clients"
+    )
     try:
         yield ws_server
     finally:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
         ws_server.close()
 
 
