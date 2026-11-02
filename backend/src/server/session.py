@@ -42,9 +42,7 @@ class Session(SessionBase):
         connection: WSConnectionBase | None,
     ) -> None:
         local_LOG = self.local_logger(connection)
-        local_LOG.debug(
-            f"creating new session (user={user._name},  client-token': {redact_str(client_token)})"
-        )
+        local_LOG.debug(f"creating new session (user={user.display_name})")
         Session._all_sessions.append(self)
         self._session_nbr = Session._next_session_nbr
         Session._next_session_nbr += 1

@@ -29,13 +29,13 @@ class Test_100_Session(unittest.TestCase):
         connection.connection_context = {"connection": "mock-connection"}
         with patch("server.session.App.get_config_item", return_value=2):
             return Session(
-                user=cast(User, user or SimpleNamespace(name="alice")),
+                user=cast(User, user or SimpleNamespace(display_name="alice")),
                 conn_token=conn_token,
                 connection=connection,
             )
 
     def test_101_constructor_registers_session_and_creates_token(self):
-        user = cast(User, SimpleNamespace(name="alice"))
+        user = cast(User, SimpleNamespace(display_name="alice"))
         connection = Mock(name="connection")
 
         session = self.create_session(user=user, connection=connection)
@@ -67,7 +67,7 @@ class Test_100_Session(unittest.TestCase):
         self.assertEqual(session.conn_tokens, {connection_token.token})
 
     def test_105_get_session_from_connection_token_filters_by_user(self):
-        user = cast(User, SimpleNamespace(name="alice"))
+        user = cast(User, SimpleNamespace(display_name="alice"))
         connection_token = WSToken(inactive_seconds_timeout=None)
         session = self.create_session(user=user, conn_token=connection_token)
         found = Session.get_session_from_token(
@@ -81,13 +81,14 @@ class Test_100_Session(unittest.TestCase):
     def test_106_get_session_from_connection_token_rejects_other_user(self):
         connection_token = WSToken(inactive_seconds_timeout=None)
         self.create_session(
-            user=cast(User, SimpleNamespace(name="alice")), conn_token=connection_token
+            user=cast(User, SimpleNamespace(display_name="alice")),
+            conn_token=connection_token,
         )
 
         found = Session.get_session_from_token(
             ses_token="",
             conn_token=connection_token.token,
-            session_user=cast(User, SimpleNamespace(name="bob")),
+            session_user=cast(User, SimpleNamespace(display_name="bob")),
         )
 
         self.assertIsNone(found)
