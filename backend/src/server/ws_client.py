@@ -33,14 +33,6 @@ class WSClient:
         self.websockets: list = []
         WSClient.clients[client_token] = self
         LOG.debug(f"Initialized WSClient with client_token: {redact_str(client_token)}")
-        LOG.log(VERBOSE_DEBUG, "WSClient.clients:")
-        for line in pprint_lines(
-            {
-                redact_str(k): v.user.display_name if v.user else "<no user>"
-                for k, v in WSClient.clients.items()
-            }
-        ):
-            LOG.log(VERBOSE_DEBUG, f"  {line}")
 
     @property
     def user(self) -> GenericUser | None:
