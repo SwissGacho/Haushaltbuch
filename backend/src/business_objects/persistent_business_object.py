@@ -607,13 +607,17 @@ class PersistentBusinessObject(BOBase):
         LOG.debug(
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )
-        cursor = (
-            await SQL(connection=db_conn)
+        insert = (
+            SQL(connection=db_conn)
             .insert(self.table)
             .rows(values_to_store)
             .returning("id")
-            .execute()
         )
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            LOG.log(VERBOSE_DEBUG, f"{self.__class__.__name__}.insert_self: inserting")
+            for line in pprint_lines(insert.get_sql()):
+                LOG.log(VERBOSE_DEBUG, f"   {line}")
+        cursor = await insert.execute()
         fetched = await cursor.fetchone()
         id = fetched.get("id")
         if id is None:
@@ -658,6 +662,13 @@ class PersistentBusinessObject(BOBase):
             update.assignment(k, Value(k, self._data[k]))
         try:
             if changed_values:
+                if LOG.isEnabledFor(VERBOSE_DEBUG):
+                    LOG.log(
+                        VERBOSE_DEBUG,
+                        f"{self.__class__.__name__}.update_self: updating",
+                    )
+                    for line in pprint_lines(update.get_sql()):
+                        LOG.log(VERBOSE_DEBUG, f"   {line}")
                 await update.execute()
         finally:
             # read the row back to get any changes made by the DB (e.g. triggers)

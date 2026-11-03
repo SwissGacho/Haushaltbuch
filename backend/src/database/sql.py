@@ -116,10 +116,6 @@ class _SQLBase(SQLExecutable):
         if self._my_connection is not None:
             await self._my_connection.rollback()
 
-    def sql(self) -> "SQL":
-        "Create a new SQL statement object"
-        return SQL(connection=self.connection)
-
 
 class SQL(_SQLBase):
     """Usage:
@@ -292,6 +288,15 @@ class SQLTransaction(_SQLBase):
         LOG.log(VERBOSE_DEBUG, f"SQL transaction context {self._ctx_id} closed.")
         return False
 
+    def sql(self) -> "SQL":
+        "Create a new SQL statement object"
+        if self.connection is None:
+            raise RuntimeError(
+                "A connection sharing SQL statement can only be created"
+                " with an active connection (inside a transaction context)."
+            )
+        return SQL(connection=self.connection, autocommit=False)
+
 
 class SQLConnection(_SQLBase):
     """SQL connection context manager."""
@@ -301,7 +306,21 @@ class SQLConnection(_SQLBase):
 
     def transaction(self) -> SQLTransaction:
         "Create a new SQL transaction object"
+        if self.connection is None:
+            raise RuntimeError(
+                "A connection sharing SQL transaction can only be created"
+                " with an active connection (inside a connection context)."
+            )
         return SQLTransaction(connection=self.connection)
+
+    def sql(self) -> "SQL":
+        "Create a new SQL statement object"
+        if self.connection is None:
+            raise RuntimeError(
+                "A connection sharing SQL statement can only be created"
+                " with an active connection (inside a connection context)."
+            )
+        return SQL(connection=self.connection)
 
 
 log_exit(LOG)
