@@ -41,6 +41,10 @@ class TokenExpiredError(Exception):
     "Lifetime of token has expired"
 
 
+class ClientNotFoundError(Exception):
+    "No existing client found for the given valid client_token"
+
+
 class InvalidSQLStatementException(Exception):
     """
     Exception raised when an invalid SQL statement is encountered.
