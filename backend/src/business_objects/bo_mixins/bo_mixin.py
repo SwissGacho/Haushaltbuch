@@ -15,8 +15,7 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from business_objects.bo_descriptors import AttributeDescription
-from core.util import check_property
-from database.sql import SQL
+from core.base_objects import ConnectionBaseClass
 from database.sql_expression import (
     SQLExpression,
     In,
@@ -133,7 +132,7 @@ class MixinBase:
 
     async def fetch_mixin(
         self,
-        sql: SQL,
+        db_conn: ConnectionBaseClass,
         id=None,
         newest: bool = False,
         session: Optional[SessionBase] = None,
@@ -148,11 +147,11 @@ class MixinBase:
                 f"MixinBase.fetch_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
             )
         await fetch_self(  # pylint: disable=not-callable
-            sql, id=id, newest=newest, session=session
+            db_conn=db_conn, id=id, newest=newest, session=session
         )
 
     async def store_mixin(
-        self, sql: SQL, session: Optional[SessionBase] = None
+        self, db_conn: ConnectionBaseClass, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
@@ -168,10 +167,14 @@ class MixinBase:
                 f"MixinBase.store_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
             )
         if getattr(self, "id", None) is None:
-            await insert_self(sql, session)  # pylint: disable=not-callable
+            await insert_self(
+                db_conn=db_conn, session=session
+            )  # pylint: disable=not-callable
             return {}
         else:
-            return await update_self(sql, session)  # pylint: disable=not-callable
+            return await update_self(
+                db_conn=db_conn, session=session
+            )  # pylint: disable=not-callable
 
 
 log_exit(LOG)
