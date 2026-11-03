@@ -320,7 +320,7 @@ class SQLConnection(_SQLBase):
                 "A connection sharing SQL statement can only be created"
                 " with an active connection (inside a connection context)."
             )
-        return SQL(connection=self.connection)
+        return SQL(connection=self.connection, auto_commit=True)
 
 
 log_exit(LOG)
