@@ -23,22 +23,22 @@ class _SingletonTarget(Singleton):
         if has_user_id:
             self.user_id = None
 
-    async def fetch_self(self, sql, id=None, newest=None, session=None):
-        self.fetch_calls.append((sql, id, newest, session))
+    async def fetch_self(self, db_conn, id=None, newest=None, session=None):
+        self.fetch_calls.append((db_conn, id, newest, session))
 
-    async def store(self, session=None, trx=None):
-        self.store_calls.append((session, trx))
+    async def store(self, session=None, db_conn=None):
+        self.store_calls.append((session, db_conn))
         if self.id is None:
             self.id = 999
 
     async def count_rows(self, session=None, db_conn=None):
         return self._count
 
-    async def insert_self(self, sql, session=None):
-        self.insert_calls.append((sql, session))
+    async def insert_self(self, db_conn, session=None):
+        self.insert_calls.append((db_conn, session))
 
-    async def update_self(self, sql, session=None):
-        self.update_calls.append((sql, session))
+    async def update_self(self, db_conn, session=None):
+        self.update_calls.append((db_conn, session))
         return self.update_return_value
 
 
@@ -46,10 +46,10 @@ class _SingletonInvalidFetch(Singleton):
     def __init__(self):
         self.id = None
 
-    def fetch_self(self, sql, id=None, newest=None, session=None):
+    def fetch_self(self, db_conn, id=None, newest=None, session=None):
         return None
 
-    async def store(self, session=None):
+    async def store(self, session=None, db_conn=None):
         return None
 
 
@@ -60,75 +60,77 @@ class _SingletonInvalidCountRows(Singleton):
     def count_rows(self, session=None, db_conn=None):
         return 0
 
-    async def insert_self(self, sql, session=None):
+    async def insert_self(self, db_conn, session=None):
         return None
 
-    async def update_self(self, sql, session=None):
+    async def update_self(self, db_conn, session=None):
         return None
 
 
 class _SyncNextMixin:
-    def fetch_mixin(self, sql, id=None, newest=None, session=None):
+    def fetch_mixin(self, db_conn, id=None, newest=None, session=None):
         return None
 
 
 class _SingletonWithSyncNext(Singleton, _SyncNextMixin):
-    async def fetch_self(self, sql, id=None, newest=None, session=None):
+    async def fetch_self(self, db_conn, id=None, newest=None, session=None):
         return None
 
-    async def store(self, session=None):
+    async def store(self, session=None, db_conn=None):
         return None
 
 
 class TestSingletonMixin(unittest.IsolatedAsyncioTestCase):
     async def test_fetch_mixin_defaults_to_newest_when_no_id(self):
         target = _SingletonTarget(bo_id=None, count=0)
-        mock_sql = Mock(name="mock_sql")
+        mock_conn = Mock(name="mock_conn")
 
-        await target.fetch_mixin(sql=mock_sql, id=None, newest=None, session=None)
+        await target.fetch_mixin(db_conn=mock_conn, id=None, newest=None, session=None)
 
         self.assertEqual(1, len(target.fetch_calls))
-        sql, _, newest, _ = target.fetch_calls[0]
-        self.assertIs(sql, mock_sql)
+        db_conn, _, newest, _ = target.fetch_calls[0]
+        self.assertIs(db_conn, mock_conn)
         self.assertTrue(newest)
 
     async def test_fetch_mixin_stores_when_not_found(self):
         target = _SingletonTarget(bo_id=None, count=0, has_user_id=True)
         session = Mock(name="session")
         session.user = Mock(name="user")
-        mock_sql = Mock(name="mock_sql")
+        mock_conn = Mock(name="mock_conn")
 
-        await target.fetch_mixin(sql=mock_sql, id=None, newest=None, session=session)
+        await target.fetch_mixin(
+            db_conn=mock_conn, id=None, newest=None, session=session
+        )
 
         self.assertEqual(999, target.id)
-        self.assertEqual([(session, None)], target.store_calls)
+        self.assertEqual([(session, mock_conn)], target.store_calls)
 
     async def test_fetch_mixin_raises_if_fetch_self_not_coroutine(self):
         with self.assertRaises(TypeError):
             await _SingletonInvalidFetch().fetch_mixin(
-                sql=Mock(name="mock_sql"), session=None
+                db_conn=Mock(name="mock_conn"), session=None
             )
 
     async def test_store_mixin_raises_if_count_rows_not_coroutine(self):
         with self.assertRaises(TypeError):
             await _SingletonInvalidCountRows().store_mixin(
-                sql=Mock(name="mock_sql"), session=None
+                db_conn=Mock(name="mock_conn"), session=None
             )
 
     async def test_store_mixin_raises_if_singleton_already_exists(self):
         target = _SingletonTarget(bo_id=None, count=1)
 
         with self.assertRaises(CannotStoreEmptyBO):
-            await target.store_mixin(sql=Mock(name="mock_sql"), session=None)
+            await target.store_mixin(db_conn=Mock(name="mock_conn"), session=None)
 
     async def test_store_mixin_inserts_when_new_and_none_exists(self):
         target = _SingletonTarget(bo_id=None, count=0)
-        mock_sql = Mock(name="mock_sql")
+        mock_conn = Mock(name="mock_conn")
         session = Mock(name="session")
 
-        result = await target.store_mixin(sql=mock_sql, session=session)
+        result = await target.store_mixin(db_conn=mock_conn, session=session)
 
-        self.assertEqual([(mock_sql, session)], target.insert_calls)
+        self.assertEqual([(mock_conn, session)], target.insert_calls)
         self.assertEqual([], target.update_calls)
         self.assertEqual({}, result)
 
@@ -137,11 +139,11 @@ class TestSingletonMixin(unittest.IsolatedAsyncioTestCase):
         target = _SingletonTarget(
             bo_id=5, count=1, update_return_value=expected_old_values
         )
-        mock_sql = Mock(name="mock_sql")
+        mock_conn = Mock(name="mock_conn")
         session = Mock(name="session")
 
-        result = await target.store_mixin(sql=mock_sql, session=session)
+        result = await target.store_mixin(db_conn=mock_conn, session=session)
 
         self.assertEqual([], target.insert_calls)
-        self.assertEqual([(mock_sql, session)], target.update_calls)
+        self.assertEqual([(mock_conn, session)], target.update_calls)
         self.assertEqual(expected_old_values, result)
