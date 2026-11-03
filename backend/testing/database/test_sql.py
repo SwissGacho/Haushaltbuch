@@ -320,7 +320,9 @@ class AsyncTest_300_SQLTransaction(unittest.IsolatedAsyncioTestCase):
         async with SQLTransaction() as trx:
             sql = trx.sql()
         MockApp.db.connect.assert_awaited_once_with()
-        self.MockSQL.assert_called_once_with(connection=mocked_connection)
+        self.MockSQL.assert_called_once_with(
+            connection=mocked_connection, auto_commit=False
+        )
         self.assertEqual(sql, self.mock_sql)
         mocked_connection.commit.assert_awaited_once_with()
         mocked_connection.rollback.assert_not_awaited()
@@ -332,7 +334,9 @@ class AsyncTest_300_SQLTransaction(unittest.IsolatedAsyncioTestCase):
         async with SQLTransaction(mock_external_conn) as trx:
             sql = trx.sql()
         MockApp.db.connect.assert_not_awaited()
-        self.MockSQL.assert_called_once_with(connection=mock_external_conn)
+        self.MockSQL.assert_called_once_with(
+            connection=mock_external_conn, auto_commit=False
+        )
         self.assertEqual(sql, self.mock_sql)
         mock_external_conn.commit.assert_awaited_once_with()
         mock_external_conn.rollback.assert_not_awaited()
@@ -348,7 +352,9 @@ class AsyncTest_300_SQLTransaction(unittest.IsolatedAsyncioTestCase):
                 sql = trx.sql()
                 raise MockException("Test exception")
         MockApp.db.connect.assert_awaited_once_with()
-        self.MockSQL.assert_called_once_with(connection=mocked_connection)
+        self.MockSQL.assert_called_once_with(
+            connection=mocked_connection, auto_commit=False
+        )
         self.assertEqual(sql, self.mock_sql)
         mocked_connection.commit.assert_not_awaited()
         mocked_connection.rollback.assert_awaited_once_with()
@@ -366,7 +372,9 @@ class AsyncTest_300_SQLTransaction(unittest.IsolatedAsyncioTestCase):
                 sql = trx.sql()
                 raise MockException("Test exception")
         MockApp.db.connect.assert_not_awaited()
-        self.MockSQL.assert_called_once_with(connection=mock_external_conn)
+        self.MockSQL.assert_called_once_with(
+            connection=mock_external_conn, auto_commit=False
+        )
         self.assertEqual(sql, self.mock_sql)
         mock_external_conn.commit.assert_not_awaited()
         mock_external_conn.rollback.assert_awaited_once_with()
@@ -376,17 +384,19 @@ class AsyncTest_300_SQLTransaction(unittest.IsolatedAsyncioTestCase):
         mocked_connection.close.assert_not_awaited()
 
     def test_311_sql_no_ctx_no_conn(self):
-        """Test creating SQL without with"""
+        """Test creating SQL without an active connection"""
         trx = SQLTransaction()
-        sql = trx.sql()
-        self.MockSQL.assert_called_once_with(connection=None)
-        self.assertEqual(sql, self.mock_sql)
+        with self.assertRaisesRegex(RuntimeError, "active connection"):
+            trx.sql()
+        self.MockSQL.assert_not_called()
 
     def test_312_sql_no_ctx_with_conn(self):
         """Test creating SQL with connection"""
         trx = SQLTransaction(sentinel.connection)
         sql = trx.sql()
-        self.MockSQL.assert_called_once_with(connection=sentinel.connection)
+        self.MockSQL.assert_called_once_with(
+            connection=sentinel.connection, auto_commit=False
+        )
         self.assertEqual(sql, self.mock_sql)
 
 
@@ -455,16 +465,16 @@ class AsyncTest_400_SQLConnection(unittest.IsolatedAsyncioTestCase):
         mocked_connection.close.assert_awaited_once_with()
 
     def test_405_sql_trx_no_ctx_no_conn(self):
-        """Test creating SQL and Trx without with"""
+        """Test creating SQL and Trx without an active connection"""
         conn = SQLConnection()
 
-        sql = conn.sql()
-        self.MockSQL.assert_called_once_with(connection=None)
-        self.assertEqual(sql, self.mock_sql)
+        with self.assertRaisesRegex(RuntimeError, "active connection"):
+            conn.sql()
+        self.MockSQL.assert_not_called()
 
-        trx = conn.transaction()
-        self.MockTrx.assert_called_once_with(connection=None)
-        self.assertEqual(trx, self.mock_trx)
+        with self.assertRaisesRegex(RuntimeError, "active connection"):
+            conn.transaction()
+        self.MockTrx.assert_not_called()
 
     async def test_406_sql_trx_no_ctx_connected(self):
         """Test creating SQL and Trx with connection"""

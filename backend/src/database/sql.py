@@ -295,7 +295,7 @@ class SQLTransaction(_SQLBase):
                 "A connection sharing SQL statement can only be created"
                 " with an active connection (inside a transaction context)."
             )
-        return SQL(connection=self.connection, autocommit=False)
+        return SQL(connection=self.connection, auto_commit=False)
 
 
 class SQLConnection(_SQLBase):
