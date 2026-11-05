@@ -608,7 +608,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_tx.__aenter__.assert_awaited_once_with()
         self.mock_tx.__aexit__.assert_awaited_once_with(None, None, None)
         self.mock_bo.insert_self.assert_awaited_once_with(
-            db_conn=self.mock_conn, session=session
+            transaction=self.mock_tx, session=session
         )
         self.mock_bo.update_self.assert_not_awaited()
 
@@ -632,7 +632,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_tx.__aexit__.assert_awaited_once_with(None, None, None)
         self.mock_bo.insert_self.assert_not_awaited()
         self.mock_bo.update_self.assert_awaited_once_with(
-            db_conn=self.mock_conn, session=session
+            transaction=self.mock_tx, session=session
         )
         self.mock_bo._notify_store.assert_awaited_once_with(
             session, old_values=expected_old_values
@@ -653,7 +653,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         transaction.__aenter__.assert_not_awaited()
         transaction.__aexit__.assert_not_awaited()
         self.mock_bo.insert_self.assert_awaited_once_with(
-            db_conn=self.mock_conn, session=session
+            transaction=self.mock_tx, session=session
         )
 
     async def test_203_store_uses_provided_db_conn(self):
@@ -664,11 +664,11 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             "business_objects.persistent_business_object.SQLTransaction",
             new=self.MockSQLTx,
         ):
-            await self.mock_bo.store(session=session, db_conn=self.mock_conn)
+            await self.mock_bo.store(session=session, transaction=self.mock_tx)
 
         self.MockSQLTx.assert_not_called()
         self.mock_bo.insert_self.assert_awaited_once_with(
-            db_conn=self.mock_conn, session=session
+            transaction=self.mock_tx, session=session
         )
 
     async def test_203a_store_with_mixin_propagates_old_values(self):
@@ -693,7 +693,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
         self.MockSQLTx.assert_called_once_with()
         target.store_mixin.assert_awaited_once_with(
-            db_conn=self.mock_conn, session=session
+            transaction=self.mock_tx, session=session
         )
         target.insert_self.assert_not_awaited()
         target.update_self.assert_not_awaited()
@@ -717,10 +717,10 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             mock_bo = MockPersistentBO2(**mock_attrs)
             mock_bo.fetch = AsyncMock(name="fetch")
 
-            await mock_bo.insert_self(db_conn=self.mock_conn, session=session)
+            await mock_bo.insert_self(transaction=self.mock_tx, session=session)
 
             self.MockSQLTx.assert_not_called()
-            self.MockSQL.assert_called_once_with(connection=self.mock_conn)
+            self.MockSQL.assert_called_once_with(connection=self.mock_tx.connection)
             self.mock_sql.insert.assert_called_once_with(MOCK_TAB2)
             self.mock_sql.rows.assert_called_once_with(
                 [(a, mock_attrs[a]) for a in mock_bo2_as_dict if a in mock_attrs]
@@ -730,14 +730,14 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.mock_cursor.fetchone.assert_awaited_once_with()
             self.assertEqual(mock_bo.id, self.FETCH_RESULT["id"])
             mock_bo.fetch.assert_awaited_once_with(
-                db_conn=self.mock_conn, id=mock_bo.id, session=session
+                transaction=self.mock_tx, id=mock_bo.id, session=session
             )
 
     async def test_204a_insert_self(self):
         with self.assertRaises(ValueError):
             self.mock_bo._assign_id(77)
             self.assertEqual(self.mock_bo.id, 77)
-            await self.mock_bo.insert_self(db_conn=self.mock_conn)
+            await self.mock_bo.insert_self(transaction=self.mock_tx)
 
     async def test_204b_insert_self(self):
         await self._204_insert_self()
@@ -823,10 +823,12 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 self.mock_sql.execute.side_effect = [Exception, None]
                 with self.assertRaises(Exception):
                     await self.mock_bo.update_self(
-                        db_conn=self.mock_conn, session=session
+                        transaction=self.mock_tx, session=session
                     )
             else:
-                await self.mock_bo.update_self(db_conn=self.mock_conn, session=session)
+                await self.mock_bo.update_self(
+                    transaction=self.mock_tx, session=session
+                )
 
             self.MockSQLTx.assert_not_called()
             self.MockSQL.assert_called_once_with(connection=self.mock_conn)
@@ -856,12 +858,12 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 mock_dt.astimezone.assert_called_once_with(datetime.UTC)
             self.mock_sql.execute.assert_awaited_once_with()
             self.mock_bo.fetch.assert_awaited_once_with(
-                db_conn=self.mock_conn, id=id, session=session
+                transaction=self.mock_tx, id=id, session=session
             )
 
     async def test_205a_update_self(self):
         with self.assertRaises(AssertionError) as exp:
-            await self.mock_bo.update_self(db_conn=self.mock_conn)
+            await self.mock_bo.update_self(transaction=self.mock_tx)
 
     async def test_205b_update_self(self):
         self.mock_bo = MockPersistentBO2(bo_id=55)

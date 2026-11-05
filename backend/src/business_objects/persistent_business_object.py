@@ -400,7 +400,6 @@ class PersistentBusinessObject(BOBase):
         newest: bool = False,
         session: Optional[SessionBase] = None,
         transaction: Optional[SQLTransaction] = None,
-        db_conn: Optional[ConnectionBaseClass] = None,
     ):
         """Fetch the content for a business object instance from the DB.
         If 'id' is given, fetch the identified object
@@ -427,23 +426,23 @@ class PersistentBusinessObject(BOBase):
             LOG.debug(f"fetching {self} without id or newest")
             return self
         async with (
-            nullcontext(transaction) if transaction or db_conn else SQLTransaction()
+            nullcontext(transaction) if transaction else SQLTransaction()
         ) as transaction:
-            if transaction and not db_conn:
-                db_conn = transaction.connection
-            if db_conn is None:
-                raise ValueError("No DB connection provided for fetch operation")
+            if transaction is None:
+                raise ValueError("No transaction provided for fetch operation")
             if mixin:
-                await mixin(db_conn=db_conn, id=id, newest=newest, session=session)
+                await mixin(
+                    transaction=transaction, id=id, newest=newest, session=session
+                )
             else:
                 await self.fetch_self(
-                    db_conn=db_conn, id=id, newest=newest, session=session
+                    transaction=transaction, id=id, newest=newest, session=session
                 )
         return self
 
     async def fetch_self(
         self,
-        db_conn: ConnectionBaseClass,
+        transaction: SQLTransaction,
         id=None,
         newest: bool = False,
         session: Optional[SessionBase] = None,
@@ -466,7 +465,8 @@ class PersistentBusinessObject(BOBase):
             raise ValueError("Either 'id' must be specified or 'newest' must be True")
 
             # Build conditions for the SQL query based on the provided id and newest flag
-        select = SQL(connection=db_conn).select([], True).from_(self.table)
+        db_connection = transaction.connection if transaction else None
+        select = SQL(connection=db_connection).select([], True).from_(self.table)
         if id is not None:
             filter_conditions = self._filter_conditions(
                 Eq("id", id), user=session.user if session else None
@@ -517,7 +517,7 @@ class PersistentBusinessObject(BOBase):
                     self._data.db_data.get(description.name),
                     description.data_type,
                     description.constraint_values,
-                    db_conn=db_conn,
+                    db_conn=transaction.connection,
                 )
                 # LOG.log(
                 #     VERBOSE_DEBUG,
@@ -533,7 +533,6 @@ class PersistentBusinessObject(BOBase):
         self,
         session: Optional[SessionBase] = None,
         transaction: Optional[SQLTransaction] = None,
-        db_conn: Optional[ConnectionBaseClass] = None,
     ):
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
@@ -545,22 +544,22 @@ class PersistentBusinessObject(BOBase):
             f"{self.__class__.__name__}.store({session.user if session else 'N/A'})",
         )
         async with (
-            nullcontext(transaction) if transaction or db_conn else SQLTransaction()
+            nullcontext(transaction) if transaction else SQLTransaction()
         ) as transaction:
-            if transaction and not db_conn:
-                db_conn = transaction.connection
-            if db_conn is None:
-                raise ValueError("No DB connection provided for store operation")
+            if transaction is None:
+                raise ValueError("No transaction provided for store operation")
             if (mixin := getattr(self, "store_mixin", None)) and iscoroutinefunction(
                 mixin
             ):
                 old_values = await mixin(
-                    db_conn=db_conn, session=session
+                    transaction=transaction, session=session
                 )  # pylint: disable=not-callable
             elif self.id is None:
-                await self.insert_self(db_conn=db_conn, session=session)
+                await self.insert_self(transaction=transaction, session=session)
             else:
-                old_values = await self.update_self(db_conn=db_conn, session=session)
+                old_values = await self.update_self(
+                    transaction=transaction, session=session
+                )
         await self._notify_store(session, old_values=old_values)
 
     async def business_values_as_dict(
@@ -583,7 +582,7 @@ class PersistentBusinessObject(BOBase):
         return business_values
 
     async def insert_self(
-        self, db_conn: ConnectionBaseClass, session: Optional[SessionBase] = None
+        self, transaction: SQLTransaction, session: Optional[SessionBase] = None
     ):
         LOG.log(
             VERBOSE_DEBUG,
@@ -607,8 +606,9 @@ class PersistentBusinessObject(BOBase):
         LOG.debug(
             f"Inserting new {self} into DB; user={session.user if session else 'N/A'}"
         )
+        db_connection = transaction.connection if transaction else None
         insert = (
-            SQL(connection=db_conn)
+            SQL(connection=db_connection)
             .insert(self.table)
             .rows(values_to_store)
             .returning("id")
@@ -630,10 +630,10 @@ class PersistentBusinessObject(BOBase):
         self._assign_id(id)
         LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
         # read the new row back to get any default values set by the DB
-        await self.fetch(db_conn=db_conn, id=self.id, session=session)
+        await self.fetch(transaction=transaction, id=self.id, session=session)
 
     async def update_self(
-        self, db_conn: ConnectionBaseClass, session: Optional[SessionBase] = None
+        self, transaction: SQLTransaction, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
         if self._data is None:
@@ -645,12 +645,15 @@ class PersistentBusinessObject(BOBase):
             )
             for line in pprint_lines(self._data):
                 LOG.log(VERBOSE_DEBUG, f" -  {line}")
+        db_connection = transaction.connection if transaction else None
         update = (
-            SQL(connection=db_conn)
+            SQL(connection=db_connection)
             .update(self.table)
             .where(Eq(ColumnName("id"), Value(self.id)))
         )
-        previous_values = await self._convert_db_data_from_db(db_conn=db_conn)
+        previous_values = await self._convert_db_data_from_db(
+            db_conn=transaction.connection
+        )
         changed_values = self._detect_changes(previous_values)
         if changed_values:
             for k, v in changed_values.items():
@@ -672,7 +675,7 @@ class PersistentBusinessObject(BOBase):
                 await update.execute()
         finally:
             # read the row back to get any changes made by the DB (e.g. triggers)
-            await self.fetch(db_conn=db_conn, id=self.id, session=session)
+            await self.fetch(transaction=transaction, id=self.id, session=session)
         changes = self._detect_changes(old_values=previous_values)
         return {k: v for k, v in previous_values.items() if k in changes}
 

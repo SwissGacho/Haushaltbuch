@@ -15,7 +15,7 @@ LOG = getLogger(__name__)
 
 from business_objects.bo_mixins.bo_mixin import MixinBase
 from core.exceptions import CannotStoreEmptyBO
-from core.base_objects import ConnectionBaseClass
+from database.sql import SQLTransaction
 from server.ws_connection_base import SessionBase
 
 
@@ -29,7 +29,7 @@ class Singleton(MixinBase):
 
     async def fetch_mixin(
         self,
-        db_conn: ConnectionBaseClass,
+        transaction: SQLTransaction,
         id=None,
         newest: bool = False,
         session: Optional[SessionBase] = None,
@@ -49,7 +49,7 @@ class Singleton(MixinBase):
         if id is None:
             newest = True
         await super().fetch_mixin(
-            db_conn=db_conn, id=id, newest=newest, session=session
+            transaction=transaction, id=id, newest=newest, session=session
         )
 
         if getattr(self, "id", None) is None:
@@ -58,12 +58,12 @@ class Singleton(MixinBase):
                 " Returning a new empty one."
             )
             await store(
-                session=session, db_conn=db_conn
+                session=session, transaction=transaction
             )  # pylint: disable=not-callable
 
     async def store_mixin(
         self,
-        db_conn: ConnectionBaseClass,
+        transaction: SQLTransaction,
         session: Optional[SessionBase] = None,
     ) -> dict[str, Any]:
         """Store the business object in the database.
@@ -80,13 +80,13 @@ class Singleton(MixinBase):
                     f"Singleton.store_mixin: Expected PersistentBusinessObject with count_rows method, got {type(self).__name__}"
                 )
             existing_count = await count_rows(  # pylint: disable=not-callable
-                session=session, db_conn=db_conn
+                session=session, db_conn=transaction.connection if transaction else None
             )
             if existing_count > 0:
                 raise CannotStoreEmptyBO(
                     f"Cannot insert {self} as it is a Singleton and already exists in the DB"
                 )
-        return await super().store_mixin(db_conn=db_conn, session=session)
+        return await super().store_mixin(transaction=transaction, session=session)
 
 
 log_exit(LOG)

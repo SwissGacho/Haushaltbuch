@@ -425,13 +425,17 @@ class AsyncTest_400_SQLConnection(unittest.IsolatedAsyncioTestCase):
             MockApp.db.connect.assert_awaited_once_with()
             sql = conn.sql()
             self.assertEqual(sql, self.mock_sql)
-            self.MockSQL.assert_called_once_with(connection=mocked_connection)
+            self.MockSQL.assert_called_once_with(
+                connection=mocked_connection, auto_commit=True
+            )
             self.MockTrx.assert_not_called()
 
             trx = conn.transaction()
             self.assertEqual(trx, self.mock_trx)
             MockApp.db.connect.assert_awaited_once_with()
-            self.MockSQL.assert_called_once_with(connection=mocked_connection)
+            self.MockSQL.assert_called_once_with(
+                connection=mocked_connection, auto_commit=True
+            )
             self.MockTrx.assert_called_once_with(connection=mocked_connection)
             mocked_connection.commit.assert_not_awaited()
             mocked_connection.rollback.assert_not_awaited()
@@ -445,7 +449,9 @@ class AsyncTest_400_SQLConnection(unittest.IsolatedAsyncioTestCase):
                 sql = conn.sql()
                 raise MockException("Test exception")
         MockApp.db.connect.assert_awaited_once_with()
-        self.MockSQL.assert_called_once_with(connection=mocked_connection)
+        self.MockSQL.assert_called_once_with(
+            connection=mocked_connection, auto_commit=True
+        )
         self.assertEqual(sql, self.mock_sql)
         mocked_connection.commit.assert_not_awaited()
         mocked_connection.rollback.assert_not_awaited()
@@ -481,5 +487,7 @@ class AsyncTest_400_SQLConnection(unittest.IsolatedAsyncioTestCase):
         conn = SQLConnection()
         await conn.connect()
         sql = conn.sql()
-        self.MockSQL.assert_called_once_with(connection=mocked_connection)
+        self.MockSQL.assert_called_once_with(
+            connection=mocked_connection, auto_commit=True
+        )
         self.assertEqual(sql, self.mock_sql)
