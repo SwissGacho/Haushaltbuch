@@ -261,7 +261,7 @@ class SQL(_SQLBase):
 class SQLTransaction(_SQLBase):
     """SQL transaction context manager."""
 
-    def __init__(self, connection: ConnectionBaseClass) -> None:
+    def __init__(self, connection: ConnectionBaseClass | None = None) -> None:
         super().__init__(connection=connection)
         self._calls_after_commit: list[Callable[..., Any]] = []
         self._calls_after_rollback: list[Callable[..., Any]] = []
