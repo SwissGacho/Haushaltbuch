@@ -46,7 +46,6 @@ class LedgerEntry(PersistentBusinessObject):
         self,
         session: Optional[SessionBase] = None,
         transaction: Optional[SQLTransaction] = None,
-        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> None:
         "Store the object in the database"
 
@@ -56,21 +55,17 @@ class LedgerEntry(PersistentBusinessObject):
                 "No debit or credit account specified. At least one must be specified."
             )
         async with (
-            nullcontext(transaction)
-            if transaction is not None or db_conn is not None
-            else SQLTransaction()
+            nullcontext(transaction) if transaction else SQLTransaction()
         ) as transaction:
-            if transaction is not None and db_conn is None:
-                db_conn = transaction.connection
             if not self.debit_account:
-                self.debit_account = await DefaultDebitAccount().fetch(db_conn=db_conn)
+                self.debit_account = await DefaultDebitAccount().fetch(
+                    transaction=transaction
+                )
             if not self.credit_account:
                 self.credit_account = await DefaultCreditAccount().fetch(
-                    db_conn=db_conn
+                    transaction=transaction
                 )
-            await super().store(
-                session=session, transaction=transaction, db_conn=db_conn
-            )
+            await super().store(session=session, transaction=transaction)
 
 
 class Posting(PersistentBusinessObject):
