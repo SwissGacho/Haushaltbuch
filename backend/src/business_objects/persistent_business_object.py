@@ -9,6 +9,8 @@ from inspect import iscoroutinefunction
 from contextlib import nullcontext
 from typing import Any, Type, Self, Optional, cast
 from datetime import date, datetime, UTC
+from functools import partial
+
 from core.app_logging import (
     getLogger,
     log_exit,
@@ -560,7 +562,10 @@ class PersistentBusinessObject(BOBase):
                 old_values = await self.update_self(
                     transaction=transaction, session=session
                 )
-        await self._notify_store(session, old_values=old_values)
+            transaction.add_after_commit(
+                partial(self._notify_store, session, old_values=old_values)
+            )
+        # await self._notify_store(session, old_values=old_values)
 
     async def business_values_as_dict(
         self,
@@ -627,6 +632,7 @@ class PersistentBusinessObject(BOBase):
                 f"Failed to insert {self} into DB, id {id} already exists"
             )
         LOG.log(DEBUG, f"Inserted new {self} into DB returning id={id}")
+        transaction.add_after_rollback(partial(self._assign_id, self.id))
         self._assign_id(id)
         LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
         # read the new row back to get any default values set by the DB

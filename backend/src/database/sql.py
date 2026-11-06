@@ -1,7 +1,8 @@
 """SQL statement builder for the database.
 This module provides functionality to create, execute, and manage SQL statements."""
 
-from typing import Self, Optional
+import inspect
+from typing import Any, Callable, Awaitable, Self, Optional
 import itertools
 
 from core.app_logging import getLogger, log_exit, VERBOSE_DEBUG
@@ -260,6 +261,11 @@ class SQL(_SQLBase):
 class SQLTransaction(_SQLBase):
     """SQL transaction context manager."""
 
+    def __init__(self, connection: ConnectionBaseClass) -> None:
+        super().__init__(connection=connection)
+        self._calls_after_commit: list[Callable[..., Any]] = []
+        self._calls_after_rollback: list[Callable[..., Any]] = []
+
     async def __aenter__(self) -> Self:
         """Enter the SQL transaction context."""
         LOG.log(VERBOSE_DEBUG, f"Entering SQL transaction context {self._ctx_id}")
@@ -268,6 +274,12 @@ class SQLTransaction(_SQLBase):
             raise ConnectionError("No connection available for transaction.")
         await self._my_connection.begin()
         return self
+
+    def add_after_commit(self, callback: Callable[..., Any]) -> None:
+        self._calls_after_commit.append(callback)
+
+    def add_after_rollback(self, callback: Callable[..., Any]) -> None:
+        self._calls_after_rollback.append(callback)
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         LOG.log(VERBOSE_DEBUG, f"Exiting SQL transaction context {self._ctx_id}")
@@ -278,12 +290,26 @@ class SQLTransaction(_SQLBase):
                     VERBOSE_DEBUG,
                     f"Transaction committed successfully (context {self._ctx_id}).",
                 )
+                for callback in self._calls_after_commit:
+                    result = callback()
+                    if inspect.isawaitable(result):
+                        await result
             except OperationalError as exc:
                 await self.rollback()
+                for callback in reversed(self._calls_after_rollback):
+                    result = callback()
+                    if inspect.isawaitable(result):
+                        await result
                 await self.close()
                 raise CommitError(exc) from exc
         else:
             await self.rollback()
+            for callback in reversed(self._calls_after_rollback):
+                result = callback()
+                if inspect.isawaitable(result):
+                    await result
+        self._calls_after_rollback.clear()
+        self._calls_after_commit.clear()
         await self.close()
         LOG.log(VERBOSE_DEBUG, f"SQL transaction context {self._ctx_id} closed.")
         return False
