@@ -29,11 +29,11 @@ class _PersonalTarget(Personal):
     def bo_type_name():
         return "personal_target"
 
-    async def insert_self(self, session=None):
-        self.calls.append(("insert", session))
+    async def insert_self(self, transaction, session=None):
+        self.calls.append(("insert", transaction, session))
 
-    async def update_self(self, session=None):
-        self.calls.append(("update", session))
+    async def update_self(self, transaction, session=None):
+        self.calls.append(("update", transaction, session))
         return self.update_return_value
 
 
@@ -84,7 +84,9 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
 
         mock_column_name.assert_called_once_with("bo_name")
         mock_sql_string.assert_called_once_with("personal_target")
-        mock_eq.assert_called_once_with(mock_column_name.return_value, mock_sql_string())
+        mock_eq.assert_called_once_with(
+            mock_column_name.return_value, mock_sql_string()
+        )
         mock_not.assert_called_once_with(mock_eq())
         self.assertEqual([mock_not()], result)
 
@@ -140,7 +142,9 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
 
     async def test_store_mixin_requires_session_user(self):
         with self.assertRaises(ValueError):
-            await _PersonalTarget().store_mixin(session=None)
+            await _PersonalTarget().store_mixin(
+                transaction=Mock(name="db_transaction"), session=None
+            )
 
     async def test_store_mixin_requires_user_id_attribute(self):
         target = _PersonalTarget()
@@ -149,17 +153,20 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
         session.user = _User(1)
 
         with self.assertRaises(ValueError):
-            await target.store_mixin(session=session)
+            await target.store_mixin(
+                transaction=Mock(name="db_transaction"), session=session
+            )
 
     async def test_store_mixin_assigns_user_and_inserts_when_new(self):
         target = _PersonalTarget(bo_id=None, user_id=None)
+        db_transaction = Mock(name="db_transaction")
         session = Mock(name="session")
         session.user = _User(7)
 
-        result = await target.store_mixin(session=session)
+        result = await target.store_mixin(transaction=db_transaction, session=session)
 
         self.assertIs(target.user_id, session.user)
-        self.assertEqual([("insert", session)], target.calls)
+        self.assertEqual([("insert", db_transaction, session)], target.calls)
         self.assertEqual({}, result)
 
     async def test_store_mixin_assigns_user_and_updates_when_existing(self):
@@ -167,11 +174,12 @@ class TestPersonalMixin(unittest.IsolatedAsyncioTestCase):
         target = _PersonalTarget(
             bo_id=55, user_id=_User(99), update_return_value=expected_old_values
         )
+        db_transaction = Mock(name="db_transaction")
         session = Mock(name="session")
         session.user = _User(7)
 
-        result = await target.store_mixin(session=session)
+        result = await target.store_mixin(transaction=db_transaction, session=session)
 
         self.assertIs(target.user_id, session.user)
-        self.assertEqual([("update", session)], target.calls)
+        self.assertEqual([("update", db_transaction, session)], target.calls)
         self.assertEqual(expected_old_values, result)
