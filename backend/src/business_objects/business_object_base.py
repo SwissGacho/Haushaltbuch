@@ -119,7 +119,7 @@ class BOBase(BOBaseBase):
         BOBase.subscriptions_report()
         # Construction does not change persisted state; store() emits change notifications.
 
-    def _assign_id(self, value: int | None) -> None:
+    def _assign_id(self, value: int | None, force_none: bool = False) -> None:
         """Internal use only. Assign 'id' directly, bypassing the public setter's
         restriction."""
         LOG.log(
@@ -128,7 +128,7 @@ class BOBase(BOBaseBase):
         )
         if self._data is None:
             raise RuntimeError("Business object has no data object set. ")
-        if self.id is not None:
+        if self.id is not None and not force_none:
             raise RuntimeError(
                 f"ID is already assigned as {self.id} and cannot be changed to {value}."
             )

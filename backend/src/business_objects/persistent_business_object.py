@@ -632,7 +632,9 @@ class PersistentBusinessObject(BOBase):
                 f"Failed to insert {self} into DB, id {id} already exists"
             )
         LOG.log(DEBUG, f"Inserted new {self} into DB returning id={id}")
-        transaction.add_after_rollback(partial(self._assign_id, self.id))
+        transaction.add_after_rollback(
+            partial(self._assign_id, self.id, force_none=True)
+        )
         self._assign_id(id)
         LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
         # read the new row back to get any default values set by the DB
@@ -678,7 +680,12 @@ class PersistentBusinessObject(BOBase):
                     )
                     for line in pprint_lines(update.get_sql()):
                         LOG.log(VERBOSE_DEBUG, f"   {line}")
-                await update.execute()
+                cursor = await update.execute()
+                update_rowcount = await cursor.rowcount
+                if update_rowcount != 1:
+                    raise RuntimeError(
+                        f"Update failed for {self}:" f" {update_rowcount} rows affected"
+                    )
         finally:
             # read the row back to get any changes made by the DB (e.g. triggers)
             await self.fetch(transaction=transaction, id=self.id, session=session)
