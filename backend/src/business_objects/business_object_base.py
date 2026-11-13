@@ -22,6 +22,7 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from core.util import _classproperty
+from core.base_objects import ConnectionBaseClass
 from core.app import App
 import core.exceptions
 from core.exceptions import DataError
@@ -118,7 +119,7 @@ class BOBase(BOBaseBase):
         BOBase.subscriptions_report()
         # Construction does not change persisted state; store() emits change notifications.
 
-    def _assign_id(self, value: int | None) -> None:
+    def _assign_id(self, value: int | None, force_none: bool = False) -> None:
         """Internal use only. Assign 'id' directly, bypassing the public setter's
         restriction."""
         LOG.log(
@@ -127,7 +128,7 @@ class BOBase(BOBaseBase):
         )
         if self._data is None:
             raise RuntimeError("Business object has no data object set. ")
-        if self.id is not None:
+        if self.id is not None and not force_none:
             raise RuntimeError(
                 f"ID is already assigned as {self.id} and cannot be changed to {value}."
             )
@@ -416,6 +417,7 @@ class BOBase(BOBaseBase):
         conditions: dict | None = None,
         attributes: list[str] | None = None,
         session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> list["BOBase"]:
         """Get the business objects matching the conditions"""
         raise NotImplementedError("get_matching_objects not implemented")
@@ -549,11 +551,11 @@ class BOBase(BOBaseBase):
         self.__class__.notify_change_subscribers(self, old_values)
         return old_values
 
-    async def insert_self(self, session: Optional[SessionBase] = None):
+    async def insert_self(self, transaction, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
 
     async def update_self(
-        self, session: Optional[SessionBase] = None
+        self, transaction, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
         return {}

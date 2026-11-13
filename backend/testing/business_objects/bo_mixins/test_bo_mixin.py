@@ -86,11 +86,11 @@ class _StoreTarget(MixinBase):
             {} if update_return_value is None else update_return_value
         )
 
-    async def insert_self(self, session=None):
-        self.calls.append(("insert", session))
+    async def insert_self(self, transaction, session=None):
+        self.calls.append(("insert", transaction, session))
 
-    async def update_self(self, session=None):
-        self.calls.append(("update", session))
+    async def update_self(self, transaction, session=None):
+        self.calls.append(("update", transaction, session))
         return self.update_return_value
 
 
@@ -98,10 +98,10 @@ class _StoreTargetInvalid(MixinBase):
     def __init__(self):
         self.id = None
 
-    def insert_self(self, session=None):
+    def insert_self(self, transaction, session=None):
         return None
 
-    def update_self(self, session=None):
+    def update_self(self, transaction, session=None):
         return None
 
 
@@ -109,12 +109,12 @@ class _FetchTarget(MixinBase):
     def __init__(self):
         self.fetch_calls = []
 
-    async def fetch_self(self, sql, id=None, newest=None, session=None):
-        self.fetch_calls.append((sql, id, newest, session))
+    async def fetch_self(self, transaction, id=None, newest=None, session=None):
+        self.fetch_calls.append((transaction, id, newest, session))
 
 
 class _FetchTargetInvalid(MixinBase):
-    def fetch_self(self, sql, id=None, newest=None, session=None):
+    def fetch_self(self, transaction, id=None, newest=None, session=None):
         return None
 
 
@@ -180,45 +180,54 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
 
     async def test_fetch_mixin_forwards_arguments(self):
         target = _FetchTarget()
-        sql = Mock(name="sql")
+        db_transaction = Mock(name="db_transaction")
         session = Mock(name="session")
 
-        result = await target.fetch_mixin(sql=sql, id=123, newest=True, session=session)
+        await target.fetch_mixin(
+            transaction=db_transaction, id=123, newest=True, session=session
+        )
 
-        self.assertEqual([(sql, 123, True, session)], target.fetch_calls)
+        self.assertEqual([(db_transaction, 123, True, session)], target.fetch_calls)
 
     async def test_fetch_mixin_raises_for_non_coroutine_fetch_self(self):
         with self.assertRaises(TypeError):
-            await _FetchTargetInvalid().fetch_mixin(sql=Mock(name="sql"))
+            await _FetchTargetInvalid().fetch_mixin(db_conn=Mock(name="db_conn"))
 
     async def test_store_mixin_calls_insert_for_new_object(self):
         target = _StoreTarget(bo_id=None)
+        db_transaction = Mock(name="db_transaction")
         session = Mock(name="session")
 
-        await target.store_mixin(session=session)
+        await target.store_mixin(transaction=db_transaction, session=session)
 
-        self.assertEqual([("insert", session)], target.calls)
+        self.assertEqual([("insert", db_transaction, session)], target.calls)
 
     async def test_store_mixin_calls_update_for_existing_object(self):
         expected_old_values = {"some_attr": "old value"}
         target = _StoreTarget(bo_id=123, update_return_value=expected_old_values)
+        db_transaction = Mock(name="db_transaction")
         session = Mock(name="session")
 
-        actual_old_values = await target.store_mixin(session=session)
+        actual_old_values = await target.store_mixin(
+            transaction=db_transaction, session=session
+        )
 
-        self.assertEqual([("update", session)], target.calls)
+        self.assertEqual([("update", db_transaction, session)], target.calls)
         self.assertEqual(expected_old_values, actual_old_values)
 
     async def test_store_mixin_raises_for_non_coroutines(self):
         with self.assertRaises(TypeError):
-            await _StoreTargetInvalid().store_mixin(session=None)
+            await _StoreTargetInvalid().store_mixin(
+                transaction=Mock(name="db_transaction"), session=None
+            )
 
     async def test_store_mixin_returns_update_self_result(self):
         expected_old_values = {"name": "old name", "amount": 42}
         target = _StoreTarget(bo_id=123, update_return_value=expected_old_values)
+        db_transaction = Mock(name="db_transaction")
         session = Mock(name="session")
 
-        result = await target.store_mixin(session=session)
+        result = await target.store_mixin(transaction=db_transaction, session=session)
 
-        self.assertEqual([("update", session)], target.calls)
+        self.assertEqual([("update", db_transaction, session)], target.calls)
         self.assertEqual(expected_old_values, result)

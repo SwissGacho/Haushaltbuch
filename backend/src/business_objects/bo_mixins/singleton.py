@@ -15,7 +15,7 @@ LOG = getLogger(__name__)
 
 from business_objects.bo_mixins.bo_mixin import MixinBase
 from core.exceptions import CannotStoreEmptyBO
-from database.sql import SQL
+from database.sql import SQLTransaction
 from server.ws_connection_base import SessionBase
 
 
@@ -29,7 +29,7 @@ class Singleton(MixinBase):
 
     async def fetch_mixin(
         self,
-        sql: SQL,
+        transaction: SQLTransaction,
         id=None,
         newest: bool = False,
         session: Optional[SessionBase] = None,
@@ -48,17 +48,22 @@ class Singleton(MixinBase):
             )
         if id is None:
             newest = True
-        await super().fetch_mixin(sql, id=id, newest=newest, session=session)
+        await super().fetch_mixin(
+            transaction=transaction, id=id, newest=newest, session=session
+        )
 
         if getattr(self, "id", None) is None:
             LOG.debug(
                 f"Singleton.fetch_mixin: No {type(self).__name__} found for user {getattr(session, 'user', None)}."
                 " Returning a new empty one."
             )
-            await store(session=session)  # pylint: disable=not-callable
+            await store(
+                session=session, transaction=transaction
+            )  # pylint: disable=not-callable
 
     async def store_mixin(
         self,
+        transaction: SQLTransaction,
         session: Optional[SessionBase] = None,
     ) -> dict[str, Any]:
         """Store the business object in the database.
@@ -75,13 +80,13 @@ class Singleton(MixinBase):
                     f"Singleton.store_mixin: Expected PersistentBusinessObject with count_rows method, got {type(self).__name__}"
                 )
             existing_count = await count_rows(  # pylint: disable=not-callable
-                session=session
+                session=session, db_conn=transaction.connection if transaction else None
             )
             if existing_count > 0:
                 raise CannotStoreEmptyBO(
                     f"Cannot insert {self} as it is a Singleton and already exists in the DB"
                 )
-        return await super().store_mixin(session=session)
+        return await super().store_mixin(transaction=transaction, session=session)
 
 
 log_exit(LOG)
