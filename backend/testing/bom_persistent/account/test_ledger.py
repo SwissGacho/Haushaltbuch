@@ -16,6 +16,8 @@ class Test_100_LedgerEntry_store(unittest.IsolatedAsyncioTestCase):
         self.tx.connection = self.conn
         self.tx.__aenter__ = AsyncMock(return_value=self.tx)
         self.tx.__aexit__ = AsyncMock(return_value=False)
+        self.tx.add_after_commit = Mock()
+        self.tx.add_after_rollback = Mock()
         self.MockSQLTx = Mock(name="SQLTransaction", return_value=self.tx)
 
         self.default_debit = Account()
@@ -73,7 +75,9 @@ class Test_100_LedgerEntry_store(unittest.IsolatedAsyncioTestCase):
 
         await entry.store(session=self.session)
 
-        self.MockCredit.return_value.fetch.assert_awaited_once_with(db_conn=self.conn)
+        self.MockCredit.return_value.fetch.assert_awaited_once_with(
+            transaction=self.tx
+        )
         self.MockDebit.return_value.fetch.assert_not_awaited()
         self.assertIs(entry.credit_account, self.default_credit)
         self.assertIs(entry.debit_account, self.debit)
@@ -83,12 +87,14 @@ class Test_100_LedgerEntry_store(unittest.IsolatedAsyncioTestCase):
 
         await entry.store(session=self.session)
 
-        self.MockDebit.return_value.fetch.assert_awaited_once_with(db_conn=self.conn)
+        self.MockDebit.return_value.fetch.assert_awaited_once_with(
+            transaction=self.tx
+        )
         self.MockCredit.return_value.fetch.assert_not_awaited()
         self.assertIs(entry.debit_account, self.default_debit)
         self.assertIs(entry.credit_account, self.credit)
 
-    async def test_105_without_transaction_opens_one_and_passes_connection(self):
+    async def test_105_without_transaction_opens_one_and_passes_transaction(self):
         entry = LedgerEntry(debit_account=self.debit, credit_account=self.credit)
 
         await entry.store(session=self.session)
@@ -97,7 +103,7 @@ class Test_100_LedgerEntry_store(unittest.IsolatedAsyncioTestCase):
         self.tx.__aenter__.assert_awaited_once_with()
         self.tx.__aexit__.assert_awaited_once_with(None, None, None)
         self.super_store.assert_awaited_once_with(
-            session=self.session, transaction=self.tx, db_conn=self.conn
+            session=self.session, transaction=self.tx
         )
 
     async def test_106_provided_transaction_is_reused(self):
@@ -108,33 +114,11 @@ class Test_100_LedgerEntry_store(unittest.IsolatedAsyncioTestCase):
         self.MockSQLTx.assert_not_called()
         self.tx.__aenter__.assert_not_awaited()
         self.tx.__aexit__.assert_not_awaited()
-        self.MockCredit.return_value.fetch.assert_awaited_once_with(db_conn=self.conn)
-        self.super_store.assert_awaited_once_with(
-            session=self.session, transaction=self.tx, db_conn=self.conn
+        self.MockCredit.return_value.fetch.assert_awaited_once_with(
+            transaction=self.tx
         )
-
-    async def test_107_provided_db_conn_is_used_without_new_transaction(self):
-        other_conn = Mock(name="other_db_conn")
-        entry = LedgerEntry(credit_account=self.credit)
-
-        await entry.store(session=self.session, db_conn=other_conn)
-
-        self.MockSQLTx.assert_not_called()
-        self.MockDebit.return_value.fetch.assert_awaited_once_with(db_conn=other_conn)
         self.super_store.assert_awaited_once_with(
-            session=self.session, transaction=None, db_conn=other_conn
-        )
-
-    async def test_108_db_conn_takes_precedence_over_transaction_connection(self):
-        other_conn = Mock(name="other_db_conn")
-        entry = LedgerEntry(debit_account=self.debit, credit_account=self.credit)
-
-        await entry.store(
-            session=self.session, transaction=self.tx, db_conn=other_conn
-        )
-
-        self.super_store.assert_awaited_once_with(
-            session=self.session, transaction=self.tx, db_conn=other_conn
+            session=self.session, transaction=self.tx
         )
 
     async def test_109_default_account_fetch_failure_propagates(self):
