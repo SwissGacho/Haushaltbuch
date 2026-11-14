@@ -623,8 +623,8 @@ class PersistentBusinessObject(BOBase):
             for line in pprint_lines(insert.get_sql()):
                 LOG.log(VERBOSE_DEBUG, f"   {line}")
         cursor = await insert.execute()
-        fetched = await cursor.fetchone()
-        id = fetched.get("id")
+        fetched_returning = await cursor.fetchone()
+        id = fetched_returning.get("id")
         if id is None:
             raise RuntimeError(f"Failed to insert {self} into DB, no id returned")
         if self.__class__.get_data_object(id) is not None:
@@ -637,7 +637,11 @@ class PersistentBusinessObject(BOBase):
         )
         self._assign_id(id)
         LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
+
         # read the new row back to get any default values set by the DB
+        transaction.add_after_rollback(
+            partial(self.__class__.remove_class_data_object, id)
+        )
         await self.fetch(transaction=transaction, id=self.id, session=session)
 
     async def update_self(

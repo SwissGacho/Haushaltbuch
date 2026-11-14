@@ -128,6 +128,9 @@ class BOBase(BOBaseBase):
         )
         if self._data is None:
             raise RuntimeError("Business object has no data object set. ")
+        if value is None and force_none:
+            self._data["id"] = None
+            return
         if self.id is not None and not force_none:
             raise RuntimeError(
                 f"ID is already assigned as {self.id} and cannot be changed to {value}."
@@ -258,6 +261,13 @@ class BOBase(BOBaseBase):
 
         cls._data_objects[id] = data_object
         cls.subscriptions_report()
+
+    @classmethod
+    def remove_class_data_object(cls, id: int):
+        """Remove a data object for this class. Used when unloading from the database."""
+        if id in cls._data_objects:
+            del cls._data_objects[id]
+            cls.subscriptions_report()
 
     @property
     def data_object_set(self) -> bool:
