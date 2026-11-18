@@ -688,9 +688,12 @@ class PersistentBusinessObject(BOBase):
                 update_rowcount = await cursor.rowcount
                 if update_rowcount != 1:
                     raise RuntimeError(
-                        f"Update failed for {self}:" f" {update_rowcount} rows affected"
+                        f"Update failed for {self}: {update_rowcount} rows affected"
                     )
         finally:
+            transaction.add_after_rollback(
+                partial(self.fetch, id=self.id, session=session)
+            )
             # read the row back to get any changes made by the DB (e.g. triggers)
             await self.fetch(transaction=transaction, id=self.id, session=session)
         changes = self._detect_changes(old_values=previous_values)

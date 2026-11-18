@@ -131,7 +131,7 @@ class BOBase(BOBaseBase):
         if value is None and force_none:
             self._data["id"] = None
             return
-        if self.id is not None and not force_none:
+        if self.id is not None:
             raise RuntimeError(
                 f"ID is already assigned as {self.id} and cannot be changed to {value}."
             )

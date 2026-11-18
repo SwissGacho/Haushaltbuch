@@ -283,35 +283,36 @@ class SQLTransaction(_SQLBase):
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         LOG.log(VERBOSE_DEBUG, f"Exiting SQL transaction context {self._ctx_id}")
-        if exc_type is None:
-            try:
-                await self.commit()
-                LOG.log(
-                    VERBOSE_DEBUG,
-                    f"Transaction committed successfully (context {self._ctx_id}).",
-                )
-                for callback in self._calls_after_commit:
-                    result = callback()
-                    if inspect.isawaitable(result):
-                        await result
-            except OperationalError as exc:
+        try:
+            if exc_type is None:
+                try:
+                    await self.commit()
+                    LOG.log(
+                        VERBOSE_DEBUG,
+                        f"Transaction committed successfully (context {self._ctx_id}).",
+                    )
+                    for callback in self._calls_after_commit:
+                        result = callback()
+                        if inspect.isawaitable(result):
+                            await result
+                except OperationalError as exc:
+                    await self.rollback()
+                    for callback in reversed(self._calls_after_rollback):
+                        result = callback()
+                        if inspect.isawaitable(result):
+                            await result
+                    raise CommitError(exc) from exc
+            else:
                 await self.rollback()
                 for callback in reversed(self._calls_after_rollback):
                     result = callback()
                     if inspect.isawaitable(result):
                         await result
-                await self.close()
-                raise CommitError(exc) from exc
-        else:
-            await self.rollback()
-            for callback in reversed(self._calls_after_rollback):
-                result = callback()
-                if inspect.isawaitable(result):
-                    await result
-        self._calls_after_rollback.clear()
-        self._calls_after_commit.clear()
-        await self.close()
-        LOG.log(VERBOSE_DEBUG, f"SQL transaction context {self._ctx_id} closed.")
+        finally:
+            self._calls_after_rollback.clear()
+            self._calls_after_commit.clear()
+            await self.close()
+            LOG.log(VERBOSE_DEBUG, f"SQL transaction context {self._ctx_id} closed.")
         return False
 
     def sql(self) -> "SQL":
