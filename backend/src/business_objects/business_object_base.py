@@ -259,6 +259,9 @@ class BOBase(BOBaseBase):
             # If the existing data object is the same as the one being added, do nothing
             return
 
+        LOG.log(
+            VERBOSE_DEBUG, f"Adding class data object for {cls.__name__} with id {id}"
+        )
         cls._data_objects[id] = data_object
         cls.subscriptions_report()
 
@@ -266,6 +269,10 @@ class BOBase(BOBaseBase):
     def remove_class_data_object(cls, id: int):
         """Remove a data object for this class. Used when unloading from the database."""
         if id in cls._data_objects:
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"Removing class data object for {cls.__name__} with id {id}",
+            )
             del cls._data_objects[id]
             cls.subscriptions_report()
 

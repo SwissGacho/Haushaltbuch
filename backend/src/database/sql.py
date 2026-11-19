@@ -51,9 +51,8 @@ class _SQLBase(SQLExecutable):
         self._ctx_id = next(self._id_counter)
         LOG.log(
             VERBOSE_DEBUG,
-            f"New {self.__class__.__name__}"
-            f"({'in'if connection is not None else 'no'} connection)"
-            f" context {self._ctx_id}",
+            f"New {self.__class__.__name__} context {self._ctx_id}"
+            f" ({('in connection '+str(connection.connection_id())) if connection is not None else 'outer'})",
         )
 
     async def __aenter__(self) -> Self:
@@ -79,7 +78,9 @@ class _SQLBase(SQLExecutable):
             self._my_connection = await SQLExecutable._get_db().connect()
             LOG.log(
                 VERBOSE_DEBUG,
-                f"New {self.__class__.__name__} connection created (context {self._ctx_id})",
+                f"New {self.__class__.__name__} connection "
+                f"{self._my_connection.connection_id() if self._my_connection else 'unknown'} "
+                f"created (context {self._ctx_id})",
             )
         return self._my_connection
 
@@ -251,6 +252,7 @@ class SQL(_SQLBase):
         if self._sql_statement is None:
             raise InvalidSQLStatementException("No SQL statement to execute.")
         sql = self.get_sql()
+        LOG.log(VERBOSE_DEBUG, f"Executing SQL context {self._ctx_id}")
         # LOG.log(VERBOSE_DEBUG, f"SQL.execute(): {sql=}; context {self._ctx_id}")
         # pylint: disable=no-member
         return await SQL._get_db().execute(
@@ -268,7 +270,7 @@ class SQLTransaction(_SQLBase):
 
     async def __aenter__(self) -> Self:
         """Enter the SQL transaction context."""
-        LOG.log(VERBOSE_DEBUG, f"Entering SQL transaction context {self._ctx_id}")
+        LOG.log(VERBOSE_DEBUG, f"Entering SQLTransaction context {self._ctx_id}")
         await self.connect()
         if self._my_connection is None:
             raise ConnectionError("No connection available for transaction.")
@@ -282,7 +284,7 @@ class SQLTransaction(_SQLBase):
         self._calls_after_rollback.append(callback)
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        LOG.log(VERBOSE_DEBUG, f"Exiting SQL transaction context {self._ctx_id}")
+        LOG.log(VERBOSE_DEBUG, f"Exiting SQLTransaction context {self._ctx_id}")
         try:
             if exc_type is None:
                 try:
@@ -291,10 +293,6 @@ class SQLTransaction(_SQLBase):
                         VERBOSE_DEBUG,
                         f"Transaction committed successfully (context {self._ctx_id}).",
                     )
-                    for callback in self._calls_after_commit:
-                        result = callback()
-                        if inspect.isawaitable(result):
-                            await result
                 except OperationalError as exc:
                     await self.rollback()
                     for callback in reversed(self._calls_after_rollback):
@@ -302,6 +300,10 @@ class SQLTransaction(_SQLBase):
                         if inspect.isawaitable(result):
                             await result
                     raise CommitError(exc) from exc
+                for callback in reversed(self._calls_after_commit):
+                    result = callback()
+                    if inspect.isawaitable(result):
+                        await result
             else:
                 await self.rollback()
                 for callback in reversed(self._calls_after_rollback):
@@ -312,7 +314,7 @@ class SQLTransaction(_SQLBase):
             self._calls_after_rollback.clear()
             self._calls_after_commit.clear()
             await self.close()
-            LOG.log(VERBOSE_DEBUG, f"SQL transaction context {self._ctx_id} closed.")
+            LOG.log(VERBOSE_DEBUG, f"SQLTransaction context {self._ctx_id} closed.")
         return False
 
     def sql(self) -> "SQL":
