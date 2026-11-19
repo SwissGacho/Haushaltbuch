@@ -153,6 +153,10 @@ class ConnectionBaseClass(BaseObject, ABC):
     "Connection Baseclass"
 
     @abstractmethod
+    def connection_id(self) -> int:
+        "Return the connection ID"
+
+    @abstractmethod
     async def connect(self) -> Self:
         "Open a connection and return the Connection instance"
         raise ConnectionError("Called from DB base class.")
