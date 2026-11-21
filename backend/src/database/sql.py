@@ -49,11 +49,16 @@ class _SQLBase(SQLExecutable):
         self._connection = connection
         self._my_connection = connection
         self._ctx_id = next(self._id_counter)
-        LOG.log(
-            VERBOSE_DEBUG,
-            f"New {self.__class__.__name__} context {self._ctx_id}"
-            f" ({('in connection '+str(connection.connection_id())) if connection is not None else 'outer'})",
-        )
+        if LOG.isEnabledFor(VERBOSE_DEBUG):
+            con_id = (
+                "in connection " + str(ci())
+                if callable(ci := getattr(connection, "connection_id", None))
+                else "no connection"
+            )
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"New {self.__class__.__name__} context {self._ctx_id} ({con_id})",
+            )
 
     async def __aenter__(self) -> Self:
         """Enter the runtime context related to this object."""
@@ -265,8 +270,8 @@ class SQLTransaction(_SQLBase):
 
     def __init__(self, connection: ConnectionBaseClass | None = None) -> None:
         super().__init__(connection=connection)
-        self._calls_after_commit: list[Callable[..., Any]] = []
-        self._calls_after_rollback: list[Callable[..., Any]] = []
+        self._calls_after_commit: list[tuple[Callable[..., Any], str]] = []
+        self._calls_after_rollback: list[tuple[Callable[..., Any], str]] = []
 
     async def __aenter__(self) -> Self:
         """Enter the SQL transaction context."""
@@ -277,11 +282,19 @@ class SQLTransaction(_SQLBase):
         await self._my_connection.begin()
         return self
 
-    def add_after_commit(self, callback: Callable[..., Any]) -> None:
-        self._calls_after_commit.append(callback)
+    def add_after_commit(
+        self, callback: Callable[..., Any], description: str = ""
+    ) -> None:
+        if not description:
+            description = f"Nr {len(self._calls_after_commit) + 1}"
+        self._calls_after_commit.append((callback, description))
 
-    def add_after_rollback(self, callback: Callable[..., Any]) -> None:
-        self._calls_after_rollback.append(callback)
+    def add_after_rollback(
+        self, callback: Callable[..., Any], description: str = ""
+    ) -> None:
+        if not description:
+            description = f"Nr {len(self._calls_after_rollback) + 1}"
+        self._calls_after_rollback.append((callback, description))
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         LOG.log(VERBOSE_DEBUG, f"Exiting SQLTransaction context {self._ctx_id}")
@@ -294,22 +307,51 @@ class SQLTransaction(_SQLBase):
                         f"Transaction committed successfully (context {self._ctx_id}).",
                     )
                 except OperationalError as exc:
+                    LOG.log(
+                        VERBOSE_DEBUG,
+                        f"OperationalError occurred during commit (context {self._ctx_id}): {exc}",
+                    )
                     await self.rollback()
-                    for callback in reversed(self._calls_after_rollback):
-                        result = callback()
-                        if inspect.isawaitable(result):
-                            await result
+                    for callback, description in reversed(self._calls_after_rollback):
+                        LOG.log(
+                            VERBOSE_DEBUG,
+                            f"Executing after-rollback callback '{description}' (context {self._ctx_id})",
+                        )
+                        try:
+                            result = callback()
+                            if inspect.isawaitable(result):
+                                await result
+                        except Exception as e:
+                            LOG.exception(
+                                f"Exception occurred in after-rollback callback '{description}' (context {self._ctx_id}): {e}"
+                            )
                     raise CommitError(exc) from exc
-                for callback in reversed(self._calls_after_commit):
+                for callback, description in reversed(self._calls_after_commit):
+                    LOG.log(
+                        VERBOSE_DEBUG,
+                        f"Executing after-commit callback '{description}' (context {self._ctx_id})",
+                    )
                     result = callback()
                     if inspect.isawaitable(result):
                         await result
             else:
+                LOG.exception(
+                    f"Exception occurred in SQLTransaction context {self._ctx_id}: {exc_value}"
+                )
                 await self.rollback()
-                for callback in reversed(self._calls_after_rollback):
-                    result = callback()
-                    if inspect.isawaitable(result):
-                        await result
+                for callback, description in reversed(self._calls_after_rollback):
+                    LOG.log(
+                        VERBOSE_DEBUG,
+                        f"Executing after-rollback callback '{description}' (context {self._ctx_id})",
+                    )
+                    try:
+                        result = callback()
+                        if inspect.isawaitable(result):
+                            await result
+                    except Exception as e:
+                        LOG.exception(
+                            f"Exception occurred in after-rollback callback '{description}' (context {self._ctx_id}): {e}"
+                        )
         finally:
             self._calls_after_rollback.clear()
             self._calls_after_commit.clear()

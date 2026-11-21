@@ -128,7 +128,12 @@ class BOBase(BOBaseBase):
         )
         if self._data is None:
             raise RuntimeError("Business object has no data object set. ")
-        if value is None and force_none:
+        if value is None and "id" in self._data and force_none:
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"BOBase._assign_id: {self.__class__.__name__}"
+                f" forcefully setting id from {self._data['id']} to None",
+            )
             self._data["id"] = None
             return
         if self.id is not None:

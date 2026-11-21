@@ -57,16 +57,20 @@ class LedgerEntry(PersistentBusinessObject):
         async with (
             nullcontext(transaction) if transaction else SQLTransaction()
         ) as transaction:
+            if transaction is None:
+                raise ValueError("No transaction available for store operation")
             if not self.debit_account:
                 transaction.add_after_rollback(
-                    partial(setattr, self, "debit_account", None)
+                    partial(setattr, self, "debit_account", None),
+                    description="Restore debit_account to None",
                 )
                 self.debit_account = await DefaultDebitAccount().fetch(
                     transaction=transaction
                 )
             if not self.credit_account:
                 transaction.add_after_rollback(
-                    partial(setattr, self, "credit_account", None)
+                    partial(setattr, self, "credit_account", None),
+                    description="Restore credit_account to None",
                 )
                 self.credit_account = await DefaultCreditAccount().fetch(
                     transaction=transaction
