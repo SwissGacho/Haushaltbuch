@@ -646,7 +646,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         mock_partial.assert_called_once_with(
             self.mock_bo._notify_store, session, old_values=expected_old_values
         )
-        self.mock_tx.add_after_commit.assert_called_once_with(mock_partial())
+        self.mock_tx.add_after_commit.assert_called_once_with(
+            mock_partial(), description=ANY
+        )
 
     async def test_203_store_uses_provided_transaction(self):
         self.mock_bo.insert_self = AsyncMock(name="_insert_self")
@@ -715,7 +717,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         mock_partial.assert_called_once_with(
             target._notify_store, session, old_values=expected_old_values
         )
-        self.mock_tx.add_after_commit.assert_called_once_with(mock_partial())
+        self.mock_tx.add_after_commit.assert_called_once_with(
+            mock_partial(), description=ANY
+        )
         # target._notify_store.assert_awaited_once_with(
         #     session, old_values=expected_old_values
         # )

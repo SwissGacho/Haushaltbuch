@@ -81,12 +81,18 @@ class _SQLBase(SQLExecutable):
         if self._my_connection is None:
             # pylint: disable=no-member
             self._my_connection = await SQLExecutable._get_db().connect()
-            LOG.log(
-                VERBOSE_DEBUG,
-                f"New {self.__class__.__name__} connection "
-                f"{self._my_connection.connection_id() if self._my_connection else 'unknown'} "
-                f"created (context {self._ctx_id})",
-            )
+            if LOG.isEnabledFor(VERBOSE_DEBUG):
+                con_id = (
+                    "in connection " + str(ci())
+                    if callable(
+                        ci := getattr(self._my_connection, "connection_id", None)
+                    )
+                    else "no connection"
+                )
+                LOG.log(
+                    VERBOSE_DEBUG,
+                    f"New {self.__class__.__name__} connection {con_id} created (context {self._ctx_id})",
+                )
         return self._my_connection
 
     @property
