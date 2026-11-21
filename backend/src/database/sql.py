@@ -83,11 +83,11 @@ class _SQLBase(SQLExecutable):
             self._my_connection = await SQLExecutable._get_db().connect()
             if LOG.isEnabledFor(VERBOSE_DEBUG):
                 con_id = (
-                    "in connection " + str(ci())
+                    str(ci())
                     if callable(
                         ci := getattr(self._my_connection, "connection_id", None)
                     )
-                    else "no connection"
+                    else "unknown"
                 )
                 LOG.log(
                     VERBOSE_DEBUG,

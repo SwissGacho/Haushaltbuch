@@ -1,6 +1,7 @@
 """Test suite for Business Objects Base"""
 
 import datetime
+import inspect
 import json
 import unittest
 from unittest import mock
@@ -668,21 +669,6 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             transaction=self.mock_tx, session=session
         )
 
-    async def test_203_store_uses_provided_db_conn(self):
-        self.mock_bo.insert_self = AsyncMock(name="_insert_self")
-        session = Mock(name="session")
-
-        with patch(
-            "business_objects.persistent_business_object.SQLTransaction",
-            new=self.MockSQLTx,
-        ):
-            await self.mock_bo.store(session=session, transaction=self.mock_tx)
-
-        self.MockSQLTx.assert_not_called()
-        self.mock_bo.insert_self.assert_awaited_once_with(
-            transaction=self.mock_tx, session=session
-        )
-
     async def test_203a_store_with_mixin_propagates_old_values(self):
         """Regression test: when a store_mixin is present, store() must capture its
         awaited return value"""
@@ -768,6 +754,57 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
     async def test_204c_insert_self(self):
         mock_bo1 = MockPersistentBO1()
         await self._204_insert_self(mock_attr2=mock_bo1)
+
+    async def test_204d_insert_self_rollback_restores_data(self):
+        """Rolling back an insert restores the data snapshot taken before the insert"""
+        callbacks = []
+        self.mock_tx.add_after_rollback = Mock(
+            side_effect=lambda cb, *a, **kw: callbacks.append(cb)
+        )
+        bo = MockPersistentBO2(mock_attr1="micki mock", mock_attr3=["a"])
+        data_object = bo._data
+        original = dict(data_object.items())
+        original_db_data = dict(data_object.db_data)
+
+        async def fake_fetch(transaction, id, session=None):
+            data_object["mock_attr1"] = "changed by fetch"
+            data_object.db_data = {"mock_attr1": "db value"}
+
+        bo.fetch = AsyncMock(name="fetch", side_effect=fake_fetch)
+        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
+            await bo.insert_self(transaction=self.mock_tx)
+
+        self.assertEqual(bo.id, self.FETCH_RESULT["id"])
+        self.assertEqual(data_object["mock_attr1"], "changed by fetch")
+
+        for callback in reversed(callbacks):
+            result = callback()
+            if inspect.isawaitable(result):
+                await result
+
+        self.assertIs(bo._data, data_object)
+        self.assertEqual(dict(data_object.items()), original)
+        self.assertEqual(data_object.db_data, original_db_data)
+        self.assertIsNone(bo.id)
+
+    async def test_204e_insert_self_rollback_snapshot_is_independent(self):
+        """The snapshot is a deep copy: later changes to mutable values don't leak in"""
+        callbacks = []
+        self.mock_tx.add_after_rollback = Mock(
+            side_effect=lambda cb, *a, **kw: callbacks.append(cb)
+        )
+        bo = MockPersistentBO2(mock_attr1="micki mock", mock_attr3=["a"])
+        bo.fetch = AsyncMock(name="fetch")
+        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
+            await bo.insert_self(transaction=self.mock_tx)
+        bo._data["mock_attr3"].append("b")
+
+        for callback in reversed(callbacks):
+            result = callback()
+            if inspect.isawaitable(result):
+                await result
+
+        self.assertEqual(bo._data["mock_attr3"], ["a"])
 
     async def _205_update_self(self, exception=False):
         mock_rowcount = AsyncMock(name="rowcount", return_value=1)
