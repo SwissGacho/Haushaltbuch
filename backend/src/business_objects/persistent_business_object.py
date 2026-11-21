@@ -563,7 +563,8 @@ class PersistentBusinessObject(BOBase):
                     transaction=transaction, session=session
                 )
             transaction.add_after_commit(
-                partial(self._notify_store, session, old_values=old_values)
+                partial(self._notify_store, session, old_values=old_values),
+                description="Notify after store",
             )
         # await self._notify_store(session, old_values=old_values)
 
@@ -598,6 +599,19 @@ class PersistentBusinessObject(BOBase):
             raise ValueError(f"id must be None for {self} insert operation")
         if self._data is None:
             raise CannotStoreEmptyBO(f"_data must be set for {self} insert operation")
+        # snapshot taken before any modification so a rollback can restore it in place
+        data_object = self._data
+        saved_values = copy.deepcopy(data_object._data)
+        saved_db_values = copy.deepcopy(data_object.db_data)
+
+        def restore_data() -> None:
+            data_object._data.clear()
+            data_object._data.update(saved_values)
+            data_object.db_data = saved_db_values
+
+        transaction.add_after_rollback(
+            restore_data, description="Restore ._data of inserted object"
+        )
         self.bo_name = self.bo_type_name()
         values_to_store: NamedValueListList = [
             (k, v) for k, v in self._data.items() if k != "id" and v is not None
@@ -633,15 +647,18 @@ class PersistentBusinessObject(BOBase):
             )
         LOG.log(DEBUG, f"Inserted new {self} into DB returning id={id}")
         transaction.add_after_rollback(
-            partial(self._assign_id, self.id, force_none=True)
+            partial(self._assign_id, self.id, force_none=True),
+            description="Restore id of inserted object to None",
         )
+        if self.__class__.get_data_object(id) is None:
+            transaction.add_after_rollback(
+                partial(self.__class__.remove_class_data_object, id),
+                description=f"Remove {self.__class__.__name__} class data object",
+            )
         self._assign_id(id)
         LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
 
         # read the new row back to get any default values set by the DB
-        transaction.add_after_rollback(
-            partial(self.__class__.remove_class_data_object, id)
-        )
         await self.fetch(transaction=transaction, id=self.id, session=session)
 
     async def update_self(
@@ -684,6 +701,10 @@ class PersistentBusinessObject(BOBase):
                     )
                     for line in pprint_lines(update.get_sql()):
                         LOG.log(VERBOSE_DEBUG, f"   {line}")
+                transaction.add_after_rollback(
+                    partial(self.fetch, id=self.id, session=session),
+                    description="Fetch row from DB after UPDATE rollback",
+                )
                 cursor = await update.execute()
                 update_rowcount = await cursor.rowcount
                 if update_rowcount != 1:
@@ -691,9 +712,6 @@ class PersistentBusinessObject(BOBase):
                         f"Update failed for {self}: {update_rowcount} rows affected"
                     )
         finally:
-            transaction.add_after_rollback(
-                partial(self.fetch, id=self.id, session=session)
-            )
             # read the row back to get any changes made by the DB (e.g. triggers)
             await self.fetch(transaction=transaction, id=self.id, session=session)
         changes = self._detect_changes(old_values=previous_values)
