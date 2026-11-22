@@ -15,8 +15,7 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from business_objects.bo_descriptors import AttributeDescription
-from core.util import check_property
-from database.sql import SQL
+from database.sql import SQLTransaction
 from database.sql_expression import (
     SQLExpression,
     In,
@@ -133,7 +132,7 @@ class MixinBase:
 
     async def fetch_mixin(
         self,
-        sql: SQL,
+        transaction: SQLTransaction,
         id=None,
         newest: bool = False,
         session: Optional[SessionBase] = None,
@@ -148,11 +147,11 @@ class MixinBase:
                 f"MixinBase.fetch_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
             )
         await fetch_self(  # pylint: disable=not-callable
-            sql, id=id, newest=newest, session=session
+            transaction=transaction, id=id, newest=newest, session=session
         )
 
     async def store_mixin(
-        self, session: Optional[SessionBase] = None
+        self, transaction: SQLTransaction, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         """Store the business object in the database.
         If 'self.id is None' a new row is inserted
@@ -168,10 +167,14 @@ class MixinBase:
                 f"MixinBase.store_mixin: Expected PersistentBusinessObject, got {type(self).__name__}"
             )
         if getattr(self, "id", None) is None:
-            await insert_self(session)  # pylint: disable=not-callable
+            await insert_self(
+                transaction=transaction, session=session
+            )  # pylint: disable=not-callable
             return {}
         else:
-            return await update_self(session)  # pylint: disable=not-callable
+            return await update_self(
+                transaction=transaction, session=session
+            )  # pylint: disable=not-callable
 
 
 log_exit(LOG)

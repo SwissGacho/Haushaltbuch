@@ -1,11 +1,14 @@
 """Transaction, representing a single financial transaction from one account to another"""
 
 from typing import Optional
+from contextlib import nullcontext
 
 from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
+from core.base_objects import ConnectionBaseClass
+from database.sql import SQLTransaction
 from bom_persistent.account.category import Category
 from bom_persistent.account.account import (
     Account,
@@ -39,7 +42,11 @@ class LedgerEntry(PersistentBusinessObject):
     counterparty = BOStr()
     balance = BODecimal()
 
-    async def store(self, session: Optional[SessionBase] = None) -> None:
+    async def store(
+        self,
+        session: Optional[SessionBase] = None,
+        transaction: Optional[SQLTransaction] = None,
+    ) -> None:
         "Store the object in the database"
 
         # If credit or debit account is not set, set it to the default account
@@ -47,11 +54,18 @@ class LedgerEntry(PersistentBusinessObject):
             raise RuntimeError(
                 "No debit or credit account specified. At least one must be specified."
             )
-        if not self.debit_account:
-            self.debit_account = await DefaultDebitAccount().fetch()
-        if not self.credit_account:
-            self.credit_account = await DefaultCreditAccount().fetch()
-        await super().store(session=session)
+        async with (
+            nullcontext(transaction) if transaction else SQLTransaction()
+        ) as transaction:
+            if not self.debit_account:
+                self.debit_account = await DefaultDebitAccount().fetch(
+                    transaction=transaction
+                )
+            if not self.credit_account:
+                self.credit_account = await DefaultCreditAccount().fetch(
+                    transaction=transaction
+                )
+            await super().store(session=session, transaction=transaction)
 
 
 class Posting(PersistentBusinessObject):
