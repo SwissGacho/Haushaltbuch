@@ -119,7 +119,7 @@ class BOBase(BOBaseBase):
         BOBase.subscriptions_report()
         # Construction does not change persisted state; store() emits change notifications.
 
-    def _assign_id(self, value: int | None) -> None:
+    def _assign_id(self, value: int | None, force_none: bool = False) -> None:
         """Internal use only. Assign 'id' directly, bypassing the public setter's
         restriction."""
         LOG.log(
@@ -128,6 +128,14 @@ class BOBase(BOBaseBase):
         )
         if self._data is None:
             raise RuntimeError("Business object has no data object set. ")
+        if value is None and "id" in self._data and force_none:
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"BOBase._assign_id: {self.__class__.__name__}"
+                f" forcefully setting id from {self._data['id']} to None",
+            )
+            self._data["id"] = None
+            return
         if self.id is not None:
             raise RuntimeError(
                 f"ID is already assigned as {self.id} and cannot be changed to {value}."
@@ -256,8 +264,22 @@ class BOBase(BOBaseBase):
             # If the existing data object is the same as the one being added, do nothing
             return
 
+        LOG.log(
+            VERBOSE_DEBUG, f"Adding class data object for {cls.__name__} with id {id}"
+        )
         cls._data_objects[id] = data_object
         cls.subscriptions_report()
+
+    @classmethod
+    def remove_class_data_object(cls, id: int):
+        """Remove a data object for this class. Used when unloading from the database."""
+        if id in cls._data_objects:
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"Removing class data object for {cls.__name__} with id {id}",
+            )
+            del cls._data_objects[id]
+            cls.subscriptions_report()
 
     @property
     def data_object_set(self) -> bool:

@@ -9,7 +9,11 @@ from database.sql_expression import And, ColumnName, Eq, SQLString, Value
 from database.sql_statement import CreateTable, CreateView, Insert, SQLStatement, Select
 from database.sql_clause import SQLColumnDefinition
 from core.base_objects import ConnectionBaseClass
-from core.exceptions import InvalidSQLStatementException
+from core.exceptions import (
+    CommitError,
+    InvalidSQLStatementException,
+    OperationalError,
+)
 from business_objects.bo_descriptors import BOBaseBase, BOColumnConstraint
 from business_objects.business_attribute_base import BaseFlag
 
@@ -382,6 +386,86 @@ class AsyncTest_300_SQLTransaction(unittest.IsolatedAsyncioTestCase):
         mocked_connection.commit.assert_not_awaited()
         mocked_connection.rollback.assert_not_awaited()
         mocked_connection.close.assert_not_awaited()
+
+    @staticmethod
+    def _ext_conn() -> Mock:
+        conn = Mock(name="ext. Conn.", spec=ConnectionBaseClass)
+        for name in ("commit", "rollback", "begin", "close"):
+            setattr(conn, name, AsyncMock(name=name))
+        return conn
+
+    async def test_305_after_commit_callbacks(self):
+        """After-commit callbacks run in reverse order, sync and async; rollback ones don't"""
+        calls: list[str] = []
+
+        async def async_cb():
+            calls.append("async")
+
+        async with SQLTransaction(self._ext_conn()) as trx:
+            trx.add_after_commit(lambda: calls.append("first"))
+            trx.add_after_commit(async_cb)
+            trx.add_after_rollback(lambda: calls.append("rollback"))
+            self.assertEqual(calls, [])
+        self.assertEqual(calls, ["async", "first"])
+        self.assertEqual(trx._calls_after_commit, [])
+        self.assertEqual(trx._calls_after_rollback, [])
+
+    async def test_306_after_rollback_callbacks(self):
+        """After-rollback callbacks run in reverse order after rollback; commit ones don't"""
+        calls: list[str] = []
+        conn = self._ext_conn()
+        conn.rollback.side_effect = lambda: calls.append("db-rollback")
+
+        async def async_cb():
+            calls.append("async")
+
+        with self.assertRaises(MockException):
+            async with SQLTransaction(conn) as trx:
+                trx.add_after_rollback(lambda: calls.append("first"))
+                trx.add_after_rollback(async_cb)
+                trx.add_after_commit(lambda: calls.append("commit"))
+                raise MockException("Test exception")
+        self.assertEqual(calls, ["db-rollback", "async", "first"])
+        self.assertEqual(trx._calls_after_commit, [])
+        self.assertEqual(trx._calls_after_rollback, [])
+
+    async def test_307_failing_rollback_callback_does_not_stop_others(self):
+        """An exception in one after-rollback callback is logged; others still run"""
+        calls: list[str] = []
+
+        def failing():
+            raise RuntimeError("callback failed")
+
+        with self.assertRaises(MockException):
+            async with SQLTransaction(self._ext_conn()) as trx:
+                trx.add_after_rollback(lambda: calls.append("first"))
+                trx.add_after_rollback(failing)
+                trx.add_after_rollback(lambda: calls.append("last"))
+                raise MockException("Test exception")
+        self.assertEqual(calls, ["last", "first"])
+
+    async def test_308_commit_failure_runs_rollback_callbacks(self):
+        """OperationalError on commit triggers rollback, rollback callbacks and CommitError"""
+        calls: list[str] = []
+        conn = self._ext_conn()
+        conn.commit.side_effect = OperationalError("commit failed")
+        with self.assertRaises(CommitError):
+            async with SQLTransaction(conn) as trx:
+                trx.add_after_rollback(lambda: calls.append("rollback"))
+                trx.add_after_commit(lambda: calls.append("commit"))
+        conn.rollback.assert_awaited_once_with()
+        self.assertEqual(calls, ["rollback"])
+
+    async def test_309_callback_description_default(self):
+        """Callbacks get a numbered default description"""
+        trx = SQLTransaction()
+        trx.add_after_commit(print)
+        trx.add_after_commit(print, "named")
+        trx.add_after_rollback(print)
+        self.assertEqual(
+            [d for _, d in trx._calls_after_commit], ["Nr 1", "named"]
+        )
+        self.assertEqual([d for _, d in trx._calls_after_rollback], ["Nr 1"])
 
     def test_311_sql_no_ctx_no_conn(self):
         """Test creating SQL without an active connection"""

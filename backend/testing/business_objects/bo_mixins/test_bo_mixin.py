@@ -191,7 +191,9 @@ class TestBoMixin(unittest.IsolatedAsyncioTestCase):
 
     async def test_fetch_mixin_raises_for_non_coroutine_fetch_self(self):
         with self.assertRaises(TypeError):
-            await _FetchTargetInvalid().fetch_mixin(db_conn=Mock(name="db_conn"))
+            await _FetchTargetInvalid().fetch_mixin(
+                transaction=Mock(name="db_transaction")
+            )
 
     async def test_store_mixin_calls_insert_for_new_object(self):
         target = _StoreTarget(bo_id=None)

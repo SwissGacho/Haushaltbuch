@@ -1,6 +1,7 @@
 """Base class for DB connections"""
 
 from typing import Any, NamedTuple, Self, Optional, Protocol, AsyncContextManager
+import itertools
 from decimal import Decimal, InvalidOperation, Context as DecimalContext, setcontext
 import re
 import json
@@ -227,12 +228,19 @@ class DBConnectionProtocol(AsyncContextManager["DBConnectionProtocol"], Protocol
 class Connection(ConnectionBaseClass):
     "Connection to the DB"
 
+    _id_counter = itertools.count()
+
     def __init__(self, db_obj: DB, **cfg) -> None:
         self._cfg = cfg
         self._connection: Optional[DBConnectionProtocol] = None
         self._db = db_obj
         self._db.db_connections.add(self)
+        self._conn_id = next(self._id_counter)
         # LOG.debug(f"++++++++++++++++++++++++++++++ {self._db._connections=}")
+
+    def connection_id(self) -> int:
+        "Return the connection ID"
+        return self._conn_id
 
     async def connect(self) -> Self:
         "Open a connection and return the Connection instance"

@@ -1,8 +1,10 @@
 """Test suite for Business Objects Base"""
 
 import datetime
+import inspect
 import json
 import unittest
+from unittest import mock
 from unittest.mock import ANY, DEFAULT, Mock, AsyncMock, patch, call
 
 from business_objects.bo_mixins.specializing import Specializing
@@ -464,6 +466,8 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_tx.__aenter__ = AsyncMock(return_value=self.mock_tx)
         self.mock_tx.__aexit__ = AsyncMock(return_value=False)
         self.mock_tx.connection = self.mock_conn
+        self.mock_tx.add_after_commit = AsyncMock()
+        self.mock_tx.add_after_rollback = AsyncMock()
         self.MockSQLTx = Mock(name="MockSQL", return_value=self.mock_tx)
 
     async def test_201_fetch_none(self):
@@ -621,9 +625,15 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_bo._notify_store = AsyncMock(name="_notify_store")
         self.mock_bo._assign_id(77)
         session = Mock(name="session")
-        with patch(
-            "business_objects.persistent_business_object.SQLTransaction",
-            new=self.MockSQLTx,
+        # mock_partial = Mock(name="partial")
+        with (
+            patch(
+                "business_objects.persistent_business_object.SQLTransaction",
+                new=self.MockSQLTx,
+            ),
+            patch(
+                "business_objects.persistent_business_object.partial"
+            ) as mock_partial,
         ):
             await self.mock_bo.store(session=session)
 
@@ -634,8 +644,11 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_bo.update_self.assert_awaited_once_with(
             transaction=self.mock_tx, session=session
         )
-        self.mock_bo._notify_store.assert_awaited_once_with(
-            session, old_values=expected_old_values
+        mock_partial.assert_called_once_with(
+            self.mock_bo._notify_store, session, old_values=expected_old_values
+        )
+        self.mock_tx.add_after_commit.assert_called_once_with(
+            mock_partial(), description=ANY
         )
 
     async def test_203_store_uses_provided_transaction(self):
@@ -656,21 +669,6 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             transaction=self.mock_tx, session=session
         )
 
-    async def test_203_store_uses_provided_db_conn(self):
-        self.mock_bo.insert_self = AsyncMock(name="_insert_self")
-        session = Mock(name="session")
-
-        with patch(
-            "business_objects.persistent_business_object.SQLTransaction",
-            new=self.MockSQLTx,
-        ):
-            await self.mock_bo.store(session=session, transaction=self.mock_tx)
-
-        self.MockSQLTx.assert_not_called()
-        self.mock_bo.insert_self.assert_awaited_once_with(
-            transaction=self.mock_tx, session=session
-        )
-
     async def test_203a_store_with_mixin_propagates_old_values(self):
         """Regression test: when a store_mixin is present, store() must capture its
         awaited return value"""
@@ -685,9 +683,14 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
 
         session = Mock(name="session")
 
-        with patch(
-            "business_objects.persistent_business_object.SQLTransaction",
-            new=self.MockSQLTx,
+        with (
+            patch(
+                "business_objects.persistent_business_object.SQLTransaction",
+                new=self.MockSQLTx,
+            ),
+            patch(
+                "business_objects.persistent_business_object.partial"
+            ) as mock_partial,
         ):
             await target.store(session=session)
 
@@ -697,9 +700,15 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         )
         target.insert_self.assert_not_awaited()
         target.update_self.assert_not_awaited()
-        target._notify_store.assert_awaited_once_with(
-            session, old_values=expected_old_values
+        mock_partial.assert_called_once_with(
+            target._notify_store, session, old_values=expected_old_values
         )
+        self.mock_tx.add_after_commit.assert_called_once_with(
+            mock_partial(), description=ANY
+        )
+        # target._notify_store.assert_awaited_once_with(
+        #     session, old_values=expected_old_values
+        # )
 
     async def _204_insert_self(
         self, mock_attr1="micki mock", mock_attr3=[], **mock_attrs
@@ -746,7 +755,61 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         mock_bo1 = MockPersistentBO1()
         await self._204_insert_self(mock_attr2=mock_bo1)
 
+    async def test_204d_insert_self_rollback_restores_data(self):
+        """Rolling back an insert restores the data snapshot taken before the insert"""
+        callbacks = []
+        self.mock_tx.add_after_rollback = Mock(
+            side_effect=lambda cb, *a, **kw: callbacks.append(cb)
+        )
+        bo = MockPersistentBO2(mock_attr1="micki mock", mock_attr3=["a"])
+        data_object = bo._data
+        original = dict(data_object.items())
+        original_db_data = dict(data_object.db_data)
+
+        async def fake_fetch(transaction, id, session=None):
+            data_object["mock_attr1"] = "changed by fetch"
+            data_object.db_data = {"mock_attr1": "db value"}
+
+        bo.fetch = AsyncMock(name="fetch", side_effect=fake_fetch)
+        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
+            await bo.insert_self(transaction=self.mock_tx)
+
+        self.assertEqual(bo.id, self.FETCH_RESULT["id"])
+        self.assertEqual(data_object["mock_attr1"], "changed by fetch")
+
+        for callback in reversed(callbacks):
+            result = callback()
+            if inspect.isawaitable(result):
+                await result
+
+        self.assertIs(bo._data, data_object)
+        self.assertEqual(dict(data_object.items()), original)
+        self.assertEqual(data_object.db_data, original_db_data)
+        self.assertIsNone(bo.id)
+
+    async def test_204e_insert_self_rollback_snapshot_is_independent(self):
+        """The snapshot is a deep copy: later changes to mutable values don't leak in"""
+        callbacks = []
+        self.mock_tx.add_after_rollback = Mock(
+            side_effect=lambda cb, *a, **kw: callbacks.append(cb)
+        )
+        bo = MockPersistentBO2(mock_attr1="micki mock", mock_attr3=["a"])
+        bo.fetch = AsyncMock(name="fetch")
+        with patch("business_objects.persistent_business_object.SQL", new=self.MockSQL):
+            await bo.insert_self(transaction=self.mock_tx)
+        bo._data["mock_attr3"].append("b")
+
+        for callback in reversed(callbacks):
+            result = callback()
+            if inspect.isawaitable(result):
+                await result
+
+        self.assertEqual(bo._data["mock_attr3"], ["a"])
+
     async def _205_update_self(self, exception=False):
+        mock_rowcount = AsyncMock(name="rowcount", return_value=1)
+        if not exception:
+            self.mock_cursor.rowcount = mock_rowcount()
         mock_convert_from_db = AsyncMock(
             name="convert_from_db",
             side_effect=[
@@ -857,6 +920,10 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 mock_datetime.now.assert_called_once_with()
                 mock_dt.astimezone.assert_called_once_with(datetime.UTC)
             self.mock_sql.execute.assert_awaited_once_with()
+            if exception:
+                mock_rowcount.assert_not_awaited()
+            else:
+                mock_rowcount.assert_awaited_once_with()
             self.mock_bo.fetch.assert_awaited_once_with(
                 transaction=self.mock_tx, id=id, session=session
             )

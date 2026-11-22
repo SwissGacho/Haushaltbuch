@@ -1,5 +1,6 @@
 """Transaction, representing a single financial transaction from one account to another"""
 
+from functools import partial
 from typing import Optional
 from contextlib import nullcontext
 
@@ -7,7 +8,6 @@ from core.app_logging import getLogger, log_exit
 
 LOG = getLogger(__name__)
 
-from core.base_objects import ConnectionBaseClass
 from database.sql import SQLTransaction
 from bom_persistent.account.category import Category
 from bom_persistent.account.account import (
@@ -57,11 +57,21 @@ class LedgerEntry(PersistentBusinessObject):
         async with (
             nullcontext(transaction) if transaction else SQLTransaction()
         ) as transaction:
+            if transaction is None:
+                raise ValueError("No transaction available for store operation")
             if not self.debit_account:
+                transaction.add_after_rollback(
+                    partial(setattr, self, "debit_account", None),
+                    description="Restore debit_account to None",
+                )
                 self.debit_account = await DefaultDebitAccount().fetch(
                     transaction=transaction
                 )
             if not self.credit_account:
+                transaction.add_after_rollback(
+                    partial(setattr, self, "credit_account", None),
+                    description="Restore credit_account to None",
+                )
                 self.credit_account = await DefaultCreditAccount().fetch(
                     transaction=transaction
                 )
