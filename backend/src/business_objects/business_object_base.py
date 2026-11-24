@@ -134,21 +134,21 @@ class BOBase(BOBaseBase):
                 f"BOBase._assign_id: {self.__class__.__name__}"
                 f" forcefully setting id from {self._data['id']} to None",
             )
+            self.remove_class_data_object(self._data["id"])
             self._data["id"] = None
             return
         if self.id is not None:
             raise RuntimeError(
                 f"ID is already assigned as {self.id} and cannot be changed to {value}."
             )
-        for attr in self.__class__.attribute_descriptions():
-            if attr.name == "id":
-                self._data[attr.name] = value
-                if self.id != value:
-                    raise RuntimeError(
-                        f"id assignment failed, should be {value}, but is {self.id}"
-                    )
-                self.__class__.add_class_data_object(self._data, self.id)
-                return
+        if "id" in [attr.name for attr in self.__class__.attribute_descriptions()]:
+            self._data["id"] = value
+            if self.id != value:
+                raise RuntimeError(
+                    f"id assignment failed, should be {value}, but is {self.id}"
+                )
+            self.__class__.add_class_data_object(self._data, self.id)
+            return
         raise RuntimeError(
             f"Business object {self.__class__.__name__} has no 'id' attribute to assign value {value}"
         )
