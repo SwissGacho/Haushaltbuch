@@ -258,10 +258,10 @@ class PersistentBusinessObject(BOBase):
             if filter_conditions:
                 select.where(filter_conditions)
             result = await (await select.execute()).fetchone()
-        LOG.debug(
-            f"PersistentBusinessObject.count_rows({conditions=}) "
-            f"{result=} -> return {result['count']}"
-        )
+            LOG.debug(
+                f"PersistentBusinessObject.count_rows({conditions=}) "
+                f"{result=} -> return {result['count']}"
+            )
         return result["count"]
 
     @classmethod
@@ -650,11 +650,6 @@ class PersistentBusinessObject(BOBase):
             partial(self._assign_id, self.id, force_none=True),
             description="Restore id of inserted object to None",
         )
-        if self.__class__.get_data_object(id) is None:
-            transaction.add_after_rollback(
-                partial(self.__class__.remove_class_data_object, id),
-                description=f"Remove {self.__class__.__name__} class data object",
-            )
         self._assign_id(id)
         LOG.log(DEBUG, f"Assigned id {self.id} to {self}")
 
