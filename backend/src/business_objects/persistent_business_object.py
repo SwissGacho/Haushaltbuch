@@ -682,8 +682,6 @@ class PersistentBusinessObject(BOBase):
         if changed_values:
             for k, v in changed_values.items():
                 update.assignment(k, Value(k, v))
-
-        if changed_values:
             self._data["last_updated"] = datetime.now().astimezone(UTC)
             update.assignment(
                 "last_updated", Value("last_updated", self._data["last_updated"])
