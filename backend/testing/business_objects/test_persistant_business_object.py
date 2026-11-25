@@ -861,15 +861,9 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             new_vals = [
                 (a, self.mock_bo._data[a])
                 for a in self.mock_bo._data
-                if a not in ("bo_name", "id")
+                if a not in ("bo_name", "id", "last_updated")
                 and self.mock_bo._data[a] != self.mock_bo._data.db_data.get(a)
             ]
-            last_updated_present = (
-                "last_updated" in self.mock_bo._data
-                and self.mock_bo._data["last_updated"] is not None
-            )
-            if not last_updated_present:
-                new_vals.append(("last_updated", "mock_CURRENT_TIMESTAMP"))
             mock_dt = Mock(name="mock_dt")
             mock_dt.astimezone = Mock(return_value="mock_CURRENT_TIMESTAMP")
             mock_datetime.now = Mock(name="datetime.now", return_value=mock_dt)
@@ -911,14 +905,13 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 PersistentBusinessObject.convert_from_db.await_args_list, convert_args  # type: ignore
             )
-            self.assertEqual(self.mock_sql.assignment.call_count, len(new_vals))
-            self.assertEqual(MockValue.call_count, len(new_vals) + 1)
+            self.assertEqual(self.mock_sql.assignment.call_count, len(new_vals) + 1)
+            self.assertEqual(MockValue.call_count, len(new_vals) + 2)
             for v in new_vals:
                 MockValue.assert_any_call(v[0], v[1])
                 self.mock_sql.assignment.assert_any_call(v[0], MockValue())
-            if not last_updated_present:
-                mock_datetime.now.assert_called_once_with()
-                mock_dt.astimezone.assert_called_once_with(datetime.UTC)
+            mock_datetime.now.assert_called_once_with()
+            mock_dt.astimezone.assert_called_once_with(datetime.UTC)
             self.mock_sql.execute.assert_awaited_once_with()
             if exception:
                 mock_rowcount.assert_not_awaited()
@@ -928,7 +921,7 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
                 transaction=self.mock_tx, id=id, session=session
             )
 
-    async def test_205a_update_self(self):
+    async def test_205a_update_self_no_id(self):
         with self.assertRaises(AssertionError) as exp:
             await self.mock_bo.update_self(transaction=self.mock_tx)
 
@@ -955,6 +948,59 @@ class Test_200_BOBase_access(unittest.IsolatedAsyncioTestCase):
         self.mock_bo = MockPersistentBO2(bo_id=55)
         self.mock_bo.last_updated = datetime.datetime(2031, 4, 25, 13, 45)
         await self._205_update_self()
+
+    async def test_206_update_self_no_changed_values(self):
+        """
+        Test that when update_self is called with NO changed values,
+        no UPDATE SQL is executed.
+        """
+        self.mock_bo = MockPersistentBO2(bo_id=55)
+        # Set the _db_data to match current _data so there are no changes
+        self.mock_bo._data._db_data = dict(self.mock_bo._data._data)
+
+        # Use a function-based side_effect to handle the conversion properly
+        async def mock_convert_from_db_func(
+            value, data_type, constraint_values, db_conn=None
+        ):
+            # Just return the value as-is since we set up _db_data to match _data
+            return value
+
+        mock_convert_from_db = AsyncMock(
+            name="convert_from_db",
+            side_effect=mock_convert_from_db_func,
+        )
+        session = Mock(name="session")
+
+        with (
+            patch("business_objects.persistent_business_object.SQL", new=self.MockSQL),
+            patch(
+                "business_objects.persistent_business_object.SQLTransaction",
+                new=self.MockSQLTx,
+            ),
+            patch(
+                "business_objects.persistent_business_object.PersistentBusinessObject.convert_from_db",
+                new=mock_convert_from_db,
+            ),
+        ):
+            self.mock_bo.attribute_descriptions = Mock(
+                name="attribute_descriptions", return_value=mock_attr_desc
+            )
+            self.mock_bo.fetch = AsyncMock(name="fetch")
+            await self.mock_bo.update_self(transaction=self.mock_tx, session=session)
+
+            self.MockSQLTx.assert_not_called()
+            self.MockSQL.assert_called_once_with(connection=self.mock_conn)
+            self.mock_sql.update.assert_called_once_with(MOCK_TAB2)
+            self.mock_sql.where.assert_called_once()
+
+            # No assignment calls should be made when there are no changes
+            self.mock_sql.assignment.assert_not_called()
+            # No execute should be called when there are no changes
+            self.mock_sql.execute.assert_not_awaited()
+            # fetch should still be called to refresh from DB
+            self.mock_bo.fetch.assert_awaited_once_with(
+                transaction=self.mock_tx, id=self.mock_bo.id, session=session
+            )
 
 
 class Test_300_BOBase_instancemethods(unittest.IsolatedAsyncioTestCase):
