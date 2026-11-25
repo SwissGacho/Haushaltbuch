@@ -683,10 +683,11 @@ class PersistentBusinessObject(BOBase):
             for k, v in changed_values.items():
                 update.assignment(k, Value(k, v))
 
-        k = "last_updated"
-        if changed_values and not (k in self._data and self._data[k]):
-            self._data[k] = datetime.now().astimezone(UTC)
-            update.assignment(k, Value(k, self._data[k]))
+        if changed_values:
+            self._data["last_updated"] = datetime.now().astimezone(UTC)
+            update.assignment(
+                "last_updated", Value("last_updated", self._data["last_updated"])
+            )
         try:
             if changed_values:
                 if LOG.isEnabledFor(VERBOSE_DEBUG):
@@ -739,7 +740,7 @@ class PersistentBusinessObject(BOBase):
 
         changes: dict[str, Any] = {}
         for k, old_value in old_values.items():
-            if k not in ("bo_name", "id"):
+            if k not in ("bo_name", "id", "last_updated"):
                 if (
                     (  # pylint: disable=protected-access
                         old_value._data != self._data[k]._data
