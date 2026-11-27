@@ -27,10 +27,12 @@ class FileConfiguration(TransientBusinessObject):
         if cls.singleton_instance is not None:
             return cls.singleton_instance
         instance = super().__new__(cls)
-        cls.singleton_instance = instance
         return instance
 
     def __init__(self, cmdline_config: Optional[ConfigDict] = None, **kwargs) -> None:
+        if self.__class__.singleton_instance is not None:
+            return
+        self.__class__.singleton_instance = self
         LOG.debug(f"FileConfiguration.__init__(cmdline_config, {kwargs=})")
         if LOG.isEnabledFor(VERBOSE_DEBUG):
             for line in pprint.pformat(

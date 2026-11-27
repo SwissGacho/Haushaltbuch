@@ -27,10 +27,12 @@ class CmdlineConfiguration(TransientBusinessObject):
         if cls.singleton_instance is not None:
             return cls.singleton_instance
         instance = super().__new__(cls)
-        cls.singleton_instance = instance
         return instance
 
     def __init__(self, **kwargs) -> None:
+        if self.__class__.singleton_instance is not None:
+            return
+        self.__class__.singleton_instance = self
         LOG.debug(f"CmdlineConfiguration.__init__({kwargs=})")
         kwargs["bo_id"] = CMDLINE_CONFIG_BOID
         super().__init__(**kwargs)
