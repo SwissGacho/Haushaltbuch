@@ -25,14 +25,13 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session_user = SimpleNamespace(name="alice")
+        session_user = SimpleNamespace(name="alice", display_name="Alice")
         session = Mock(token="ses-token", user=session_user)
         connection = Mock(
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
             authenticated_user=None,
-            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -57,7 +56,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
 
         mock_check_login.assert_awaited_once_with(None)
         mock_session_class.assert_called_once()
-        mock_ctx_logger.assert_called_once()
+        self.assertEqual(mock_ctx_logger.call_count, 2)
         self.assertIs(connection.session, session)
         connection.abort_connection.assert_not_awaited()
         connection.send_message.assert_awaited_once()
@@ -91,7 +90,6 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=True,
-            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -119,7 +117,6 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
         mock_session_class.get_session_from_token.assert_called_once_with(
             ses_token="ses-token",
             conn_token="",
-            client_token=None,
             connection=connection,
         )
         mock_check_login.assert_not_awaited()
@@ -135,12 +132,15 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             {"version": "9.9.9"},
         )
 
-    async def test_104_handle_message_success_existing_session_client_token(self):
+    async def test_104_handle_message_success_existing_session_previous_connection_token(
+        self,
+    ):
         msg = LoginMessage(
             dumps(
                 {
                     MessageAttribute.WS_ATTR_TYPE: MessageType.WS_TYPE_LOGIN,
                     MessageAttribute.WS_ATTR_TOKEN: "conn-token",
+                    MessageAttribute.WS_ATTR_PREV_TOKEN: "previous-conn-token",
                 }
             )
         )
@@ -150,7 +150,6 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             connection_context={"connection": "ws-1"},
             is_primary=False,
             authenticated_user=None,
-            client_token="client-token",
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -174,8 +173,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
 
         mock_session_class.get_session_from_token.assert_called_once_with(
             ses_token="",
-            conn_token="",
-            client_token="client-token",
+            conn_token="previous-conn-token",
             connection=connection,
         )
         mock_check_login.assert_not_awaited()
@@ -192,55 +190,7 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             "alice",
         )
 
-    async def test_104b_handle_message_rejects_client_token_for_other_user(self):
-        msg = LoginMessage(
-            dumps(
-                {
-                    MessageAttribute.WS_ATTR_TYPE: MessageType.WS_TYPE_LOGIN,
-                    MessageAttribute.WS_ATTR_TOKEN: "conn-token",
-                    MessageAttribute.WS_ATTR_USER: "bob",
-                }
-            )
-        )
-        cached_session = Mock(token="ses-token", user=SimpleNamespace(name="alice"))
-        new_session_user = SimpleNamespace(name="bob")
-        new_session = Mock(token="new-ses-token", user=new_session_user)
-        connection = Mock(
-            session=None,
-            connection_context={"connection": "ws-1"},
-            is_primary=False,
-            authenticated_user=None,
-            client_token="alice-client-token",
-        )
-        connection.send_message = AsyncMock()
-        connection.abort_connection = AsyncMock()
-
-        mock_session_class = Mock(return_value=new_session)
-        mock_session_class.get_session_from_token = Mock(return_value=cached_session)
-
-        with (
-            patch("messages.login.Session", mock_session_class),
-            patch(
-                "messages.login.check_login",
-                AsyncMock(return_value=new_session_user),
-            ) as mock_check_login,
-            patch(
-                "messages.login.App",
-                SimpleNamespace(status=Status.STATUS_MULTI_USER),
-            ),
-            patch(
-                "messages.login.get_context_logger",
-                Mock(return_value=Mock(debug=Mock())),
-            ),
-        ):
-            await msg.handle_message(connection)
-
-        # cached "alice" session must not be reused for a login requesting "bob"
-        mock_check_login.assert_awaited_once_with("bob")
-        mock_session_class.assert_called_once()
-        self.assertIs(connection.session, new_session)
-
-    async def test_105_handle_message_new_session_registers_client_token(self):
+    async def test_105_handle_message_new_session_registers_connection_token(self):
         msg = LoginMessage(
             dumps(
                 {
@@ -249,14 +199,13 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session_user = SimpleNamespace(name="alice")
+        session_user = SimpleNamespace(name="alice", display_name="Alice")
         session = Mock(token="ses-token", user=session_user)
         connection = Mock(
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
             authenticated_user=None,
-            client_token="client-token",
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -280,10 +229,9 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
 
         mock_session_class.assert_called_once()
         session_args, session_kwargs = mock_session_class.call_args
-        self.assertIs(session_args[0], session_user)
-        self.assertEqual(session_args[1].token, "conn-token")
-        self.assertIs(session_args[2], connection)
-        self.assertEqual(session_kwargs, {"client_token": "client-token"})
+        self.assertEqual(session_args, (session_user,))
+        self.assertEqual(session_kwargs["conn_token"].token, "conn-token")
+        self.assertIs(session_kwargs["connection"], connection)
         self.assertIs(connection.session, session)
         connection.send_message.assert_awaited_once()
 
@@ -296,13 +244,12 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
-        session_user = SimpleNamespace(name="alice")
+        session_user = SimpleNamespace(name="alice", display_name="Alice")
         session = Mock(token="ses-token", user=session_user)
         connection = Mock(
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
-            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -341,7 +288,6 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
-            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -375,7 +321,6 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
-            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()
@@ -404,7 +349,6 @@ class Test_100_LoginMessages(unittest.IsolatedAsyncioTestCase):
             session=None,
             connection_context={"connection": "ws-1"},
             is_primary=False,
-            client_token=None,
         )
         connection.send_message = AsyncMock()
         connection.abort_connection = AsyncMock()

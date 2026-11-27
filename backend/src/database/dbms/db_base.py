@@ -1,6 +1,7 @@
 """Base class for DB connections"""
 
 from typing import Any, NamedTuple, Self, Optional, Protocol, AsyncContextManager
+import itertools
 from decimal import Decimal, InvalidOperation, Context as DecimalContext, setcontext
 import re
 import json
@@ -227,12 +228,19 @@ class DBConnectionProtocol(AsyncContextManager["DBConnectionProtocol"], Protocol
 class Connection(ConnectionBaseClass):
     "Connection to the DB"
 
+    _id_counter = itertools.count()
+
     def __init__(self, db_obj: DB, **cfg) -> None:
         self._cfg = cfg
         self._connection: Optional[DBConnectionProtocol] = None
         self._db = db_obj
         self._db.db_connections.add(self)
+        self._conn_id = next(self._id_counter)
         # LOG.debug(f"++++++++++++++++++++++++++++++ {self._db._connections=}")
+
+    def connection_id(self) -> int:
+        "Return the connection ID"
+        return self._conn_id
 
     async def connect(self) -> Self:
         "Open a connection and return the Connection instance"
@@ -240,7 +248,7 @@ class Connection(ConnectionBaseClass):
 
     async def begin(self):
         "begin a transaction"
-        # LOG.debug("Connection.begin: begin transaction")
+        LOG.log(VERBOSE_DEBUG, "Connection.begin(): begin transaction")
         # No implementation required, assuming either a transaction is started at all times
         # or with the first execute call. auto_commit should be False.
         return
@@ -269,7 +277,7 @@ class Connection(ConnectionBaseClass):
 
     async def commit(self):
         "commit current transaction"
-        # LOG.debug("commit connection")
+        LOG.log(VERBOSE_DEBUG, "Connection.commit(): commit connection")
         if not self._connection:
             raise OperationalError("No DB connection to commit.")
         try:
@@ -279,7 +287,7 @@ class Connection(ConnectionBaseClass):
 
     async def rollback(self):
         "rollback current transaction"
-        # LOG.debug("rollback connection")
+        LOG.log(VERBOSE_DEBUG, "Connection.rollback(): rollback connection")
         if not self._connection:
             raise OperationalError("No DB connection to rollback.")
         try:

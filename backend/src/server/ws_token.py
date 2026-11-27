@@ -4,7 +4,14 @@ from typing import Optional
 from datetime import datetime, timedelta
 from secrets import token_hex as token
 
-from core.app_logging import getLogger, log_exit, Logger, redact, VERBOSE_DEBUG
+from core.app_logging import (
+    getLogger,
+    log_exit,
+    Logger,
+    redact,
+    VERBOSE_DEBUG,
+    redact_str,
+)
 
 LOG: Logger = getLogger(__name__)
 
@@ -17,51 +24,57 @@ class WSToken(BaseObject):
     for a limited time after creation or last usage.
     """
 
-    _all_tokens = set()
+    _all_tokens = {}
 
     def __init__(
-        self, tok: str | None = None, inactive_seconds_timeout: Optional[int] = 300
+        self,
+        tok: str | None = None,
+        inactive_seconds_timeout: Optional[int] = 300,
+        auto_extend: bool = True,
     ) -> None:
         self.token = tok or token(16)
         self._valid_for_seconds = inactive_seconds_timeout
+        self._auto_extend = auto_extend
         self._expires = (
             datetime.now() + timedelta(seconds=inactive_seconds_timeout)
             if inactive_seconds_timeout
             else None
         )
         if tok is None:
-            self._all_tokens.add(self)
+            self._all_tokens[self.token] = self
 
     @classmethod
     def get_token(cls, tok: str) -> Optional["WSToken"]:
-        for tkn in cls._all_tokens:
-            if tkn.token == tok:
-                return tkn
-        return None
+        return cls._all_tokens.get(tok)
 
     @classmethod
-    def check_token(cls, tok: str) -> bool:
+    def token_is_valid(cls, tok: str, auto_extend: bool = False) -> bool:
         "check if token is valid"
         now = datetime.now()
-        for tkn in cls._all_tokens:
-            # pylint: disable=protected-access
-            if tok == tkn.token:
-                if not tkn._valid_for_seconds:
-                    return True
-                if tkn._expires > now:
+        tkn = cls._all_tokens.get(tok)
+        if tkn:
+            if not tkn._valid_for_seconds:
+                return True
+            if tkn._expires > now:
+                if auto_extend and tkn._auto_extend:
                     tkn._expires = datetime.now() + timedelta(
                         seconds=tkn._valid_for_seconds
                     )
                     LOG.log(
                         VERBOSE_DEBUG,
-                        f"{redact({'Token': tkn.token})} is valid until {tkn._expires}",
+                        f"Token {redact_str(tkn.token)} extended until {tkn._expires}",
                     )
-                    return True
+                return True
+            cls._all_tokens.pop(tok, None)
         return False
+
+    @classmethod
+    def check_token(cls, tok: str) -> bool:
+        return cls.token_is_valid(tok, auto_extend=True)
 
     def invalidate(self):
         "invalidate the token"
-        self._all_tokens.discard(self)
+        self._all_tokens.pop(self.token, None)
         self._expires = datetime.now() - timedelta(seconds=1)
 
     def __eq__(self, __value: object) -> bool:

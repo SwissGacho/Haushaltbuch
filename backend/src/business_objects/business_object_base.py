@@ -22,6 +22,7 @@ from core.app_logging import (
 LOG = getLogger(__name__)
 
 from core.util import _classproperty
+from core.base_objects import ConnectionBaseClass
 from core.app import App
 import core.exceptions
 from core.exceptions import DataError
@@ -118,7 +119,7 @@ class BOBase(BOBaseBase):
         BOBase.subscriptions_report()
         # Construction does not change persisted state; store() emits change notifications.
 
-    def _assign_id(self, value: int | None) -> None:
+    def _assign_id(self, value: int | None, force_none: bool = False) -> None:
         """Internal use only. Assign 'id' directly, bypassing the public setter's
         restriction."""
         LOG.log(
@@ -127,19 +128,27 @@ class BOBase(BOBaseBase):
         )
         if self._data is None:
             raise RuntimeError("Business object has no data object set. ")
+        if value is None and "id" in self._data and force_none:
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"BOBase._assign_id: {self.__class__.__name__}"
+                f" forcefully setting id from {self._data['id']} to None",
+            )
+            self.remove_class_data_object(self._data["id"])
+            self._data["id"] = None
+            return
         if self.id is not None:
             raise RuntimeError(
                 f"ID is already assigned as {self.id} and cannot be changed to {value}."
             )
-        for attr in self.__class__.attribute_descriptions():
-            if attr.name == "id":
-                self._data[attr.name] = value
-                if self.id != value:
-                    raise RuntimeError(
-                        f"id assignment failed, should be {value}, but is {self.id}"
-                    )
-                self.__class__.add_class_data_object(self._data, self.id)
-                return
+        if "id" in [attr.name for attr in self.__class__.attribute_descriptions()]:
+            self._data["id"] = value
+            if self.id != value:
+                raise RuntimeError(
+                    f"id assignment failed, should be {value}, but is {self.id}"
+                )
+            self.__class__.add_class_data_object(self._data, self.id)
+            return
         raise RuntimeError(
             f"Business object {self.__class__.__name__} has no 'id' attribute to assign value {value}"
         )
@@ -255,8 +264,22 @@ class BOBase(BOBaseBase):
             # If the existing data object is the same as the one being added, do nothing
             return
 
+        LOG.log(
+            VERBOSE_DEBUG, f"Adding class data object for {cls.__name__} with id {id}"
+        )
         cls._data_objects[id] = data_object
         cls.subscriptions_report()
+
+    @classmethod
+    def remove_class_data_object(cls, id: int):
+        """Remove a data object for this class. Used when unloading from the database."""
+        if id in cls._data_objects:
+            LOG.log(
+                VERBOSE_DEBUG,
+                f"Removing class data object for {cls.__name__} with id {id}",
+            )
+            del cls._data_objects[id]
+            cls.subscriptions_report()
 
     @property
     def data_object_set(self) -> bool:
@@ -416,6 +439,7 @@ class BOBase(BOBaseBase):
         conditions: dict | None = None,
         attributes: list[str] | None = None,
         session: Optional[SessionBase] = None,
+        db_conn: Optional[ConnectionBaseClass] = None,
     ) -> list["BOBase"]:
         """Get the business objects matching the conditions"""
         raise NotImplementedError("get_matching_objects not implemented")
@@ -549,11 +573,11 @@ class BOBase(BOBaseBase):
         self.__class__.notify_change_subscribers(self, old_values)
         return old_values
 
-    async def insert_self(self, session: Optional[SessionBase] = None):
+    async def insert_self(self, transaction, session: Optional[SessionBase] = None):
         assert self.id is None, "id must be None for insert operation"
 
     async def update_self(
-        self, session: Optional[SessionBase] = None
+        self, transaction, session: Optional[SessionBase] = None
     ) -> dict[str, Any]:
         assert self.id is not None, "id must not be None for update operation"
         return {}

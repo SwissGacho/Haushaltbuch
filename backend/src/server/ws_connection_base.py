@@ -38,6 +38,11 @@ class WSConnectionBase:
         raise NotImplementedError()
 
     @property
+    def authenticated_user(self) -> str | None:
+        "username authenticated out-of-band (e.g. via auth proxy header)"
+        raise NotImplementedError()
+
+    @property
     def session(self):
         """get/set session associated with connection"""
         raise NotImplementedError()
@@ -55,6 +60,10 @@ class WSConnectionBase:
 
     async def send_message_to_component(self, comp, msg):
         """send a message to a specific component"""
+        raise NotImplementedError()
+
+    def set_connection_user(self, user) -> None:
+        "set the authorized user for this connection"
         raise NotImplementedError()
 
     async def start_connection(self):
